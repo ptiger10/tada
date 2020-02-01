@@ -14,6 +14,11 @@ func (s *Series) Subset(index []int) *Series {
 	return nil
 }
 
+// LabelsSubset stub
+func (s *Series) LabelsSubset([]int) *Series {
+	return nil
+}
+
 // Head stub
 func (s *Series) Head(rows int) *Series {
 	return nil
@@ -72,11 +77,6 @@ func (s *Series) Swap(i, j int) {
 	return
 }
 
-// LabelsSubset stub
-func (s *Series) LabelsSubset([]int) *Series {
-	return nil
-}
-
 // sort
 
 // Sort stub
@@ -126,7 +126,7 @@ func (s *Series) GroupBy(string) *GroupedSeries {
 // iterator
 
 // IterRows stub
-func (s *Series) IterRows() []map[string]Elements {
+func (s *Series) IterRows() []map[string]Element {
 	return nil
 }
 
@@ -134,5 +134,25 @@ func (s *Series) IterRows() []map[string]Elements {
 
 // Sum stub
 func (s *Series) Sum() float64 {
+	return 0
+}
+
+// Mean stub
+func (s *Series) Mean() float64 {
+	return 0
+}
+
+// Median stub
+func (s *Series) Median() float64 {
+	return 0
+}
+
+// Std stub
+func (s *Series) Std() float64 {
+	return 0
+}
+
+// Len stub
+func (s *Series) Len() int {
 	return 0
 }

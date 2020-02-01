@@ -2,8 +2,6 @@ package tada
 
 import "time"
 
-// Series
-
 // Casters
 
 // Float stub

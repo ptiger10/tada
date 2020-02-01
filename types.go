@@ -47,10 +47,10 @@ type Sorter struct {
 	ascending bool
 }
 
-// Elements stub
-type Elements struct {
-	vals   []interface{}
-	isNull []bool
+// Element stub
+type Element struct {
+	val    interface{}
+	isNull bool
 }
 
 // GroupedSeries stub
@@ -58,4 +58,25 @@ type GroupedSeries struct {
 	groups    map[string][]int
 	reference *Series
 	Err       error
+}
+
+// GroupedDataFrame stub
+type GroupedDataFrame struct {
+	groups    map[string][]int
+	reference *DataFrame
+	Err       error
+}
+
+// Dimension stub
+type Dimension int
+
+const (
+	// Columns stub
+	Columns Dimension = iota
+	// Rows stub
+	Rows
+)
+
+func (dim Dimension) String() string {
+	return [...]string{"columns", "rows"}[dim]
 }
