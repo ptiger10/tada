@@ -45,6 +45,7 @@ type DateTimeValueContainer struct {
 type Sorter struct {
 	colName   string
 	ascending bool
+	dtype     DType
 }
 
 // Element stub
@@ -66,6 +67,18 @@ type GroupedDataFrame struct {
 	reference *DataFrame
 	Err       error
 }
+
+// DType stub
+type DType int
+
+const (
+	// Float stub
+	Float DType = iota
+	// Str stub
+	Str
+	// DateTime stub
+	DateTime
+)
 
 // Dimension stub
 type Dimension int

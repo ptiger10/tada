@@ -3,7 +3,12 @@ package tada
 // constructors
 
 // NewSeries stub
-func NewSeries(slice interface{}) *Series {
+func NewSeries(slice interface{}, labels ...interface{}) *Series {
+	return nil
+}
+
+// Copy stub
+func (s *Series) Copy() *Series {
 	return nil
 }
 
@@ -69,6 +74,12 @@ func (s *Series) Drop([]int) *Series {
 // DropNull stub
 func (s *Series) DropNull() *Series {
 	return nil
+}
+
+// Name stub
+// in place
+func (s *Series) Name() {
+	return
 }
 
 // Swap stub

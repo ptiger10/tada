@@ -3,7 +3,27 @@ package tada
 // constructors
 
 // NewDataFrame stub
-func NewDataFrame(values [][]interface{}) *DataFrame {
+func NewDataFrame(values [][]interface{}, labels ...interface{}) *DataFrame {
+	return nil
+}
+
+// Copy stub
+func (df *DataFrame) Copy() *DataFrame {
+	return nil
+}
+
+// ReadCSV stub
+func (df *DataFrame) ReadCSV(csv [][]string) *DataFrame {
+	return nil
+}
+
+// ReadInterface stub
+func (df *DataFrame) ReadInterface([][]interface{}) *DataFrame {
+	return nil
+}
+
+// ReadStructs stub
+func (df *DataFrame) ReadStructs(interface{}) *DataFrame {
 	return nil
 }
 
@@ -111,7 +131,18 @@ func (df *DataFrame) ResetLabels(labelNames ...string) *DataFrame {
 	return nil
 }
 
+// Name stub
+// in place
+func (df *DataFrame) Name() {
+	return
+}
+
 // reshape
+
+// Transpose stub
+func (df *DataFrame) Transpose() *DataFrame {
+	return nil
+}
 
 // PromoteCol stub
 func (df *DataFrame) PromoteCol(name string) *DataFrame {
