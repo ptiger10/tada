@@ -34,13 +34,13 @@ func (df *DataFrame) Subset(index []int) *DataFrame {
 	return nil
 }
 
-// LabelsSubset stub
-func (df *DataFrame) LabelsSubset([]int) *DataFrame {
+// SubsetLabels stub
+func (df *DataFrame) SubsetLabels([]int) *DataFrame {
 	return nil
 }
 
-// ColSubset stub
-func (df *DataFrame) ColSubset([]int) *DataFrame {
+// SubsetCols stub
+func (df *DataFrame) SubsetCols([]int) *DataFrame {
 	return nil
 }
 

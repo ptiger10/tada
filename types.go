@@ -15,6 +15,11 @@ type Series struct {
 	err    error
 }
 
+// SeriesMutator stub
+type SeriesMutator struct {
+	series *Series
+}
+
 // DataFrame stub
 type DataFrame struct {
 	labels []*valueContainer
