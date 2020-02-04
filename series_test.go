@@ -811,3 +811,43 @@ func TestSeries_Sort(t *testing.T) {
 		})
 	}
 }
+
+func TestSeries_Filter(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		filters []Filter
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"float filter",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{[]Filter{{F64: func(val float64, isNull bool) bool {
+				if val > 2 && !isNull {
+					return true
+				}
+				return false
+			}}}}, []int{2}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Filter(tt.args.filters...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Filter() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

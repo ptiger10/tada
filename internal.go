@@ -45,6 +45,7 @@ func makeIntRange(min, max int) []int {
 	return ret
 }
 
+// containsLabel checks if a label identifier (spanning one or more levels) is contained within a slice of stringified value containers
 func containsLabel(label string, labels []*valueContainer) ([]int, error) {
 	toFind := strings.Split(label, "|")
 	for i := range toFind {
@@ -82,6 +83,26 @@ func labelWithName(name string, labels []*valueContainer) int {
 		}
 	}
 	return -1
+}
+
+func intersection(slices [][]int) []int {
+	set := make(map[int]int)
+	for _, slice := range slices {
+		for i := range slice {
+			if _, ok := set[slice[i]]; !ok {
+				set[slice[i]] = 1
+			} else {
+				set[slice[i]]++
+			}
+		}
+	}
+	var ret []int
+	for k, v := range set {
+		if v == len(slices) {
+			ret = append(ret, k)
+		}
+	}
+	return ret
 }
 
 func minIntSlice(slice []int) int {
@@ -144,6 +165,38 @@ func (vc *valueContainer) subsetRows(index []int) error {
 	vc.slice = retVals.Interface()
 	vc.isNull = retIsNull
 	return nil
+}
+
+func (vc *valueContainer) filter(filter Filter) ([]int, error) {
+	var index []int
+	if filter.F64 != nil {
+		slice := vc.float().slice
+		isNull := vc.float().isNull
+		for i := range slice {
+			if filter.F64(slice[i], isNull[i]) {
+				index = append(index, i)
+			}
+		}
+	} else if filter.String != nil {
+		slice := vc.str().slice
+		isNull := vc.str().isNull
+		for i := range slice {
+			if filter.String(slice[i], isNull[i]) {
+				index = append(index, i)
+			}
+		}
+	} else if filter.DateTime != nil {
+		slice := vc.dateTime().slice
+		isNull := vc.dateTime().isNull
+		for i := range slice {
+			if filter.DateTime(slice[i], isNull[i]) {
+				index = append(index, i)
+			}
+		}
+	} else {
+		return nil, fmt.Errorf("no filter function provided")
+	}
+	return index, nil
 }
 
 func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int {

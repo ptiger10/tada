@@ -59,6 +59,14 @@ type Element struct {
 	isNull bool
 }
 
+// Filter stub
+type Filter struct {
+	F64      func(val float64, isNull bool) bool
+	String   func(val string, isNull bool) bool
+	DateTime func(val time.Time, isNull bool) bool
+	ColName  string
+}
+
 // GroupedSeries stub
 type GroupedSeries struct {
 	groups    map[string][]int

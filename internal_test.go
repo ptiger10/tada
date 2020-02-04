@@ -123,3 +123,23 @@ func Test_makeDefaultLabels(t *testing.T) {
 		})
 	}
 }
+
+func Test_intersection(t *testing.T) {
+	type args struct {
+		slices [][]int
+	}
+	tests := []struct {
+		name string
+		args args
+		want []int
+	}{
+		{"1 match", args{[][]int{{0, 1}, {1, 2}}}, []int{1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := intersection(tt.args.slices); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("intersection() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -1,6 +1,7 @@
 package tada
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"reflect"
@@ -121,6 +122,10 @@ func (s *Series) Subset(index []int) *Series {
 // Subset returns only the rows specified at the index positions, in the order specified.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Subset(index []int) {
+	if reflect.DeepEqual(index, []int{-999}) {
+		s.series.resetWithError(errors.New(
+			"Subset(): invalid filter (every filter must have at least one filter function; if ColName is supplied, it must be valid)"))
+	}
 	err := s.series.values.subsetRows(index)
 	if err != nil {
 		s.series.resetWithError(fmt.Errorf("Subset(): %v", err))
@@ -373,6 +378,63 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 	return
 }
 
+// filters
+
+// Filter stub
+func (s *Series) Filter(filters ...Filter) []int {
+	if len(filters) == 0 {
+		return makeIntRange(0, s.Len())
+	}
+	var subIndexes [][]int
+	for _, filter := range filters {
+		var data *valueContainer
+		if filter.ColName == "" {
+			data = s.values
+		} else if lvl := labelWithName(filter.ColName, s.labels); lvl == -1 {
+			return []int{-999}
+		} else {
+			data = s.labels[lvl]
+		}
+		subIndex, err := data.filter(filter)
+		if err != nil {
+			return []int{-999}
+		}
+		subIndexes = append(subIndexes, subIndex)
+	}
+	index := intersection(subIndexes)
+	return index
+}
+
+// GT stub
+func (s *Series) GT(comparison float64) *Series {
+	return nil
+}
+
+// // LT stub
+// func (vc *floatValueContainer) LT(comparison float64) []int {
+// 	return nil
+// }
+
+// // GTE stub
+// func (vc *floatValueContainer) GTE(comparison float64) []int {
+// 	return nil
+// }
+
+// // LTE stub
+// func (vc *floatValueContainer) LTE(comparison float64) []int {
+// 	return nil
+// }
+
+// // EQ stub
+// func (vc *floatValueContainer) EQ(comparison float64) []int {
+// 	return nil
+// }
+
+// // NEQ stub
+// func (vc *floatValueContainer) NEQ(comparison float64) []int {
+// 	return nil
+// }
+
 // combine
 
 // Lookup stub
@@ -479,17 +541,17 @@ func (s *Series) Std() float64 {
 	return math.Pow(variance/counter, 0.5)
 }
 
-// float64 coerces the Series values into []float64.
-func (s *Series) float64() []float64 {
+// AsFloat64 coerces the Series values into []float64.
+func (s *Series) AsFloat64() []float64 {
 	return s.values.float().slice
 }
 
-// Str coerces the Series values into []string.
-func (s *Series) Str() []string {
+// AsString coerces the Series values into []string.
+func (s *Series) AsString() []string {
 	return s.values.str().slice
 }
 
-// DateTime coerces the Series values into []time.Time.
-func (s *Series) DateTime() []time.Time {
+// AsTime coerces the Series values into []time.Time.
+func (s *Series) AsTime() []time.Time {
 	return s.values.dateTime().slice
 }
