@@ -2,7 +2,10 @@ package tada
 
 import (
 	"fmt"
+	"math"
 	"reflect"
+	"sort"
+	"time"
 )
 
 // -- CONSTRUCTORS
@@ -342,7 +345,7 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 	// original index
 	index := makeIntRange(0, s.series.Len())
 	var vals *valueContainer
-	// handle default (values as Float in ascending order)
+	// handle default (values as float in ascending order)
 	if len(by) == 0 {
 		vals = s.series.values.copy()
 		index = vals.sort(Float, false, index)
@@ -372,13 +375,13 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 
 // combine
 
-// Merge stub
-func (s *Series) Merge(other *Series) *Series {
+// Lookup stub
+func (s *Series) Lookup(other *Series, how string, leftOn string, rightOn string) *Series {
 	return nil
 }
 
-// Lookup stub
-func (s *Series) Lookup(other *Series, how string, leftOn string, rightOn string) *Series {
+// Merge stub
+func (s *Series) Merge(other *Series) *Series {
 	return nil
 }
 
@@ -420,20 +423,73 @@ func (s *Series) IterRows() []map[string]Element {
 
 // Sum stub
 func (s *Series) Sum() float64 {
-	return 0
+	data := s.values.float()
+	var sum float64
+	for i, val := range data.slice {
+		if !data.isNull[i] {
+			sum += val
+		}
+	}
+	return sum
 }
 
 // Mean stub
 func (s *Series) Mean() float64 {
-	return 0
+	data := s.values.float()
+	var sum float64
+	var counter float64
+	for i, val := range data.slice {
+		if !data.isNull[i] {
+			sum += val
+			counter++
+		}
+	}
+	return sum / counter
 }
 
 // Median stub
 func (s *Series) Median() float64 {
-	return 0
+	data := s.Valid().values.float().slice
+	sort.Float64s(data)
+	if len(data) == 0 {
+		return math.NaN()
+	}
+	// rounds down if there are even number of elements
+	mNumber := len(data) / 2
+
+	// odd number of elements
+	if len(data)%2 != 0 {
+		return data[mNumber]
+	}
+	// even number of elements
+	return (data[mNumber-1] + data[mNumber]) / 2
 }
 
 // Std stub
 func (s *Series) Std() float64 {
-	return 0
+	mean := s.Mean()
+	data := s.values.float()
+	var variance, counter float64
+	for i, val := range data.slice {
+		if !data.isNull[i] {
+			variance += math.Pow((val - mean), 2)
+			counter++
+		}
+	}
+	return math.Pow(variance/counter, 0.5)
+}
+
+// float64 coerces the Series values into []float64.
+func (s *Series) float64() []float64 {
+	return s.values.float().slice
+}
+
+// Str coerces the Series values into []string.
+func (s *Series) Str() []string {
+	return s.values.str().slice
+}
+
+// DateTime coerces the Series values into []time.Time.
+func (s *Series) DateTime() []time.Time {
+	return s.values.dateTime().slice
 }

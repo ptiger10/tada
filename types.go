@@ -28,24 +28,21 @@ type DataFrame struct {
 	err    error
 }
 
-// FloatValueContainer stub
-type FloatValueContainer struct {
-	Slice  []float64
-	IsNull []bool
+type floatValueContainer struct {
+	slice  []float64
+	isNull []bool
 	index  []int
 }
 
-// StringValueContainer stub
-type StringValueContainer struct {
-	Slice  []string
-	IsNull []bool
+type stringValueContainer struct {
+	slice  []string
+	isNull []bool
 	index  []int
 }
 
-// DateTimeValueContainer stub
-type DateTimeValueContainer struct {
-	Slice  []time.Time
-	IsNull []bool
+type dateTimeValueContainer struct {
+	slice  []time.Time
+	isNull []bool
 	index  []int
 }
 

@@ -11,62 +11,62 @@ import (
 )
 
 // Less stub
-func (vc FloatValueContainer) Less(i, j int) bool {
-	if vc.Slice[i] < vc.Slice[j] {
+func (vc floatValueContainer) Less(i, j int) bool {
+	if vc.slice[i] < vc.slice[j] {
 		return true
 	}
 	return false
 }
 
 // Len stub
-func (vc FloatValueContainer) Len() int {
-	return len(vc.Slice)
+func (vc floatValueContainer) Len() int {
+	return len(vc.slice)
 }
 
 // Swap stub
-func (vc FloatValueContainer) Swap(i, j int) {
-	vc.Slice[i], vc.Slice[j] = vc.Slice[j], vc.Slice[i]
-	vc.IsNull[i], vc.IsNull[j] = vc.IsNull[j], vc.IsNull[i]
+func (vc floatValueContainer) Swap(i, j int) {
+	vc.slice[i], vc.slice[j] = vc.slice[j], vc.slice[i]
+	vc.isNull[i], vc.isNull[j] = vc.isNull[j], vc.isNull[i]
 	vc.index[i], vc.index[j] = vc.index[j], vc.index[i]
 }
 
 // Less stub
-func (vc StringValueContainer) Less(i, j int) bool {
-	if vc.Slice[i] < vc.Slice[j] {
+func (vc stringValueContainer) Less(i, j int) bool {
+	if vc.slice[i] < vc.slice[j] {
 		return true
 	}
 	return false
 }
 
 // Len stub
-func (vc StringValueContainer) Len() int {
-	return len(vc.Slice)
+func (vc stringValueContainer) Len() int {
+	return len(vc.slice)
 }
 
 // Swap stub
-func (vc StringValueContainer) Swap(i, j int) {
-	vc.Slice[i], vc.Slice[j] = vc.Slice[j], vc.Slice[i]
-	vc.IsNull[i], vc.IsNull[j] = vc.IsNull[j], vc.IsNull[i]
+func (vc stringValueContainer) Swap(i, j int) {
+	vc.slice[i], vc.slice[j] = vc.slice[j], vc.slice[i]
+	vc.isNull[i], vc.isNull[j] = vc.isNull[j], vc.isNull[i]
 	vc.index[i], vc.index[j] = vc.index[j], vc.index[i]
 }
 
 // Less stub
-func (vc DateTimeValueContainer) Less(i, j int) bool {
-	if vc.Slice[i].Before(vc.Slice[j]) {
+func (vc dateTimeValueContainer) Less(i, j int) bool {
+	if vc.slice[i].Before(vc.slice[j]) {
 		return true
 	}
 	return false
 }
 
 // Len stub
-func (vc DateTimeValueContainer) Len() int {
-	return len(vc.Slice)
+func (vc dateTimeValueContainer) Len() int {
+	return len(vc.slice)
 }
 
 // Swap stub
-func (vc DateTimeValueContainer) Swap(i, j int) {
-	vc.Slice[i], vc.Slice[j] = vc.Slice[j], vc.Slice[i]
-	vc.IsNull[i], vc.IsNull[j] = vc.IsNull[j], vc.IsNull[i]
+func (vc dateTimeValueContainer) Swap(i, j int) {
+	vc.slice[i], vc.slice[j] = vc.slice[j], vc.slice[i]
+	vc.isNull[i], vc.isNull[j] = vc.isNull[j], vc.isNull[i]
 	vc.index[i], vc.index[j] = vc.index[j], vc.index[i]
 }
 
@@ -87,7 +87,7 @@ func convertBoolToFloat(val bool) float64 {
 	return 0
 }
 
-func (vc *valueContainer) Float() FloatValueContainer {
+func (vc *valueContainer) float() floatValueContainer {
 	newVals := make([]float64, reflect.ValueOf(vc.slice).Len())
 	isNull := vc.isNull
 	switch vc.slice.(type) {
@@ -142,24 +142,24 @@ func (vc *valueContainer) Float() FloatValueContainer {
 		}
 	}
 
-	ret := FloatValueContainer{
-		IsNull: isNull,
-		Slice:  newVals,
+	ret := floatValueContainer{
+		isNull: isNull,
+		slice:  newVals,
 		index:  makeIntRange(0, len(newVals)),
 	}
 	return ret
 }
 
-func (vc *valueContainer) Str() StringValueContainer {
+func (vc *valueContainer) str() stringValueContainer {
 	newVals := make([]string, reflect.ValueOf(vc.slice).Len())
 	isNull := vc.isNull
 	d := reflect.ValueOf(vc.slice)
 	for i := 0; i < d.Len(); i++ {
 		newVals[i] = d.Index(i).String()
 	}
-	ret := StringValueContainer{
-		IsNull: isNull,
-		Slice:  newVals,
+	ret := stringValueContainer{
+		isNull: isNull,
+		slice:  newVals,
 		index:  makeIntRange(0, len(newVals)),
 	}
 	return ret
@@ -173,7 +173,7 @@ func convertStringToDateTime(val string, originalBool bool) (time.Time, bool) {
 	return time.Time{}, true
 }
 
-func (vc *valueContainer) DateTime() DateTimeValueContainer {
+func (vc *valueContainer) dateTime() dateTimeValueContainer {
 	newVals := make([]time.Time, reflect.ValueOf(vc.slice).Len())
 	isNull := vc.isNull
 	switch vc.slice.(type) {
@@ -203,9 +203,9 @@ func (vc *valueContainer) DateTime() DateTimeValueContainer {
 			isNull[i] = true
 		}
 	}
-	ret := DateTimeValueContainer{
-		IsNull: isNull,
-		Slice:  newVals,
+	ret := dateTimeValueContainer{
+		isNull: isNull,
+		slice:  newVals,
 		index:  makeIntRange(0, len(newVals)),
 	}
 	return ret

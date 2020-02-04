@@ -150,7 +150,7 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 	var srt sort.Interface
 	switch dtype {
 	case Float:
-		d := vc.Float()
+		d := vc.float()
 		d.index = index
 		srt = d
 		if descending {
@@ -159,7 +159,7 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 		sort.Stable(srt)
 		return d.index
 	case String:
-		d := vc.Str()
+		d := vc.str()
 		d.index = index
 		srt = d
 		if descending {
@@ -168,7 +168,7 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 		sort.Stable(srt)
 		return d.index
 	case DateTime:
-		d := vc.DateTime()
+		d := vc.dateTime()
 		d.index = index
 		srt = d
 		if descending {
