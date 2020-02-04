@@ -156,16 +156,16 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 		if descending {
 			srt = sort.Reverse(srt)
 		}
-		sort.Sort(srt)
+		sort.Stable(srt)
 		return d.index
-	case Str:
+	case String:
 		d := vc.Str()
 		d.index = index
 		srt = d
 		if descending {
 			srt = sort.Reverse(srt)
 		}
-		sort.Sort(srt)
+		sort.Stable(srt)
 		return d.index
 	case DateTime:
 		d := vc.DateTime()
@@ -174,7 +174,7 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 		if descending {
 			srt = sort.Reverse(srt)
 		}
-		sort.Sort(srt)
+		sort.Stable(srt)
 		return d.index
 	}
 

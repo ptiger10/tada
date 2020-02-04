@@ -82,8 +82,8 @@ type DType int
 const (
 	// Float stub
 	Float DType = iota
-	// Str stub
-	Str
+	// String stub
+	String
 	// DateTime stub
 	DateTime
 )

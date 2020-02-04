@@ -1,6 +1,7 @@
 package tada
 
 import (
+	"fmt"
 	"math"
 	"reflect"
 	"strconv"
@@ -136,8 +137,8 @@ func (vc *valueContainer) Float() FloatValueContainer {
 	case []uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64, []float32:
 		d := reflect.ValueOf(vc.slice)
 		for i := 0; i < d.Len(); i++ {
-			v := d.Index(i).String()
-			newVals[i], isNull[i] = convertStringToFloat(v, isNull[i])
+			v := d.Index(i).Interface()
+			newVals[i], isNull[i] = convertStringToFloat(fmt.Sprint(v), isNull[i])
 		}
 	}
 

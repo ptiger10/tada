@@ -766,14 +766,37 @@ func TestSeries_Sort(t *testing.T) {
 		args   args
 		want   *Series
 	}{
-		{"sort string",
+		{"sort values as float by default",
 			fields{
-				values: &valueContainer{slice: []string{"foo", "bar"}, isNull: []bool{false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{[]Sorter{Sorter{DType: Str}}},
+				values: &valueContainer{slice: []float64{3, 1, 2}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{nil},
 			&Series{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{1, 2, 0}, isNull: []bool{false, false, false}}}}},
+		{"sort string descending",
+			fields{
 				values: &valueContainer{slice: []string{"bar", "foo"}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{[]Sorter{Sorter{DType: String, Descending: true}}},
+			&Series{
+				values: &valueContainer{slice: []string{"foo", "bar"}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{1, 0}, isNull: []bool{false, false}}}}},
+		{"sort labels as string then as float",
+			fields{
+				values: &valueContainer{slice: []string{"baz", "foo", "baz"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{name: "*0", slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{[]Sorter{Sorter{DType: String}, Sorter{ColName: "*0", Descending: true}}},
+			&Series{
+				values: &valueContainer{slice: []string{"baz", "baz", "foo"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{name: "*0", slice: []int{2, 0, 1}, isNull: []bool{false, false, false}}}}},
+		{"fail: bad label level name",
+			fields{
+				values: &valueContainer{slice: []string{"baz", "foo", "baz"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{name: "*0", slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{[]Sorter{{ColName: "foo", Descending: true}}},
+			&Series{
+				err: errors.New("Sort(): cannot use label level: name (foo) does not match any existing level")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -783,7 +806,7 @@ func TestSeries_Sort(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := s.Sort(tt.args.by...); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.Sort() = %v, want %v", got, tt.want)
+				t.Errorf("Series.Sort() = %v %v, want %v %v", got.values, got.labels[0], tt.want.values, tt.want.labels[0])
 			}
 		})
 	}

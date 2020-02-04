@@ -332,25 +332,37 @@ func (s *Series) Name(name string) *Series {
 // Returns a new Series.
 func (s *Series) Sort(by ...Sorter) *Series {
 	s.Copy()
-	s.InPlace().Sort()
+	s.InPlace().Sort(by...)
 	return s
 }
 
 // Sort stub
 func (s *SeriesMutator) Sort(by ...Sorter) {
+	// must copy the values to sort to avoid prematurely overwriting underlying data
 	// original index
 	index := makeIntRange(0, s.series.Len())
 	var vals *valueContainer
+	// handle default (values as Float in ascending order)
+	if len(by) == 0 {
+		vals = s.series.values.copy()
+		index = vals.sort(Float, false, index)
+		s.Subset(index)
+		return
+	}
 	for i := len(by) - 1; i >= 0; i-- {
+		// empty ColName -> use Series values
 		if by[i].ColName == "" {
-			vals = s.series.values
+			vals = s.series.values.copy()
+			vals.subsetRows(index)
 		} else {
 			lvl := labelWithName(by[i].ColName, s.series.labels)
 			if lvl == -1 {
-				s.series.resetWithError(fmt.Errorf("Sort(): cannot use label level: name (%v) does not match any existing level", by[i].ColName))
+				s.series.resetWithError(fmt.Errorf(
+					"Sort(): cannot use label level: name (%v) does not match any existing level", by[i].ColName))
 				return
 			}
-			vals = s.series.labels[lvl]
+			vals = s.series.labels[lvl].copy()
+			vals.subsetRows(index)
 		}
 		index = vals.sort(by[i].DType, by[i].Descending, index)
 	}
