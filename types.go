@@ -30,27 +30,30 @@ type DataFrame struct {
 
 // FloatValueContainer stub
 type FloatValueContainer struct {
-	slice  []float64
-	isNull []bool
+	Slice  []float64
+	IsNull []bool
+	index  []int
 }
 
 // StringValueContainer stub
 type StringValueContainer struct {
-	slice  []string
-	isNull []bool
+	Slice  []string
+	IsNull []bool
+	index  []int
 }
 
 // DateTimeValueContainer stub
 type DateTimeValueContainer struct {
-	slice  []time.Time
-	isNull []bool
+	Slice  []time.Time
+	IsNull []bool
+	index  []int
 }
 
 // Sorter stub
 type Sorter struct {
-	colName   string
-	ascending bool
-	dtype     DType
+	ColName    string
+	Descending bool
+	DType      DType
 }
 
 // Element stub

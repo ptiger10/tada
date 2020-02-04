@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 )
@@ -103,6 +104,26 @@ func maxIntSlice(slice []int) int {
 	return max
 }
 
+func (vc *valueContainer) valid() []int {
+	index := make([]int, 0)
+	for i, isNull := range vc.isNull {
+		if !isNull {
+			index = append(index, i)
+		}
+	}
+	return index
+}
+
+func (vc *valueContainer) null() []int {
+	index := make([]int, 0)
+	for i, isNull := range vc.isNull {
+		if isNull {
+			index = append(index, i)
+		}
+	}
+	return index
+}
+
 // subsetRows returns the rows specified by index. If any position is out of range, returns an error
 func (vc *valueContainer) subsetRows(index []int) error {
 	v := reflect.ValueOf(vc.slice)
@@ -119,6 +140,56 @@ func (vc *valueContainer) subsetRows(index []int) error {
 		ptr := retVals.Index(indexPosition)
 		ptr.Set(v.Index(indexValue))
 	}
+
+	vc.slice = retVals.Interface()
+	vc.isNull = retIsNull
+	return nil
+}
+
+func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int {
+	var srt sort.Interface
+	switch dtype {
+	case Float:
+		d := vc.Float()
+		d.index = index
+		srt = d
+		if descending {
+			srt = sort.Reverse(srt)
+		}
+		sort.Sort(srt)
+		return d.index
+	case Str:
+		d := vc.Str()
+		d.index = index
+		srt = d
+		if descending {
+			srt = sort.Reverse(srt)
+		}
+		sort.Sort(srt)
+		return d.index
+	case DateTime:
+		d := vc.DateTime()
+		d.index = index
+		srt = d
+		if descending {
+			srt = sort.Reverse(srt)
+		}
+		sort.Sort(srt)
+		return d.index
+	}
+
+	return nil
+}
+
+func (vc *valueContainer) dropRow(index int) error {
+	v := reflect.ValueOf(vc.slice)
+	l := v.Len()
+	if index >= l {
+		return fmt.Errorf("index out of range (%d > %d)", index, l-1)
+	}
+	retIsNull := append(vc.isNull[:index], vc.isNull[index+1:]...)
+	retVals := reflect.MakeSlice(v.Type(), 0, 0)
+	retVals = reflect.AppendSlice(v.Slice(0, index), v.Slice(index+1, l))
 
 	vc.slice = retVals.Interface()
 	vc.isNull = retIsNull
@@ -147,13 +218,6 @@ func setNullsFromInterface(input interface{}) []bool {
 		return nil
 	}
 	switch input.(type) {
-	// no null value possible
-	case []bool, []uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64, []float32:
-		l := reflect.ValueOf(input).Len()
-		ret = make([]bool, l)
-		for i := range ret {
-			ret[i] = false
-		}
 	case []float64:
 		vals := input.([]float64)
 		ret = make([]bool, len(vals))
@@ -185,12 +249,7 @@ func setNullsFromInterface(input interface{}) []bool {
 				ret[i] = false
 			}
 		}
-	case []Element:
-		vals := input.([]Element)
-		ret = make([]bool, len(vals))
-		for i := range ret {
-			ret[i] = vals[i].isNull
-		}
+
 	case []interface{}:
 		vals := input.([]interface{})
 		ret = make([]bool, len(vals))
@@ -200,6 +259,19 @@ func setNullsFromInterface(input interface{}) []bool {
 			} else {
 				ret[i] = false
 			}
+		}
+		// no null value possible
+	case []bool, []uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64, []float32:
+		l := reflect.ValueOf(input).Len()
+		ret = make([]bool, l)
+		for i := range ret {
+			ret[i] = false
+		}
+	case []Element:
+		vals := input.([]Element)
+		ret = make([]bool, len(vals))
+		for i := range ret {
+			ret[i] = vals[i].isNull
 		}
 	default:
 		return nil

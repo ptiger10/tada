@@ -176,24 +176,14 @@ func (s *Series) Tail(rows int) *Series {
 // Valid returns all the rows with non-null values.
 // Returns a new Series.
 func (s *Series) Valid() *Series {
-	index := make([]int, 0)
-	for i, isNull := range s.values.isNull {
-		if !isNull {
-			index = append(index, i)
-		}
-	}
+	index := s.values.valid()
 	return s.Subset(index)
 }
 
 // Null returns all the rows with null values.
 // Returns a new Series.
 func (s *Series) Null() *Series {
-	index := make([]int, 0)
-	for i, isNull := range s.values.isNull {
-		if isNull {
-			index = append(index, i)
-		}
-	}
+	index := s.values.null()
 	return s.Subset(index)
 }
 
@@ -293,38 +283,79 @@ func (s *Series) WithRow(label string, values interface{}) *Series {
 	return nil
 }
 
-// Drop stub
-func (s *Series) Drop([]int) *Series {
-	return nil
+// Drop removes the row at the specified index.
+// Returns a new Series.
+func (s *Series) Drop(index int) *Series {
+	s.Copy()
+	s.InPlace().Drop(index)
+	return s
 }
 
-// Drop stub
-func (s *SeriesMutator) Drop(index []int) {
-
+// Drop removes the row at the specified index.
+// Modifies the underlying Series in place.
+func (s *SeriesMutator) Drop(index int) {
+	err := s.series.values.dropRow(index)
+	if err != nil {
+		s.series.resetWithError(fmt.Errorf("Drop(): %v", err))
+		return
+	}
+	for j := 0; j < len(s.series.labels); j++ {
+		s.series.labels[j].dropRow(index)
+	}
 }
 
-// DropNull stub
+// DropNull removes the null values in the Series.
+// Returns a new Series.
 func (s *Series) DropNull() *Series {
-	return nil
+	s.Copy()
+	s.InPlace().DropNull()
+	return s
 }
 
-// Name stub
-// in place
-func (s *Series) Name() {
+// DropNull removes the null values in the Series.
+// Modifies the underlying Series in place.
+func (s *SeriesMutator) DropNull() {
+	index := s.series.values.valid()
+	s.Subset(index)
 	return
 }
 
-// Swap stub
-// in place
-func (s *Series) Swap(i, j int) {
-	return
+// Name modifies the name of a Series in place and returns the original Series.
+func (s *Series) Name(name string) *Series {
+	s.values.name = name
+	return s
 }
 
 // sort
 
+// Sort removes the null values in the Series.
+// Returns a new Series.
+func (s *Series) Sort(by ...Sorter) *Series {
+	s.Copy()
+	s.InPlace().Sort()
+	return s
+}
+
 // Sort stub
-func (s *Series) Sort(...Sorter) *Series {
-	return nil
+func (s *SeriesMutator) Sort(by ...Sorter) {
+	// original index
+	index := makeIntRange(0, s.series.Len())
+	var vals *valueContainer
+	for i := len(by) - 1; i >= 0; i-- {
+		if by[i].ColName == "" {
+			vals = s.series.values
+		} else {
+			lvl := labelWithName(by[i].ColName, s.series.labels)
+			if lvl == -1 {
+				s.series.resetWithError(fmt.Errorf("Sort(): cannot use label level: name (%v) does not match any existing level", by[i].ColName))
+				return
+			}
+			vals = s.series.labels[lvl]
+		}
+		index = vals.sort(by[i].DType, by[i].Descending, index)
+	}
+	s.Subset(index)
+	return
 }
 
 // combine

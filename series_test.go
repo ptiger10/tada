@@ -634,3 +634,157 @@ func TestSeries_Elements(t *testing.T) {
 		})
 	}
 }
+
+func TestSeries_Name(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		name string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"normal",
+			fields{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
+				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}}}},
+			args{"bar"},
+			&Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "bar"},
+				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Name(tt.args.name); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Name() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Drop(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		index int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"pass",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, true}},
+				labels: []*valueContainer{{slice: []string{"foo", "bar", ""}, isNull: []bool{false, false, true}}}},
+			args{1},
+			&Series{
+				values: &valueContainer{slice: []float64{1, 3}, isNull: []bool{false, true}},
+				labels: []*valueContainer{{slice: []string{"foo", ""}, isNull: []bool{false, true}}}}},
+		{"fail: out of index",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, true}},
+				labels: []*valueContainer{{slice: []string{"foo", "bar", ""}, isNull: []bool{false, false, true}}}},
+			args{3},
+			&Series{
+				err: errors.New("Drop(): index out of range (3 > 2)")}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Drop(tt.args.index); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Drop() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_DropNull(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass",
+			fields{
+				values: &valueContainer{slice: []string{"", "", "foo"}, isNull: []bool{true, true, false}},
+				labels: []*valueContainer{{slice: []string{"bar", "baz", "qux"}, isNull: []bool{false, false, false}}}},
+			&Series{
+				values: &valueContainer{slice: []string{"foo"}, isNull: []bool{false}},
+				labels: []*valueContainer{{slice: []string{"qux"}, isNull: []bool{false}}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.DropNull(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.DropNull() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Sort(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		by []Sorter
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"sort string",
+			fields{
+				values: &valueContainer{slice: []string{"foo", "bar"}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{[]Sorter{Sorter{DType: Str}}},
+			&Series{
+				values: &valueContainer{slice: []string{"bar", "foo"}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{1, 0}, isNull: []bool{false, false}}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Sort(tt.args.by...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Sort() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
