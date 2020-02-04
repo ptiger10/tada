@@ -42,6 +42,15 @@ func NewSeries(slice interface{}, labels ...interface{}) *Series {
 				return seriesWithError(fmt.Errorf(
 					"NewSeries(): unable to calculate null values at level %d ([]%v not supported)", i, reflect.TypeOf(input).Elem()))
 			}
+			// handle special case of []Element: convert to []interface{}
+			elements, ok := input.([]Element)
+			if ok {
+				ret := make([]interface{}, len(isNull))
+				for i := range ret {
+					ret[i] = elements[i].val
+				}
+				input = ret
+			}
 			retLabels[i] = &valueContainer{slice: input, isNull: isNull, name: fmt.Sprintf("*%d", i)}
 		}
 	}
@@ -218,7 +227,7 @@ func (s *Series) IndexRange(firstLabel, lastLabel string) ([]int, error) {
 	return index, nil
 }
 
-// setters
+// -- SETTERS
 
 // InPlace returns a SeriesMutator, which contains most of the same methods as Series but never returns a new Series.
 // If you want to save memory and improve performance and do not need to preserve the original Series, consider using InPlace().
@@ -255,13 +264,14 @@ func (s *Series) WithLabels(name string, input interface{}) *Series {
 func (s *SeriesMutator) WithLabels(name string, input interface{}) {
 	switch reflect.TypeOf(input).Kind() {
 
+	// `input` is string: rename label level
 	case reflect.String:
-		index := labelWithName(name, s.series.labels)
-		if index == -1 {
-			s.series.resetWithError(fmt.Errorf("WithLabels(): cannot rename label level: name (%v) does not match any existing level", name))
+		lvl, err := labelWithName(name, s.series.labels)
+		if err != nil {
+			s.series.resetWithError(fmt.Errorf("WithLabels(): cannot rename label level: %v", err))
 			return
 		}
-		s.series.labels[index].name = input.(string)
+		s.series.labels[lvl].name = input.(string)
 		return
 	case reflect.Slice:
 		isNull := setNullsFromInterface(input)
@@ -274,13 +284,16 @@ func (s *SeriesMutator) WithLabels(name string, input interface{}) {
 				"WithLabels(): cannot replace labels in level %s: length of input does not match length of Series (%d != %d)", name, l, s.series.Len()))
 			return
 		}
-		index := labelWithName(name, s.series.labels)
-		if index >= 0 {
-			s.series.labels[index].slice = input
-			s.series.labels[index].isNull = isNull
-		} else if index == -1 {
+		// `input` is supported slice
+		lvl, err := labelWithName(name, s.series.labels)
+		if err != nil {
+			// `name` does not already exist: append new label level
 			s.series.labels = append(s.series.labels, &valueContainer{slice: input, name: name, isNull: isNull})
+			return
 		}
+		// `name` already exists: overwrite existing label level
+		s.series.labels[lvl].slice = input
+		s.series.labels[lvl].isNull = isNull
 	default:
 		s.series.resetWithError(fmt.Errorf("WithLabels(): unsupported input kind: must be either slice or string"))
 	}
@@ -334,7 +347,7 @@ func (s *Series) Name(name string) *Series {
 	return s
 }
 
-// sort
+// -- SORT
 
 // Sort removes the null values in the Series.
 // Returns a new Series.
@@ -346,41 +359,40 @@ func (s *Series) Sort(by ...Sorter) *Series {
 
 // Sort stub
 func (s *SeriesMutator) Sort(by ...Sorter) {
-	// must copy the values to sort to avoid prematurely overwriting underlying data
 	// original index
 	index := makeIntRange(0, s.series.Len())
 	var vals *valueContainer
-	// handle default (values as float in ascending order)
+	// default for handling no Sorters: values as float in ascending order
 	if len(by) == 0 {
+		// must copy the values to sort to avoid prematurely overwriting underlying data
 		vals = s.series.values.copy()
 		index = vals.sort(Float, false, index)
 		s.Subset(index)
 		return
 	}
 	for i := len(by) - 1; i >= 0; i-- {
-		// empty ColName -> use Series values
+		// Sorter with empty ColName -> use Series values
 		if by[i].ColName == "" {
 			vals = s.series.values.copy()
-			vals.subsetRows(index)
 		} else {
-			lvl := labelWithName(by[i].ColName, s.series.labels)
-			if lvl == -1 {
+			lvl, err := labelWithName(by[i].ColName, s.series.labels)
+			if err != nil {
 				s.series.resetWithError(fmt.Errorf(
-					"Sort(): cannot use label level: name (%v) does not match any existing level", by[i].ColName))
+					"Sort(): cannot use label level: %v", err))
 				return
 			}
 			vals = s.series.labels[lvl].copy()
-			vals.subsetRows(index)
 		}
+		// overwrite index with new index
 		index = vals.sort(by[i].DType, by[i].Descending, index)
 	}
 	s.Subset(index)
 	return
 }
 
-// filters
+// -- FILTERS
 
-// Filter stub
+// Filter applies one or more filters to a Series and returns the intersection of the row positions that satisfy all filters.
 func (s *Series) Filter(filters ...Filter) []int {
 	if len(filters) == 0 {
 		return makeIntRange(0, s.Len())
@@ -390,7 +402,7 @@ func (s *Series) Filter(filters ...Filter) []int {
 		var data *valueContainer
 		if filter.ColName == "" {
 			data = s.values
-		} else if lvl := labelWithName(filter.ColName, s.labels); lvl == -1 {
+		} else if lvl, err := labelWithName(filter.ColName, s.labels); err != nil {
 			return []int{-999}
 		} else {
 			data = s.labels[lvl]
@@ -405,37 +417,62 @@ func (s *Series) Filter(filters ...Filter) []int {
 	return index
 }
 
-// GT stub
-func (s *Series) GT(comparison float64) *Series {
-	return nil
+// GT coerces Series values to float64 and returns each row position with a non-null value greater than `comparison`.
+func (s *Series) GT(comparison float64) []int {
+	return s.values.gt(comparison)
 }
 
-// // LT stub
-// func (vc *floatValueContainer) LT(comparison float64) []int {
-// 	return nil
-// }
+// GTE coerces Series values to float64 and returns each row position with a non-null value greater than or equal to `comparison`.
+func (s *Series) GTE(comparison float64) []int {
+	return s.values.gte(comparison)
+}
 
-// // GTE stub
-// func (vc *floatValueContainer) GTE(comparison float64) []int {
-// 	return nil
-// }
+// LT coerces Series values to float64 and returns each row position with a non-null value less than `comparison`.
+func (s *Series) LT(comparison float64) []int {
+	return s.values.lt(comparison)
+}
 
-// // LTE stub
-// func (vc *floatValueContainer) LTE(comparison float64) []int {
-// 	return nil
-// }
+// LTE coerces Series values to float64 and returns each row position with a non-null value less than or equal to `comparison`.
+func (s *Series) LTE(comparison float64) []int {
+	return s.values.lte(comparison)
+}
 
-// // EQ stub
-// func (vc *floatValueContainer) EQ(comparison float64) []int {
-// 	return nil
-// }
+// FloatEQ coerces Series values to float64 and returns each row position with a non-null value equal to `comparison`.
+func (s *Series) FloatEQ(comparison float64) []int {
+	return s.values.floateq(comparison)
+}
 
-// // NEQ stub
-// func (vc *floatValueContainer) NEQ(comparison float64) []int {
-// 	return nil
-// }
+// FloatNEQ coerces Series values to float64 and returns each row position with a non-null value not equal to `comparison`.
+func (s *Series) FloatNEQ(comparison float64) []int {
+	return s.values.floatneq(comparison)
+}
 
-// combine
+// EQ coerces Series values to string and returns each row position with a non-null value equal to `comparison`.
+func (s *Series) EQ(comparison string) []int {
+	return s.values.eq(comparison)
+}
+
+// NEQ coerces Series values to string and returns each row position with a non-null value not equal to `comparison`.
+func (s *Series) NEQ(comparison string) []int {
+	return s.values.neq(comparison)
+}
+
+// Contains coerces Series values to string and returns each row position with a non-null value containing `comparison`.
+func (s *Series) Contains(substr string) []int {
+	return s.values.contains(substr)
+}
+
+// Before coerces Series values to time.Time and returns each row position with a non-null value before `comparison`.
+func (s *Series) Before(comparison time.Time) []int {
+	return s.values.before(comparison)
+}
+
+// After coerces Series values to time.Time and returns each row position with a non-null value after `comparison`.
+func (s *Series) After(comparison time.Time) []int {
+	return s.values.after(comparison)
+}
+
+// -- MERGERS
 
 // Lookup stub
 func (s *Series) Lookup(other *Series, how string, leftOn string, rightOn string) *Series {
@@ -467,21 +504,21 @@ func (s *Series) Divide(other *Series) *Series {
 	return nil
 }
 
-// grouping
+// -- GROUPERS
 
 // GroupBy stub
 func (s *Series) GroupBy(string) *GroupedSeries {
 	return nil
 }
 
-// iterator
+// -- ITERATORS
 
 // IterRows stub
 func (s *Series) IterRows() []map[string]Element {
 	return nil
 }
 
-// math
+// -- MATH
 
 // Sum stub
 func (s *Series) Sum() float64 {
@@ -541,17 +578,30 @@ func (s *Series) Std() float64 {
 	return math.Pow(variance/counter, 0.5)
 }
 
-// AsFloat64 coerces the Series values into []float64.
-func (s *Series) AsFloat64() []float64 {
-	return s.values.float().slice
+// -- Slicers
+
+// SliceFloat64 coerces the Series values into []float64.
+func (s *Series) SliceFloat64(name ...string) []float64 {
+	if len(name) == 0 {
+		return s.values.float().slice
+	}
+	toFind := name[0]
+	labelWithName(toFind, s.labels)
+
+	return nil
 }
 
-// AsString coerces the Series values into []string.
-func (s *Series) AsString() []string {
+// SliceString coerces the Series values into []string.
+func (s *Series) SliceString() []string {
 	return s.values.str().slice
 }
 
-// AsTime coerces the Series values into []time.Time.
-func (s *Series) AsTime() []time.Time {
+// SliceTime coerces the Series values into []time.Time.
+func (s *Series) SliceTime() []time.Time {
 	return s.values.dateTime().slice
+}
+
+// SliceNulls returns whether each value is null or not as []bool.
+func (s *Series) SliceNulls() []bool {
+	return s.values.isNull
 }

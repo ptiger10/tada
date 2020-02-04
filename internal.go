@@ -75,14 +75,14 @@ func containsLabel(label string, labels []*valueContainer) ([]int, error) {
 	return ret, nil
 }
 
-// labelWithName returns the index of the label level with the supplied name, or -1 if no level matches
-func labelWithName(name string, labels []*valueContainer) int {
+// labelWithName returns the position of the first level within labels with a name matching `name`, or an error if no level matches
+func labelWithName(name string, labels []*valueContainer) (int, error) {
 	for j := range labels {
 		if labels[j].name == name {
-			return j
+			return j, nil
 		}
 	}
-	return -1
+	return 0, fmt.Errorf("name (%v) does not match any existing level", name)
 }
 
 func intersection(slices [][]int) []int {
@@ -165,6 +165,116 @@ func (vc *valueContainer) subsetRows(index []int) error {
 	vc.slice = retVals.Interface()
 	vc.isNull = retIsNull
 	return nil
+}
+
+func (vc *valueContainer) gt(comparison float64) []int {
+	index, _ := vc.filter(Filter{F64: func(v float64, isNull bool) bool {
+		if v > comparison && !isNull {
+			return true
+		}
+		return false
+	}})
+	return index
+}
+
+func (vc *valueContainer) lt(comparison float64) []int {
+	index, _ := vc.filter(Filter{F64: func(v float64, isNull bool) bool {
+		if v < comparison && !isNull {
+			return true
+		}
+		return false
+	}})
+	return index
+}
+
+func (vc *valueContainer) gte(comparison float64) []int {
+	index, _ := vc.filter(Filter{F64: func(v float64, isNull bool) bool {
+		if v >= comparison && !isNull {
+			return true
+		}
+		return false
+	}})
+	return index
+}
+
+func (vc *valueContainer) lte(comparison float64) []int {
+	index, _ := vc.filter(Filter{F64: func(v float64, isNull bool) bool {
+		if v <= comparison && !isNull {
+			return true
+		}
+		return false
+	}})
+	return index
+}
+
+func (vc *valueContainer) floateq(comparison float64) []int {
+	index, _ := vc.filter(Filter{F64: func(v float64, isNull bool) bool {
+		if v == comparison && !isNull {
+			return true
+		}
+		return false
+	}})
+	return index
+}
+
+func (vc *valueContainer) floatneq(comparison float64) []int {
+	index, _ := vc.filter(Filter{F64: func(v float64, isNull bool) bool {
+		if v != comparison && !isNull {
+			return true
+		}
+		return false
+	}})
+	return index
+}
+
+func (vc *valueContainer) eq(comparison string) []int {
+	index, _ := vc.filter(Filter{String: func(v string, isNull bool) bool {
+		if v == comparison && !isNull {
+			return true
+		}
+		return false
+	}})
+	return index
+}
+
+func (vc *valueContainer) neq(comparison string) []int {
+	index, _ := vc.filter(Filter{String: func(v string, isNull bool) bool {
+		if v != comparison && !isNull {
+			return true
+		}
+		return false
+	}})
+	return index
+}
+
+func (vc *valueContainer) contains(substr string) []int {
+	index, _ := vc.filter(Filter{String: func(v string, isNull bool) bool {
+		if strings.Contains(v, substr) && !isNull {
+			return true
+		}
+		return false
+	}})
+	return index
+}
+
+func (vc *valueContainer) before(comparison time.Time) []int {
+	index, _ := vc.filter(Filter{DateTime: func(v time.Time, isNull bool) bool {
+		if v.Before(comparison) && !isNull {
+			return true
+		}
+		return false
+	}})
+	return index
+}
+
+func (vc *valueContainer) after(comparison time.Time) []int {
+	index, _ := vc.filter(Filter{DateTime: func(v time.Time, isNull bool) bool {
+		if v.After(comparison) && !isNull {
+			return true
+		}
+		return false
+	}})
+	return index
 }
 
 func (vc *valueContainer) filter(filter Filter) ([]int, error) {

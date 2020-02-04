@@ -3,6 +3,7 @@ package tada
 import (
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -832,11 +833,29 @@ func TestSeries_Filter(t *testing.T) {
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
 			args{[]Filter{{F64: func(val float64, isNull bool) bool {
-				if val > 2 && !isNull {
+				if val > 1 && !isNull {
 					return true
 				}
 				return false
 			}}}}, []int{2}},
+		{"float and string intersection",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{name: "*0", slice: []string{"bar", "foo", "baz"}, isNull: []bool{false, false, false}}}},
+			args{[]Filter{
+				{F64: func(val float64, isNull bool) bool {
+					if val > 1 {
+						return true
+					}
+					return false
+				}},
+				{ColName: "*0", String: func(val string, isNull bool) bool {
+					if strings.Contains(val, "a") {
+						return true
+					}
+					return false
+				}},
+			}}, []int{2}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

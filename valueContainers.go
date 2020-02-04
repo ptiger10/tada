@@ -155,7 +155,7 @@ func (vc *valueContainer) str() stringValueContainer {
 	isNull := vc.isNull
 	d := reflect.ValueOf(vc.slice)
 	for i := 0; i < d.Len(); i++ {
-		newVals[i] = d.Index(i).String()
+		newVals[i] = fmt.Sprint(d.Index(i).Interface())
 	}
 	ret := stringValueContainer{
 		isNull: isNull,
