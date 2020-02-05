@@ -2,68 +2,6 @@ package tada
 
 import "time"
 
-// Filters
-
-// Filter stub
-func (vc *floatValueContainer) Filter(func(val float64) bool) []int {
-	return nil
-}
-
-// GT stub
-func (vc *floatValueContainer) GT(comparison float64) []int {
-	return nil
-}
-
-// LT stub
-func (vc *floatValueContainer) LT(comparison float64) []int {
-	return nil
-}
-
-// GTE stub
-func (vc *floatValueContainer) GTE(comparison float64) []int {
-	return nil
-}
-
-// LTE stub
-func (vc *floatValueContainer) LTE(comparison float64) []int {
-	return nil
-}
-
-// EQ stub
-func (vc *floatValueContainer) EQ(comparison float64) []int {
-	return nil
-}
-
-// NEQ stub
-func (vc *floatValueContainer) NEQ(comparison float64) []int {
-	return nil
-}
-
-// Filter stub
-func (vc *stringValueContainer) Filter(func(val string) bool) []int {
-	return nil
-}
-
-// Contains stub
-func (vc *stringValueContainer) Contains(comparison string) []int {
-	return nil
-}
-
-// Filter stub
-func (vc *dateTimeValueContainer) Filter(func(val time.Time) bool) []int {
-	return nil
-}
-
-// Before stub
-func (vc *dateTimeValueContainer) Before(comparison time.Time) []int {
-	return nil
-}
-
-// After stub
-func (vc *dateTimeValueContainer) After(comparison time.Time) []int {
-	return nil
-}
-
 // Apply
 
 // Apply stub

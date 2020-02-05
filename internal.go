@@ -75,8 +75,8 @@ func containsLabel(label string, labels []*valueContainer) ([]int, error) {
 	return ret, nil
 }
 
-// labelWithName returns the position of the first level within labels with a name matching `name`, or an error if no level matches
-func labelWithName(name string, labels []*valueContainer) (int, error) {
+// levelWithName returns the position of the first level within labels with a name matching `name`, or an error if no level matches
+func levelWithName(name string, labels []*valueContainer) (int, error) {
 	for j := range labels {
 		if labels[j].name == name {
 			return j, nil
@@ -167,8 +167,14 @@ func (vc *valueContainer) subsetRows(index []int) error {
 	return nil
 }
 
+func (vc *valueContainer) iterRow(index int) Element {
+	return Element{
+		val:    reflect.ValueOf(vc.slice).Index(index).Interface(),
+		isNull: vc.isNull[index]}
+}
+
 func (vc *valueContainer) gt(comparison float64) []int {
-	index, _ := vc.filter(Filter{F64: func(v float64, isNull bool) bool {
+	index, _ := vc.filter(FilterFn{F64: func(v float64, isNull bool) bool {
 		if v > comparison && !isNull {
 			return true
 		}
@@ -178,7 +184,7 @@ func (vc *valueContainer) gt(comparison float64) []int {
 }
 
 func (vc *valueContainer) lt(comparison float64) []int {
-	index, _ := vc.filter(Filter{F64: func(v float64, isNull bool) bool {
+	index, _ := vc.filter(FilterFn{F64: func(v float64, isNull bool) bool {
 		if v < comparison && !isNull {
 			return true
 		}
@@ -188,7 +194,7 @@ func (vc *valueContainer) lt(comparison float64) []int {
 }
 
 func (vc *valueContainer) gte(comparison float64) []int {
-	index, _ := vc.filter(Filter{F64: func(v float64, isNull bool) bool {
+	index, _ := vc.filter(FilterFn{F64: func(v float64, isNull bool) bool {
 		if v >= comparison && !isNull {
 			return true
 		}
@@ -198,7 +204,7 @@ func (vc *valueContainer) gte(comparison float64) []int {
 }
 
 func (vc *valueContainer) lte(comparison float64) []int {
-	index, _ := vc.filter(Filter{F64: func(v float64, isNull bool) bool {
+	index, _ := vc.filter(FilterFn{F64: func(v float64, isNull bool) bool {
 		if v <= comparison && !isNull {
 			return true
 		}
@@ -208,7 +214,7 @@ func (vc *valueContainer) lte(comparison float64) []int {
 }
 
 func (vc *valueContainer) floateq(comparison float64) []int {
-	index, _ := vc.filter(Filter{F64: func(v float64, isNull bool) bool {
+	index, _ := vc.filter(FilterFn{F64: func(v float64, isNull bool) bool {
 		if v == comparison && !isNull {
 			return true
 		}
@@ -218,7 +224,7 @@ func (vc *valueContainer) floateq(comparison float64) []int {
 }
 
 func (vc *valueContainer) floatneq(comparison float64) []int {
-	index, _ := vc.filter(Filter{F64: func(v float64, isNull bool) bool {
+	index, _ := vc.filter(FilterFn{F64: func(v float64, isNull bool) bool {
 		if v != comparison && !isNull {
 			return true
 		}
@@ -228,7 +234,7 @@ func (vc *valueContainer) floatneq(comparison float64) []int {
 }
 
 func (vc *valueContainer) eq(comparison string) []int {
-	index, _ := vc.filter(Filter{String: func(v string, isNull bool) bool {
+	index, _ := vc.filter(FilterFn{String: func(v string, isNull bool) bool {
 		if v == comparison && !isNull {
 			return true
 		}
@@ -238,7 +244,7 @@ func (vc *valueContainer) eq(comparison string) []int {
 }
 
 func (vc *valueContainer) neq(comparison string) []int {
-	index, _ := vc.filter(Filter{String: func(v string, isNull bool) bool {
+	index, _ := vc.filter(FilterFn{String: func(v string, isNull bool) bool {
 		if v != comparison && !isNull {
 			return true
 		}
@@ -248,7 +254,7 @@ func (vc *valueContainer) neq(comparison string) []int {
 }
 
 func (vc *valueContainer) contains(substr string) []int {
-	index, _ := vc.filter(Filter{String: func(v string, isNull bool) bool {
+	index, _ := vc.filter(FilterFn{String: func(v string, isNull bool) bool {
 		if strings.Contains(v, substr) && !isNull {
 			return true
 		}
@@ -258,7 +264,7 @@ func (vc *valueContainer) contains(substr string) []int {
 }
 
 func (vc *valueContainer) before(comparison time.Time) []int {
-	index, _ := vc.filter(Filter{DateTime: func(v time.Time, isNull bool) bool {
+	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time, isNull bool) bool {
 		if v.Before(comparison) && !isNull {
 			return true
 		}
@@ -268,7 +274,7 @@ func (vc *valueContainer) before(comparison time.Time) []int {
 }
 
 func (vc *valueContainer) after(comparison time.Time) []int {
-	index, _ := vc.filter(Filter{DateTime: func(v time.Time, isNull bool) bool {
+	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time, isNull bool) bool {
 		if v.After(comparison) && !isNull {
 			return true
 		}
@@ -277,7 +283,7 @@ func (vc *valueContainer) after(comparison time.Time) []int {
 	return index
 }
 
-func (vc *valueContainer) filter(filter Filter) ([]int, error) {
+func (vc *valueContainer) filter(filter FilterFn) ([]int, error) {
 	var index []int
 	if filter.F64 != nil {
 		slice := vc.float().slice
@@ -307,6 +313,35 @@ func (vc *valueContainer) filter(filter Filter) ([]int, error) {
 		return nil, fmt.Errorf("no filter function provided")
 	}
 	return index, nil
+}
+
+func (vc *valueContainer) apply(apply ApplyFn) (interface{}, error) {
+	var ret interface{}
+	if apply.F64 != nil {
+		slice := vc.float().slice
+		retSlice := make([]float64, len(slice))
+		for i := range slice {
+			retSlice[i] = apply.F64(slice[i])
+		}
+		ret = retSlice
+	} else if apply.String != nil {
+		slice := vc.str().slice
+		retSlice := make([]string, len(slice))
+		for i := range slice {
+			retSlice[i] = apply.String(slice[i])
+		}
+		ret = retSlice
+	} else if apply.DateTime != nil {
+		slice := vc.dateTime().slice
+		retSlice := make([]time.Time, len(slice))
+		for i := range slice {
+			retSlice[i] = apply.DateTime(slice[i])
+		}
+		ret = retSlice
+	} else {
+		return nil, fmt.Errorf("no apply function provided")
+	}
+	return ret, nil
 }
 
 func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int {
@@ -343,6 +378,133 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 
 	return nil
 }
+
+// labelNamesToIndex converts a slice of label names to index positions
+func labelNamesToIndex(names []string, levels []*valueContainer) ([]int, error) {
+	ret := make([]int, len(names))
+	for i, name := range names {
+		lvl, err := levelWithName(name, levels)
+		if err != nil {
+			return nil, err
+		}
+		ret[i] = lvl
+	}
+	return ret, nil
+}
+
+// labelsToString reduces all label levels referenced in the index to a single slice of concatenated strings
+func labelsToStrings(labels []*valueContainer, index []int) []string {
+	sep := "|"
+	labelStrings := make([][]string, len(index))
+	// coerce every label level referenced in the index to a separate string slice
+	for j := range index {
+		labelStrings[j] = labels[j].str().slice
+	}
+	ret := make([]string, len(labelStrings[0]))
+	// for each row, combine labels into one concatenated string
+	for i := 0; i < len(labelStrings[0]); i++ {
+		components := make([]string, len(labels))
+		for j := range labels {
+			components[j] = labelStrings[j][i]
+		}
+		concatenatedString := strings.Join(components, sep)
+		ret[i] = concatenatedString
+	}
+	// return a single slice of strings
+	return ret
+}
+
+// labelsToString reduces all label levels referenced in the index to a map
+// where the key is a single concatenated string of the labels
+// and the value is the integer position where the key first appears in the labels.
+func labelsToMap(labels []*valueContainer, index []int) map[string]int {
+	sep := "|"
+	// coerce all label levels referenced in the index to string
+	labelStrings := make([][]string, len(index))
+	for j := range index {
+		labelStrings[j] = labels[j].str().slice
+	}
+	ret := make(map[string]int, len(labelStrings[0]))
+	// for each row, combine labels into a single string
+	for i := 0; i < len(labelStrings[0]); i++ {
+		components := make([]string, len(labels))
+		for j := range labels {
+			components[j] = labelStrings[j][i]
+		}
+		key := strings.Join(components, sep)
+		if _, ok := ret[key]; !ok {
+			ret[key] = i
+		}
+	}
+	return ret
+}
+
+func matchLabelPositions(labels1 []string, labels2 map[string]int) []int {
+	ret := make([]int, len(labels1))
+	for i, key := range labels1 {
+		if val, ok := labels2[key]; ok {
+			ret[i] = val
+		} else {
+			ret[i] = -1
+		}
+	}
+	return ret
+}
+
+func lookup(how string,
+	values1 *valueContainer, labels1 []*valueContainer, leftOn []int,
+	values2 *valueContainer, labels2 []*valueContainer, rightOn []int) (*Series, error) {
+	switch how {
+	case "left":
+		return lookupWithAnchor(values1, labels1, leftOn, values2, labels2, rightOn), nil
+	case "right":
+		return lookupWithAnchor(values2, labels2, rightOn, values1, labels1, leftOn), nil
+	default:
+		return nil, fmt.Errorf("unsupported how: must be `left` or `right`")
+	}
+}
+
+func lookupWithAnchor(
+	values1 *valueContainer, labels1 []*valueContainer, leftOn []int,
+	values2 *valueContainer, labels2 []*valueContainer, rightOn []int) *Series {
+	toLookup := labelsToStrings(labels1, leftOn)
+	lookupSource := labelsToMap(labels2, rightOn)
+	matches := matchLabelPositions(toLookup, lookupSource)
+	v := reflect.ValueOf(values2.slice)
+	isNull := make([]bool, len(matches))
+	vals := reflect.MakeSlice(v.Type(), len(matches), len(matches))
+	for i, matchedIndex := range matches {
+		// positive match
+		if matchedIndex != -1 {
+			vals.Index(i).Set(v.Index(matchedIndex))
+			isNull[i] = values2.isNull[i]
+			// no match
+		} else {
+			vals.Index(i).Set(reflect.Zero(reflect.TypeOf(values2.slice).Elem()))
+			isNull[i] = true
+		}
+	}
+	return &Series{
+		values: &valueContainer{slice: vals.Interface(), isNull: isNull, name: values1.name},
+		labels: labels1,
+	}
+}
+
+// func lookupRight(values1 *valueContainer, labels1 []*valueContainer, leftOn []int, values2 *valueContainer, labels2 []*valueContainer, rightOn []int) (values *valueContainer, labels []*valueContainer, err error) {
+// 	toLookup := labelsToStrings(labels2, rightOn)
+// 	lookupSource := labelsToMap(labels1, leftOn)
+// 	matches := matchLabelPositions(toLookup, lookupSource)
+// 	v := reflect.ValueOf(values1.slice)
+// 	ret := reflect.MakeSlice(v.Type(), len(matches), len(matches))
+// 	for i, match := range matches {
+// 		if match != -1 {
+// 			ret.Index(i).Set(v.Index(i))
+// 		} else {
+// 			ret.Index(i).Set(reflect.Zero(v.Type()))
+// 		}
+// 	}
+// 	return ret.Interface(), nil
+// }
 
 func (vc *valueContainer) dropRow(index int) error {
 	v := reflect.ValueOf(vc.slice)

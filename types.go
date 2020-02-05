@@ -59,11 +59,19 @@ type Element struct {
 	isNull bool
 }
 
-// Filter stub
-type Filter struct {
+// FilterFn stub
+type FilterFn struct {
 	F64      func(val float64, isNull bool) bool
 	String   func(val string, isNull bool) bool
 	DateTime func(val time.Time, isNull bool) bool
+	ColName  string
+}
+
+// ApplyFn stub
+type ApplyFn struct {
+	F64      func(val float64) float64
+	String   func(val string) string
+	DateTime func(val time.Time) time.Time
 	ColName  string
 }
 

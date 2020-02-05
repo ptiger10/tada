@@ -93,7 +93,13 @@ func (s *Series) Len() int {
 	return reflect.ValueOf(s.values.slice).Len()
 }
 
-// Elements returns the underlying value and isNull for each row. If any label level is provided, this returns the Elements of the first label level provided.
+// Levels returns the number of columns of labels in the Series.
+func (s *Series) Levels() int {
+	return len(s.labels)
+}
+
+// Elements returns the underlying value and isNull for each row.
+// If any `level` is provided, returns the Elements of the columns of labels at that level.
 func (s *Series) Elements(level ...int) []Element {
 	ret := make([]Element, s.Len())
 	if len(level) == 0 {
@@ -237,11 +243,11 @@ func (s *Series) InPlace() *SeriesMutator {
 
 // WithLabels resolves as follows:
 //
-// If a scalar string is supplied as `input` and a label level exists that matches `name`: rename the level to match `input`
+// If a scalar string is supplied as `input` and a column of labels exists that matches `name`: rename the level to match `input`
 //
-// If a slice is supplied as `input` and a label level exists that matches `name`: replace the values at this level to match `input`
+// If a slice is supplied as `input` and a column of labels exists that matches `name`: replace the values at this level to match `input`
 //
-// If a slice is supplied as `input` and a label level does not exist that matches `name`: append a new label level with a name matching `name` and values matching `input`
+// If a slice is supplied as `input` and a column of labels does not exist that matches `name`: append a new level with a name matching `name` and values matching `input`
 //
 // Error conditions: supplying slice of unsupported type, supplying slice with a different length than the underlying Series, or supplying scalar string and `name` that does not match an existing label level.
 // In all cases, returns a new Series.
@@ -253,11 +259,11 @@ func (s *Series) WithLabels(name string, input interface{}) *Series {
 
 // WithLabels resolves as follows:
 //
-// If a scalar string is supplied as `input` and a label level exists that matches `name`: rename the level to match `input`
+// If a scalar string is supplied as `input` and a column of labels exists that matches `name`: rename the level to match `input`
 //
-// If a slice is supplied as `input` and a label level exists that matches `name`: replace the values at this level to match `input`
+// If a slice is supplied as `input` and a column of labels exists that matches `name`: replace the values at this level to match `input`
 //
-// If a slice is supplied as `input` and a label level does not exist that matches `name`: append a new label level with a name matching `name` and values matching `input`
+// If a slice is supplied as `input` and a column of labels does not exist that matches `name`: append a new level with a name matching `name` and values matching `input`
 //
 // Error conditions: supplying slice of unsupported type, supplying slice with a different length than the underlying Series, or supplying scalar string and `name` that does not match an existing label level.
 // In all cases, modifies the underlying Series in place.
@@ -266,7 +272,7 @@ func (s *SeriesMutator) WithLabels(name string, input interface{}) {
 
 	// `input` is string: rename label level
 	case reflect.String:
-		lvl, err := labelWithName(name, s.series.labels)
+		lvl, err := levelWithName(name, s.series.labels)
 		if err != nil {
 			s.series.resetWithError(fmt.Errorf("WithLabels(): cannot rename label level: %v", err))
 			return
@@ -285,7 +291,7 @@ func (s *SeriesMutator) WithLabels(name string, input interface{}) {
 			return
 		}
 		// `input` is supported slice
-		lvl, err := labelWithName(name, s.series.labels)
+		lvl, err := levelWithName(name, s.series.labels)
 		if err != nil {
 			// `name` does not already exist: append new label level
 			s.series.labels = append(s.series.labels, &valueContainer{slice: input, name: name, isNull: isNull})
@@ -375,7 +381,7 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 		if by[i].ColName == "" {
 			vals = s.series.values.copy()
 		} else {
-			lvl, err := labelWithName(by[i].ColName, s.series.labels)
+			lvl, err := levelWithName(by[i].ColName, s.series.labels)
 			if err != nil {
 				s.series.resetWithError(fmt.Errorf(
 					"Sort(): cannot use label level: %v", err))
@@ -393,7 +399,7 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 // -- FILTERS
 
 // Filter applies one or more filters to a Series and returns the intersection of the row positions that satisfy all filters.
-func (s *Series) Filter(filters ...Filter) []int {
+func (s *Series) Filter(filters ...FilterFn) []int {
 	if len(filters) == 0 {
 		return makeIntRange(0, s.Len())
 	}
@@ -402,7 +408,7 @@ func (s *Series) Filter(filters ...Filter) []int {
 		var data *valueContainer
 		if filter.ColName == "" {
 			data = s.values
-		} else if lvl, err := labelWithName(filter.ColName, s.labels); err != nil {
+		} else if lvl, err := levelWithName(filter.ColName, s.labels); err != nil {
 			return []int{-999}
 		} else {
 			data = s.labels[lvl]
@@ -472,11 +478,90 @@ func (s *Series) After(comparison time.Time) []int {
 	return s.values.after(comparison)
 }
 
+// -- APPLY
+
+// Apply stub
+func (s *Series) Apply(function ApplyFn) *Series {
+	s.Copy()
+	s.InPlace().Apply(function)
+	return s
+}
+
+// Apply applies a user-defined function to every row in the Series and coerces all values to match the function type.
+// Apply may be applied to a level of labels (if no column is specified, the main Series values are used).
+// Modifies the underlying Series in place.
+func (s *SeriesMutator) Apply(function ApplyFn) {
+	var data *valueContainer
+	var err error
+	if function.ColName == "" {
+		data = s.series.values
+	} else if lvl, err := levelWithName(function.ColName, s.series.labels); err == nil {
+		data = s.series.labels[lvl]
+	} else {
+		if function.ColName == s.series.values.name {
+			data = s.series.values
+		} else {
+			s.series.resetWithError(fmt.Errorf("Apply(): %v", err))
+			return
+		}
+	}
+	data.slice, err = data.apply(function)
+	if err != nil {
+		s.series.resetWithError(fmt.Errorf("Apply(): %v", err))
+	}
+	return
+}
+
 // -- MERGERS
 
+// search for a name only once. if it is found multiple times, return only the first
+func findMatchingLabelNames(labels1 []*valueContainer, labels2 []*valueContainer) ([]int, []int) {
+	var leftKeys, rightKeys []int
+	searched := make(map[string]bool)
+	for j := range labels1 {
+		key := labels1[j].name
+		if _, ok := searched[key]; ok {
+			continue
+		} else {
+			searched[key] = true
+		}
+		for k := range labels2 {
+			if key == labels2[k].name {
+				leftKeys = append(leftKeys, j)
+				rightKeys = append(rightKeys, k)
+				break
+			}
+		}
+	}
+	return leftKeys, rightKeys
+}
+
 // Lookup stub
-func (s *Series) Lookup(other *Series, how string, leftOn string, rightOn string) *Series {
-	return nil
+func (s *Series) Lookup(other *Series, how string, leftOn []string, rightOn []string) *Series {
+	var leftKeys, rightKeys []int
+	var err error
+	if len(leftOn) == 0 || len(rightOn) == 0 {
+		if !(len(leftOn) == 0 && len(rightOn) == 0) {
+			return seriesWithError(fmt.Errorf("Lookup(): if either leftOn or rightOn is empty, both must be empty"))
+		}
+	}
+	if len(leftOn) == 0 {
+		leftKeys, rightKeys = findMatchingLabelNames(s.labels, other.labels)
+	} else {
+		leftKeys, err = labelNamesToIndex(leftOn, s.labels)
+		if err != nil {
+			return seriesWithError(fmt.Errorf("Lookup(): %v", err))
+		}
+		rightKeys, err = labelNamesToIndex(rightOn, other.labels)
+		if err != nil {
+			return seriesWithError(fmt.Errorf("Lookup(): %v", err))
+		}
+	}
+	ret, err := lookup(how, s.values, s.labels, leftKeys, other.values, other.labels, rightKeys)
+	if err != nil {
+		return seriesWithError(fmt.Errorf("Lookup(): %v", err))
+	}
+	return ret
 }
 
 // Merge stub
@@ -513,9 +598,21 @@ func (s *Series) GroupBy(string) *GroupedSeries {
 
 // -- ITERATORS
 
-// IterRows stub
+// IterRows returns a slice of maps that return the underlying data for every row in the Series.
+// The key in each map is a column header, including label level names.
+// The name of the main Series values is the same as the name of the Series itself.
+// The value in each map is an Element containing an interface value and whether or not the value is null.
+// If multiple columns have the same header, only the values of the right-most column are returned.
 func (s *Series) IterRows() []map[string]Element {
-	return nil
+	ret := make([]map[string]Element, s.Len())
+	for i := 0; i < s.Len(); i++ {
+		ret[i] = make(map[string]Element, s.Levels()+1)
+		for j := range s.labels {
+			ret[i][s.labels[j].name] = s.labels[j].iterRow(i)
+		}
+		ret[i][s.values.name] = s.values.iterRow(i)
+	}
+	return ret
 }
 
 // -- MATH
@@ -581,27 +678,57 @@ func (s *Series) Std() float64 {
 // -- Slicers
 
 // SliceFloat64 coerces the Series values into []float64.
-func (s *Series) SliceFloat64(name ...string) []float64 {
-	if len(name) == 0 {
+// If `level` is provided, the column of labels at that level is coerced instead.
+// If multiple levels are provides, only the first is used. If the level is out of range, a nil value is returned.
+func (s *Series) SliceFloat64(level ...int) []float64 {
+	if len(level) == 0 {
 		return s.values.float().slice
 	}
-	toFind := name[0]
-	labelWithName(toFind, s.labels)
-
-	return nil
+	lvl := level[0]
+	if lvl >= s.Levels() {
+		return nil
+	}
+	return s.labels[lvl].float().slice
 }
 
 // SliceString coerces the Series values into []string.
-func (s *Series) SliceString() []string {
-	return s.values.str().slice
+// If `level` is provided, the column of labels at that level is coerced instead.
+// If multiple levels are provides, only the first is used. If the level is out of range, a nil value is returned.
+func (s *Series) SliceString(level ...int) []string {
+	if len(level) == 0 {
+		return s.values.str().slice
+	}
+	lvl := level[0]
+	if lvl >= s.Levels() {
+		return nil
+	}
+	return s.labels[lvl].str().slice
 }
 
 // SliceTime coerces the Series values into []time.Time.
-func (s *Series) SliceTime() []time.Time {
-	return s.values.dateTime().slice
+// If `level` is provided, the column of labels at that level is coerced instead.
+// If multiple levels are provides, only the first is used. If the level is out of range, a nil value is returned.
+func (s *Series) SliceTime(level ...int) []time.Time {
+	if len(level) == 0 {
+		return s.values.dateTime().slice
+	}
+	lvl := level[0]
+	if lvl >= s.Levels() {
+		return nil
+	}
+	return s.labels[lvl].dateTime().slice
 }
 
-// SliceNulls returns whether each value is null or not as []bool.
-func (s *Series) SliceNulls() []bool {
-	return s.values.isNull
+// SliceNulls returns whether each value is null or not.
+// If `level` is provided, the column of labels at that level is coerced instead.
+// If multiple levels are provides, only the first is used. If the level is out of range, a nil value is returned.
+func (s *Series) SliceNulls(level ...int) []bool {
+	if len(level) == 0 {
+		return s.values.isNull
+	}
+	lvl := level[0]
+	if lvl >= s.Levels() {
+		return nil
+	}
+	return s.labels[lvl].isNull
 }
