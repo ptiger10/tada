@@ -422,13 +422,14 @@ func labelsToMap(labels []*valueContainer, index []int) map[string]int {
 	// coerce all label levels referenced in the index to string
 	labelStrings := make([][]string, len(index))
 	for j := range index {
-		labelStrings[j] = labels[j].str().slice
+		labelStrings[j] = labels[index[j]].str().slice
 	}
 	ret := make(map[string]int, len(labelStrings[0]))
 	// for each row, combine labels into a single string
-	for i := 0; i < len(labelStrings[0]); i++ {
-		components := make([]string, len(labels))
-		for j := range labels {
+	l := len(labelStrings[0])
+	for i := 0; i < l; i++ {
+		components := make([]string, len(labelStrings))
+		for j := range labelStrings {
 			components[j] = labelStrings[j][i]
 		}
 		key := strings.Join(components, sep)
@@ -459,9 +460,47 @@ func lookup(how string,
 		return lookupWithAnchor(values1, labels1, leftOn, values2, labels2, rightOn), nil
 	case "right":
 		return lookupWithAnchor(values2, labels2, rightOn, values1, labels1, leftOn), nil
+	case "inner":
+		s := lookupWithAnchor(values1, labels1, leftOn, values2, labels2, rightOn)
+		s.InPlace().DropNull()
+		return s, nil
 	default:
-		return nil, fmt.Errorf("unsupported how: must be `left` or `right`")
+		return nil, fmt.Errorf("unsupported how: must be `left`, `right`, or `inner`")
 	}
+}
+
+func (s *Series) combineMath(other *Series, ignoreMissing bool, fn func(v1 float64, v2 float64) float64) *Series {
+	retFloat := make([]float64, s.Len())
+	retIsNull := make([]bool, s.Len())
+	lookupVals := s.Lookup(other, "left", nil, nil)
+	lookupFloat := lookupVals.SliceFloat64()
+	lookupNulls := lookupVals.SliceNulls()
+	originalFloat := s.SliceFloat64()
+	originalNulls := s.SliceNulls()
+	for i := range originalFloat {
+		// handle null lookup
+		if lookupNulls[i] {
+			if ignoreMissing {
+				retFloat[i] = originalFloat[i]
+				retIsNull[i] = originalNulls[i]
+				continue
+			}
+			retFloat[i] = 0
+			retIsNull[i] = true
+			continue
+		}
+		// actual combination logic
+		combinedFloat := fn(originalFloat[i], lookupFloat[i])
+		// handle division by 0
+		if math.IsNaN(combinedFloat) || math.IsInf(combinedFloat, 0) {
+			combinedFloat = 0
+			retIsNull[i] = true
+			continue
+		}
+		retFloat[i] = combinedFloat
+		retIsNull[i] = originalNulls[i]
+	}
+	return &Series{values: &valueContainer{slice: retFloat, isNull: retIsNull}, labels: s.labels}
 }
 
 func lookupWithAnchor(
@@ -472,6 +511,7 @@ func lookupWithAnchor(
 	matches := matchLabelPositions(toLookup, lookupSource)
 	v := reflect.ValueOf(values2.slice)
 	isNull := make([]bool, len(matches))
+	// return type is set to same type as within lookupSource
 	vals := reflect.MakeSlice(v.Type(), len(matches), len(matches))
 	for i, matchedIndex := range matches {
 		// positive match
@@ -489,22 +529,6 @@ func lookupWithAnchor(
 		labels: labels1,
 	}
 }
-
-// func lookupRight(values1 *valueContainer, labels1 []*valueContainer, leftOn []int, values2 *valueContainer, labels2 []*valueContainer, rightOn []int) (values *valueContainer, labels []*valueContainer, err error) {
-// 	toLookup := labelsToStrings(labels2, rightOn)
-// 	lookupSource := labelsToMap(labels1, leftOn)
-// 	matches := matchLabelPositions(toLookup, lookupSource)
-// 	v := reflect.ValueOf(values1.slice)
-// 	ret := reflect.MakeSlice(v.Type(), len(matches), len(matches))
-// 	for i, match := range matches {
-// 		if match != -1 {
-// 			ret.Index(i).Set(v.Index(i))
-// 		} else {
-// 			ret.Index(i).Set(reflect.Zero(v.Type()))
-// 		}
-// 	}
-// 	return ret.Interface(), nil
-// }
 
 func (vc *valueContainer) dropRow(index int) error {
 	v := reflect.ValueOf(vc.slice)

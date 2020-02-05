@@ -932,29 +932,29 @@ func TestSeries_Lookup(t *testing.T) {
 		args   args
 		want   *Series
 	}{
-		// {"single label level, named keys, left join", fields{
-		// 	values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
-		// 	labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
-		// 	args{
-		// 		other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
-		// 			labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-		// 		how:    "left",
-		// 		leftOn: []string{"foo"}, rightOn: []string{"foo"}},
-		// 	&Series{values: &valueContainer{slice: []float64{30, 0}, isNull: []bool{false, true}},
-		// 		labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
-		// },
-		// {"single label level, no named keys, left join", fields{
-		// 	values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
-		// 	labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
-		// 	args{
-		// 		other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
-		// 			labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-		// 		how:    "left",
-		// 		leftOn: nil, rightOn: nil},
-		// 	&Series{values: &valueContainer{slice: []float64{30, 0}, isNull: []bool{false, true}},
-		// 		labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
-		// },
-		{"multiple label level, no named keys, left join", fields{
+		{"single label level, named keys, left join", fields{
+			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+			labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
+			args{
+				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
+					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
+				how:    "left",
+				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
+			&Series{values: &valueContainer{slice: []float64{30, 0}, isNull: []bool{false, true}},
+				labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
+		},
+		{"single label level, no named keys, left join", fields{
+			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+			labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
+			args{
+				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
+					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
+				how:    "left",
+				leftOn: nil, rightOn: nil},
+			&Series{values: &valueContainer{slice: []float64{30, 0}, isNull: []bool{false, true}},
+				labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
+		},
+		{"multiple label level, no named keys, left join, match at index 1", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
 			labels: []*valueContainer{
 				{name: "waldo", slice: []string{"baz", "bar"}, isNull: []bool{false, false}},
@@ -967,7 +967,7 @@ func TestSeries_Lookup(t *testing.T) {
 						{name: "waldo", slice: []string{"baz", "bar", "quux"}, isNull: []bool{false, false}}}},
 				how:    "left",
 				leftOn: nil, rightOn: nil},
-			&Series{values: &valueContainer{slice: []float64{0, 20}, isNull: []bool{false, true}},
+			&Series{values: &valueContainer{slice: []float64{0, 20}, isNull: []bool{true, false}},
 				labels: []*valueContainer{
 					{name: "waldo", slice: []string{"baz", "bar"}, isNull: []bool{false, false}},
 					{name: "corge", slice: []int{0, 1}, isNull: []bool{false, false}}}},
@@ -1029,6 +1029,218 @@ func TestSeries_Apply(t *testing.T) {
 			if got := s.Apply(tt.args.function); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.Apply() = %v, want %v", got.labels, tt.want)
 
+			}
+		})
+	}
+}
+
+func TestSeries_Add(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		other         *Series
+		ignoreMissing bool
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"ignore missing - match on different indexes",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{
+				other: &Series{values: &valueContainer{slice: []float64{4, 10}, isNull: []bool{false, false}},
+					labels: []*valueContainer{{slice: []int{1, 10}, isNull: []bool{false, false}}}},
+				ignoreMissing: true},
+			&Series{
+				values: &valueContainer{slice: []float64{1, 6}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
+		{"missing as null",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{
+				other: &Series{values: &valueContainer{slice: []float64{4, 10}, isNull: []bool{false, false}},
+					labels: []*valueContainer{{slice: []int{1, 10}, isNull: []bool{false, false}}}},
+				ignoreMissing: false},
+			&Series{
+				values: &valueContainer{slice: []float64{0, 6}, isNull: []bool{true, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Add(tt.args.other, tt.args.ignoreMissing); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Add() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Subtract(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		other         *Series
+		ignoreMissing bool
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"ignore missing",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{
+				other: &Series{values: &valueContainer{slice: []float64{4, 10}, isNull: []bool{false, false}},
+					labels: []*valueContainer{{slice: []int{1, 10}, isNull: []bool{false, false}}}},
+				ignoreMissing: true},
+			&Series{
+				values: &valueContainer{slice: []float64{1, -2}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
+		{"missing as null",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{
+				other: &Series{values: &valueContainer{slice: []float64{4, 10}, isNull: []bool{false, false}},
+					labels: []*valueContainer{{slice: []int{1, 10}, isNull: []bool{false, false}}}},
+				ignoreMissing: false},
+			&Series{
+				values: &valueContainer{slice: []float64{0, -2}, isNull: []bool{true, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Subtract(tt.args.other, tt.args.ignoreMissing); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Subtract() = %v, want %v", got.values, tt.want.values)
+			}
+		})
+	}
+}
+
+func TestSeries_Multiply(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		other         *Series
+		ignoreMissing bool
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"ignore missing",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{
+				other: &Series{values: &valueContainer{slice: []float64{4, 10}, isNull: []bool{false, false}},
+					labels: []*valueContainer{{slice: []int{1, 10}, isNull: []bool{false, false}}}},
+				ignoreMissing: true},
+			&Series{
+				values: &valueContainer{slice: []float64{1, 8}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
+		{"missing as null",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{
+				other: &Series{values: &valueContainer{slice: []float64{4, 10}, isNull: []bool{false, false}},
+					labels: []*valueContainer{{slice: []int{1, 10}, isNull: []bool{false, false}}}},
+				ignoreMissing: false},
+			&Series{
+				values: &valueContainer{slice: []float64{0, 8}, isNull: []bool{true, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Multiply(tt.args.other, tt.args.ignoreMissing); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Multiply() = %v, want %v", got.values, tt.want.values)
+			}
+		})
+	}
+}
+
+func TestSeries_Divide(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		other         *Series
+		ignoreMissing bool
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"ignore missing",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{
+				other: &Series{values: &valueContainer{slice: []float64{4, 10}, isNull: []bool{false, false}},
+					labels: []*valueContainer{{slice: []int{1, 10}, isNull: []bool{false, false}}}},
+				ignoreMissing: true},
+			&Series{
+				values: &valueContainer{slice: []float64{1, .5}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
+		{"missing as null - divide by 0",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{
+				other: &Series{values: &valueContainer{slice: []float64{0, 2, 10}, isNull: []bool{false, false, false}},
+					labels: []*valueContainer{{slice: []int{0, 1, 10}, isNull: []bool{false, false, false}}}},
+				ignoreMissing: false},
+			&Series{
+				values: &valueContainer{slice: []float64{0, 1, 0}, isNull: []bool{true, false, true}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Divide(tt.args.other, tt.args.ignoreMissing); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Divide() = %v, want %v", got.values, tt.want.values)
 			}
 		})
 	}

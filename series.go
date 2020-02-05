@@ -564,29 +564,39 @@ func (s *Series) Lookup(other *Series, how string, leftOn []string, rightOn []st
 	return ret
 }
 
-// Merge stub
-func (s *Series) Merge(other *Series) *Series {
-	return nil
-}
-
 // Add stub
-func (s *Series) Add(other *Series) *Series {
-	return nil
+func (s *Series) Add(other *Series, ignoreMissing bool) *Series {
+	fn := func(v1 float64, v2 float64) float64 {
+		return v1 + v2
+	}
+	return s.combineMath(other, ignoreMissing, fn)
 }
 
 // Subtract stub
-func (s *Series) Subtract(other *Series) *Series {
-	return nil
+func (s *Series) Subtract(other *Series, ignoreMissing bool) *Series {
+	fn := func(v1 float64, v2 float64) float64 {
+		return v1 - v2
+	}
+	return s.combineMath(other, ignoreMissing, fn)
 }
 
 // Multiply stub
-func (s *Series) Multiply(other *Series) *Series {
-	return nil
+func (s *Series) Multiply(other *Series, ignoreMissing bool) *Series {
+	fn := func(v1 float64, v2 float64) float64 {
+		return v1 * v2
+	}
+	return s.combineMath(other, ignoreMissing, fn)
 }
 
 // Divide stub
-func (s *Series) Divide(other *Series) *Series {
-	return nil
+func (s *Series) Divide(other *Series, ignoreMissing bool) *Series {
+	fn := func(v1 float64, v2 float64) float64 {
+		defer func() {
+			recover()
+		}()
+		return v1 / v2
+	}
+	return s.combineMath(other, ignoreMissing, fn)
 }
 
 // -- GROUPERS
