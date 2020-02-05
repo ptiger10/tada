@@ -77,16 +77,16 @@ type ApplyFn struct {
 
 // GroupedSeries stub
 type GroupedSeries struct {
-	groups    map[string][]int
-	reference *Series
-	Err       error
+	groups map[string][]int
+	series *Series
+	err    error
 }
 
 // GroupedDataFrame stub
 type GroupedDataFrame struct {
-	groups    map[string][]int
-	reference *DataFrame
-	Err       error
+	groups map[string][]int
+	df     *DataFrame
+	err    error
 }
 
 // DType stub

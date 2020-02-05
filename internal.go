@@ -45,8 +45,30 @@ func makeIntRange(min, max int) []int {
 	return ret
 }
 
-// containsLabel checks if a label identifier (spanning one or more levels) is contained within a slice of stringified value containers
-func containsLabel(label string, labels []*valueContainer) ([]int, error) {
+// search for a name only once. if it is found multiple times, return only the first
+func findMatchingKeysBetweenTwoLabels(labels1 []*valueContainer, labels2 []*valueContainer) ([]int, []int) {
+	var leftKeys, rightKeys []int
+	searched := make(map[string]bool)
+	for j := range labels1 {
+		key := labels1[j].name
+		if _, ok := searched[key]; ok {
+			continue
+		} else {
+			searched[key] = true
+		}
+		for k := range labels2 {
+			if key == labels2[k].name {
+				leftKeys = append(leftKeys, j)
+				rightKeys = append(rightKeys, k)
+				break
+			}
+		}
+	}
+	return leftKeys, rightKeys
+}
+
+// findLabelPositions returns a slice of row positions where `label` (spanning one or more levels) is contained within `labels`
+func findLabelPositions(label string, labels []*valueContainer) ([]int, error) {
 	toFind := strings.Split(label, "|")
 	for i := range toFind {
 		toFind[i] = strings.TrimSpace(toFind[i])
@@ -75,8 +97,8 @@ func containsLabel(label string, labels []*valueContainer) ([]int, error) {
 	return ret, nil
 }
 
-// levelWithName returns the position of the first level within labels with a name matching `name`, or an error if no level matches
-func levelWithName(name string, labels []*valueContainer) (int, error) {
+// findLevelWithName returns the position of the first level within `labels` with a name matching `name`, or an error if no level matches
+func findLevelWithName(name string, labels []*valueContainer) (int, error) {
 	for j := range labels {
 		if labels[j].name == name {
 			return j, nil
@@ -379,11 +401,11 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 	return nil
 }
 
-// labelNamesToIndex converts a slice of label names to index positions
+// labelNamesToIndex converts a slice of label names to index positions. If any name is not in index, returns an error
 func labelNamesToIndex(names []string, levels []*valueContainer) ([]int, error) {
 	ret := make([]int, len(names))
 	for i, name := range names {
-		lvl, err := levelWithName(name, levels)
+		lvl, err := findLevelWithName(name, levels)
 		if err != nil {
 			return nil, err
 		}
@@ -414,17 +436,19 @@ func labelsToStrings(labels []*valueContainer, index []int) []string {
 	return ret
 }
 
-// labelsToString reduces all label levels referenced in the index to a map
-// where the key is a single concatenated string of the labels
-// and the value is the integer position where the key first appears in the labels.
-func labelsToMap(labels []*valueContainer, index []int) map[string]int {
+// labelsToMap reduces all label levels referenced in the index to two maps:
+// the first where the key is a single concatenated string of the labels
+// and the value is an integer slice of all the positions where the key appears in the labels, preserving the order in which they appear,
+// and the second where the value is the integer of the first position where the key appears in the labels.
+func labelsToMap(labels []*valueContainer, index []int) (map[string][]int, map[string]int) {
 	sep := "|"
 	// coerce all label levels referenced in the index to string
 	labelStrings := make([][]string, len(index))
 	for j := range index {
 		labelStrings[j] = labels[index[j]].str().slice
 	}
-	ret := make(map[string]int, len(labelStrings[0]))
+	ret := make(map[string][]int, len(labelStrings[0]))
+	retFirst := make(map[string]int, len(labelStrings[0]))
 	// for each row, combine labels into a single string
 	l := len(labelStrings[0])
 	for i := 0; i < l; i++ {
@@ -434,10 +458,13 @@ func labelsToMap(labels []*valueContainer, index []int) map[string]int {
 		}
 		key := strings.Join(components, sep)
 		if _, ok := ret[key]; !ok {
-			ret[key] = i
+			ret[key] = []int{i}
+			retFirst[key] = i
+		} else {
+			ret[key] = append(ret[key], i)
 		}
 	}
-	return ret
+	return ret, retFirst
 }
 
 func matchLabelPositions(labels1 []string, labels2 map[string]int) []int {
@@ -507,7 +534,7 @@ func lookupWithAnchor(
 	values1 *valueContainer, labels1 []*valueContainer, leftOn []int,
 	values2 *valueContainer, labels2 []*valueContainer, rightOn []int) *Series {
 	toLookup := labelsToStrings(labels1, leftOn)
-	lookupSource := labelsToMap(labels2, rightOn)
+	_, lookupSource := labelsToMap(labels2, rightOn)
 	matches := matchLabelPositions(toLookup, lookupSource)
 	v := reflect.ValueOf(values2.slice)
 	isNull := make([]bool, len(matches))

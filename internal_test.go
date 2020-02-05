@@ -144,30 +144,6 @@ func Test_intersection(t *testing.T) {
 	}
 }
 
-func Test_labelsToMap(t *testing.T) {
-	type args struct {
-		labels []*valueContainer
-		index  []int
-	}
-	tests := []struct {
-		name string
-		args args
-		want map[string]int
-	}{
-		{"normal", args{[]*valueContainer{{slice: []float64{1}}, {slice: []string{"foo"}}}, []int{0, 1}}, map[string]int{"1|foo": 0}},
-		{"reversed", args{[]*valueContainer{{slice: []float64{1}}, {slice: []string{"foo"}}}, []int{1, 0}}, map[string]int{"foo|1": 0}},
-		{"skip", args{[]*valueContainer{{slice: []float64{1}}, {slice: []string{"foo"}}, {slice: []bool{true}}}, []int{2, 0}},
-			map[string]int{"true|1": 0}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := labelsToMap(tt.args.labels, tt.args.index); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("labelsToMap() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_lookup(t *testing.T) {
 	type args struct {
 		how     string
@@ -221,6 +197,39 @@ func Test_lookup(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("lookup() = %v, want %v", got.labels[0], tt.want.labels[0])
+			}
+		})
+	}
+}
+
+func Test_labelsToMap(t *testing.T) {
+	type args struct {
+		labels []*valueContainer
+		index  []int
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  map[string][]int
+		want1 map[string]int
+	}{
+		{"normal", args{[]*valueContainer{{slice: []float64{1}}, {slice: []string{"foo"}}}, []int{0, 1}},
+			map[string][]int{"1|foo": []int{0}}, map[string]int{"1|foo": 0}},
+		{"reversed", args{[]*valueContainer{{slice: []float64{1}}, {slice: []string{"foo"}}}, []int{1, 0}},
+			map[string][]int{"foo|1": []int{0}}, map[string]int{"foo|1": 0}},
+		{"skip", args{[]*valueContainer{{slice: []float64{1}}, {slice: []string{"foo"}}, {slice: []bool{true}}}, []int{2, 0}},
+			map[string][]int{"true|1": []int{0}}, map[string]int{"true|1": 0}},
+		{"multiple", args{[]*valueContainer{{slice: []float64{1, 1}}, {slice: []string{"foo", "foo"}}}, []int{0, 1}},
+			map[string][]int{"1|foo": []int{0, 1}}, map[string]int{"1|foo": 0}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := labelsToMap(tt.args.labels, tt.args.index)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("labelsToMap() got = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got1, tt.want1) {
+				t.Errorf("labelsToMap() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}

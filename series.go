@@ -212,7 +212,7 @@ func (s *Series) Null() *Series {
 
 // Index stub
 func (s *Series) Index(label string) ([]int, error) {
-	ret, err := containsLabel(label, s.labels)
+	ret, err := findLabelPositions(label, s.labels)
 	if err != nil {
 		return nil, fmt.Errorf("Index(): %v", err)
 	}
@@ -221,11 +221,11 @@ func (s *Series) Index(label string) ([]int, error) {
 
 // IndexRange stub
 func (s *Series) IndexRange(firstLabel, lastLabel string) ([]int, error) {
-	index1, err := containsLabel(firstLabel, s.labels)
+	index1, err := findLabelPositions(firstLabel, s.labels)
 	if err != nil {
 		return nil, fmt.Errorf("IndexRange(): %v", err)
 	}
-	index2, err := containsLabel(lastLabel, s.labels)
+	index2, err := findLabelPositions(lastLabel, s.labels)
 	if err != nil {
 		return nil, fmt.Errorf("IndexRange(): %v", err)
 	}
@@ -272,7 +272,7 @@ func (s *SeriesMutator) WithLabels(name string, input interface{}) {
 
 	// `input` is string: rename label level
 	case reflect.String:
-		lvl, err := levelWithName(name, s.series.labels)
+		lvl, err := findLevelWithName(name, s.series.labels)
 		if err != nil {
 			s.series.resetWithError(fmt.Errorf("WithLabels(): cannot rename label level: %v", err))
 			return
@@ -291,7 +291,7 @@ func (s *SeriesMutator) WithLabels(name string, input interface{}) {
 			return
 		}
 		// `input` is supported slice
-		lvl, err := levelWithName(name, s.series.labels)
+		lvl, err := findLevelWithName(name, s.series.labels)
 		if err != nil {
 			// `name` does not already exist: append new label level
 			s.series.labels = append(s.series.labels, &valueContainer{slice: input, name: name, isNull: isNull})
@@ -381,7 +381,7 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 		if by[i].ColName == "" {
 			vals = s.series.values.copy()
 		} else {
-			lvl, err := levelWithName(by[i].ColName, s.series.labels)
+			lvl, err := findLevelWithName(by[i].ColName, s.series.labels)
 			if err != nil {
 				s.series.resetWithError(fmt.Errorf(
 					"Sort(): cannot use label level: %v", err))
@@ -408,7 +408,7 @@ func (s *Series) Filter(filters ...FilterFn) []int {
 		var data *valueContainer
 		if filter.ColName == "" {
 			data = s.values
-		} else if lvl, err := levelWithName(filter.ColName, s.labels); err != nil {
+		} else if lvl, err := findLevelWithName(filter.ColName, s.labels); err != nil {
 			return []int{-999}
 		} else {
 			data = s.labels[lvl]
@@ -495,7 +495,7 @@ func (s *SeriesMutator) Apply(function ApplyFn) {
 	var err error
 	if function.ColName == "" {
 		data = s.series.values
-	} else if lvl, err := levelWithName(function.ColName, s.series.labels); err == nil {
+	} else if lvl, err := findLevelWithName(function.ColName, s.series.labels); err == nil {
 		data = s.series.labels[lvl]
 	} else {
 		if function.ColName == s.series.values.name {
@@ -514,28 +514,6 @@ func (s *SeriesMutator) Apply(function ApplyFn) {
 
 // -- MERGERS
 
-// search for a name only once. if it is found multiple times, return only the first
-func findMatchingLabelNames(labels1 []*valueContainer, labels2 []*valueContainer) ([]int, []int) {
-	var leftKeys, rightKeys []int
-	searched := make(map[string]bool)
-	for j := range labels1 {
-		key := labels1[j].name
-		if _, ok := searched[key]; ok {
-			continue
-		} else {
-			searched[key] = true
-		}
-		for k := range labels2 {
-			if key == labels2[k].name {
-				leftKeys = append(leftKeys, j)
-				rightKeys = append(rightKeys, k)
-				break
-			}
-		}
-	}
-	return leftKeys, rightKeys
-}
-
 // Lookup stub
 func (s *Series) Lookup(other *Series, how string, leftOn []string, rightOn []string) *Series {
 	var leftKeys, rightKeys []int
@@ -546,7 +524,7 @@ func (s *Series) Lookup(other *Series, how string, leftOn []string, rightOn []st
 		}
 	}
 	if len(leftOn) == 0 {
-		leftKeys, rightKeys = findMatchingLabelNames(s.labels, other.labels)
+		leftKeys, rightKeys = findMatchingKeysBetweenTwoLabels(s.labels, other.labels)
 	} else {
 		leftKeys, err = labelNamesToIndex(leftOn, s.labels)
 		if err != nil {
@@ -602,8 +580,16 @@ func (s *Series) Divide(other *Series, ignoreMissing bool) *Series {
 // -- GROUPERS
 
 // GroupBy stub
-func (s *Series) GroupBy(string) *GroupedSeries {
-	return nil
+func (s *Series) GroupBy(names ...string) *GroupedSeries {
+	index, err := labelNamesToIndex(names, s.labels)
+	if err != nil {
+		return &GroupedSeries{err: fmt.Errorf("GroupBy(): %v", err)}
+	}
+	g, _ := labelsToMap(s.labels, index)
+	return &GroupedSeries{
+		groups: g,
+		series: s,
+	}
 }
 
 // -- ITERATORS
