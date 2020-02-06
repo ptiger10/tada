@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 )
 
 // -- CONSTRUCTORS
@@ -412,13 +413,14 @@ func (df *DataFrame) DropCol(name string) *DataFrame {
 }
 
 // DropCol drops the first column matching `name`
-func (df *DataFrameMutator) DropCol(name string) *DataFrame {
+func (df *DataFrameMutator) DropCol(name string) {
 	toExclude, err := findColWithName(name, df.dataframe.values)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("DropCol(): %v", err))
+		df.dataframe.resetWithError(fmt.Errorf("DropCol(): %v", err))
 	}
 	index := excludeFromIndex(len(df.dataframe.values), toExclude)
-	return df.dataframe.SubsetCols(index)
+	df.SubsetCols(index)
+	return
 }
 
 // Drop removes the row at the specified index.
@@ -445,14 +447,63 @@ func (df *DataFrameMutator) Drop(index int) {
 	return
 }
 
-// SetLabels stub
-func (df *DataFrame) SetLabels(cols ...string) *DataFrame {
-	return nil
+// SetLabels removes the row at the specified index.
+// Returns a new DataFrame.
+func (df *DataFrame) SetLabels(colNames ...string) *DataFrame {
+	df.Copy()
+	df.InPlace().SetLabels(colNames...)
+	return df
 }
 
-// ResetLabels stub
-func (df *DataFrame) ResetLabels(labelNames ...string) *DataFrame {
-	return nil
+// SetLabels appends the column(s) supplied as `colNames` as label levels and drops the column(s).
+// The number of `colNames` supplied must be less than the number of columns in the Series.
+// Modifies the underlying DataFrame in place.
+func (df *DataFrameMutator) SetLabels(colNames ...string) {
+	if len(colNames) >= len(df.dataframe.values) {
+		df.dataframe.resetWithError(fmt.Errorf("SetLabels(): number of colNames must be less than number of columns (%d >= %d)",
+			len(colNames), len(df.dataframe.values)))
+	}
+	for i := 0; i < len(colNames); i++ {
+		index, err := findColWithName(colNames[i], df.dataframe.values)
+		if err != nil {
+			df.dataframe.resetWithError(fmt.Errorf("SetLabels(): %v", err))
+		}
+		df.dataframe.labels = append(df.dataframe.labels, df.dataframe.values[index])
+		df.DropCol(colNames[i])
+	}
+	return
+}
+
+// ResetLabels appends the label level(s) at the supplied index levels as columns and drops the levels.
+// If no index levels are supplied, all label levels are appended as columns and dropped as levels, and replaced by a default label column.
+// Returns a new DataFrame.
+func (df *DataFrame) ResetLabels(index ...int) *DataFrame {
+	df.Copy()
+	df.InPlace().ResetLabels(index...)
+	return df
+}
+
+// ResetLabels appends the label level(s) at the supplied index levels as columns and drops the levels.
+// If no index levels are supplied, all label levels are appended as columns and dropped as levels, and replaced by a default label column.
+// Modifies the underlying DataFrame in place.
+func (df *DataFrameMutator) ResetLabels(index ...int) {
+	if len(index) == 0 {
+		index = makeIntRange(0, df.dataframe.Levels())
+	}
+	for _, i := range index {
+		if i >= df.dataframe.Levels() {
+			df.dataframe.resetWithError(fmt.Errorf("ResetLabels(): index out of range (%d > %d)", i, df.dataframe.Levels()-1))
+		}
+		newVal := df.dataframe.labels[i]
+		newVal.name = regexp.MustCompile(`^\*`).ReplaceAllString(newVal.name, "")
+		df.dataframe.values = append(df.dataframe.values, newVal)
+		df.dataframe.labels, _ = subsetCols(df.dataframe.labels, excludeFromIndex(df.dataframe.Levels(), i))
+	}
+	if df.dataframe.Levels() == 0 {
+		labels, isNull := makeDefaultLabels(0, df.dataframe.Len())
+		df.dataframe.labels[0] = &valueContainer{slice: labels, isNull: isNull, name: "*0"}
+	}
+	return
 }
 
 // SetName stub

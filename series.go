@@ -100,10 +100,10 @@ func (s *Series) Levels() int {
 }
 
 // Elements returns the underlying value and isNull for each row.
-// If any `level` is provided, returns the Elements of the columns of labels at that level.
-func (s *Series) Elements(level ...int) []Element {
+// If any `labelLevel` is provided, returns the Elements of the columns of labels at that level.
+func (s *Series) Elements(labelLevel ...int) []Element {
 	ret := make([]Element, s.Len())
-	if len(level) == 0 {
+	if len(labelLevel) == 0 {
 		v := reflect.ValueOf(s.values.slice)
 		for i := 0; i < s.Len(); i++ {
 			ret[i] = Element{
@@ -111,9 +111,9 @@ func (s *Series) Elements(level ...int) []Element {
 				isNull: s.values.isNull[i],
 			}
 		}
-		// handle optional level
-	} else if len(level) > 0 {
-		lvl := level[0]
+		// handle optional labelLevel
+	} else if len(labelLevel) > 0 {
+		lvl := labelLevel[0]
 		if lvl >= len(s.labels) {
 			return []Element{}
 		}
@@ -616,13 +616,13 @@ func (s *Series) Std() float64 {
 // -- Slicers
 
 // SliceFloat64 coerces the Series values into []float64.
-// If `level` is provided, the column of labels at that level is coerced instead.
+// If `labelLevel` is provided, the column of labels at that level is coerced instead.
 // If multiple levels are provides, only the first is used. If the level is out of range, a nil value is returned.
-func (s *Series) SliceFloat64(level ...int) []float64 {
-	if len(level) == 0 {
+func (s *Series) SliceFloat64(labelLevel ...int) []float64 {
+	if len(labelLevel) == 0 {
 		return s.values.float().slice
 	}
-	lvl := level[0]
+	lvl := labelLevel[0]
 	if lvl >= s.Levels() {
 		return nil
 	}
@@ -630,13 +630,13 @@ func (s *Series) SliceFloat64(level ...int) []float64 {
 }
 
 // SliceString coerces the Series values into []string.
-// If `level` is provided, the column of labels at that level is coerced instead.
+// If `labelLevel` is provided, the column of labels at that level is coerced instead.
 // If multiple levels are provides, only the first is used. If the level is out of range, a nil value is returned.
-func (s *Series) SliceString(level ...int) []string {
-	if len(level) == 0 {
+func (s *Series) SliceString(labelLevel ...int) []string {
+	if len(labelLevel) == 0 {
 		return s.values.str().slice
 	}
-	lvl := level[0]
+	lvl := labelLevel[0]
 	if lvl >= s.Levels() {
 		return nil
 	}
@@ -644,13 +644,13 @@ func (s *Series) SliceString(level ...int) []string {
 }
 
 // SliceTime coerces the Series values into []time.Time.
-// If `level` is provided, the column of labels at that level is coerced instead.
+// If `labelLevel` is provided, the column of labels at that level is coerced instead.
 // If multiple levels are provides, only the first is used. If the level is out of range, a nil value is returned.
-func (s *Series) SliceTime(level ...int) []time.Time {
-	if len(level) == 0 {
+func (s *Series) SliceTime(labelLevel ...int) []time.Time {
+	if len(labelLevel) == 0 {
 		return s.values.dateTime().slice
 	}
-	lvl := level[0]
+	lvl := labelLevel[0]
 	if lvl >= s.Levels() {
 		return nil
 	}
@@ -658,13 +658,13 @@ func (s *Series) SliceTime(level ...int) []time.Time {
 }
 
 // SliceNulls returns whether each value is null or not.
-// If `level` is provided, the column of labels at that level is coerced instead.
+// If `labelLevel` is provided, the column of labels at that level is coerced instead.
 // If multiple levels are provides, only the first is used. If the level is out of range, a nil value is returned.
-func (s *Series) SliceNulls(level ...int) []bool {
-	if len(level) == 0 {
+func (s *Series) SliceNulls(labelLevel ...int) []bool {
+	if len(labelLevel) == 0 {
 		return s.values.isNull
 	}
-	lvl := level[0]
+	lvl := labelLevel[0]
 	if lvl >= s.Levels() {
 		return nil
 	}

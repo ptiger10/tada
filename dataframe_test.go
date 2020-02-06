@@ -680,3 +680,96 @@ func TestDataFrame_Null(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_SetLabels(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	type args struct {
+		colNames []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"normal", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:   "baz"},
+			args{[]string{"bar"}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"},
+					{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				name: "baz"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.SetLabels(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.SetLabels() = %v, want %v", got.values[0], tt.want.values[0])
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+			}
+		})
+	}
+}
+
+func TestDataFrame_ResetLabels(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	type args struct {
+		index []int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"normal", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
+				{slice: []int{1}, isNull: []bool{false}, name: "*1"}},
+			name: "baz"},
+			args{[]int{1}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				{slice: []int{1}, isNull: []bool{false}, name: "1"},
+			},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				name: "baz"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.ResetLabels(tt.args.index...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.ResetLabels() = %v, want %v", got.values[1], tt.want.values[1])
+			}
+		})
+	}
+}
