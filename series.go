@@ -3,9 +3,7 @@ package tada
 import (
 	"errors"
 	"fmt"
-	"math"
 	"reflect"
-	"sort"
 	"time"
 )
 
@@ -616,60 +614,38 @@ func (s *Series) IterRows() []map[string]Element {
 
 // Sum stub
 func (s *Series) Sum() float64 {
-	data := s.values.float()
-	var sum float64
-	for i, val := range data.slice {
-		if !data.isNull[i] {
-			sum += val
-		}
-	}
+	sum, _ := sum(
+		s.values.float().slice,
+		s.values.isNull,
+		makeIntRange(0, s.Len()))
 	return sum
 }
 
 // Mean stub
 func (s *Series) Mean() float64 {
-	data := s.values.float()
-	var sum float64
-	var counter float64
-	for i, val := range data.slice {
-		if !data.isNull[i] {
-			sum += val
-			counter++
-		}
-	}
-	return sum / counter
+	mean, _ := mean(
+		s.values.float().slice,
+		s.values.isNull,
+		makeIntRange(0, s.Len()))
+	return mean
 }
 
 // Median stub
 func (s *Series) Median() float64 {
-	data := s.Valid().values.float().slice
-	sort.Float64s(data)
-	if len(data) == 0 {
-		return math.NaN()
-	}
-	// rounds down if there are even number of elements
-	mNumber := len(data) / 2
-
-	// odd number of elements
-	if len(data)%2 != 0 {
-		return data[mNumber]
-	}
-	// even number of elements
-	return (data[mNumber-1] + data[mNumber]) / 2
+	median, _ := median(
+		s.values.float().slice,
+		s.values.isNull,
+		makeIntRange(0, s.Len()))
+	return median
 }
 
 // Std stub
 func (s *Series) Std() float64 {
-	mean := s.Mean()
-	data := s.values.float()
-	var variance, counter float64
-	for i, val := range data.slice {
-		if !data.isNull[i] {
-			variance += math.Pow((val - mean), 2)
-			counter++
-		}
-	}
-	return math.Pow(variance/counter, 0.5)
+	std, _ := std(
+		s.values.float().slice,
+		s.values.isNull,
+		makeIntRange(0, s.Len()))
+	return std
 }
 
 // -- Slicers

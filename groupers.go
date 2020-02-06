@@ -53,19 +53,20 @@ func (g *GroupedSeries) mathFunc(fn func(val []float64, isNull []bool, index []i
 
 // Sum stub
 func (g *GroupedSeries) Sum() *Series {
+	return g.mathFunc(sum)
+}
 
-	return g.mathFunc(func(v []float64, isNull []bool, index []int) (float64, bool) {
-		var sum float64
-		var atLeastOneValid bool
-		for _, i := range index {
-			if !isNull[i] {
-				sum += v[i]
-				atLeastOneValid = true
-			}
-		}
-		if !atLeastOneValid {
-			return 0, true
-		}
-		return sum, false
-	})
+// Mean stub
+func (g *GroupedSeries) Mean() *Series {
+	return g.mathFunc(mean)
+}
+
+// Median stub
+func (g *GroupedSeries) Median() *Series {
+	return g.mathFunc(median)
+}
+
+// Std stub
+func (g *GroupedSeries) Std() *Series {
+	return g.mathFunc(std)
 }

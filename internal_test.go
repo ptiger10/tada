@@ -223,7 +223,7 @@ func Test_labelsToMap(t *testing.T) {
 		{"multiple same", args{[]*valueContainer{{slice: []float64{1, 1}}, {slice: []string{"foo", "foo"}}}, []int{0, 1}},
 			map[string][]int{"1|foo": []int{0, 1}}, map[string]int{"1|foo": 0}, []string{"1|foo"}},
 		{"multiple different", args{[]*valueContainer{{slice: []float64{2, 1}}, {slice: []string{"foo", "bar"}}}, []int{0, 1}},
-			map[string][]int{"2|foo": []int{0}, "1|bar": []int{1}}, map[string]int{"1|bar": 0}, []string{"2|foo", "1|bar"}},
+			map[string][]int{"2|foo": []int{0}, "1|bar": []int{1}}, map[string]int{"1|bar": 1, "2|foo": 0}, []string{"2|foo", "1|bar"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -235,7 +235,7 @@ func Test_labelsToMap(t *testing.T) {
 				t.Errorf("labelsToMap() got1 = %v, want %v", got1, tt.want1)
 			}
 			if !reflect.DeepEqual(got2, tt.want2) {
-				t.Errorf("labelsToMap() got2 = %v, want %v", got1, tt.want1)
+				t.Errorf("labelsToMap() got2 = %v, want %v", got2, tt.want2)
 			}
 		})
 	}

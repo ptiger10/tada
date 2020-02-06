@@ -436,10 +436,11 @@ func labelsToStrings(labels []*valueContainer, index []int) []string {
 	return ret
 }
 
-// labelsToMap reduces all label levels referenced in the index to two maps:
-// the first where the key is a single concatenated string of the labels
+// labelsToMap reduces all label levels referenced in the index to two maps and a slice of strings:
+// 1) map[string][]int: the key is a single concatenated string of the labels
 // and the value is an integer slice of all the positions where the key appears in the labels, preserving the order in which they appear,
-// and the second where the value is the integer of the first position where the key appears in the labels.
+// 2) map[string]int: same key as above, but the value is the integer of the first position where the key appears in the labels.
+// 3) []string: the map keys in the order in which they appear in the Series
 func labelsToMap(labels []*valueContainer, index []int) (
 	allIndex map[string][]int, firstIndex map[string]int, orderedKeys []string) {
 	sep := "|"
@@ -450,7 +451,7 @@ func labelsToMap(labels []*valueContainer, index []int) (
 	}
 	allIndex = make(map[string][]int, len(labelStrings[0]))
 	firstIndex = make(map[string]int, len(labelStrings[0]))
-	orderedKeys = make([]string, len(labelStrings[0]))
+	orderedKeys = make([]string, 0)
 	// for each row, combine labels into a single string
 	l := len(labelStrings[0])
 	for i := 0; i < l; i++ {
@@ -462,7 +463,7 @@ func labelsToMap(labels []*valueContainer, index []int) (
 		if _, ok := allIndex[key]; !ok {
 			allIndex[key] = []int{i}
 			firstIndex[key] = i
-			orderedKeys[i] = key
+			orderedKeys = append(orderedKeys, key)
 		} else {
 			allIndex[key] = append(allIndex[key], i)
 		}
@@ -689,4 +690,88 @@ func isNullString(s string) bool {
 		}
 	}
 	return false
+}
+
+// math
+
+// sum sums the non-null values at the index positions in `vals`. If all values are null, the final result is null.
+// Compatible with Grouped calculations as well as Series
+func sum(vals []float64, isNull []bool, index []int) (float64, bool) {
+	var sum float64
+	var atLeastOneValid bool
+	for _, i := range index {
+		if !isNull[i] {
+			sum += vals[i]
+			atLeastOneValid = true
+		}
+	}
+	if !atLeastOneValid {
+		return 0, true
+	}
+	return sum, false
+}
+
+// mean calculates the mean of the non-null values at the index positions in `vals`.
+// If all values are null, the final result is null.
+// Compatible with Grouped calculations as well as Series
+func mean(vals []float64, isNull []bool, index []int) (float64, bool) {
+	var sum float64
+	var counter float64
+	var atLeastOneValid bool
+	for _, i := range index {
+		if !isNull[i] {
+			sum += vals[i]
+			counter++
+			atLeastOneValid = true
+		}
+	}
+	if !atLeastOneValid {
+		return 0, true
+	}
+	return sum / counter, false
+}
+
+// median calculates the median of the non-null values at the index positions in `vals`.
+// If all values are null, the final result is null.
+// Compatible with Grouped calculations as well as Series
+func median(vals []float64, isNull []bool, index []int) (float64, bool) {
+	data := make([]float64, 0)
+	for _, i := range index {
+		if !isNull[i] {
+			data = append(data, vals[i])
+		}
+	}
+	sort.Float64s(data)
+	if len(data) == 0 {
+		return math.NaN(), true
+	}
+	// rounds down if there are even number of elements
+	mNumber := len(data) / 2
+
+	// odd number of elements
+	if len(data)%2 != 0 {
+		return data[mNumber], false
+	}
+	// even number of elements
+	return (data[mNumber-1] + data[mNumber]) / 2, false
+}
+
+// std calculates the standard deviation of the non-null values at the index positions in `vals`.
+// If all values are null, the final result is null.
+// Compatible with Grouped calculations as well as Series
+func std(vals []float64, isNull []bool, index []int) (float64, bool) {
+	mean, _ := mean(vals, isNull, index)
+	var variance, counter float64
+	var atLeastOneValid bool
+	for _, i := range index {
+		if !isNull[i] {
+			variance += math.Pow((vals[i] - mean), 2)
+			counter++
+			atLeastOneValid = true
+		}
+	}
+	if !atLeastOneValid {
+		return 0, true
+	}
+	return math.Pow(variance/counter, 0.5), false
 }

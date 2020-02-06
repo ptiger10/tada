@@ -1245,3 +1245,112 @@ func TestSeries_Divide(t *testing.T) {
 		})
 	}
 }
+
+func TestSeries_Sum(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   float64
+	}{
+		{"pass", fields{values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}}}, 3},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Sum(); got != tt.want {
+				t.Errorf("Series.Sum() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Mean(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   float64
+	}{
+		{"pass", fields{values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}}}, 1.5},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Mean(); got != tt.want {
+				t.Errorf("Series.Mean() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Median(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   float64
+	}{
+		{"odd", fields{values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}}}, 1.5},
+		{"even", fields{values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}}, 2},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Median(); got != tt.want {
+				t.Errorf("Series.Median() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Std(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   float64
+	}{
+		{"pass", fields{values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}}}, 0.5},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Std(); got != tt.want {
+				t.Errorf("Series.Std() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
