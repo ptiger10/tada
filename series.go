@@ -177,24 +177,32 @@ func (s *SeriesMutator) SubsetLabels(index []int) {
 	return
 }
 
-// Head returns the first n rows of the Series. If n is greater than the length of the Series, returns the entire Series.
+// Head returns the first `n` rows of the Series. If `n` is greater than the length of the Series, returns the entire Series.
 // In either case, returns a new Series.
 func (s *Series) Head(n int) *Series {
 	if s.Len() < n {
 		n = s.Len()
 	}
-	index := makeIntRange(0, n)
-	return s.Subset(index)
+	retVals := s.values.head(n)
+	retLabels := make([]*valueContainer, s.Levels())
+	for j := range s.labels {
+		retLabels[j] = s.labels[j].head(n)
+	}
+	return &Series{values: retVals, labels: retLabels}
 }
 
-// Tail returns the last n rows of the Series. If n is greater than the length of the Series, returns the entire Series.
+// Tail returns the last `n` rows of the Series. If `n` is greater than the length of the Series, returns the entire Series.
 // In either case, returns a new Series.
-func (s *Series) Tail(rows int) *Series {
-	if s.Len() < rows {
-		rows = s.Len()
+func (s *Series) Tail(n int) *Series {
+	if s.Len() < n {
+		n = s.Len()
 	}
-	index := makeIntRange(s.Len()-rows, s.Len())
-	return s.Subset(index)
+	retVals := s.values.tail(n)
+	retLabels := make([]*valueContainer, s.Levels())
+	for j := range s.labels {
+		retLabels[j] = s.labels[j].tail(n)
+	}
+	return &Series{values: retVals, labels: retLabels}
 }
 
 // Valid returns all the rows with non-null values.

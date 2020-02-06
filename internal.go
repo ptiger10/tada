@@ -195,6 +195,33 @@ func (vc *valueContainer) subsetRows(index []int) error {
 	return nil
 }
 
+// head returns the number of rows specified by `n`
+func (vc *valueContainer) head(n int) *valueContainer {
+	v := reflect.ValueOf(vc.slice)
+	var retIsNull []bool
+	retVals := v.Slice(0, n)
+	retIsNull = vc.isNull[:n]
+
+	return &valueContainer{
+		slice:  retVals.Interface(),
+		isNull: retIsNull,
+	}
+}
+
+// tail returns the number of rows specified by `n`
+func (vc *valueContainer) tail(n int) *valueContainer {
+	v := reflect.ValueOf(vc.slice)
+	var retIsNull []bool
+	retVals := v.Slice(len(vc.isNull)-n, len(vc.isNull))
+	retIsNull = vc.isNull[len(vc.isNull)-n : len(vc.isNull)]
+
+	return &valueContainer{
+		slice:  retVals.Interface(),
+		isNull: retIsNull,
+		name:   vc.name,
+	}
+}
+
 func (vc *valueContainer) iterRow(index int) Element {
 	return Element{
 		val:    reflect.ValueOf(vc.slice).Index(index).Interface(),

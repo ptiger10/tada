@@ -42,20 +42,6 @@ func TestNewSeries(t *testing.T) {
 	}
 }
 
-// for DF to series conversion
-// {"unsupported dataframe with multiple columns", args{
-// 	slice: DataFrame{
-// 		values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}}, {slice: []float64{2}, isNull: []bool{false}}},
-// 		labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}}}}},
-// 	&Series{err: errors.New("unsupported input type (DataFrame with multiple columns); must be slice or DataFrame with single column")}},
-// {"dataframe with single column", args{
-// 	slice: DataFrame{
-// 		values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}}},
-// 		labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}}}},
-// },
-// 	&Series{values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
-// 		labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}}}}},
-
 func TestSeries_Copy(t *testing.T) {
 	type fields struct {
 		values *valueContainer
@@ -305,7 +291,7 @@ func TestSeries_Tail(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := s.Tail(tt.args.rows); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.Tail() = %v, want %v", got, tt.want)
+				t.Errorf("Series.Tail() = %v, want %v", got.values, tt.want.values)
 			}
 		})
 	}

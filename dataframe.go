@@ -199,10 +199,16 @@ func (df *DataFrame) ResetLabels(labelNames ...string) *DataFrame {
 	return nil
 }
 
-// Name stub
+// SetName stub
 // in place
-func (df *DataFrame) Name() {
-	return
+func (df *DataFrame) SetName() *DataFrame {
+	return nil
+}
+
+// SetCols stub
+// in place
+func (df *DataFrame) SetCols() *DataFrame {
+	return nil
 }
 
 // reshape
