@@ -506,16 +506,22 @@ func (df *DataFrameMutator) ResetLabels(index ...int) {
 	return
 }
 
-// SetName stub
-// in place
-func (df *DataFrame) SetName() *DataFrame {
-	return nil
+// SetName sets the name of a DataFrame and returns the entire DataFrame.
+func (df *DataFrame) SetName(name string) *DataFrame {
+	df.name = name
+	return df
 }
 
-// SetCols stub
-// in place
-func (df *DataFrame) SetCols() *DataFrame {
-	return nil
+// SetCols sets the names of all the columns in the DataFrame and returns the entire DataFrame.
+func (df *DataFrame) SetCols(colNames []string) *DataFrame {
+	if len(colNames) != len(df.values) {
+		return dataFrameWithError(
+			fmt.Errorf("SetCols(): number of colNames must match number of columns in DataFrame (%d != %d)", len(colNames), len(df.values)))
+	}
+	for k := range colNames {
+		df.values[k].name = colNames[k]
+	}
+	return df
 }
 
 // reshape
@@ -540,11 +546,39 @@ func (df *DataFrame) ColToLabel(name string) *DataFrame {
 	return nil
 }
 
-// filter
+// -- FILTERS
 
-// FilterFloat stub
-func (df *DataFrame) FilterFloat(func(val float64) bool) *DataFrame {
-	return nil
+// Filter stub
+func (df *DataFrame) Filter(filters ...FilterFn) []int {
+	var err error
+	if len(filters) == 0 {
+		return makeIntRange(0, df.Len())
+	}
+	// subIndexes contains the index positions computed across all the filters
+	var subIndexes [][]int
+	for _, filter := range filters {
+		var data *valueContainer
+		var lvl int
+
+		// first check column names
+		if lvl, err = findColWithName(filter.ColName, df.values); err == nil {
+			data = df.values[lvl]
+			// then check label level names
+		} else if lvl, err = findColWithName(filter.ColName, df.labels); err == nil {
+			data = df.labels[lvl]
+		} else {
+			return []int{-999}
+		}
+
+		subIndex, err := data.filter(filter)
+		if err != nil {
+			return []int{-999}
+		}
+		subIndexes = append(subIndexes, subIndex)
+	}
+	// reduce the subindexes to a single index that shares all the values
+	index := intersection(subIndexes)
+	return index
 }
 
 // apply

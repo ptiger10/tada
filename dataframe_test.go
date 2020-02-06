@@ -773,3 +773,54 @@ func TestDataFrame_ResetLabels(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_Filter(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	type args struct {
+		filters []FilterFn
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"multiple", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, false, false}, name: "bar"}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			args{[]FilterFn{
+				{F64: func(v float64, isNull bool) bool {
+					if v < 2 {
+						return true
+					}
+					return false
+				}, ColName: "foo"},
+				{String: func(v string, isNull bool) bool {
+					if strings.Contains(v, "oo") {
+						return true
+					}
+					return false
+				}, ColName: "bar"},
+			}}, []int{0}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.Filter(tt.args.filters...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Filter() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
