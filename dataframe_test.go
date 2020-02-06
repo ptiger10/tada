@@ -418,3 +418,265 @@ func TestDataFrame_FilterCols(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_WithCol(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	type args struct {
+		name  string
+		input interface{}
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"rename column", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name: "bar"},
+			args{"foo", "qux"},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "qux"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				name: "bar"},
+		},
+		{"replace column", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name: "bar"},
+			args{"foo", []float64{10}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{10}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				name: "bar"},
+		},
+		{"append column", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name: "bar"},
+			args{"baz", []float64{10}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				{slice: []float64{10}, isNull: []bool{false}, name: "baz"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				name: "bar"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.WithCol(tt.args.name, tt.args.input); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.WithCol() = %v, want %v", got.values[0], tt.want.values[0])
+			}
+		})
+	}
+}
+
+func TestDataFrame_WithLabels(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	type args struct {
+		name  string
+		input interface{}
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"rename column", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name: "bar"},
+			args{"*0", "qux"},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "qux"}},
+				name: "bar"},
+		},
+		{"replace column", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name: "bar"},
+			args{"*0", []int{10}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{10}, isNull: []bool{false}, name: "*0"}},
+				name: "bar"},
+		},
+		{"append column", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name: "bar"},
+			args{"baz", []float64{10}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"},
+					{slice: []float64{10}, isNull: []bool{false}, name: "baz"}},
+				name: "bar"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.WithLabels(tt.args.name, tt.args.input); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.WithLabels() = %v, want %v", got.values[0], tt.want.values[0])
+			}
+		})
+	}
+}
+
+func TestDataFrame_Valid(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	type args struct {
+		subset []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"all", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{true, false, false}, name: "0"},
+				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, true, false}, name: "1"}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			name:   "baz"},
+			args{nil},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{2}, isNull: []bool{false}, name: "0"},
+				{slice: []string{"bar"}, isNull: []bool{false}, name: "1"}},
+				labels: []*valueContainer{{slice: []int{2}, isNull: []bool{false}, name: "*0"}},
+				name:   "baz"},
+		},
+		{"subset", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{true, false, false}, name: "0"},
+				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, true, false}, name: "1"}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			name:   "baz"},
+			args{[]string{"0"}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"},
+				{slice: []string{"", "bar"}, isNull: []bool{true, false}, name: "1"}},
+				labels: []*valueContainer{{slice: []int{1, 2}, isNull: []bool{false, false}, name: "*0"}},
+				name:   "baz"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.Valid(tt.args.subset...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Valid() = %v, want %v", got.values[0], tt.want.values[0])
+			}
+		})
+	}
+}
+
+func TestDataFrame_Null(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	type args struct {
+		subset []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"all", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{true, false, false}, name: "0"},
+				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, true, false}, name: "1"}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			name:   "baz"},
+			args{nil},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "0"},
+				{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "1"}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				name:   "baz"},
+		},
+		{"subset", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{true, false, false}, name: "0"},
+				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, true, false}, name: "1"}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			name:   "baz"},
+			args{[]string{"0"}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{0}, isNull: []bool{true}, name: "0"},
+				{slice: []string{"foo"}, isNull: []bool{false}, name: "1"}},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				name:   "baz"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.Null(tt.args.subset...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Null() = %v, want %v", got.values[0], tt.want.values[0])
+			}
+		})
+	}
+}

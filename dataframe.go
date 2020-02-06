@@ -280,6 +280,7 @@ func (df *DataFrame) Valid(subset ...string) *DataFrame {
 			}
 			index = append(index, i)
 		}
+
 	}
 
 	subIndexes := make([][]int, len(index))
@@ -402,14 +403,46 @@ func (df *DataFrame) WithRow(label string, values []interface{}) *DataFrame {
 	return nil
 }
 
-// Drop stub
-func (df *DataFrame) Drop(index []int, dimension Dimension) *DataFrame {
-	return nil
+// DropCol drops the first column matching `name`
+// Returns a new DataFrame.
+func (df *DataFrame) DropCol(name string) *DataFrame {
+	df.Copy()
+	df.InPlace().DropCol(name)
+	return df
 }
 
-// DropNull stub
-func (df *DataFrame) DropNull(cols ...string) *DataFrame {
-	return nil
+// DropCol drops the first column matching `name`
+func (df *DataFrameMutator) DropCol(name string) *DataFrame {
+	toExclude, err := findColWithName(name, df.dataframe.values)
+	if err != nil {
+		return dataFrameWithError(fmt.Errorf("DropCol(): %v", err))
+	}
+	index := excludeFromIndex(len(df.dataframe.values), toExclude)
+	return df.dataframe.SubsetCols(index)
+}
+
+// Drop removes the row at the specified index.
+// Returns a new DataFrame.
+func (df *DataFrame) Drop(index int) *DataFrame {
+	df.Copy()
+	df.InPlace().Drop(index)
+	return df
+}
+
+// Drop removes the row at the specified index.
+// Modifies the underlying DataFrame in place.
+func (df *DataFrameMutator) Drop(index int) {
+	for k := range df.dataframe.values {
+		err := df.dataframe.values[k].dropRow(index)
+		if err != nil {
+			df.dataframe.resetWithError(fmt.Errorf("Drop(): %v", err))
+			return
+		}
+	}
+	for j := range df.dataframe.labels {
+		df.dataframe.labels[j].dropRow(index)
+	}
+	return
 }
 
 // SetLabels stub

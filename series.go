@@ -221,8 +221,16 @@ func (s *Series) Range(first, last int) *Series {
 // Valid returns all the rows with non-null values.
 // Returns a new Series.
 func (s *Series) Valid() *Series {
-	index := s.values.valid()
-	return s.Subset(index)
+	s = s.Copy()
+	s.InPlace().Valid()
+	return s
+}
+
+// Valid returns all the rows with non-null values.
+// Modifies the underlying Series.
+func (s *SeriesMutator) Valid() {
+	index := s.series.values.valid()
+	s.Subset(index)
 }
 
 // Null returns all the rows with null values.
@@ -274,41 +282,6 @@ func (s *SeriesMutator) WithLabels(name string, input interface{}) {
 	s.series.labels = labels
 }
 
-func withColumn(cols []*valueContainer, name string, input interface{}, requiredLen int) ([]*valueContainer, error) {
-	switch reflect.TypeOf(input).Kind() {
-	// `input` is string: rename label level
-	case reflect.String:
-		lvl, err := findColWithName(name, cols)
-		if err != nil {
-			return nil, fmt.Errorf("cannot rename column: %v", err)
-		}
-		cols[lvl].name = input.(string)
-	case reflect.Slice:
-		isNull := setNullsFromInterface(input)
-		if isNull == nil {
-			return nil, fmt.Errorf("unable to calculate null values ([]%v not supported)", reflect.TypeOf(input).Elem())
-		}
-		if l := reflect.ValueOf(input).Len(); l != requiredLen {
-			return nil, fmt.Errorf(
-				"cannot replace items in column %s: length of input does not match existing length (%d != %d)",
-				name, l, requiredLen)
-		}
-		// `input` is supported slice
-		lvl, err := findColWithName(name, cols)
-		if err != nil {
-			// `name` does not already exist: append new label level
-			cols = append(cols, &valueContainer{slice: input, name: name, isNull: isNull})
-		} else {
-			// `name` already exists: overwrite existing label level
-			cols[lvl].slice = input
-			cols[lvl].isNull = isNull
-		}
-	default:
-		return nil, fmt.Errorf("unsupported input kind: must be either slice or string")
-	}
-	return cols, nil
-}
-
 // WithRow stub
 func (s *Series) WithRow(label string, values interface{}) *Series {
 	return nil
@@ -330,25 +303,9 @@ func (s *SeriesMutator) Drop(index int) {
 		s.series.resetWithError(fmt.Errorf("Drop(): %v", err))
 		return
 	}
-	for j := 0; j < len(s.series.labels); j++ {
+	for j := range s.series.labels {
 		s.series.labels[j].dropRow(index)
 	}
-}
-
-// DropNull removes the null values in the Series.
-// Returns a new Series.
-func (s *Series) DropNull() *Series {
-	s.Copy()
-	s.InPlace().DropNull()
-	return s
-}
-
-// DropNull removes the null values in the Series.
-// Modifies the underlying Series in place.
-func (s *SeriesMutator) DropNull() {
-	index := s.series.values.valid()
-	s.Subset(index)
-	return
 }
 
 // Name modifies the name of a Series in place and returns the original Series.

@@ -103,6 +103,41 @@ func findColWithName(name string, cols []*valueContainer) (int, error) {
 	return 0, fmt.Errorf("name (%v) does not match any existing column", name)
 }
 
+func withColumn(cols []*valueContainer, name string, input interface{}, requiredLen int) ([]*valueContainer, error) {
+	switch reflect.TypeOf(input).Kind() {
+	// `input` is string: rename label level
+	case reflect.String:
+		lvl, err := findColWithName(name, cols)
+		if err != nil {
+			return nil, fmt.Errorf("cannot rename column: %v", err)
+		}
+		cols[lvl].name = input.(string)
+	case reflect.Slice:
+		isNull := setNullsFromInterface(input)
+		if isNull == nil {
+			return nil, fmt.Errorf("unable to calculate null values ([]%v not supported)", reflect.TypeOf(input).Elem())
+		}
+		if l := reflect.ValueOf(input).Len(); l != requiredLen {
+			return nil, fmt.Errorf(
+				"cannot replace items in column %s: length of input does not match existing length (%d != %d)",
+				name, l, requiredLen)
+		}
+		// `input` is supported slice
+		lvl, err := findColWithName(name, cols)
+		if err != nil {
+			// `name` does not already exist: append new label level
+			cols = append(cols, &valueContainer{slice: input, name: name, isNull: isNull})
+		} else {
+			// `name` already exists: overwrite existing label level
+			cols[lvl].slice = input
+			cols[lvl].isNull = isNull
+		}
+	default:
+		return nil, fmt.Errorf("unsupported input kind: must be either slice or string")
+	}
+	return cols, nil
+}
+
 func intersection(slices [][]int) []int {
 	set := make(map[int]int)
 	for _, slice := range slices {
@@ -560,7 +595,7 @@ func lookup(how string,
 		return lookupWithAnchor(values2, labels2, rightOn, values1, labels1, leftOn), nil
 	case "inner":
 		s := lookupWithAnchor(values1, labels1, leftOn, values2, labels2, rightOn)
-		s.InPlace().DropNull()
+		s = s.Valid()
 		return s, nil
 	default:
 		return nil, fmt.Errorf("unsupported how: must be `left`, `right`, or `inner`")
@@ -643,6 +678,16 @@ func (vc *valueContainer) dropRow(index int) error {
 	vc.slice = retVals.Interface()
 	vc.isNull = retIsNull
 	return nil
+}
+
+func excludeFromIndex(indexLength int, item int) []int {
+	var ret []int
+	for i := 0; i < indexLength; i++ {
+		if i != item {
+			ret = append(ret, i)
+		}
+	}
+	return ret
 }
 
 func (vc *valueContainer) copy() *valueContainer {
