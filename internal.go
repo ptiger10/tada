@@ -425,11 +425,11 @@ func labelsToStrings(labels []*valueContainer, index []int) []string {
 	ret := make([]string, len(labelStrings[0]))
 	// for each row, combine labels into one concatenated string
 	for i := 0; i < len(labelStrings[0]); i++ {
-		components := make([]string, len(labels))
+		labelComponents := make([]string, len(labels))
 		for j := range labels {
-			components[j] = labelStrings[j][i]
+			labelComponents[j] = labelStrings[j][i]
 		}
-		concatenatedString := strings.Join(components, sep)
+		concatenatedString := strings.Join(labelComponents, sep)
 		ret[i] = concatenatedString
 	}
 	// return a single slice of strings
@@ -440,31 +440,34 @@ func labelsToStrings(labels []*valueContainer, index []int) []string {
 // the first where the key is a single concatenated string of the labels
 // and the value is an integer slice of all the positions where the key appears in the labels, preserving the order in which they appear,
 // and the second where the value is the integer of the first position where the key appears in the labels.
-func labelsToMap(labels []*valueContainer, index []int) (map[string][]int, map[string]int) {
+func labelsToMap(labels []*valueContainer, index []int) (
+	allIndex map[string][]int, firstIndex map[string]int, orderedKeys []string) {
 	sep := "|"
 	// coerce all label levels referenced in the index to string
 	labelStrings := make([][]string, len(index))
 	for j := range index {
 		labelStrings[j] = labels[index[j]].str().slice
 	}
-	ret := make(map[string][]int, len(labelStrings[0]))
-	retFirst := make(map[string]int, len(labelStrings[0]))
+	allIndex = make(map[string][]int, len(labelStrings[0]))
+	firstIndex = make(map[string]int, len(labelStrings[0]))
+	orderedKeys = make([]string, len(labelStrings[0]))
 	// for each row, combine labels into a single string
 	l := len(labelStrings[0])
 	for i := 0; i < l; i++ {
-		components := make([]string, len(labelStrings))
+		labelComponents := make([]string, len(labelStrings))
 		for j := range labelStrings {
-			components[j] = labelStrings[j][i]
+			labelComponents[j] = labelStrings[j][i]
 		}
-		key := strings.Join(components, sep)
-		if _, ok := ret[key]; !ok {
-			ret[key] = []int{i}
-			retFirst[key] = i
+		key := strings.Join(labelComponents, sep)
+		if _, ok := allIndex[key]; !ok {
+			allIndex[key] = []int{i}
+			firstIndex[key] = i
+			orderedKeys[i] = key
 		} else {
-			ret[key] = append(ret[key], i)
+			allIndex[key] = append(allIndex[key], i)
 		}
 	}
-	return ret, retFirst
+	return
 }
 
 func matchLabelPositions(labels1 []string, labels2 map[string]int) []int {
@@ -530,11 +533,13 @@ func (s *Series) combineMath(other *Series, ignoreMissing bool, fn func(v1 float
 	return &Series{values: &valueContainer{slice: retFloat, isNull: retIsNull}, labels: s.labels}
 }
 
+// cuts labels by leftOn and rightOn, anchors to labels in labels1, finds matches in labels2
+// looks up values in values2, converts to Series and keeps the same name as values1
 func lookupWithAnchor(
 	values1 *valueContainer, labels1 []*valueContainer, leftOn []int,
 	values2 *valueContainer, labels2 []*valueContainer, rightOn []int) *Series {
 	toLookup := labelsToStrings(labels1, leftOn)
-	_, lookupSource := labelsToMap(labels2, rightOn)
+	_, lookupSource, _ := labelsToMap(labels2, rightOn)
 	matches := matchLabelPositions(toLookup, lookupSource)
 	v := reflect.ValueOf(values2.slice)
 	isNull := make([]bool, len(matches))

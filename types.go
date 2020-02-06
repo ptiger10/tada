@@ -77,9 +77,10 @@ type ApplyFn struct {
 
 // GroupedSeries stub
 type GroupedSeries struct {
-	groups map[string][]int
-	series *Series
-	err    error
+	groups      map[string][]int
+	orderedKeys []string
+	series      *Series
+	err         error
 }
 
 // GroupedDataFrame stub

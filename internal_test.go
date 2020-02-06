@@ -212,24 +212,30 @@ func Test_labelsToMap(t *testing.T) {
 		args  args
 		want  map[string][]int
 		want1 map[string]int
+		want2 []string
 	}{
 		{"normal", args{[]*valueContainer{{slice: []float64{1}}, {slice: []string{"foo"}}}, []int{0, 1}},
-			map[string][]int{"1|foo": []int{0}}, map[string]int{"1|foo": 0}},
+			map[string][]int{"1|foo": []int{0}}, map[string]int{"1|foo": 0}, []string{"1|foo"}},
 		{"reversed", args{[]*valueContainer{{slice: []float64{1}}, {slice: []string{"foo"}}}, []int{1, 0}},
-			map[string][]int{"foo|1": []int{0}}, map[string]int{"foo|1": 0}},
+			map[string][]int{"foo|1": []int{0}}, map[string]int{"foo|1": 0}, []string{"foo|1"}},
 		{"skip", args{[]*valueContainer{{slice: []float64{1}}, {slice: []string{"foo"}}, {slice: []bool{true}}}, []int{2, 0}},
-			map[string][]int{"true|1": []int{0}}, map[string]int{"true|1": 0}},
-		{"multiple", args{[]*valueContainer{{slice: []float64{1, 1}}, {slice: []string{"foo", "foo"}}}, []int{0, 1}},
-			map[string][]int{"1|foo": []int{0, 1}}, map[string]int{"1|foo": 0}},
+			map[string][]int{"true|1": []int{0}}, map[string]int{"true|1": 0}, []string{"true|1"}},
+		{"multiple same", args{[]*valueContainer{{slice: []float64{1, 1}}, {slice: []string{"foo", "foo"}}}, []int{0, 1}},
+			map[string][]int{"1|foo": []int{0, 1}}, map[string]int{"1|foo": 0}, []string{"1|foo"}},
+		{"multiple different", args{[]*valueContainer{{slice: []float64{2, 1}}, {slice: []string{"foo", "bar"}}}, []int{0, 1}},
+			map[string][]int{"2|foo": []int{0}, "1|bar": []int{1}}, map[string]int{"1|bar": 0}, []string{"2|foo", "1|bar"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := labelsToMap(tt.args.labels, tt.args.index)
+			got, got1, got2 := labelsToMap(tt.args.labels, tt.args.index)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("labelsToMap() got = %v, want %v", got, tt.want)
 			}
 			if !reflect.DeepEqual(got1, tt.want1) {
 				t.Errorf("labelsToMap() got1 = %v, want %v", got1, tt.want1)
+			}
+			if !reflect.DeepEqual(got2, tt.want2) {
+				t.Errorf("labelsToMap() got2 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}
