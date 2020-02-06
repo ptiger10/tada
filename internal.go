@@ -21,6 +21,12 @@ func seriesWithError(err error) *Series {
 	}
 }
 
+func dataFrameWithError(err error) *DataFrame {
+	return &DataFrame{
+		err: err,
+	}
+}
+
 func isSlice(input interface{}) bool {
 	return reflect.TypeOf(input).Kind() == reflect.Slice
 }

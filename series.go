@@ -16,6 +16,9 @@ func NewSeries(slice interface{}, labels ...interface{}) *Series {
 	if !isSlice(slice) {
 		return &Series{err: fmt.Errorf("NewSeries(): unsupported kind (%v); must be slice", reflect.TypeOf(slice))}
 	}
+	if reflect.ValueOf(slice).Len() == 0 {
+		return &Series{err: fmt.Errorf("NewSeries(): slice cannot be empty")}
+	}
 	isNull := setNullsFromInterface(slice)
 	if isNull == nil {
 		return &Series{err: fmt.Errorf(
@@ -397,14 +400,18 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 // -- FILTERS
 
 // Filter applies one or more filters to a Series and returns the intersection of the row positions that satisfy all filters.
+// If no filter is provided, returns a list of all index positions in the Series.
+// In event of error, returns []int
 func (s *Series) Filter(filters ...FilterFn) []int {
 	if len(filters) == 0 {
 		return makeIntRange(0, s.Len())
 	}
+	// subIndexes contains the index positions computed across all the filters
 	var subIndexes [][]int
 	for _, filter := range filters {
 		var data *valueContainer
-		if filter.ColName == "" {
+		// if no column name is specified in a filter, use the series values
+		if filter.ColName == "" || filter.ColName == s.values.name {
 			data = s.values
 		} else if lvl, err := findLevelWithName(filter.ColName, s.labels); err != nil {
 			return []int{-999}
@@ -417,6 +424,7 @@ func (s *Series) Filter(filters ...FilterFn) []int {
 		}
 		subIndexes = append(subIndexes, subIndex)
 	}
+	// reduce the subindexes to a single index that shares all the values
 	index := intersection(subIndexes)
 	return index
 }
@@ -485,25 +493,22 @@ func (s *Series) Apply(function ApplyFn) *Series {
 	return s
 }
 
-// Apply applies a user-defined function to every row in the Series and coerces all values to match the function type.
+// Apply applies a user-defined `lambda` function to every row in the Series and coerces all values to match the lambda type.
 // Apply may be applied to a level of labels (if no column is specified, the main Series values are used).
 // Modifies the underlying Series in place.
-func (s *SeriesMutator) Apply(function ApplyFn) {
+func (s *SeriesMutator) Apply(lambda ApplyFn) {
 	var data *valueContainer
 	var err error
-	if function.ColName == "" {
+	// if colName is not specified, use the main values
+	if lambda.ColName == "" || lambda.ColName == s.series.values.name {
 		data = s.series.values
-	} else if lvl, err := findLevelWithName(function.ColName, s.series.labels); err == nil {
+	} else if lvl, err := findLevelWithName(lambda.ColName, s.series.labels); err == nil {
 		data = s.series.labels[lvl]
 	} else {
-		if function.ColName == s.series.values.name {
-			data = s.series.values
-		} else {
-			s.series.resetWithError(fmt.Errorf("Apply(): %v", err))
-			return
-		}
+		s.series.resetWithError(fmt.Errorf("Apply(): %v", err))
+		return
 	}
-	data.slice, err = data.apply(function)
+	data.slice, err = data.apply(lambda)
 	if err != nil {
 		s.series.resetWithError(fmt.Errorf("Apply(): %v", err))
 	}
