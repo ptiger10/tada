@@ -24,6 +24,10 @@ func NewSeries(slice interface{}, labels ...interface{}) *Series {
 		return &Series{err: fmt.Errorf(
 			"NewSeries(): unable to calculate null values ([]%v not supported)", reflect.TypeOf(slice).Elem())}
 	}
+	elements := handleElementsSlice(slice)
+	if elements != nil {
+		slice = elements
+	}
 	values := &valueContainer{slice: slice, isNull: isNull}
 
 	// handle labels
@@ -44,13 +48,9 @@ func NewSeries(slice interface{}, labels ...interface{}) *Series {
 					"NewSeries(): unable to calculate null values at level %d ([]%v not supported)", i, reflect.TypeOf(input).Elem()))
 			}
 			// handle special case of []Element: convert to []interface{}
-			elements, ok := input.([]Element)
-			if ok {
-				ret := make([]interface{}, len(isNull))
-				for i := range ret {
-					ret[i] = elements[i].val
-				}
-				input = ret
+			elements := handleElementsSlice(slice)
+			if elements != nil {
+				input = elements
 			}
 			retLabels[i] = &valueContainer{slice: input, isNull: isNull, name: fmt.Sprintf("*%d", i)}
 		}
@@ -147,13 +147,13 @@ func (s *SeriesMutator) Subset(index []int) {
 		s.series.resetWithError(fmt.Errorf("Subset(): %v", err))
 		return
 	}
-	for j := 0; j < len(s.series.labels); j++ {
+	for j := range s.series.labels {
 		s.series.labels[j].subsetRows(index)
 	}
 	return
 }
 
-// SubsetLabels returns only the labels specified at the index positions, in the order specified.
+// SubsetLabels includes only the columns of labels specified at the index positions, in the order specified.
 // Returns a new Series.
 func (s *Series) SubsetLabels(index []int) *Series {
 	s = s.Copy()
@@ -161,19 +161,15 @@ func (s *Series) SubsetLabels(index []int) *Series {
 	return s
 }
 
-// SubsetLabels returns only the labels specified at the index positions, in the order specified.
+// SubsetLabels includes only the columns of labels specified at the index positions, in the order specified.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) SubsetLabels(index []int) {
-	l := len(s.series.labels)
-	retLabels := make([]*valueContainer, len(index))
-	for indexPosition, indexValue := range index {
-		if indexValue >= l {
-			s.series.resetWithError(fmt.Errorf("SubsetLabels(): index out of range (%d > %d)", indexValue, l-1))
-			return
-		}
-		retLabels[indexPosition] = s.series.labels[indexValue]
+	labels, err := subsetCols(s.series.labels, index)
+	if err != nil {
+		s.series.resetWithError(fmt.Errorf("SubsetLabels(): %v", err))
+		return
 	}
-	s.series.labels = retLabels
+	s.series.labels = labels
 	return
 }
 
@@ -205,6 +201,23 @@ func (s *Series) Tail(n int) *Series {
 	return &Series{values: retVals, labels: retLabels}
 }
 
+// Range returns the rows of the Series starting at `first` and `ending` with last (inclusive).
+// If either `first` or `last` is greater than the length of the Series, a Series error is returned.
+// In all cases, returns a new Series.
+func (s *Series) Range(first, last int) *Series {
+	if first >= s.Len() {
+		return seriesWithError(fmt.Errorf("Range(): first index out of range (%d > %d)", first, s.Len()-1))
+	} else if last >= s.Len() {
+		return seriesWithError(fmt.Errorf("Range(): last index out of range (%d > %d)", last, s.Len()-1))
+	}
+	retVals := s.values.rangeSlice(first, last)
+	retLabels := make([]*valueContainer, s.Levels())
+	for j := range s.labels {
+		retLabels[j] = s.labels[j].rangeSlice(first, last)
+	}
+	return &Series{values: retVals, labels: retLabels}
+}
+
 // Valid returns all the rows with non-null values.
 // Returns a new Series.
 func (s *Series) Valid() *Series {
@@ -217,29 +230,6 @@ func (s *Series) Valid() *Series {
 func (s *Series) Null() *Series {
 	index := s.values.null()
 	return s.Subset(index)
-}
-
-// Index stub
-func (s *Series) Index(label string) ([]int, error) {
-	ret, err := findLabelPositions(label, s.labels)
-	if err != nil {
-		return nil, fmt.Errorf("Index(): %v", err)
-	}
-	return ret, nil
-}
-
-// IndexRange stub
-func (s *Series) IndexRange(firstLabel, lastLabel string) ([]int, error) {
-	index1, err := findLabelPositions(firstLabel, s.labels)
-	if err != nil {
-		return nil, fmt.Errorf("IndexRange(): %v", err)
-	}
-	index2, err := findLabelPositions(lastLabel, s.labels)
-	if err != nil {
-		return nil, fmt.Errorf("IndexRange(): %v", err)
-	}
-	index := makeIntRange(minIntSlice(index1), maxIntSlice(index2)+1)
-	return index, nil
 }
 
 // -- SETTERS
@@ -277,41 +267,46 @@ func (s *Series) WithLabels(name string, input interface{}) *Series {
 // Error conditions: supplying slice of unsupported type, supplying slice with a different length than the underlying Series, or supplying scalar string and `name` that does not match an existing label level.
 // In all cases, modifies the underlying Series in place.
 func (s *SeriesMutator) WithLabels(name string, input interface{}) {
-	switch reflect.TypeOf(input).Kind() {
+	labels, err := withColumn(s.series.labels, name, input, s.series.Len())
+	if err != nil {
+		s.series.resetWithError(fmt.Errorf("WithLabels(): %v", err))
+	}
+	s.series.labels = labels
+}
 
+func withColumn(cols []*valueContainer, name string, input interface{}, requiredLen int) ([]*valueContainer, error) {
+	switch reflect.TypeOf(input).Kind() {
 	// `input` is string: rename label level
 	case reflect.String:
-		lvl, err := findLevelWithName(name, s.series.labels)
+		lvl, err := findColWithName(name, cols)
 		if err != nil {
-			s.series.resetWithError(fmt.Errorf("WithLabels(): cannot rename label level: %v", err))
-			return
+			return nil, fmt.Errorf("cannot rename column: %v", err)
 		}
-		s.series.labels[lvl].name = input.(string)
-		return
+		cols[lvl].name = input.(string)
 	case reflect.Slice:
 		isNull := setNullsFromInterface(input)
 		if isNull == nil {
-			s.series.resetWithError(fmt.Errorf("WithLabels(): unable to calculate null values ([]%v not supported)", reflect.TypeOf(input).Elem()))
-			return
+			return nil, fmt.Errorf("unable to calculate null values ([]%v not supported)", reflect.TypeOf(input).Elem())
 		}
-		if l := reflect.ValueOf(input).Len(); l != s.series.Len() {
-			s.series.resetWithError(fmt.Errorf(
-				"WithLabels(): cannot replace labels in level %s: length of input does not match length of Series (%d != %d)", name, l, s.series.Len()))
-			return
+		if l := reflect.ValueOf(input).Len(); l != requiredLen {
+			return nil, fmt.Errorf(
+				"cannot replace items in column %s: length of input does not match existing length (%d != %d)",
+				name, l, requiredLen)
 		}
 		// `input` is supported slice
-		lvl, err := findLevelWithName(name, s.series.labels)
+		lvl, err := findColWithName(name, cols)
 		if err != nil {
 			// `name` does not already exist: append new label level
-			s.series.labels = append(s.series.labels, &valueContainer{slice: input, name: name, isNull: isNull})
-			return
+			cols = append(cols, &valueContainer{slice: input, name: name, isNull: isNull})
+		} else {
+			// `name` already exists: overwrite existing label level
+			cols[lvl].slice = input
+			cols[lvl].isNull = isNull
 		}
-		// `name` already exists: overwrite existing label level
-		s.series.labels[lvl].slice = input
-		s.series.labels[lvl].isNull = isNull
 	default:
-		s.series.resetWithError(fmt.Errorf("WithLabels(): unsupported input kind: must be either slice or string"))
+		return nil, fmt.Errorf("unsupported input kind: must be either slice or string")
 	}
+	return cols, nil
 }
 
 // WithRow stub
@@ -390,7 +385,7 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 		if by[i].ColName == "" {
 			vals = s.series.values.copy()
 		} else {
-			lvl, err := findLevelWithName(by[i].ColName, s.series.labels)
+			lvl, err := findColWithName(by[i].ColName, s.series.labels)
 			if err != nil {
 				s.series.resetWithError(fmt.Errorf(
 					"Sort(): cannot use label level: %v", err))
@@ -421,7 +416,7 @@ func (s *Series) Filter(filters ...FilterFn) []int {
 		// if no column name is specified in a filter, use the series values
 		if filter.ColName == "" || filter.ColName == s.values.name {
 			data = s.values
-		} else if lvl, err := findLevelWithName(filter.ColName, s.labels); err != nil {
+		} else if lvl, err := findColWithName(filter.ColName, s.labels); err != nil {
 			return []int{-999}
 		} else {
 			data = s.labels[lvl]
@@ -510,7 +505,7 @@ func (s *SeriesMutator) Apply(lambda ApplyFn) {
 	// if colName is not specified, use the main values
 	if lambda.ColName == "" || lambda.ColName == s.series.values.name {
 		data = s.series.values
-	} else if lvl, err := findLevelWithName(lambda.ColName, s.series.labels); err == nil {
+	} else if lvl, err := findColWithName(lambda.ColName, s.series.labels); err == nil {
 		data = s.series.labels[lvl]
 	} else {
 		s.series.resetWithError(fmt.Errorf("Apply(): %v", err))
@@ -535,7 +530,7 @@ func (s *Series) Lookup(other *Series, how string, leftOn []string, rightOn []st
 		}
 	}
 	if len(leftOn) == 0 {
-		leftKeys, rightKeys = findMatchingKeysBetweenTwoLabels(s.labels, other.labels)
+		leftKeys, rightKeys = findMatchingKeysBetweenTwoLabelContainers(s.labels, other.labels)
 	} else {
 		leftKeys, err = labelNamesToIndex(leftOn, s.labels)
 		if err != nil {

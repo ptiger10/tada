@@ -144,6 +144,26 @@ func Test_intersection(t *testing.T) {
 	}
 }
 
+func Test_union(t *testing.T) {
+	type args struct {
+		slices [][]int
+	}
+	tests := []struct {
+		name string
+		args args
+		want []int
+	}{
+		{"normal", args{[][]int{{0, 1}, {1, 5}}}, []int{0, 1, 5}},
+		{"sorted", args{[][]int{{1, 5}, {0, 1}}}, []int{0, 1, 5}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := union(tt.args.slices); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("union() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 func Test_lookup(t *testing.T) {
 	type args struct {
 		how     string

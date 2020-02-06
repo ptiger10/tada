@@ -15,6 +15,13 @@ func (s *Series) resetWithError(err error) {
 	s.err = err
 }
 
+func (df *DataFrame) resetWithError(err error) {
+	df.values = nil
+	df.labels = nil
+	df.name = ""
+	df.err = err
+}
+
 func seriesWithError(err error) *Series {
 	return &Series{
 		err: err,
@@ -51,8 +58,21 @@ func makeIntRange(min, max int) []int {
 	return ret
 }
 
+// convert []Element to []interface of Element values only
+func handleElementsSlice(input interface{}) []interface{} {
+	elements, ok := input.([]Element)
+	if ok {
+		ret := make([]interface{}, len(elements))
+		for i := range ret {
+			ret[i] = elements[i].val
+		}
+		return ret
+	}
+	return nil
+}
+
 // search for a name only once. if it is found multiple times, return only the first
-func findMatchingKeysBetweenTwoLabels(labels1 []*valueContainer, labels2 []*valueContainer) ([]int, []int) {
+func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels2 []*valueContainer) ([]int, []int) {
 	var leftKeys, rightKeys []int
 	searched := make(map[string]bool)
 	for j := range labels1 {
@@ -73,44 +93,14 @@ func findMatchingKeysBetweenTwoLabels(labels1 []*valueContainer, labels2 []*valu
 	return leftKeys, rightKeys
 }
 
-// findLabelPositions returns a slice of row positions where `label` (spanning one or more levels) is contained within `labels`
-func findLabelPositions(label string, labels []*valueContainer) ([]int, error) {
-	toFind := strings.Split(label, "|")
-	for i := range toFind {
-		toFind[i] = strings.TrimSpace(toFind[i])
-	}
-	if len(toFind) != len(labels) {
-		return nil, fmt.Errorf("label (%v) must reference same number of levels as labels (%d != %d)", label, len(toFind), len(labels))
-	}
-	l := reflect.ValueOf(labels[0].slice).Len()
-	ret := make([]int, 0)
-	for i := 0; i < l; i++ {
-		match := true
-		for j := range labels {
-			v := reflect.ValueOf(labels[j].slice)
-			if v.Index(i).String() != toFind[j] {
-				match = false
-				break
-			}
-		}
-		if match {
-			ret = append(ret, i)
-		}
-	}
-	if len(ret) == 0 {
-		return nil, fmt.Errorf("label (%v) does not exist", label)
-	}
-	return ret, nil
-}
-
-// findLevelWithName returns the position of the first level within `labels` with a name matching `name`, or an error if no level matches
-func findLevelWithName(name string, labels []*valueContainer) (int, error) {
-	for j := range labels {
-		if labels[j].name == name {
+// findColWithName returns the position of the first level within `cols` with a name matching `name`, or an error if no level matches
+func findColWithName(name string, cols []*valueContainer) (int, error) {
+	for j := range cols {
+		if cols[j].name == name {
 			return j, nil
 		}
 	}
-	return 0, fmt.Errorf("name (%v) does not match any existing level", name)
+	return 0, fmt.Errorf("name (%v) does not match any existing column", name)
 }
 
 func intersection(slices [][]int) []int {
@@ -130,6 +120,21 @@ func intersection(slices [][]int) []int {
 			ret = append(ret, k)
 		}
 	}
+	return ret
+}
+
+func union(slices [][]int) []int {
+	var ret []int
+	set := make(map[int]bool)
+	for _, slice := range slices {
+		for i := range slice {
+			if _, ok := set[slice[i]]; !ok {
+				set[slice[i]] = true
+				ret = append(ret, slice[i])
+			}
+		}
+	}
+	sort.Ints(ret)
 	return ret
 }
 
@@ -173,7 +178,8 @@ func (vc *valueContainer) null() []int {
 	return index
 }
 
-// subsetRows returns the rows specified by index. If any position is out of range, returns an error
+// subsetRows modifies vc in place to contain ony the rows specified by index.
+// If any position is out of range, returns an error
 func (vc *valueContainer) subsetRows(index []int) error {
 	v := reflect.ValueOf(vc.slice)
 	l := v.Len()
@@ -195,7 +201,20 @@ func (vc *valueContainer) subsetRows(index []int) error {
 	return nil
 }
 
-// head returns the number of rows specified by `n`
+// subsetCols returns a new set of valueContainers containing only the columns specified by index.
+// If any position is out of range, returns error
+func subsetCols(cols []*valueContainer, index []int) ([]*valueContainer, error) {
+	retLabels := make([]*valueContainer, len(index))
+	for indexPosition, indexValue := range index {
+		if indexValue >= len(cols) {
+			return nil, fmt.Errorf("index out of range (%d > %d)", indexValue, len(cols)-1)
+		}
+		retLabels[indexPosition] = cols[indexValue]
+	}
+	return retLabels, nil
+}
+
+// head returns the first number of rows specified by `n`
 func (vc *valueContainer) head(n int) *valueContainer {
 	v := reflect.ValueOf(vc.slice)
 	var retIsNull []bool
@@ -205,15 +224,30 @@ func (vc *valueContainer) head(n int) *valueContainer {
 	return &valueContainer{
 		slice:  retVals.Interface(),
 		isNull: retIsNull,
+		name:   vc.name,
 	}
 }
 
-// tail returns the number of rows specified by `n`
+// tail returns the last number of rows specified by `n`
 func (vc *valueContainer) tail(n int) *valueContainer {
 	v := reflect.ValueOf(vc.slice)
 	var retIsNull []bool
 	retVals := v.Slice(len(vc.isNull)-n, len(vc.isNull))
 	retIsNull = vc.isNull[len(vc.isNull)-n : len(vc.isNull)]
+
+	return &valueContainer{
+		slice:  retVals.Interface(),
+		isNull: retIsNull,
+		name:   vc.name,
+	}
+}
+
+// rangeSlice returns the rows starting with first and ending with last (inclusive)
+func (vc *valueContainer) rangeSlice(first, last int) *valueContainer {
+	v := reflect.ValueOf(vc.slice)
+	var retIsNull []bool
+	retVals := v.Slice(first, last+1)
+	retIsNull = vc.isNull[first : last+1]
 
 	return &valueContainer{
 		slice:  retVals.Interface(),
@@ -438,7 +472,7 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 func labelNamesToIndex(names []string, levels []*valueContainer) ([]int, error) {
 	ret := make([]int, len(names))
 	for i, name := range names {
-		lvl, err := findLevelWithName(name, levels)
+		lvl, err := findColWithName(name, levels)
 		if err != nil {
 			return nil, err
 		}
@@ -447,8 +481,8 @@ func labelNamesToIndex(names []string, levels []*valueContainer) ([]int, error) 
 	return ret, nil
 }
 
-// labelsToString reduces all label levels referenced in the index to a single slice of concatenated strings
-func labelsToStrings(labels []*valueContainer, index []int) []string {
+// concatenateLabelsToStringsreduces all label levels referenced in the index to a single slice of concatenated strings
+func concatenateLabelsToStrings(labels []*valueContainer, index []int) []string {
 	sep := "|"
 	labelStrings := make([][]string, len(index))
 	// coerce every label level referenced in the index to a separate string slice
@@ -572,7 +606,7 @@ func (s *Series) combineMath(other *Series, ignoreMissing bool, fn func(v1 float
 func lookupWithAnchor(
 	values1 *valueContainer, labels1 []*valueContainer, leftOn []int,
 	values2 *valueContainer, labels2 []*valueContainer, rightOn []int) *Series {
-	toLookup := labelsToStrings(labels1, leftOn)
+	toLookup := concatenateLabelsToStrings(labels1, leftOn)
 	_, lookupSource, _ := labelsToMap(labels2, rightOn)
 	matches := matchLabelPositions(toLookup, lookupSource)
 	v := reflect.ValueOf(values2.slice)

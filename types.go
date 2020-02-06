@@ -20,6 +20,11 @@ type SeriesMutator struct {
 	series *Series
 }
 
+// DataFrameMutator stub
+type DataFrameMutator struct {
+	dataframe *DataFrame
+}
+
 // DataFrame stub
 type DataFrame struct {
 	labels []*valueContainer
