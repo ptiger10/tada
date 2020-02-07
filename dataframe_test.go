@@ -2,6 +2,7 @@ package tada
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -38,19 +39,48 @@ func TestNewDataFrame(t *testing.T) {
 	}
 }
 
-// for DF to series conversion
-// {"unsupported dataframe with multiple columns", args{
-// 	slice: DataFrame{
-// 		values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}}, {slice: []float64{2}, isNull: []bool{false}}},
-// 		labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}}}}},
-// 	&Series{err: errors.New("unsupported input type (DataFrame with multiple columns); must be slice or DataFrame with single column")}},
-// {"dataframe with single column", args{
-// 	slice: DataFrame{
-// 		values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}}},
-// 		labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}}}},
-// },
-// 	&Series{values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
-// 		labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}}}}},
+func TestDataFrame_ToSeries(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass", fields{
+			values: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"}},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}},
+			&Series{
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}},
+		},
+		{"fail: two columns", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"}},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}},
+			&Series{
+				err: fmt.Errorf("ToSeries(): DataFrame must have a single column")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.ToSeries(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.ToSeries() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestDataFrame_Copy(t *testing.T) {
 	type fields struct {
@@ -96,6 +126,36 @@ func TestDataFrame_Copy(t *testing.T) {
 			got.err = errors.New("foo")
 			if reflect.DeepEqual(got, df) {
 				t.Errorf("DataFrame.Copy() retained reference to original error")
+			}
+		})
+	}
+}
+
+func TestReadCSV(t *testing.T) {
+	type args struct {
+		csv    [][]string
+		config []ReadConfig
+	}
+	tests := []struct {
+		name string
+		args args
+		want *DataFrame
+	}{
+		{"1 header row, 2 columns, no index",
+			args{
+				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
+				config: []ReadConfig{{NumHeaderRows: 1}}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ReadCSV(tt.args.csv, tt.args.config...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ReadCSV() = %v, want %v", got, tt.want)
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}

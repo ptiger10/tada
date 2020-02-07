@@ -121,3 +121,11 @@ const (
 	// DateTime stub
 	DateTime
 )
+
+// ReadConfig stub
+type ReadConfig struct {
+	NumHeaderRows int
+	NumLabelCols  int
+	SkipRows      int
+	Delimiter     rune
+}
