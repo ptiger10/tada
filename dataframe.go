@@ -734,11 +734,32 @@ func (df *DataFrameMutator) Sort(by ...Sorter) {
 // GroupBy stub
 // includes label levels and columns
 func (df *DataFrame) GroupBy(names ...string) *GroupedDataFrame {
-	return nil
+	var index []int
+	var err error
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	// if no names supplied, group by all label levels
+	if len(names) == 0 {
+		index = makeIntRange(0, df.Levels())
+	} else {
+		index, err = convertColNamesToIndexPositions(names, mergedLabelsAndCols)
+		if err != nil {
+			return &GroupedDataFrame{err: fmt.Errorf("GroupBy(): %v", err)}
+		}
+	}
+	g, _, orderedKeys := labelsToMap(mergedLabelsAndCols, index)
+	return &GroupedDataFrame{
+		groups:      g,
+		orderedKeys: orderedKeys,
+		df:          df,
+	}
 }
 
 // PivotTable stub
 func (df *DataFrame) PivotTable(labels, columns, values, aggFn string) *DataFrame {
+	// group by
+	// stack
+	// select
+	// apply aggfn
 	return nil
 }
 

@@ -104,9 +104,10 @@ type GroupedSeries struct {
 
 // GroupedDataFrame stub
 type GroupedDataFrame struct {
-	groups map[string][]int
-	df     *DataFrame
-	err    error
+	groups      map[string][]int
+	orderedKeys []string
+	df          *DataFrame
+	err         error
 }
 
 // DType stub

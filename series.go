@@ -499,11 +499,11 @@ func (s *Series) Lookup(other *Series, how string, leftOn []string, rightOn []st
 	if len(leftOn) == 0 {
 		leftKeys, rightKeys = findMatchingKeysBetweenTwoLabelContainers(s.labels, other.labels)
 	} else {
-		leftKeys, err = labelNamesToIndex(leftOn, s.labels)
+		leftKeys, err = convertColNamesToIndexPositions(leftOn, s.labels)
 		if err != nil {
 			return seriesWithError(fmt.Errorf("Lookup(): %v", err))
 		}
-		rightKeys, err = labelNamesToIndex(rightOn, other.labels)
+		rightKeys, err = convertColNamesToIndexPositions(rightOn, other.labels)
 		if err != nil {
 			return seriesWithError(fmt.Errorf("Lookup(): %v", err))
 		}
@@ -554,9 +554,16 @@ func (s *Series) Divide(other *Series, ignoreMissing bool) *Series {
 
 // GroupBy stub
 func (s *Series) GroupBy(names ...string) *GroupedSeries {
-	index, err := labelNamesToIndex(names, s.labels)
-	if err != nil {
-		return &GroupedSeries{err: fmt.Errorf("GroupBy(): %v", err)}
+	var index []int
+	var err error
+	// if no names supplied, group by all label levels
+	if len(names) == 0 {
+		index = makeIntRange(0, s.Levels())
+	} else {
+		index, err = convertColNamesToIndexPositions(names, s.labels)
+		if err != nil {
+			return &GroupedSeries{err: fmt.Errorf("GroupBy(): %v", err)}
+		}
 	}
 	g, _, orderedKeys := labelsToMap(s.labels, index)
 	return &GroupedSeries{

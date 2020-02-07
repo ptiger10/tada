@@ -523,11 +523,12 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 	return nil
 }
 
-// labelNamesToIndex converts a slice of label names to index positions. If any name is not in index, returns an error
-func labelNamesToIndex(names []string, levels []*valueContainer) ([]int, error) {
+// convertColNamesToIndexPositions converts a slice of label or column names to index positions.
+// If any name is not in the set of columns, returns an error
+func convertColNamesToIndexPositions(names []string, columns []*valueContainer) ([]int, error) {
 	ret := make([]int, len(names))
 	for i, name := range names {
-		lvl, err := findColWithName(name, levels)
+		lvl, err := findColWithName(name, columns)
 		if err != nil {
 			return nil, err
 		}
