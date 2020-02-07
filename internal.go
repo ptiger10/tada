@@ -93,6 +93,19 @@ func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels
 	return leftKeys, rightKeys
 }
 
+// if name is not found in either columns nor labels, return -1
+func findNameInColumnsOrLabels(name string, cols []*valueContainer, labels []*valueContainer) (index int, isCol bool) {
+	// first check column names
+	if lvl, err := findColWithName(name, cols); err == nil {
+		return lvl, true
+		// then check label level names
+	} else if lvl, err := findColWithName(name, labels); err == nil {
+		return lvl, false
+	} else {
+		return -1, false
+	}
+}
+
 // findColWithName returns the position of the first level within `cols` with a name matching `name`, or an error if no level matches
 func findColWithName(name string, cols []*valueContainer) (int, error) {
 	for j := range cols {
@@ -439,7 +452,7 @@ func (vc *valueContainer) filter(filter FilterFn) ([]int, error) {
 	return index, nil
 }
 
-func (vc *valueContainer) apply(apply ApplyFn) (interface{}, error) {
+func (vc *valueContainer) apply(apply ApplyFn) interface{} {
 	var ret interface{}
 	if apply.F64 != nil {
 		slice := vc.float().slice
@@ -462,10 +475,17 @@ func (vc *valueContainer) apply(apply ApplyFn) (interface{}, error) {
 			retSlice[i] = apply.DateTime(slice[i])
 		}
 		ret = retSlice
-	} else {
-		return nil, fmt.Errorf("no apply function provided")
 	}
-	return ret, nil
+	return ret
+}
+
+// expects slices to be same-lengthed
+func isEitherNull(isNull1, isNull2 []bool) []bool {
+	ret := make([]bool, len(isNull1))
+	for i := 0; i < len(isNull1); i++ {
+		ret[i] = isNull1[i] || isNull2[i]
+	}
+	return ret
 }
 
 func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int {

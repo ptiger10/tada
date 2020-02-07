@@ -457,8 +457,12 @@ func (s *Series) Apply(function ApplyFn) *Series {
 // Apply may be applied to a level of labels (if no column is specified, the main Series values are used).
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Apply(lambda ApplyFn) {
+	err := lambda.validate()
+	if err != nil {
+		s.series.resetWithError((fmt.Errorf("Apply(): %v", err)))
+		return
+	}
 	var data *valueContainer
-	var err error
 	// if colName is not specified, use the main values
 	if lambda.ColName == "" || lambda.ColName == s.series.values.name {
 		data = s.series.values
@@ -468,10 +472,8 @@ func (s *SeriesMutator) Apply(lambda ApplyFn) {
 		s.series.resetWithError(fmt.Errorf("Apply(): %v", err))
 		return
 	}
-	data.slice, err = data.apply(lambda)
-	if err != nil {
-		s.series.resetWithError(fmt.Errorf("Apply(): %v", err))
-	}
+	data.slice = data.apply(lambda)
+	data.isNull = setNullsFromInterface(data.slice)
 	return
 }
 

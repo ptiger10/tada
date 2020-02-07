@@ -550,24 +550,37 @@ func (df *DataFrame) ColToLabel(name string) *DataFrame {
 
 // Filter stub
 func (df *DataFrame) Filter(filters ...FilterFn) []int {
-	var err error
 	if len(filters) == 0 {
 		return makeIntRange(0, df.Len())
 	}
 	// subIndexes contains the index positions computed across all the filters
 	var subIndexes [][]int
 	for _, filter := range filters {
+		// if ColName is empty, apply filter to all columns
+		if filter.ColName == "" {
+			var dfWideSubIndexes [][]int
+			for k := range df.values {
+				subIndex, err := df.values[k].filter(filter)
+				if err != nil {
+					return []int{-999}
+				}
+				dfWideSubIndexes = append(dfWideSubIndexes, subIndex)
+			}
+			subIndexes = append(subIndexes, intersection(dfWideSubIndexes))
+			continue
+		}
+		// if ColName is not empty, find name in either columns or labels
 		var data *valueContainer
-		var lvl int
-
-		// first check column names
-		if lvl, err = findColWithName(filter.ColName, df.values); err == nil {
-			data = df.values[lvl]
-			// then check label level names
-		} else if lvl, err = findColWithName(filter.ColName, df.labels); err == nil {
-			data = df.labels[lvl]
-		} else {
+		index, isCol := findNameInColumnsOrLabels(filter.ColName, df.values, df.labels)
+		// could not match on either columns or labels
+		if index == -1 {
 			return []int{-999}
+		}
+		if isCol {
+			data = df.values[index]
+		} else {
+			data = df.labels[index]
+
 		}
 
 		subIndex, err := data.filter(filter)
@@ -581,14 +594,63 @@ func (df *DataFrame) Filter(filters ...FilterFn) []int {
 	return index
 }
 
-// apply
+// -- APPLY
 
-// ApplyFloat stub
-func (df *DataFrame) ApplyFloat(func(val float64) float64) *DataFrame {
-	return nil
+// Apply applies a user-defined `lambda` function to every row in a particular column and coerces all values to match the lambda type.
+// Apply may be applied to any label level or column by specifying a ColName in `lambda`.
+// If no ColName is specified in `lambda`, the function is applied to every column.
+// If a value is considered null either prior to or after the lambda function is applied, it is considered null after.
+// Returns a new DataFrame.
+func (df *DataFrame) Apply(lambda ApplyFn) *DataFrame {
+	df.Copy()
+	df.InPlace().Apply(lambda)
+	return df
 }
 
-// combine
+// Apply applies a user-defined `lambda` function to every row in a particular column and coerces all values to match the lambda type.
+// Apply may be applied to any label level or column by specifying a ColName in `lambda`.
+// If no ColName is specified in `lambda`, the function is applied to every column.
+// If a value is considered null either prior to or after the lambda function is applied, it is considered null after.
+// Modifies the underlying DataFrame in place.
+func (df *DataFrameMutator) Apply(lambda ApplyFn) {
+	err := lambda.validate()
+	if err != nil {
+		df.dataframe.resetWithError((fmt.Errorf("Apply(): %v", err)))
+		return
+	}
+	// if ColName is empty, apply lambda to all columns
+	if lambda.ColName == "" {
+		for k := range df.dataframe.values {
+			df.dataframe.values[k].slice = df.dataframe.values[k].apply(lambda)
+			df.dataframe.values[k].isNull = isEitherNull(
+				df.dataframe.values[k].isNull,
+				setNullsFromInterface(df.dataframe.values[k].slice))
+		}
+	} else {
+		// if ColName is not empty, find name in either columns or labels
+		index, isCol := findNameInColumnsOrLabels(lambda.ColName, df.dataframe.values, df.dataframe.labels)
+		if index == -1 {
+			df.dataframe.resetWithError((fmt.Errorf(
+				"Apply(): no matching colName (%s) in either columns nor label leves", err)))
+		}
+		// apply to col
+		if isCol {
+			df.dataframe.values[index].slice = df.dataframe.values[index].apply(lambda)
+			df.dataframe.values[index].isNull = isEitherNull(
+				df.dataframe.values[index].isNull,
+				setNullsFromInterface(df.dataframe.values[index].slice))
+			//apply to label level
+		} else {
+			df.dataframe.labels[index].slice = df.dataframe.labels[index].apply(lambda)
+			df.dataframe.labels[index].isNull = isEitherNull(
+				df.dataframe.labels[index].isNull,
+				setNullsFromInterface(df.dataframe.labels[index].slice))
+		}
+	}
+	return
+}
+
+// -- MERGERS
 
 // Merge stub
 func (df *DataFrame) Merge(other *DataFrame) *DataFrame {
@@ -620,14 +682,21 @@ func (df *DataFrame) Divide(other *DataFrame) *DataFrame {
 	return nil
 }
 
-// sort
+// -- SORTERS
 
 // Sort stub
-func (df *DataFrame) Sort(...Sorter) *DataFrame {
+func (df *DataFrame) Sort(by ...Sorter) *DataFrame {
+	df.Copy()
+	df.InPlace().Sort(by...)
+	return df
+}
+
+// Sort stub
+func (df *DataFrameMutator) Sort(by ...Sorter) *DataFrame {
 	return nil
 }
 
-// grouping
+// -- GROUPERS
 
 // GroupBy stub
 // includes label levels and columns

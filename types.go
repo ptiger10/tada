@@ -1,6 +1,9 @@
 package tada
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type valueContainer struct {
 	slice  interface{}
@@ -78,6 +81,17 @@ type ApplyFn struct {
 	String   func(val string) string
 	DateTime func(val time.Time) time.Time
 	ColName  string
+}
+
+func (lambda ApplyFn) validate() error {
+	if lambda.F64 == nil {
+		if lambda.String == nil {
+			if lambda.DateTime == nil {
+				return fmt.Errorf("no apply function provided")
+			}
+		}
+	}
+	return nil
 }
 
 // GroupedSeries stub
