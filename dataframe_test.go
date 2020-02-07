@@ -872,3 +872,47 @@ func TestDataFrame_Apply(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_Sort(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	type args struct {
+		by []Sorter
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"float64 on one column", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 2, 1}, isNull: []bool{false, false, false}, name: "foo"}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			name:   "baz"},
+			args{[]Sorter{{ColName: "foo"}}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"}},
+				labels: []*valueContainer{{slice: []int{0, 2, 1}, isNull: []bool{false, false, false}, name: "*0"}},
+				name:   "baz"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.Sort(tt.args.by...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Sort() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

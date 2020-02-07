@@ -316,7 +316,10 @@ func (s *Series) Name(name string) *Series {
 
 // -- SORT
 
-// Sort removes the null values in the Series.
+// Sort sorts the values `by` zero or more Sorter specifications.
+// If no Sorter is supplied, sorts by Series values (as float64) in ascending order.
+// If a Sorter is supplied without a ColName or name matching the Series name, sorts by Series values.
+// If no DType is supplied, sorts as float64.
 // Returns a new Series.
 func (s *Series) Sort(by ...Sorter) *Series {
 	s.Copy()
@@ -339,7 +342,7 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 	}
 	for i := len(by) - 1; i >= 0; i-- {
 		// Sorter with empty ColName -> use Series values
-		if by[i].ColName == "" {
+		if by[i].ColName == "" || by[i].ColName == s.series.values.name {
 			vals = s.series.values.copy()
 		} else {
 			lvl, err := findColWithName(by[i].ColName, s.series.labels)

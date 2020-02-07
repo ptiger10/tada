@@ -93,16 +93,16 @@ func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels
 	return leftKeys, rightKeys
 }
 
-// if name is not found in either columns nor labels, return -1
-func findNameInColumnsOrLabels(name string, cols []*valueContainer, labels []*valueContainer) (index int, isCol bool) {
+// if name is not found in either columns nor labels, return error
+func findNameInColumnsOrLabels(name string, cols []*valueContainer, labels []*valueContainer) (index int, isCol bool, err error) {
 	// first check column names
 	if lvl, err := findColWithName(name, cols); err == nil {
-		return lvl, true
+		return lvl, true, nil
 		// then check label level names
 	} else if lvl, err := findColWithName(name, labels); err == nil {
-		return lvl, false
+		return lvl, false, nil
 	} else {
-		return -1, false
+		return 0, false, fmt.Errorf("no matching name (%s) in either columns or label levels", name)
 	}
 }
 

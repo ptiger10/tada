@@ -571,16 +571,15 @@ func (df *DataFrame) Filter(filters ...FilterFn) []int {
 		}
 		// if ColName is not empty, find name in either columns or labels
 		var data *valueContainer
-		index, isCol := findNameInColumnsOrLabels(filter.ColName, df.values, df.labels)
+		index, isCol, err := findNameInColumnsOrLabels(filter.ColName, df.values, df.labels)
 		// could not match on either columns or labels
-		if index == -1 {
+		if err != nil {
 			return []int{-999}
 		}
 		if isCol {
 			data = df.values[index]
 		} else {
 			data = df.labels[index]
-
 		}
 
 		subIndex, err := data.filter(filter)
@@ -628,10 +627,9 @@ func (df *DataFrameMutator) Apply(lambda ApplyFn) {
 		}
 	} else {
 		// if ColName is not empty, find name in either columns or labels
-		index, isCol := findNameInColumnsOrLabels(lambda.ColName, df.dataframe.values, df.dataframe.labels)
-		if index == -1 {
-			df.dataframe.resetWithError((fmt.Errorf(
-				"Apply(): no matching colName (%s) in either columns nor label leves", err)))
+		index, isCol, err := findNameInColumnsOrLabels(lambda.ColName, df.dataframe.values, df.dataframe.labels)
+		if err != nil {
+			df.dataframe.resetWithError((fmt.Errorf("Apply(): %v", err)))
 		}
 		// apply to col
 		if isCol {
@@ -692,8 +690,38 @@ func (df *DataFrame) Sort(by ...Sorter) *DataFrame {
 }
 
 // Sort stub
-func (df *DataFrameMutator) Sort(by ...Sorter) *DataFrame {
-	return nil
+func (df *DataFrameMutator) Sort(by ...Sorter) {
+	// original index
+	index := makeIntRange(0, df.dataframe.Len())
+	var vals *valueContainer
+	// no Sorters supplied -> error
+	if len(by) == 0 {
+		df.dataframe.resetWithError(fmt.Errorf(
+			"Sort(): must supply at least one Sorter"))
+		return
+	}
+	for i := len(by) - 1; i >= 0; i-- {
+		// Sorter with empty ColName -> error
+		if by[i].ColName == "" {
+			df.dataframe.resetWithError(fmt.Errorf(
+				"Sort(): Sorter (position %d) does not have ColName", i))
+			return
+		}
+		colPosition, isCol, err := findNameInColumnsOrLabels(by[i].ColName, df.dataframe.values, df.dataframe.labels)
+		if err != nil {
+			df.dataframe.resetWithError(fmt.Errorf("Sort(): %v", err))
+			return
+		}
+		if isCol {
+			vals = df.dataframe.values[colPosition].copy()
+		} else {
+			vals = df.dataframe.labels[colPosition].copy()
+
+		}
+		// overwrite index with new index
+		index = vals.sort(by[i].DType, by[i].Descending, index)
+	}
+	df.Subset(index)
 }
 
 // -- GROUPERS
