@@ -540,7 +540,7 @@ func TestSeries_Elements(t *testing.T) {
 	}
 }
 
-func TestSeries_Name(t *testing.T) {
+func TestSeries_SetName(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -571,8 +571,8 @@ func TestSeries_Name(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Name(tt.args.name); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.Name() = %v, want %v", got, tt.want)
+			if got := s.SetName(tt.args.name); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.SetName() = %v, want %v", got, tt.want)
 			}
 		})
 	}

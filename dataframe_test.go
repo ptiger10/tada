@@ -916,3 +916,198 @@ func TestDataFrame_Sort(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_IterRows(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []map[string]Element
+	}{
+		{"single label level, named values", fields{
+			values: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"}},
+			labels: []*valueContainer{{name: "*0", slice: []string{"bar", ""}, isNull: []bool{false, true}}}},
+			[]map[string]Element{
+				{"foo": Element{float64(1), false}, "*0": Element{"bar", false}},
+				{"foo": Element{float64(2), false}, "*0": Element{"", true}},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.IterRows(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.IterRows() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_Sum(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "bar"},
+			},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "baz"}},
+			name:   "corge",
+		},
+			&Series{
+				values: &valueContainer{slice: []float64{3, 7}, isNull: []bool{false, false}, name: "sum"},
+				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.Sum(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Sum() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_Mean(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "bar"},
+			},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "baz"}},
+			name:   "corge",
+		},
+			&Series{
+				values: &valueContainer{slice: []float64{1.5, 3.5}, isNull: []bool{false, false}, name: "mean"},
+				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.Mean(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Mean() = %v, want %v", got.values, tt.want.values)
+			}
+		})
+	}
+}
+
+func TestDataFrame_Median(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2, 5}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []float64{3, 4, 6}, isNull: []bool{false, false, false}, name: "bar"},
+			},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "baz"}},
+			name:   "corge",
+		},
+			&Series{
+				values: &valueContainer{slice: []float64{2, 4}, isNull: []bool{false, false}, name: "median"},
+				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.Median(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Median() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_Std(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "bar"},
+			},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "baz"}},
+			name:   "corge",
+		},
+			&Series{
+				values: &valueContainer{slice: []float64{.5, .5}, isNull: []bool{false, false}, name: "std"},
+				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.Std(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Std() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

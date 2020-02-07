@@ -512,6 +512,11 @@ func (df *DataFrame) SetName(name string) *DataFrame {
 	return df
 }
 
+// Name returns the name of the DataFrame
+func (df *DataFrame) Name() string {
+	return df.name
+}
+
 // SetCols sets the names of all the columns in the DataFrame and returns the entire DataFrame.
 func (df *DataFrame) SetCols(colNames []string) *DataFrame {
 	if len(colNames) != len(df.values) {
@@ -737,36 +742,68 @@ func (df *DataFrame) PivotTable(labels, columns, values, aggFn string) *DataFram
 	return nil
 }
 
-// iterator
+// -- ITERATORS
 
-// IterRows stub
+// IterRows returns a slice of maps that return the underlying data for every row in the DataFrame.
+// The key in each map is a column header, including label level headers.
+// The value in each map is an Element containing an interface value and whether or not the value is null.
+// If multiple label levels or columns have the same header, only the Elements of the right-most column are returned.
 func (df *DataFrame) IterRows() []map[string]Element {
-	return nil
+	ret := make([]map[string]Element, df.Len())
+	for i := 0; i < df.Len(); i++ {
+		// all label levels + all columns
+		ret[i] = make(map[string]Element, df.Levels()+len(df.values))
+		for j := range df.labels {
+			key := df.labels[j].name
+			ret[i][key] = df.labels[j].iterRow(i)
+		}
+		for k := range df.values {
+			key := df.values[k].name
+			ret[i][key] = df.values[k].iterRow(i)
+		}
+	}
+	return ret
 }
 
-// IterCols stub
-func (df *DataFrame) IterCols() []map[string]Element {
-	return nil
+// -- MATH
+
+func (df *DataFrame) math(name string, mathFunction func([]float64, []bool, []int) (float64, bool)) *Series {
+	retVals := make([]float64, len(df.values))
+	retIsNull := make([]bool, len(df.values))
+	labels := make([]string, len(df.values))
+	labelsIsNull := make([]bool, len(df.values))
+
+	for k := range df.values {
+		retVals[k], retIsNull[k] = mathFunction(
+			df.values[k].float().slice,
+			df.values[k].isNull,
+			makeIntRange(0, df.Len()))
+
+		labels[k] = df.values[k].name
+		labelsIsNull[k] = false
+	}
+	return &Series{
+		values: &valueContainer{slice: retVals, isNull: retIsNull, name: name},
+		labels: []*valueContainer{{slice: labels, isNull: labelsIsNull, name: "*0"}},
+	}
 }
 
-// math
-
-// Sum stub
+// Sum coerces the values in each column to float64 and sums each column.
 func (df *DataFrame) Sum() *Series {
-	return nil
+	return df.math("sum", sum)
 }
 
 // Mean stub
 func (df *DataFrame) Mean() *Series {
-	return nil
+	return df.math("mean", mean)
 }
 
 // Median stub
 func (df *DataFrame) Median() *Series {
-	return nil
+	return df.math("median", median)
 }
 
 // Std stub
 func (df *DataFrame) Std() *Series {
-	return nil
+	return df.math("std", std)
 }

@@ -308,10 +308,15 @@ func (s *SeriesMutator) Drop(index int) {
 	}
 }
 
-// Name modifies the name of a Series in place and returns the original Series.
-func (s *Series) Name(name string) *Series {
+// SetName modifies the name of a Series in place and returns the original Series.
+func (s *Series) SetName(name string) *Series {
 	s.values.name = name
 	return s
+}
+
+// Name returns the name of the Series
+func (s *Series) Name() string {
+	return s.values.name
 }
 
 // -- SORT
@@ -564,13 +569,14 @@ func (s *Series) GroupBy(names ...string) *GroupedSeries {
 // -- ITERATORS
 
 // IterRows returns a slice of maps that return the underlying data for every row in the Series.
-// The key in each map is a column header, including label level names.
-// The name of the main Series values is the same as the name of the Series itself.
-// The value in each map is an Element containing an interface value and whether or not the value is null.
-// If multiple columns have the same header, only the values of the right-most column are returned.
+// The key in each map is a column header, including label level headers.
+// The name of the main values header is the same as the name of the Series itself.
+// The value in each map is an Element containing an interface value and a bool denoting if the value is null.
+// If multiple columns have the same header, only the Elements of the right-most column are returned.
 func (s *Series) IterRows() []map[string]Element {
 	ret := make([]map[string]Element, s.Len())
 	for i := 0; i < s.Len(); i++ {
+		// all label levels + the main Series values
 		ret[i] = make(map[string]Element, s.Levels()+1)
 		for j := range s.labels {
 			ret[i][s.labels[j].name] = s.labels[j].iterRow(i)
