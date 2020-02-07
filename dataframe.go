@@ -266,7 +266,7 @@ func (df *DataFrame) Range(first, last int) *DataFrame {
 	return &DataFrame{values: retVals, labels: retLabels, name: df.name}
 }
 
-// Valid returns all the rows with all non-null values.
+// Valid returns rows with all non-null values.
 // If `subset` is supplied, returns all the rows with all non-null values in the specified columns.
 // Returns a new DataFrame.
 func (df *DataFrame) Valid(subset ...string) *DataFrame {
@@ -661,8 +661,37 @@ func (df *DataFrame) Merge(other *DataFrame) *DataFrame {
 }
 
 // Lookup stub
-func (df *DataFrame) Lookup(other *DataFrame, how string, leftOn string, rightOn string, dimension Dimension) *DataFrame {
-	return nil
+func (df *DataFrame) Lookup(other *DataFrame, how string, leftOn []string, rightOn []string) *DataFrame {
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	otherMergedLabelsAndCols := append(other.labels, other.values...)
+	var leftKeys, rightKeys []int
+	var err error
+	if len(leftOn) == 0 || len(rightOn) == 0 {
+		if !(len(leftOn) == 0 && len(rightOn) == 0) {
+			return dataFrameWithError(
+				fmt.Errorf("Lookup(): if either leftOn or rightOn is empty, both must be empty"))
+		}
+	}
+	if len(leftOn) == 0 {
+		leftKeys, rightKeys = findMatchingKeysBetweenTwoLabelContainers(
+			mergedLabelsAndCols, otherMergedLabelsAndCols)
+	} else {
+		leftKeys, err = convertColNamesToIndexPositions(leftOn, mergedLabelsAndCols)
+		if err != nil {
+			return dataFrameWithError(fmt.Errorf("Lookup(): %v", err))
+		}
+		rightKeys, err = convertColNamesToIndexPositions(rightOn, otherMergedLabelsAndCols)
+		if err != nil {
+			return dataFrameWithError(fmt.Errorf("Lookup(): %v", err))
+		}
+	}
+	ret, err := lookupDataFrame(
+		how, df.name, df.values, df.labels, leftKeys,
+		other.values, other.labels, rightKeys, leftOn, rightOn)
+	if err != nil {
+		return dataFrameWithError(fmt.Errorf("Lookup(): %v", err))
+	}
+	return ret
 }
 
 // Add stub
@@ -827,4 +856,9 @@ func (df *DataFrame) Median() *Series {
 // Std stub
 func (df *DataFrame) Std() *Series {
 	return df.math("std", std)
+}
+
+// Count stub
+func (df *DataFrame) Count() *Series {
+	return df.math("count", count)
 }

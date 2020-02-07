@@ -1111,3 +1111,53 @@ func TestDataFrame_Std(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_Lookup(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	type args struct {
+		other   *DataFrame
+		how     string
+		leftOn  []string
+		rightOn []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"single label level, named keys, left join", fields{
+			values: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
+			labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+			name:   "qux"},
+			args{
+				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
+					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
+				how:    "left",
+				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
+			&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
+				labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+				name:   "qux"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.Lookup(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Lookup() = %v, want %v", got.labels[0], tt.want.labels[0])
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+
+			}
+		})
+	}
+}

@@ -55,11 +55,11 @@ func TestSeries_Copy(t *testing.T) {
 	}{
 		{"pass",
 			fields{
-				values: &valueContainer{[]float64{1}, "foo", []bool{false}},
-				labels: []*valueContainer{{[]float64{1}, "bar", []bool{false}}}},
+				values: &valueContainer{slice: []float64{1}, name: "foo", isNull: []bool{false}},
+				labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}},
 			&Series{
-				values: &valueContainer{[]float64{1}, "foo", []bool{false}},
-				labels: []*valueContainer{{[]float64{1}, "bar", []bool{false}}}}},
+				values: &valueContainer{slice: []float64{1}, name: "foo", isNull: []bool{false}},
+				labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -97,12 +97,12 @@ func TestSeries_ToDataFrame(t *testing.T) {
 	}{
 		{"pass",
 			fields{
-				values: &valueContainer{[]float64{1}, "foo", []bool{false}},
-				labels: []*valueContainer{{[]float64{1}, "bar", []bool{false}}},
+				values: &valueContainer{slice: []float64{1}, name: "foo", isNull: []bool{false}},
+				labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}},
 				err:    errors.New("foo")},
 			&DataFrame{
-				values: []*valueContainer{{[]float64{1}, "foo", []bool{false}}},
-				labels: []*valueContainer{{[]float64{1}, "bar", []bool{false}}},
+				values: []*valueContainer{{slice: []float64{1}, name: "foo", isNull: []bool{false}}},
+				labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}},
 				err:    errors.New("foo")}},
 	}
 	for _, tt := range tests {

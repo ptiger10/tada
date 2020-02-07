@@ -7,8 +7,8 @@ import (
 
 type valueContainer struct {
 	slice  interface{}
-	name   string
 	isNull []bool
+	name   string
 }
 
 // Series stub
@@ -121,17 +121,3 @@ const (
 	// DateTime stub
 	DateTime
 )
-
-// Dimension stub
-type Dimension int
-
-const (
-	// Columns stub
-	Columns Dimension = iota
-	// Rows stub
-	Rows
-)
-
-func (dim Dimension) String() string {
-	return [...]string{"columns", "rows"}[dim]
-}

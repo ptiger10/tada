@@ -597,38 +597,36 @@ func (s *Series) IterRows() []map[string]Element {
 
 // Sum stub
 func (s *Series) Sum() float64 {
-	sum, _ := sum(
-		s.values.float().slice,
-		s.values.isNull,
-		makeIntRange(0, s.Len()))
-	return sum
+	return s.math(sum)
 }
 
 // Mean stub
 func (s *Series) Mean() float64 {
-	mean, _ := mean(
-		s.values.float().slice,
-		s.values.isNull,
-		makeIntRange(0, s.Len()))
-	return mean
+	return s.math(mean)
 }
 
 // Median stub
 func (s *Series) Median() float64 {
-	median, _ := median(
-		s.values.float().slice,
-		s.values.isNull,
-		makeIntRange(0, s.Len()))
-	return median
+	return s.math(median)
 }
 
 // Std stub
 func (s *Series) Std() float64 {
-	std, _ := std(
+	return s.math(std)
+}
+
+// Count stub
+func (s *Series) Count() int {
+	count := s.math(count)
+	return int(count)
+}
+
+func (s *Series) math(mathFunction func([]float64, []bool, []int) (float64, bool)) float64 {
+	output, _ := mathFunction(
 		s.values.float().slice,
 		s.values.isNull,
 		makeIntRange(0, s.Len()))
-	return std
+	return output
 }
 
 // -- Slicers

@@ -181,12 +181,12 @@ func Test_lookup(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "left", args: args{
-			how: "left", values1: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+			how: "left", values1: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
 			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}, leftOn: []int{0},
 			values2: &valueContainer{slice: []int{10, 20}, isNull: []bool{false, false}},
 			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}}}, rightOn: []int{0}},
 			want: &Series{
-				values: &valueContainer{slice: []int{10, 0}, isNull: []bool{false, true}},
+				values: &valueContainer{slice: []int{10, 0}, isNull: []bool{false, true}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}, wantErr: false,
 		},
 		{name: "right", args: args{
@@ -610,6 +610,40 @@ func Test_valueContainer_after(t *testing.T) {
 			}
 			if got := vc.after(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("valueContainer.after() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_concatenateLabelsToStrings(t *testing.T) {
+	type args struct {
+		labels []*valueContainer
+		index  []int
+	}
+	tests := []struct {
+		name string
+		args args
+		want []string
+	}{
+		{"one level", args{labels: []*valueContainer{
+			{slice: []string{"foo", "bar"}}},
+			index: []int{0}},
+			[]string{"foo", "bar"}},
+		{"two levels, one index", args{labels: []*valueContainer{
+			{slice: []string{"foo", "bar"}},
+			{slice: []int{0, 1}}},
+			index: []int{0}},
+			[]string{"foo", "bar"}},
+		{"two levels, two index", args{labels: []*valueContainer{
+			{slice: []string{"foo", "bar"}},
+			{slice: []int{0, 1}}},
+			index: []int{0, 1}},
+			[]string{"foo|0", "bar|1"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := concatenateLabelsToStrings(tt.args.labels, tt.args.index); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("concatenateLabelsToStrings() = %v, want %v", got, tt.want)
 			}
 		})
 	}

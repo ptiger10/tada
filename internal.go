@@ -548,8 +548,8 @@ func concatenateLabelsToStrings(labels []*valueContainer, index []int) []string 
 	ret := make([]string, len(labelStrings[0]))
 	// for each row, combine labels into one concatenated string
 	for i := 0; i < len(labelStrings[0]); i++ {
-		labelComponents := make([]string, len(labels))
-		for j := range labels {
+		labelComponents := make([]string, len(index))
+		for j := range index {
 			labelComponents[j] = labelStrings[j][i]
 		}
 		concatenatedString := strings.Join(labelComponents, sep)
@@ -606,23 +606,6 @@ func matchLabelPositions(labels1 []string, labels2 map[string]int) []int {
 	return ret
 }
 
-func lookup(how string,
-	values1 *valueContainer, labels1 []*valueContainer, leftOn []int,
-	values2 *valueContainer, labels2 []*valueContainer, rightOn []int) (*Series, error) {
-	switch how {
-	case "left":
-		return lookupWithAnchor(values1, labels1, leftOn, values2, labels2, rightOn), nil
-	case "right":
-		return lookupWithAnchor(values2, labels2, rightOn, values1, labels1, leftOn), nil
-	case "inner":
-		s := lookupWithAnchor(values1, labels1, leftOn, values2, labels2, rightOn)
-		s = s.Valid()
-		return s, nil
-	default:
-		return nil, fmt.Errorf("unsupported how: must be `left`, `right`, or `inner`")
-	}
-}
-
 func (s *Series) combineMath(other *Series, ignoreMissing bool, fn func(v1 float64, v2 float64) float64) *Series {
 	retFloat := make([]float64, s.Len())
 	retIsNull := make([]bool, s.Len())
@@ -657,10 +640,50 @@ func (s *Series) combineMath(other *Series, ignoreMissing bool, fn func(v1 float
 	return &Series{values: &valueContainer{slice: retFloat, isNull: retIsNull}, labels: s.labels}
 }
 
-// cuts labels by leftOn and rightOn, anchors to labels in labels1, finds matches in labels2
-// looks up values in values2, converts to Series and keeps the same name as values1
-func lookupWithAnchor(
+func lookup(how string,
 	values1 *valueContainer, labels1 []*valueContainer, leftOn []int,
+	values2 *valueContainer, labels2 []*valueContainer, rightOn []int) (*Series, error) {
+	switch how {
+	case "left":
+		return lookupWithAnchor(values1.name, labels1, leftOn, values2, labels2, rightOn), nil
+	case "right":
+		return lookupWithAnchor(values2.name, labels2, rightOn, values1, labels1, leftOn), nil
+	case "inner":
+		s := lookupWithAnchor(values1.name, labels1, leftOn, values2, labels2, rightOn)
+		s = s.Valid()
+		return s, nil
+	default:
+		return nil, fmt.Errorf("unsupported how: must be `left`, `right`, or `inner`")
+	}
+}
+
+func lookupDataFrame(how string,
+	name string, values1 []*valueContainer, labels1 []*valueContainer, leftOn []int,
+	values2 []*valueContainer, labels2 []*valueContainer, rightOn []int,
+	excludeLeft []string, excludeRight []string) (*DataFrame, error) {
+	mergedLabelsCols1 := append(labels1, values1...)
+	mergedLabelsCols2 := append(labels2, values2...)
+	switch how {
+	case "left":
+		return lookupDataFrameWithAnchor(name, mergedLabelsCols1, labels1, leftOn,
+			values2, mergedLabelsCols2, rightOn, excludeRight), nil
+	case "right":
+		return lookupDataFrameWithAnchor(name, mergedLabelsCols2, labels2, rightOn,
+			values1, mergedLabelsCols1, leftOn, excludeLeft), nil
+	case "inner":
+		df := lookupDataFrameWithAnchor(name, mergedLabelsCols1, labels1, leftOn,
+			values2, mergedLabelsCols2, rightOn, excludeRight)
+		df = df.Valid()
+		return df, nil
+	default:
+		return nil, fmt.Errorf("unsupported how: must be `left`, `right`, or `inner`")
+	}
+}
+
+// cuts labels by leftOn and rightOn, anchors to labels in labels1, finds matches in labels2
+// looks up values in values2, converts to Series and preserves the name from values1
+func lookupWithAnchor(
+	name string, labels1 []*valueContainer, leftOn []int,
 	values2 *valueContainer, labels2 []*valueContainer, rightOn []int) *Series {
 	toLookup := concatenateLabelsToStrings(labels1, leftOn)
 	_, lookupSource, _ := labelsToMap(labels2, rightOn)
@@ -670,19 +693,65 @@ func lookupWithAnchor(
 	// return type is set to same type as within lookupSource
 	vals := reflect.MakeSlice(v.Type(), len(matches), len(matches))
 	for i, matchedIndex := range matches {
-		// positive match
+		// positive match: copy value from values2
 		if matchedIndex != -1 {
 			vals.Index(i).Set(v.Index(matchedIndex))
 			isNull[i] = values2.isNull[i]
-			// no match
+			// no match: set to zero value
 		} else {
 			vals.Index(i).Set(reflect.Zero(reflect.TypeOf(values2.slice).Elem()))
 			isNull[i] = true
 		}
 	}
 	return &Series{
-		values: &valueContainer{slice: vals.Interface(), isNull: isNull, name: values1.name},
+		values: &valueContainer{slice: vals.Interface(), isNull: isNull, name: name},
 		labels: labels1,
+	}
+}
+
+// cuts labels by leftOn and rightOn, anchors to labels in labels1, finds matches in labels2
+// looks up values in every column in values2 (excluding colNames matching `except`),
+// preserves the column names from values2, converts to dataframe with `name`
+func lookupDataFrameWithAnchor(
+	name string, mergedLabelsCols1 []*valueContainer, labels1 []*valueContainer, leftOn []int,
+	values2 []*valueContainer, mergedLabelsCols2 []*valueContainer, rightOn []int, exclude []string) *DataFrame {
+	toLookup := concatenateLabelsToStrings(mergedLabelsCols1, leftOn)
+	_, lookupSource, _ := labelsToMap(mergedLabelsCols2, rightOn)
+	matches := matchLabelPositions(toLookup, lookupSource)
+	// slice of slices
+	var retVals []*valueContainer
+	for k := range values2 {
+		var skip bool
+		for _, exclusion := range exclude {
+			// skip any column whose name is also used in the lookup
+			if values2[k].name == exclusion {
+				skip = true
+			}
+		}
+		if skip {
+			continue
+		}
+		v := reflect.ValueOf(values2[k].slice)
+		isNull := make([]bool, len(matches))
+		// return type is set to same type as within lookupSource
+		vals := reflect.MakeSlice(v.Type(), len(matches), len(matches))
+		for i, matchedIndex := range matches {
+			// positive match: copy value from values2
+			if matchedIndex != -1 {
+				vals.Index(i).Set(v.Index(matchedIndex))
+				isNull[i] = values2[k].isNull[i]
+				// no match
+			} else {
+				vals.Index(i).Set(reflect.Zero(reflect.TypeOf(values2[k].slice).Elem()))
+				isNull[i] = true
+			}
+		}
+		retVals = append(retVals, &valueContainer{slice: vals.Interface(), isNull: isNull, name: values2[k].name})
+	}
+	return &DataFrame{
+		values: retVals,
+		labels: labels1,
+		name:   name,
 	}
 }
 
@@ -907,4 +976,16 @@ func std(vals []float64, isNull []bool, index []int) (float64, bool) {
 		return 0, true
 	}
 	return math.Pow(variance/counter, 0.5), false
+}
+
+// count counts the non-null values at the `index` positions in `vals`.
+// Compatible with Grouped calculations as well as Series
+func count(vals []float64, isNull []bool, index []int) (float64, bool) {
+	var counter int
+	for _, i := range index {
+		if !isNull[i] {
+			counter++
+		}
+	}
+	return float64(counter), false
 }
