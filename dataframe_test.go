@@ -1221,3 +1221,43 @@ func TestDataFrame_Lookup(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_Transpose(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *DataFrame
+	}{
+		{"single column",
+			fields{
+				values: []*valueContainer{
+					{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
+				labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+				name:   "qux"},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"1"}, isNull: []bool{false}, name: "bar"},
+				{slice: []string{"2"}, isNull: []bool{false}, name: "baz"}},
+				labels: []*valueContainer{{slice: []string{"waldo"}, isNull: []bool{false}}},
+				name:   "qux"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.Transpose(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Transpose() = %v, want %v", got, tt.want)
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+			}
+		})
+	}
+}

@@ -758,9 +758,84 @@ func (df *DataFrame) SetCols(colNames []string) *DataFrame {
 
 // reshape
 
+func (df *DataFrame) numColLevels() int {
+	return len(splitLabelIntoLevels(df.values[0].name))
+}
+
+func (df *DataFrame) numColumns() int {
+	return len(df.values)
+}
+
 // Transpose stub
 func (df *DataFrame) Transpose() *DataFrame {
-	return nil
+	// label level names become column level names -- not implemented
+
+	// column values become row values: 2 row x 1 col -> 2 col x 1 row
+	vals := make([][]string, df.Len())
+	valsIsNull := make([][]bool, df.Len())
+	// each new column has the same number of rows as prior columns
+	for k := range vals {
+		vals[k] = make([]string, df.numColumns())
+		valsIsNull[k] = make([]bool, df.numColumns())
+	}
+	// label names become column names: 2 row x 1 level -> 2 col x 1 level
+	colNames := make([][]string, df.Len())
+	// each new column name has the same number of levels as prior label levels
+	for i := range colNames {
+		colNames[i] = make([]string, df.numLevels())
+	}
+	// column names become label names: 2 level x 1 col -> 2 level x 1 row
+	labels := make([][]string, df.numColLevels())
+	labelsIsNull := make([][]bool, df.numColLevels())
+
+	// each new label level has same number of rows as prior columns
+	for j := range labels {
+		labels[j] = make([]string, df.numColumns())
+		labelsIsNull[j] = make([]bool, df.numColumns())
+	}
+
+	// iterate over labels
+	for j := range df.labels {
+		v := df.labels[j].str().slice
+		for i := range v {
+			colNames[i][j] = v[i]
+		}
+	}
+	// iterate over columns
+	for k := range df.values {
+		splitColName := splitLabelIntoLevels(df.values[k].name)
+		for l := range splitColName {
+			labels[l][k] = splitColName[l]
+			labelsIsNull[l][k] = false
+		}
+		// save label level name -- not implemented
+		v := df.values[k].str().slice
+		for i := range v {
+			vals[i][k] = v[i]
+			valsIsNull[i][k] = df.values[k].isNull[i]
+		}
+	}
+	retLabels := make([]*valueContainer, df.numColLevels())
+	retVals := make([]*valueContainer, df.Len())
+	for j := range labels {
+		retLabels[j] = &valueContainer{
+			slice:  labels[j],
+			isNull: labelsIsNull[j],
+			// append label name -- not implemented
+		}
+	}
+	for k := range retVals {
+		retVals[k] = &valueContainer{
+			slice:  vals[k],
+			isNull: valsIsNull[k],
+			name:   joinLevelsIntoLabel(colNames[k]),
+		}
+	}
+	return &DataFrame{
+		values: retVals,
+		labels: retLabels,
+		name:   df.name,
+	}
 }
 
 // PromoteCol stub

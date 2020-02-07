@@ -17,6 +17,10 @@ func splitLabelIntoLevels(label string) []string {
 	return strings.Split(label, "|")
 }
 
+func joinLevelsIntoLabel(levels []string) string {
+	return strings.Join(levels, "|")
+}
+
 func (g *GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
 	if len(g.groups) == 0 {
 		return seriesWithError(errors.New("GroupBy(): no groups"))
