@@ -95,22 +95,12 @@ func (df *DataFrame) ToSeries() *Series {
 	}
 }
 
-// ReadCSV stub
-func ReadCSV(csv [][]string, config ...ReadConfig) *DataFrame {
+func readCSVByRows(csv [][]string, cfg ReadConfig) *DataFrame {
 	levelSeparator := "|"
-
-	var cfg ReadConfig
-	if len(config) >= 1 {
-		cfg = config[0]
-	}
-	if len(csv) == 0 {
-		return dataFrameWithError(fmt.Errorf("ReadCSV(): csv must have at least one row"))
-	}
-	if len(csv[0]) == 0 {
-		return dataFrameWithError(fmt.Errorf("ReadCSV(): csv must at least one column"))
-	}
 	numCols := len(csv[0]) - cfg.NumLabelCols
 	numRows := len(csv) - cfg.NumHeaderRows
+
+	// prepare intermediary values containers
 	vals := make([][]string, numCols)
 	valsIsNull := make([][]bool, numCols)
 	valsNames := make([][]string, numCols)
@@ -120,6 +110,7 @@ func ReadCSV(csv [][]string, config ...ReadConfig) *DataFrame {
 		valsNames[k] = make([]string, cfg.NumHeaderRows)
 	}
 
+	// prepare intermediary label containers
 	labels := make([][]string, cfg.NumLabelCols)
 	labelsIsNull := make([][]bool, cfg.NumLabelCols)
 	labelsNames := make([][]string, cfg.NumLabelCols)
@@ -129,25 +120,32 @@ func ReadCSV(csv [][]string, config ...ReadConfig) *DataFrame {
 		labelsNames[j] = make([]string, cfg.NumHeaderRows)
 	}
 
+	// iterate over csv and transpose rows and columns
 	for row := range csv {
 		for column := range csv[row] {
 			if row < cfg.NumHeaderRows {
 				if column < cfg.NumLabelCols {
+					// write header rows to labels, no offset
 					labelsNames[column][row] = csv[row][column]
 				} else {
+					// write header rows to cols, offset for label cols
 					valsNames[column-cfg.NumLabelCols][row] = csv[row][column]
 				}
 				continue
 			}
 			if column < cfg.NumLabelCols {
+				// write values to labels, offset for header rows
 				labels[column][row-cfg.NumHeaderRows] = csv[row][column]
 				labelsIsNull[column][row-cfg.NumHeaderRows] = isNullString(csv[row][column])
 			} else {
+				// write values to cols, offset for label cols and header rows
 				vals[column-cfg.NumLabelCols][row-cfg.NumHeaderRows] = csv[row][column]
 				valsIsNull[column-cfg.NumLabelCols][row-cfg.NumHeaderRows] = isNullString(csv[row][column])
 			}
 		}
 	}
+
+	// transfer values to final value containers
 	retLabels := make([]*valueContainer, len(labels))
 	retVals := make([]*valueContainer, len(vals))
 	for k := range retVals {
@@ -164,6 +162,7 @@ func ReadCSV(csv [][]string, config ...ReadConfig) *DataFrame {
 			name:   strings.Join(labelsNames[j], levelSeparator),
 		}
 	}
+	// create default labels if no labels
 	if len(retLabels) == 0 {
 		labels, isNull := makeDefaultLabels(0, numRows)
 		retLabels = append(retLabels, &valueContainer{slice: labels, isNull: isNull, name: "*0"})
@@ -174,9 +173,110 @@ func ReadCSV(csv [][]string, config ...ReadConfig) *DataFrame {
 	}
 }
 
+func readCSVByCols(csv [][]string, cfg ReadConfig) *DataFrame {
+	levelSeparator := "|"
+	numRows := len(csv[0]) - cfg.NumHeaderRows
+	numCols := len(csv) - cfg.NumLabelCols
+
+	// prepare intermediary values containers
+	vals := make([][]string, numCols)
+	valsIsNull := make([][]bool, numCols)
+	valsNames := make([]string, numCols)
+
+	// prepare intermediary label containers
+	labels := make([][]string, cfg.NumLabelCols)
+	labelsIsNull := make([][]bool, cfg.NumLabelCols)
+	labelsNames := make([]string, cfg.NumLabelCols)
+
+	// iterate over all cols to get header names
+	for j := 0; j < cfg.NumLabelCols; j++ {
+		// write label headers, no offset
+		labelsNames[j] = strings.Join(csv[j][:cfg.NumHeaderRows], levelSeparator)
+	}
+	for k := 0; k < numCols; k++ {
+		// write col headers, offset for label cols
+		valsNames[k] = strings.Join(csv[k+cfg.NumLabelCols][:cfg.NumHeaderRows], levelSeparator)
+	}
+	for col := range csv {
+		if col < cfg.NumLabelCols {
+			// write label values, offset for header rows
+			valsToWrite := csv[col][cfg.NumHeaderRows:]
+			labels[col] = valsToWrite
+			labelsIsNull[col] = setNullsFromInterface(valsToWrite)
+		} else {
+			// write column values, offset for label cols and header rows
+			valsToWrite := csv[col+cfg.NumLabelCols][cfg.NumHeaderRows:]
+			vals[col] = valsToWrite
+			valsIsNull[col] = setNullsFromInterface(valsToWrite)
+		}
+	}
+
+	// transfer values to final value containers
+	retLabels := make([]*valueContainer, len(labels))
+	retVals := make([]*valueContainer, len(vals))
+	for k := range retVals {
+		retVals[k] = &valueContainer{
+			slice:  vals[k],
+			isNull: valsIsNull[k],
+			name:   valsNames[k],
+		}
+	}
+	for j := range retLabels {
+		retLabels[j] = &valueContainer{
+			slice:  labels[j],
+			isNull: labelsIsNull[j],
+			name:   labelsNames[j],
+		}
+	}
+	// create default labels if no labels
+	if len(retLabels) == 0 {
+		labels, isNull := makeDefaultLabels(0, numRows)
+		retLabels = append(retLabels, &valueContainer{slice: labels, isNull: isNull, name: "*0"})
+	}
+	return &DataFrame{
+		values: retVals,
+		labels: retLabels,
+	}
+
+}
+
+// ReadCSV stub
+func ReadCSV(csv [][]string, majorDimRows bool, config ...ReadConfig) *DataFrame {
+	var cfg ReadConfig
+	if len(config) >= 1 {
+		cfg = config[0]
+	}
+	if len(csv) == 0 {
+		return dataFrameWithError(fmt.Errorf("ReadCSV(): csv must have at least one row"))
+	}
+	if len(csv[0]) == 0 {
+		return dataFrameWithError(fmt.Errorf("ReadCSV(): csv must at least one column"))
+	}
+	if majorDimRows {
+		return readCSVByRows(csv, cfg)
+	}
+	return readCSVByCols(csv, cfg)
+
+}
+
 // ReadInterface stub
-func ReadInterface([][]interface{}) *DataFrame {
-	return nil
+func ReadInterface(input [][]interface{}, majorDimRows bool, config ...ReadConfig) *DataFrame {
+	if len(input) == 0 {
+		return dataFrameWithError(fmt.Errorf("ReadInterface(): `input` must have at least one row"))
+	}
+	if len(input[0]) == 0 {
+		return dataFrameWithError(fmt.Errorf("ReadInterface(): `input` must at least one column"))
+	}
+	str := make([][]string, len(input))
+	for j := range str {
+		str[j] = make([]string, len(input[0]))
+	}
+	for i := range input {
+		for j := range input[i] {
+			str[i][j] = fmt.Sprint(input[i][j])
+		}
+	}
+	return ReadCSV(str, majorDimRows, config...)
 }
 
 // ReadStructs stub
