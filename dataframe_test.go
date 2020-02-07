@@ -131,11 +131,10 @@ func TestDataFrame_Copy(t *testing.T) {
 	}
 }
 
-func TestReadCSV(t *testing.T) {
+func TestReadCSVByRows(t *testing.T) {
 	type args struct {
-		csv          [][]string
-		majorDimRows bool
-		config       []ReadConfig
+		csv    [][]string
+		config ReadConfig
 	}
 	tests := []struct {
 		name string
@@ -144,9 +143,8 @@ func TestReadCSV(t *testing.T) {
 	}{
 		{"1 header row, 2 columns, no index",
 			args{
-				csv:          [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				majorDimRows: true,
-				config:       []ReadConfig{{NumHeaderRows: 1}}},
+				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
+				config: ReadConfig{NumHeaderRows: 1}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
@@ -155,8 +153,8 @@ func TestReadCSV(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ReadCSV(tt.args.csv, tt.args.majorDimRows, tt.args.config...); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ReadCSV() = %v, want %v", got, tt.want)
+			if got := readCSVByRows(tt.args.csv, tt.args.config); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("readCSVByRows() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})

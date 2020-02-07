@@ -1,8 +1,11 @@
 package tada
 
 import (
+	"bytes"
+	"encoding/csv"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"reflect"
 	"regexp"
 	"strings"
@@ -241,26 +244,43 @@ func readCSVByCols(csv [][]string, cfg ReadConfig) *DataFrame {
 }
 
 // ReadCSV stub
-func ReadCSV(csv [][]string, majorDimRows bool, config ...ReadConfig) *DataFrame {
+func ReadCSV(path string, config ...ReadConfig) *DataFrame {
 	var cfg ReadConfig
 	if len(config) >= 1 {
 		cfg = config[0]
 	}
+
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		return dataFrameWithError(fmt.Errorf("ReadCSV(): %s", err))
+	}
+	reader := csv.NewReader(bytes.NewReader(data))
+	if cfg.Delimiter != 0 {
+		reader.Comma = cfg.Delimiter
+	}
+
+	csv, err := reader.ReadAll()
+	if err != nil {
+		return dataFrameWithError(fmt.Errorf("ReadCSV(): %s", err))
+	}
+
 	if len(csv) == 0 {
 		return dataFrameWithError(fmt.Errorf("ReadCSV(): csv must have at least one row"))
 	}
 	if len(csv[0]) == 0 {
 		return dataFrameWithError(fmt.Errorf("ReadCSV(): csv must at least one column"))
 	}
-	if majorDimRows {
-		return readCSVByRows(csv, cfg)
-	}
-	return readCSVByCols(csv, cfg)
+	return readCSVByRows(csv, cfg)
 
 }
 
 // ReadInterface stub
 func ReadInterface(input [][]interface{}, majorDimRows bool, config ...ReadConfig) *DataFrame {
+	var cfg ReadConfig
+	if len(config) >= 1 {
+		cfg = config[0]
+	}
+
 	if len(input) == 0 {
 		return dataFrameWithError(fmt.Errorf("ReadInterface(): `input` must have at least one row"))
 	}
@@ -276,7 +296,10 @@ func ReadInterface(input [][]interface{}, majorDimRows bool, config ...ReadConfi
 			str[i][j] = fmt.Sprint(input[i][j])
 		}
 	}
-	return ReadCSV(str, majorDimRows, config...)
+	if majorDimRows {
+		return readCSVByRows(str, cfg)
+	}
+	return readCSVByCols(str, cfg)
 }
 
 // ReadStructs stub
