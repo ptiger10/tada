@@ -134,7 +134,7 @@ func TestDataFrame_Copy(t *testing.T) {
 func TestReadCSVByRows(t *testing.T) {
 	type args struct {
 		csv    [][]string
-		config ReadConfig
+		config *ReadConfig
 	}
 	tests := []struct {
 		name string
@@ -144,7 +144,7 @@ func TestReadCSVByRows(t *testing.T) {
 		{"1 header row, 2 columns, no index",
 			args{
 				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				config: ReadConfig{NumHeaderRows: 1}},
+				config: &ReadConfig{NumHeaderRows: 1}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
@@ -1319,9 +1319,13 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 		name   string
 		err    error
 	}
+	type args struct {
+		ignoreLabels bool
+	}
 	tests := []struct {
 		name   string
 		fields fields
+		args   args
 		want   [][]string
 	}{
 		{name: "one col level",
@@ -1331,6 +1335,7 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 			},
+			args: args{ignoreLabels: false},
 			want: [][]string{
 				{"*0", "foo", "bar"},
 				{"0", "1", "a"},
@@ -1343,6 +1348,7 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar|qux"}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 			},
+			args: args{ignoreLabels: false},
 			want: [][]string{
 				{"", "foo", "bar"},
 				{"*0", "baz", "qux"},
@@ -1373,7 +1379,7 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.toCSVByRows(); !reflect.DeepEqual(got, tt.want) {
+			if got := df.toCSVByRows(tt.args.ignoreLabels); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.toCSVByRows() = %v, want %v", got, tt.want)
 			}
 		})

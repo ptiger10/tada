@@ -124,8 +124,15 @@ const (
 
 // ReadConfig stub
 type ReadConfig struct {
-	NumHeaderRows int
-	NumLabelCols  int
-	SkipRows      int
-	Delimiter     rune
+	NumHeaderRows  int
+	NumLabelCols   int
+	SkipRows       int
+	Delimiter      rune
+	MajorDimIsCols bool
+}
+
+// WriteConfig stub
+type WriteConfig struct {
+	Delimiter    rune
+	IgnoreLabels bool
 }

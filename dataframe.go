@@ -98,37 +98,73 @@ func (df *DataFrame) ToSeries() *Series {
 	}
 }
 
-func (df *DataFrame) toCSVByRows() [][]string {
+func (df *DataFrame) toCSVByRows(ignoreLabels bool) [][]string {
 	ret := make([][]string, df.numColLevels()+df.Len())
 	for i := range ret {
-		ret[i] = make([]string, df.numLevels()+df.numColumns())
+		var offset int
+		if !ignoreLabels {
+			offset = df.numLevels() + df.numColumns()
+		} else {
+			offset = df.numColumns()
+		}
+		ret[i] = make([]string, offset)
 	}
-	for j := range df.labels {
-		// write label headers, index at first header row
-		ret[df.numColLevels()-1][j] = df.labels[j].name
-		v := df.labels[j].str().slice
-		// write label values, offset by header rows
-		for i := range v {
-			ret[i+df.numColLevels()][j] = v[i]
+	if !ignoreLabels {
+		for j := range df.labels {
+			// write label headers, index at first header row
+			ret[df.numColLevels()-1][j] = df.labels[j].name
+			v := df.labels[j].str().slice
+			// write label values, offset by header rows
+			for i := range v {
+				ret[i+df.numColLevels()][j] = v[i]
+			}
 		}
 	}
 	// if there are multiple column headers, those rows will be blank above the index header
 	for k := range df.values {
+		var offset int
+		if !ignoreLabels {
+			offset = df.numLevels()
+		}
 		multiColHeaders := splitLabelIntoLevels(df.values[k].name)
 		for l := 0; l < df.numColLevels(); l++ {
 			// write multi column headers, offset by label levels
-			ret[l][k+df.numLevels()] = multiColHeaders[l]
+			ret[l][k+offset] = multiColHeaders[l]
 		}
 		v := df.values[k].str().slice
 		// write label values, offset by header rows and label levels
 		for i := range v {
-			ret[i+df.numColLevels()][k+df.numLevels()] = v[i]
+			ret[i+df.numColLevels()][k+offset] = v[i]
 		}
 	}
 	return ret
 }
 
-func readCSVByRows(csv [][]string, cfg ReadConfig) *DataFrame {
+// ToCSV writes the contents of the DataFrame to a csv file.
+func (df *DataFrame) ToCSV(file string, config *WriteConfig) error {
+	if config == nil {
+		config = &WriteConfig{
+			Delimiter: ',',
+		}
+	}
+
+	transposedStringValues := df.toCSVByRows(config.IgnoreLabels)
+	var b bytes.Buffer
+	w := csv.NewWriter(&b)
+	w.Comma = config.Delimiter
+	err := w.WriteAll(transposedStringValues)
+	if err != nil {
+		return fmt.Errorf("ToCSV(): %v", err)
+	}
+	// ducks error because process is controlled
+	err = ioutil.WriteFile(file, b.Bytes(), 0666)
+	if err != nil {
+		return fmt.Errorf("ToCSV(): %v", err)
+	}
+	return nil
+}
+
+func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
 	levelSeparator := "|"
 	numCols := len(csv[0]) - cfg.NumLabelCols
 	numRows := len(csv) - cfg.NumHeaderRows
@@ -206,7 +242,7 @@ func readCSVByRows(csv [][]string, cfg ReadConfig) *DataFrame {
 	}
 }
 
-func readCSVByCols(csv [][]string, cfg ReadConfig) *DataFrame {
+func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 	levelSeparator := "|"
 	numRows := len(csv[0]) - cfg.NumHeaderRows
 	numCols := len(csv) - cfg.NumLabelCols
@@ -274,10 +310,12 @@ func readCSVByCols(csv [][]string, cfg ReadConfig) *DataFrame {
 }
 
 // ReadCSV stub
-func ReadCSV(path string, config ...ReadConfig) *DataFrame {
-	var cfg ReadConfig
-	if len(config) >= 1 {
-		cfg = config[0]
+func ReadCSV(path string, config *ReadConfig) *DataFrame {
+	if config == nil {
+		config = &ReadConfig{
+			NumHeaderRows: 1,
+			Delimiter:     ',',
+		}
 	}
 
 	data, err := ioutil.ReadFile(path)
@@ -285,8 +323,8 @@ func ReadCSV(path string, config ...ReadConfig) *DataFrame {
 		return dataFrameWithError(fmt.Errorf("ReadCSV(): %s", err))
 	}
 	reader := csv.NewReader(bytes.NewReader(data))
-	if cfg.Delimiter != 0 {
-		reader.Comma = cfg.Delimiter
+	if config.Delimiter != 0 {
+		reader.Comma = config.Delimiter
 	}
 
 	csv, err := reader.ReadAll()
@@ -300,15 +338,17 @@ func ReadCSV(path string, config ...ReadConfig) *DataFrame {
 	if len(csv[0]) == 0 {
 		return dataFrameWithError(fmt.Errorf("ReadCSV(): csv must at least one column"))
 	}
-	return readCSVByRows(csv, cfg)
+	return readCSVByRows(csv, config)
 
 }
 
 // ReadInterface stub
-func ReadInterface(input [][]interface{}, majorDimRows bool, config ...ReadConfig) *DataFrame {
-	var cfg ReadConfig
-	if len(config) >= 1 {
-		cfg = config[0]
+func ReadInterface(input [][]interface{}, config *ReadConfig) *DataFrame {
+	if config == nil {
+		config = &ReadConfig{
+			NumHeaderRows: 1,
+			Delimiter:     ',',
+		}
 	}
 
 	if len(input) == 0 {
@@ -317,6 +357,7 @@ func ReadInterface(input [][]interface{}, majorDimRows bool, config ...ReadConfi
 	if len(input[0]) == 0 {
 		return dataFrameWithError(fmt.Errorf("ReadInterface(): `input` must at least one column"))
 	}
+	// convert [][]interface to [][]string
 	str := make([][]string, len(input))
 	for j := range str {
 		str[j] = make([]string, len(input[0]))
@@ -326,10 +367,10 @@ func ReadInterface(input [][]interface{}, majorDimRows bool, config ...ReadConfi
 			str[i][j] = fmt.Sprint(input[i][j])
 		}
 	}
-	if majorDimRows {
-		return readCSVByRows(str, cfg)
+	if config.MajorDimIsCols {
+		return readCSVByCols(str, config)
 	}
-	return readCSVByCols(str, cfg)
+	return readCSVByRows(str, config)
 }
 
 // ReadStructs stub
