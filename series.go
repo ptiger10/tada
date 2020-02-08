@@ -553,7 +553,7 @@ func (s *Series) Divide(other *Series, ignoreMissing bool) *Series {
 // -- GROUPERS
 
 // GroupBy stub
-func (s *Series) GroupBy(names ...string) *GroupedSeries {
+func (s *Series) GroupBy(names ...string) GroupedSeries {
 	var index []int
 	var err error
 	// if no names supplied, group by all label levels
@@ -562,11 +562,11 @@ func (s *Series) GroupBy(names ...string) *GroupedSeries {
 	} else {
 		index, err = convertColNamesToIndexPositions(names, s.labels)
 		if err != nil {
-			return &GroupedSeries{err: fmt.Errorf("GroupBy(): %v", err)}
+			return GroupedSeries{err: fmt.Errorf("GroupBy(): %v", err)}
 		}
 	}
 	g, _, orderedKeys := labelsToMap(s.labels, index)
-	return &GroupedSeries{
+	return GroupedSeries{
 		groups:      g,
 		orderedKeys: orderedKeys,
 		series:      s,

@@ -1225,3 +1225,51 @@ func TestSeries_Std(t *testing.T) {
 		})
 	}
 }
+
+func TestSeries_GroupBy(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		names []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   GroupedSeries
+	}{
+		{"group by all levels, with repeats", fields{
+			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+			labels: []*valueContainer{
+				{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}},
+				{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}},
+			}},
+			args{nil},
+			GroupedSeries{
+				groups:      map[string][]int{"0|foo": []int{0, 1}, "1|foo": []int{2}, "2|bar": []int{3}},
+				orderedKeys: []string{"0|foo", "1|foo", "2|bar"},
+				series: &Series{
+					values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+					labels: []*valueContainer{
+						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}},
+						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}},
+					}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.GroupBy(tt.args.names...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.GroupBy() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

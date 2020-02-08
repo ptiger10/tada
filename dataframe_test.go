@@ -1261,3 +1261,53 @@ func TestDataFrame_Transpose(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_GroupBy(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	type args struct {
+		names []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   GroupedDataFrame
+	}{
+		{"group by all levels, with repeats", fields{
+			values: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}}},
+			labels: []*valueContainer{
+				{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}},
+				{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}},
+			}},
+			args{nil},
+			GroupedDataFrame{
+				groups:      map[string][]int{"0|foo": []int{0, 1}, "1|foo": []int{2}, "2|bar": []int{3}},
+				orderedKeys: []string{"0|foo", "1|foo", "2|bar"},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}}},
+					labels: []*valueContainer{
+						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}},
+						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}},
+					}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.GroupBy(tt.args.names...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.GroupBy() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

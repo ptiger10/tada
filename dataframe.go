@@ -770,7 +770,7 @@ func (df *DataFrame) numColumns() int {
 func (df *DataFrame) Transpose() *DataFrame {
 	// label level names become column level names -- not implemented
 
-	// column values become row values: 2 row x 1 col -> 2 col x 1 row
+	// row values become column values: 2 row x 1 col -> 2 col x 1 row
 	vals := make([][]string, df.Len())
 	valsIsNull := make([][]bool, df.Len())
 	// each new column has the same number of rows as prior columns
@@ -784,7 +784,7 @@ func (df *DataFrame) Transpose() *DataFrame {
 	for i := range colNames {
 		colNames[i] = make([]string, df.numLevels())
 	}
-	// column names become label names: 2 level x 1 col -> 2 level x 1 row
+	// column levels become label levels: 2 level x 1 col -> 2 level x 1 row
 	labels := make([][]string, df.numColLevels())
 	labelsIsNull := make([][]bool, df.numColLevels())
 
@@ -815,8 +815,10 @@ func (df *DataFrame) Transpose() *DataFrame {
 			valsIsNull[i][k] = df.values[k].isNull[i]
 		}
 	}
+	// transfer to valueContainers
 	retLabels := make([]*valueContainer, df.numColLevels())
 	retVals := make([]*valueContainer, df.Len())
+	// labels
 	for j := range labels {
 		retLabels[j] = &valueContainer{
 			slice:  labels[j],
@@ -824,6 +826,7 @@ func (df *DataFrame) Transpose() *DataFrame {
 			// append label name -- not implemented
 		}
 	}
+	// values
 	for k := range retVals {
 		retVals[k] = &valueContainer{
 			slice:  vals[k],
@@ -1054,7 +1057,7 @@ func (df *DataFrameMutator) Sort(by ...Sorter) {
 
 // GroupBy stub
 // includes label levels and columns
-func (df *DataFrame) GroupBy(names ...string) *GroupedDataFrame {
+func (df *DataFrame) GroupBy(names ...string) GroupedDataFrame {
 	var index []int
 	var err error
 	mergedLabelsAndCols := append(df.labels, df.values...)
@@ -1064,11 +1067,11 @@ func (df *DataFrame) GroupBy(names ...string) *GroupedDataFrame {
 	} else {
 		index, err = convertColNamesToIndexPositions(names, mergedLabelsAndCols)
 		if err != nil {
-			return &GroupedDataFrame{err: fmt.Errorf("GroupBy(): %v", err)}
+			return GroupedDataFrame{err: fmt.Errorf("GroupBy(): %v", err)}
 		}
 	}
 	g, _, orderedKeys := labelsToMap(mergedLabelsAndCols, index)
-	return &GroupedDataFrame{
+	return GroupedDataFrame{
 		groups:      g,
 		orderedKeys: orderedKeys,
 		df:          df,

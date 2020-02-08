@@ -9,7 +9,7 @@ import (
 // GroupedSeries
 
 // Err returns the underlying error, if any
-func (g *GroupedSeries) Err() error {
+func (g GroupedSeries) Err() error {
 	return g.err
 }
 
@@ -21,7 +21,7 @@ func joinLevelsIntoLabel(levels []string) string {
 	return strings.Join(levels, "|")
 }
 
-func (g *GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
+func (g GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
 	if len(g.groups) == 0 {
 		return seriesWithError(errors.New("GroupBy(): no groups"))
 	}
@@ -60,32 +60,34 @@ func (g *GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []bo
 }
 
 // Sum stub
-func (g *GroupedSeries) Sum() *Series {
+func (g GroupedSeries) Sum() *Series {
 	return g.mathFunc("sum", sum)
 }
 
 // Mean stub
-func (g *GroupedSeries) Mean() *Series {
+func (g GroupedSeries) Mean() *Series {
 	return g.mathFunc("mean", mean)
 }
 
 // Median stub
-func (g *GroupedSeries) Median() *Series {
+func (g GroupedSeries) Median() *Series {
 	return g.mathFunc("median", median)
 }
 
 // Std stub
-func (g *GroupedSeries) Std() *Series {
+func (g GroupedSeries) Std() *Series {
 	return g.mathFunc("std", std)
 }
 
-func (g *GroupedDataFrame) mathFunc(
+func (g GroupedDataFrame) mathFunc(
 	name string, cols []string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *DataFrame {
 	if len(g.groups) == 0 {
 		return dataFrameWithError(errors.New("GroupBy(): no groups"))
 	}
 	sampleKey := g.orderedKeys[0]
 	numLabelsPerRow := len(splitLabelIntoLevels(sampleKey))
+
+	// isolate columns to return
 	var colIndex []int
 	if len(cols) == 0 {
 		colIndex = makeIntRange(0, len(g.df.values))
@@ -150,21 +152,21 @@ func (g *GroupedDataFrame) mathFunc(
 }
 
 // Sum stub
-func (g *GroupedDataFrame) Sum(colNames ...string) *DataFrame {
+func (g GroupedDataFrame) Sum(colNames ...string) *DataFrame {
 	return g.mathFunc("sum", colNames, sum)
 }
 
 // Mean stub
-func (g *GroupedDataFrame) Mean(colNames ...string) *DataFrame {
+func (g GroupedDataFrame) Mean(colNames ...string) *DataFrame {
 	return g.mathFunc("mean", colNames, mean)
 }
 
 // Median stub
-func (g *GroupedDataFrame) Median(colNames ...string) *DataFrame {
+func (g GroupedDataFrame) Median(colNames ...string) *DataFrame {
 	return g.mathFunc("median", colNames, median)
 }
 
 // Std stub
-func (g *GroupedDataFrame) Std(colNames ...string) *DataFrame {
+func (g GroupedDataFrame) Std(colNames ...string) *DataFrame {
 	return g.mathFunc("std", colNames, std)
 }
