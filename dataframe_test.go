@@ -1311,3 +1311,71 @@ func TestDataFrame_GroupBy(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_toCSVByRows(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   [][]string
+	}{
+		{name: "one col level",
+			fields: fields{
+				values: []*valueContainer{
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"},
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			},
+			want: [][]string{
+				{"*0", "foo", "bar"},
+				{"0", "1", "a"},
+				{"1", "2", "b"},
+			}},
+		{name: "two col levels",
+			fields: fields{
+				values: []*valueContainer{
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo|baz"},
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar|qux"}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			},
+			want: [][]string{
+				{"", "foo", "bar"},
+				{"*0", "baz", "qux"},
+				{"0", "1", "a"},
+				{"1", "2", "b"},
+			}},
+		{name: "two label levels",
+			fields: fields{
+				values: []*valueContainer{
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"},
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"}},
+				labels: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"},
+					{slice: []int{10, 11}, isNull: []bool{false, false}, name: "*1"},
+				},
+			},
+			want: [][]string{
+				{"*0", "*1", "foo", "bar"},
+				{"0", "10", "1", "a"},
+				{"1", "11", "2", "b"},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.toCSVByRows(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.toCSVByRows() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

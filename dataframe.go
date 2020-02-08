@@ -98,6 +98,36 @@ func (df *DataFrame) ToSeries() *Series {
 	}
 }
 
+func (df *DataFrame) toCSVByRows() [][]string {
+	ret := make([][]string, df.numColLevels()+df.Len())
+	for i := range ret {
+		ret[i] = make([]string, df.numLevels()+df.numColumns())
+	}
+	for j := range df.labels {
+		// write label headers, index at first header row
+		ret[df.numColLevels()-1][j] = df.labels[j].name
+		v := df.labels[j].str().slice
+		// write label values, offset by header rows
+		for i := range v {
+			ret[i+df.numColLevels()][j] = v[i]
+		}
+	}
+	// if there are multiple column headers, those rows will be blank above the index header
+	for k := range df.values {
+		multiColHeaders := splitLabelIntoLevels(df.values[k].name)
+		for l := 0; l < df.numColLevels(); l++ {
+			// write multi column headers, offset by label levels
+			ret[l][k+df.numLevels()] = multiColHeaders[l]
+		}
+		v := df.values[k].str().slice
+		// write label values, offset by header rows and label levels
+		for i := range v {
+			ret[i+df.numColLevels()][k+df.numLevels()] = v[i]
+		}
+	}
+	return ret
+}
+
 func readCSVByRows(csv [][]string, cfg ReadConfig) *DataFrame {
 	levelSeparator := "|"
 	numCols := len(csv[0]) - cfg.NumLabelCols
