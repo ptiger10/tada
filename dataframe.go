@@ -64,7 +64,7 @@ func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 		}
 	}
 
-	return &DataFrame{values: values, labels: retLabels}
+	return &DataFrame{values: values, labels: retLabels, colLevelNames: []string{"*0"}}
 }
 
 // Copy stub
@@ -98,7 +98,10 @@ func (df *DataFrame) ToSeries() *Series {
 	}
 }
 
-func (df *DataFrame) toCSVByRows(ignoreLabels bool) [][]string {
+func (df *DataFrame) toCSVByRows(ignoreLabels bool) ([][]string, error) {
+	if df.values == nil {
+		return nil, fmt.Errorf("cannot export empty dataframe")
+	}
 	ret := make([][]string, df.numColLevels()+df.Len())
 	for i := range ret {
 		var offset int
@@ -126,7 +129,8 @@ func (df *DataFrame) toCSVByRows(ignoreLabels bool) [][]string {
 		if !ignoreLabels {
 			offset = df.numLevels()
 		}
-		multiColHeaders := splitLabelIntoLevels(df.values[k].name)
+		// if number of col levels is only one, return the name as a single-item slice
+		multiColHeaders := splitLabelIntoLevels(df.values[k].name, df.numColLevels() > 1)
 		for l := 0; l < df.numColLevels(); l++ {
 			// write multi column headers, offset by label levels
 			ret[l][k+offset] = multiColHeaders[l]
@@ -137,10 +141,28 @@ func (df *DataFrame) toCSVByRows(ignoreLabels bool) [][]string {
 			ret[i+df.numColLevels()][k+offset] = v[i]
 		}
 	}
-	return ret
+	return ret, nil
 }
 
-// ToCSV writes the contents of the DataFrame to a csv file.
+// ToInterface exports a DataFrame to a [][]interface with rows as the major dimension.
+func (df *DataFrame) ToInterface(ignoreLabels bool) ([][]interface{}, error) {
+	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
+	if err != nil {
+		return nil, fmt.Errorf("ToInterface(): %v", err)
+	}
+	ret := make([][]interface{}, len(transposedStringValues))
+	for k := range ret {
+		ret[k] = make([]interface{}, len(transposedStringValues[0]))
+	}
+	for i := range transposedStringValues {
+		for k := range transposedStringValues[i] {
+			ret[i][k] = transposedStringValues[i][k]
+		}
+	}
+	return ret, nil
+}
+
+// ToCSV exports a DataFrame to a [][]string with rows as the major dimension, and writes the output to a csv file.
 func (df *DataFrame) ToCSV(file string, config *WriteConfig) error {
 	if config == nil {
 		config = &WriteConfig{
@@ -148,11 +170,14 @@ func (df *DataFrame) ToCSV(file string, config *WriteConfig) error {
 		}
 	}
 
-	transposedStringValues := df.toCSVByRows(config.IgnoreLabels)
+	transposedStringValues, err := df.toCSVByRows(config.IgnoreLabels)
+	if err != nil {
+		return fmt.Errorf("ToCSV(): %v", err)
+	}
 	var b bytes.Buffer
 	w := csv.NewWriter(&b)
 	w.Comma = config.Delimiter
-	err := w.WriteAll(transposedStringValues)
+	err = w.WriteAll(transposedStringValues)
 	if err != nil {
 		return fmt.Errorf("ToCSV(): %v", err)
 	}
@@ -830,7 +855,7 @@ func (df *DataFrame) SetCols(colNames []string) *DataFrame {
 // reshape
 
 func (df *DataFrame) numColLevels() int {
-	return len(splitLabelIntoLevels(df.values[0].name))
+	return len(df.colLevelNames)
 }
 
 func (df *DataFrame) numColumns() int {
@@ -839,7 +864,6 @@ func (df *DataFrame) numColumns() int {
 
 // Transpose stub
 func (df *DataFrame) Transpose() *DataFrame {
-	// label level names become column level names -- not implemented
 
 	// row values become column values: 2 row x 1 col -> 2 col x 1 row
 	vals := make([][]string, df.Len())
@@ -859,27 +883,38 @@ func (df *DataFrame) Transpose() *DataFrame {
 	labels := make([][]string, df.numColLevels())
 	labelsIsNull := make([][]bool, df.numColLevels())
 
+	// column level names become label level names
+	labelNames := make([]string, df.numColLevels())
+	// label level names become column level names
+	colLevelNames := make([]string, df.numLevels())
+
 	// each new label level has same number of rows as prior columns
 	for j := range labels {
 		labels[j] = make([]string, df.numColumns())
 		labelsIsNull[j] = make([]bool, df.numColumns())
 	}
 
-	// iterate over labels
+	// iterate over labels to write column names and column level names
 	for j := range df.labels {
 		v := df.labels[j].str().slice
 		for i := range v {
 			colNames[i][j] = v[i]
 		}
+		colLevelNames[j] = df.labels[j].name
+	}
+	// iterate over column levels to write label level names
+	for l := range df.colLevelNames {
+		labelNames[l] = df.colLevelNames[l]
 	}
 	// iterate over columns
 	for k := range df.values {
-		splitColName := splitLabelIntoLevels(df.values[k].name)
+		// write label values
+		splitColName := splitLabelIntoLevels(df.values[k].name, df.numColLevels() > 1)
 		for l := range splitColName {
 			labels[l][k] = splitColName[l]
 			labelsIsNull[l][k] = false
 		}
-		// save label level name -- not implemented
+		// write values
 		v := df.values[k].str().slice
 		for i := range v {
 			vals[i][k] = v[i]
@@ -894,7 +929,7 @@ func (df *DataFrame) Transpose() *DataFrame {
 		retLabels[j] = &valueContainer{
 			slice:  labels[j],
 			isNull: labelsIsNull[j],
-			// append label name -- not implemented
+			name:   labelNames[j],
 		}
 	}
 	// values

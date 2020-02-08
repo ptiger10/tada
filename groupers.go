@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+var levelSeparator = "|"
+
 // GroupedSeries
 
 // Err returns the underlying error, if any
@@ -13,12 +15,16 @@ func (g GroupedSeries) Err() error {
 	return g.err
 }
 
-func splitLabelIntoLevels(label string) []string {
-	return strings.Split(label, "|")
+// control for inadvertent splitting just because the name has the level separator using `toSplit`
+func splitLabelIntoLevels(label string, toSplit bool) []string {
+	if toSplit {
+		return strings.Split(label, levelSeparator)
+	}
+	return []string{label}
 }
 
 func joinLevelsIntoLabel(levels []string) string {
-	return strings.Join(levels, "|")
+	return strings.Join(levels, levelSeparator)
 }
 
 func (g GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
@@ -27,13 +33,13 @@ func (g GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []boo
 	}
 	vals := make([]float64, len(g.groups))
 	sampleKey := g.orderedKeys[0]
-	numLabelsPerRow := len(splitLabelIntoLevels(sampleKey))
-	labelLevels := make([][]string, numLabelsPerRow)
-	labelIsNull := make([][]bool, numLabelsPerRow)
-	labelNames := make([]string, numLabelsPerRow)
+	numLevels := len(splitLabelIntoLevels(sampleKey, true))
+	labelLevels := make([][]string, numLevels)
+	labelIsNull := make([][]bool, numLevels)
+	labelNames := make([]string, numLevels)
 
 	valueIsNull := make([]bool, len(g.groups))
-	for lvl := 0; lvl < numLabelsPerRow; lvl++ {
+	for lvl := 0; lvl < numLevels; lvl++ {
 		labelLevels[lvl] = make([]string, len(g.groups))
 		labelIsNull[lvl] = make([]bool, len(g.groups))
 		labelNames[lvl] = g.series.labels[lvl].name
@@ -43,7 +49,7 @@ func (g GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []boo
 		output, isNull := fn(g.series.values.float().slice, g.series.values.isNull, g.groups[key])
 		vals[rowNumber] = output
 		valueIsNull[rowNumber] = isNull
-		splitKey := splitLabelIntoLevels(key)
+		splitKey := splitLabelIntoLevels(key, true)
 		for j := range splitKey {
 			labelLevels[j][rowNumber] = splitKey[j]
 			labelIsNull[j][rowNumber] = false
@@ -85,7 +91,7 @@ func (g GroupedDataFrame) mathFunc(
 		return dataFrameWithError(errors.New("GroupBy(): no groups"))
 	}
 	sampleKey := g.orderedKeys[0]
-	numLabelsPerRow := len(splitLabelIntoLevels(sampleKey))
+	numLevels := len(splitLabelIntoLevels(sampleKey, true))
 
 	// isolate columns to return
 	var colIndex []int
@@ -112,10 +118,10 @@ func (g GroupedDataFrame) mathFunc(
 	}
 
 	// prepare [][]string container to receive row-level labels
-	labelLevels := make([][]string, numLabelsPerRow)
-	labelIsNull := make([][]bool, numLabelsPerRow)
-	labelNames := make([]string, numLabelsPerRow)
-	for lvl := 0; lvl < numLabelsPerRow; lvl++ {
+	labelLevels := make([][]string, numLevels)
+	labelIsNull := make([][]bool, numLevels)
+	labelNames := make([]string, numLevels)
+	for lvl := 0; lvl < numLevels; lvl++ {
 		labelLevels[lvl] = make([]string, len(g.groups))
 		labelIsNull[lvl] = make([]bool, len(g.groups))
 		labelNames[lvl] = g.df.labels[lvl].name
@@ -128,7 +134,7 @@ func (g GroupedDataFrame) mathFunc(
 			vals[i][rowNumber] = output
 			valuesIsNull[i][rowNumber] = isNull
 		}
-		splitKey := splitLabelIntoLevels(key)
+		splitKey := splitLabelIntoLevels(key, true)
 		for j := range splitKey {
 			labelLevels[j][rowNumber] = splitKey[j]
 			labelIsNull[j][rowNumber] = false

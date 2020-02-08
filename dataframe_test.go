@@ -27,7 +27,8 @@ func TestNewDataFrame(t *testing.T) {
 				values: []*valueContainer{
 					{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"},
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "1"}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
 		},
 	}
 	for _, tt := range tests {
@@ -1323,10 +1324,11 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 		ignoreLabels bool
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   [][]string
+		name    string
+		fields  fields
+		args    args
+		want    [][]string
+		wantErr bool
 	}{
 		{name: "one col level",
 			fields: fields{
@@ -1340,7 +1342,8 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 				{"*0", "foo", "bar"},
 				{"0", "1", "a"},
 				{"1", "2", "b"},
-			}},
+			},
+			wantErr: false},
 		{name: "two col levels",
 			fields: fields{
 				values: []*valueContainer{
@@ -1369,7 +1372,8 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 				{"*0", "*1", "foo", "bar"},
 				{"0", "10", "1", "a"},
 				{"1", "11", "2", "b"},
-			}},
+			},
+			wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1379,8 +1383,12 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.toCSVByRows(tt.args.ignoreLabels); !reflect.DeepEqual(got, tt.want) {
+			got, err := df.toCSVByRows(tt.args.ignoreLabels)
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.toCSVByRows() = %v, want %v", got, tt.want)
+			}
+			if (err == nil) != tt.wantErr {
+				t.Errorf("DataFrame.toCSVByRows() err = %v, want %v", err, tt.wantErr)
 			}
 		})
 	}

@@ -30,10 +30,11 @@ type DataFrameMutator struct {
 
 // DataFrame stub
 type DataFrame struct {
-	labels []*valueContainer
-	values []*valueContainer
-	name   string
-	err    error
+	labels        []*valueContainer
+	values        []*valueContainer
+	name          string
+	err           error
+	colLevelNames []string
 }
 
 type floatValueContainer struct {
