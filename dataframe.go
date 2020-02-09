@@ -869,9 +869,9 @@ func (df *DataFrame) Transpose() *DataFrame {
 	vals := make([][]string, df.Len())
 	valsIsNull := make([][]bool, df.Len())
 	// each new column has the same number of rows as prior columns
-	for k := range vals {
-		vals[k] = make([]string, df.numColumns())
-		valsIsNull[k] = make([]bool, df.numColumns())
+	for i := range vals {
+		vals[i] = make([]string, df.numColumns())
+		valsIsNull[i] = make([]bool, df.numColumns())
 	}
 	// label names become column names: 2 row x 1 level -> 2 col x 1 level
 	colNames := make([][]string, df.Len())
@@ -889,9 +889,9 @@ func (df *DataFrame) Transpose() *DataFrame {
 	colLevelNames := make([]string, df.numLevels())
 
 	// each new label level has same number of rows as prior columns
-	for j := range labels {
-		labels[j] = make([]string, df.numColumns())
-		labelsIsNull[j] = make([]bool, df.numColumns())
+	for l := range labels {
+		labels[l] = make([]string, df.numColumns())
+		labelsIsNull[l] = make([]bool, df.numColumns())
 	}
 
 	// iterate over labels to write column names and column level names
@@ -941,9 +941,10 @@ func (df *DataFrame) Transpose() *DataFrame {
 		}
 	}
 	return &DataFrame{
-		values: retVals,
-		labels: retLabels,
-		name:   df.name,
+		values:        retVals,
+		labels:        retLabels,
+		name:          df.name,
+		colLevelNames: colLevelNames,
 	}
 }
 
