@@ -162,8 +162,17 @@ func (df *DataFrame) ToInterface(ignoreLabels bool) ([][]interface{}, error) {
 	return ret, nil
 }
 
-// ToCSV exports a DataFrame to a [][]string with rows as the major dimension, and writes the output to a csv file.
-func (df *DataFrame) ToCSV(file string, config *WriteConfig) error {
+// ToCSV converts a DataFrame to a [][]string with rows as the major dimension
+func (df *DataFrame) ToCSV() [][]string {
+	transposedStringValues, err := df.toCSVByRows(false)
+	if err != nil {
+		return nil
+	}
+	return transposedStringValues
+}
+
+// ExportCSV converts a DataFrame to a [][]string with rows as the major dimension, and writes the output to a csv file.
+func (df *DataFrame) ExportCSV(file string, config *WriteConfig) error {
 	if config == nil {
 		config = &WriteConfig{
 			Delimiter: ',',
@@ -269,10 +278,11 @@ func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
 	// create default column names
 	if len(retColLevelNames) == 0 {
 		retColLevelNames = append(retColLevelNames, "default")
+		for k := range retVals {
+			retVals[k].name = fmt.Sprintf("%v", k)
+		}
 	}
-	for k := range retVals {
-		retVals[k].name = fmt.Sprintf("%v", k)
-	}
+
 	return &DataFrame{
 		values:        retVals,
 		labels:        retLabels,

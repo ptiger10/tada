@@ -82,6 +82,16 @@ func (s *Series) ToDataFrame() *DataFrame {
 	}
 }
 
+// ToCSV converts a Series to a DataFrame and returns as [][]string.
+func (s *Series) ToCSV() [][]string {
+	df := &DataFrame{
+		values: []*valueContainer{s.values},
+		labels: s.labels,
+		err:    s.err,
+	}
+	return df.ToCSV()
+}
+
 // -- GETTERS
 
 // Err returns the most recent error attached to the Series, if any.
