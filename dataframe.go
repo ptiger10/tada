@@ -864,7 +864,6 @@ func (df *DataFrame) numColumns() int {
 
 // Transpose stub
 func (df *DataFrame) Transpose() *DataFrame {
-
 	// row values become column values: 2 row x 1 col -> 2 col x 1 row
 	vals := make([][]string, df.Len())
 	valsIsNull := make([][]bool, df.Len())
@@ -948,20 +947,135 @@ func (df *DataFrame) Transpose() *DataFrame {
 	}
 }
 
-// PromoteCol stub
-func (df *DataFrame) PromoteCol(name string) *DataFrame {
-	return nil
+// PromoteToColLevel pivots either a column or label level into a new column level.
+// If stacking would use either the last column or index level, it returns an error.
+// Adds new columns - each unique value in the stacked column is stacked above each existing column.
+// Stacking does not add any rows.
+func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
+	index, isCol, err := findNameInColumnsOrLabels(name, df.values, df.labels)
+	if err != nil {
+		return dataFrameWithError(fmt.Errorf("PromoteToColLevel(): %v", err))
+	}
+	var valsToStack *valueContainer
+
+	// by default, include all label levels
+	residualLabelIndex := makeIntRange(0, len(df.labels))
+	if isCol {
+		if len(df.values) <= 1 {
+			return dataFrameWithError(fmt.Errorf("PromoteToColLevel(): cannot stack only column"))
+		}
+		valsToStack = df.values[index]
+	} else {
+		if len(df.labels) <= 1 {
+			return dataFrameWithError(fmt.Errorf("PromoteToColLevel(): cannot stack only label level"))
+		}
+		valsToStack = df.labels[index]
+		residualLabelIndex = excludeFromIndex(len(df.labels), index)
+	}
+	retName := valsToStack.name
+	lookupSource, _, orderedKeys, _ := labelsToMap([]*valueContainer{valsToStack}, []int{0})
+	_, _, uniqueLabels, rowToUniqueLabels := labelsToMap(df.labels, residualLabelIndex)
+
+	newLabelNames := make([]string, len(residualLabelIndex))
+	newLabels := make([][]string, len(residualLabelIndex))
+	for j, pos := range residualLabelIndex {
+		newLabels[j] = make([]string, len(uniqueLabels))
+		for i := range uniqueLabels {
+			splitName := splitLabelIntoLevels(uniqueLabels[i], true)
+			for l := range splitName {
+				newLabels[j][i] = splitName[l]
+			}
+		}
+		newLabelNames[j] = df.labels[pos].name
+	}
+
+	// new values will have as many columns as unique values in the column-to-be-stacked * existing columns
+	// (minus the stacked column * existing columns, if a column is selected and not label level)
+	newVals := make([][]string, len(lookupSource)*df.numColumns())
+	colNames := make([]string, len(lookupSource)*df.numColumns())
+	for k := range newVals {
+		newVals[k] = make([]string, len(uniqueLabels))
+	}
+	// iterate over columns -> unique values of stacked column -> index of each unique value
+	// compare to original value at column and index position
+	// write to unique row in container for each label value
+	for k := 0; k < df.numColumns(); k++ {
+		for m, orderedKey := range orderedKeys {
+			newColumn := k*len(lookupSource) + m
+			// skip column if it is derivative of the original
+			if k == index && isCol {
+				continue
+			}
+			newHeader := joinLevelsIntoLabel([]string{orderedKey, df.values[k].name})
+			colNames[newColumn] = newHeader
+			originalVals := df.values[k].str().slice
+			for _, i := range lookupSource[orderedKey] {
+				newRow := rowToUniqueLabels[i]
+				newVals[newColumn][newRow] = originalVals[i]
+			}
+		}
+	}
+	retVals := make([]*valueContainer, len(newVals))
+	for k := range retVals {
+		retVals[k] = &valueContainer{
+			slice:  newVals[k],
+			isNull: setNullsFromInterface(newVals[k]),
+			name:   colNames[k],
+		}
+	}
+	retLabels := make([]*valueContainer, len(newLabels))
+	for j := range retLabels {
+		retLabels[j] = &valueContainer{
+			slice:  newLabels[j],
+			isNull: setNullsFromInterface(newLabels[j]),
+			name:   newLabelNames[j],
+		}
+	}
+	// if a column is selected, drop cols that are a derivative of the original
+	if isCol {
+		retVals = append(retVals[:index*len(lookupSource)],
+			retVals[index*len(lookupSource)+len(lookupSource):]...)
+	}
+	return &DataFrame{
+		values:        retVals,
+		labels:        retLabels,
+		colLevelNames: append([]string{retName}, df.colLevelNames...),
+		name:          df.name,
+	}
 }
 
-// LabelToCol stub
-func (df *DataFrame) LabelToCol(label string) *DataFrame {
-	return nil
-}
+// ResetColLevel pivots a column level to be a new label level.
+// If unstacking would use the last column level, it fails.
+// Removes columns by consolidating all lower level columns with the same name, and adds one label level.
+// Unstacking does not change the number of rows.
+// func (df *DataFrame) ResetColLevel(level int) *DataFrame {
+// 	if len(df.colLevelNames) <= 1 {
+// 		return dataFrameWithError(fmt.Errorf("ResetColLevel(): cannot unstack only column level"))
+// 	}
+// 	if level >= len(df.colLevelNames) {
+// 		return dataFrameWithError(
+// 			fmt.Errorf("ResetColLevel(): level out of range (%d > %d", level, len(df.colLevelNames)-1))
 
-// ColToLabel stub
-func (df *DataFrame) ColToLabel(name string) *DataFrame {
-	return nil
-}
+// 	}
+// 	valPositions := make(map[string][]int)
+// 	for k := range df.values {
+// 		name := splitLabelIntoLevels(df.values[k].name)[level]
+// 		// the first time the column header is found, isolate all the rows where it is valid
+// 		if _, ok := valPositions[name]; !ok {
+// 			valPositions[name] = make([]int, 0)
+// 			for i := 0; i < df.Len(); i++ {
+// 				if !df.values[k].isNull[i] {
+// 					valPositions[name] = append(valPositions[name], i)
+// 				}
+// 			}
+// 		}
+// 	}
+
+// 	newVals := make([][]string, )
+// 	newLabels := make([]string, df.Len())
+
+// 	return nil
+// }
 
 // -- FILTERS
 
@@ -1168,7 +1282,7 @@ func (df *DataFrame) GroupBy(names ...string) GroupedDataFrame {
 	var index []int
 	var err error
 	mergedLabelsAndCols := append(df.labels, df.values...)
-	// if no names supplied, group by all label levels
+	// if no names supplied, group by all label levels and use all label level names
 	if len(names) == 0 {
 		index = makeIntRange(0, df.numLevels())
 	} else {
@@ -1177,21 +1291,70 @@ func (df *DataFrame) GroupBy(names ...string) GroupedDataFrame {
 			return GroupedDataFrame{err: fmt.Errorf("GroupBy(): %v", err)}
 		}
 	}
-	g, _, orderedKeys := labelsToMap(mergedLabelsAndCols, index)
+	return df.groupby(index)
+}
+
+func (df *DataFrame) groupby(index []int) GroupedDataFrame {
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	g, _, orderedKeys, _ := labelsToMap(mergedLabelsAndCols, index)
+	names := make([]string, len(index))
+	for i, pos := range index {
+		names[i] = mergedLabelsAndCols[pos].name
+	}
 	return GroupedDataFrame{
 		groups:      g,
 		orderedKeys: orderedKeys,
 		df:          df,
+		labelNames:  names,
 	}
 }
 
 // PivotTable stub
-func (df *DataFrame) PivotTable(labels, columns, values, aggFn string) *DataFrame {
+func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFrame {
 	// group by
 	// stack
 	// select
 	// apply aggfn
-	return nil
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	labelIndex, err := findColWithName(labels, mergedLabelsAndCols)
+	if err != nil {
+		return dataFrameWithError(fmt.Errorf("PivotTable(): invalid labels: %v", err))
+	}
+	colIndex, err := findColWithName(columns, mergedLabelsAndCols)
+	if err != nil {
+		return dataFrameWithError(fmt.Errorf("PivotTable(): invalid columns: %v", err))
+	}
+	grouper := df.groupby([]int{labelIndex, colIndex})
+	var ret *DataFrame
+	switch aggFunc {
+	case "sum":
+		ret = grouper.Sum(values)
+	case "mean":
+		ret = grouper.Mean(values)
+	case "median":
+		ret = grouper.Median(values)
+	case "std":
+		ret = grouper.Std(values)
+	default:
+		return dataFrameWithError(fmt.Errorf("df.Pivot(): unsupported aggFunc (%v)", aggFunc))
+	}
+	if ret.err != nil {
+		return dataFrameWithError(fmt.Errorf("df.Pivot(): %v", err))
+	}
+	ret = ret.PromoteToColLevel(columns)
+	ret.dropColLevel(1)
+	return ret
+}
+
+// inplace
+func (df *DataFrame) dropColLevel(level int) *DataFrame {
+	df.colLevelNames = append(df.colLevelNames[:level], df.colLevelNames[level+1:]...)
+	for k := range df.values {
+		priorNames := splitLabelIntoLevels(df.values[k].name, true)
+		newNames := append(priorNames[:level], priorNames[level+1:]...)
+		df.values[k].name = joinLevelsIntoLabel(newNames)
+	}
+	return df
 }
 
 // -- ITERATORS

@@ -565,16 +565,19 @@ func concatenateLabelsToStrings(labels []*valueContainer, index []int) []string 
 // 2) map[string]int: same key as above, but the value is the integer of the first position where the key appears in the labels.
 // 3) []string: the map keys in the order in which they appear in the Series
 func labelsToMap(labels []*valueContainer, index []int) (
-	allIndex map[string][]int, firstIndex map[string]int, orderedKeys []string) {
+	allIndex map[string][]int, firstIndex map[string]int,
+	orderedKeys []string, originalIndexToUniqueIndex map[int]int) {
 	sep := "|"
 	// coerce all label levels referenced in the index to string
 	labelStrings := make([][]string, len(index))
 	for j := range index {
 		labelStrings[j] = labels[index[j]].str().slice
 	}
-	allIndex = make(map[string][]int, len(labelStrings[0]))
-	firstIndex = make(map[string]int, len(labelStrings[0]))
+	allIndex = make(map[string][]int)
+	firstIndex = make(map[string]int)
 	orderedKeys = make([]string, 0)
+	originalIndexToUniqueIndex = make(map[int]int, len(labelStrings[0]))
+	orderedKeyIndex := make(map[string]int)
 	// for each row, combine labels into a single string
 	l := len(labelStrings[0])
 	for i := 0; i < l; i++ {
@@ -586,10 +589,12 @@ func labelsToMap(labels []*valueContainer, index []int) (
 		if _, ok := allIndex[key]; !ok {
 			allIndex[key] = []int{i}
 			firstIndex[key] = i
+			orderedKeyIndex[key] = len(orderedKeys)
 			orderedKeys = append(orderedKeys, key)
 		} else {
 			allIndex[key] = append(allIndex[key], i)
 		}
+		originalIndexToUniqueIndex[i] = orderedKeyIndex[key]
 	}
 	return
 }
@@ -686,7 +691,7 @@ func lookupWithAnchor(
 	name string, labels1 []*valueContainer, leftOn []int,
 	values2 *valueContainer, labels2 []*valueContainer, rightOn []int) *Series {
 	toLookup := concatenateLabelsToStrings(labels1, leftOn)
-	_, lookupSource, _ := labelsToMap(labels2, rightOn)
+	_, lookupSource, _, _ := labelsToMap(labels2, rightOn)
 	matches := matchLabelPositions(toLookup, lookupSource)
 	v := reflect.ValueOf(values2.slice)
 	isNull := make([]bool, len(matches))
@@ -716,7 +721,7 @@ func lookupDataFrameWithAnchor(
 	name string, mergedLabelsCols1 []*valueContainer, labels1 []*valueContainer, leftOn []int,
 	values2 []*valueContainer, mergedLabelsCols2 []*valueContainer, rightOn []int, exclude []string) *DataFrame {
 	toLookup := concatenateLabelsToStrings(mergedLabelsCols1, leftOn)
-	_, lookupSource, _ := labelsToMap(mergedLabelsCols2, rightOn)
+	_, lookupSource, _, _ := labelsToMap(mergedLabelsCols2, rightOn)
 	matches := matchLabelPositions(toLookup, lookupSource)
 	// slice of slices
 	var retVals []*valueContainer

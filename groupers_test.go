@@ -181,6 +181,7 @@ func TestGroupedDataFrame_Sum(t *testing.T) {
 		groups      map[string][]int
 		orderedKeys []string
 		df          *DataFrame
+		labelNames  []string
 		err         error
 	}
 	type args struct {
@@ -201,13 +202,15 @@ func TestGroupedDataFrame_Sum(t *testing.T) {
 					{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "corge"},
 					{slice: []float64{5, 6, 7, 8}, isNull: []bool{false, false, false, false}, name: "waldo"},
 				},
-					labels: []*valueContainer{{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}}}}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "baz"}}},
+				labelNames: []string{"baz"}},
 			args: args{nil},
 			want: &DataFrame{values: []*valueContainer{
 				{slice: []float64{3, 7}, isNull: []bool{false, false}, name: "corge"},
 				{slice: []float64{11, 15}, isNull: []bool{false, false}, name: "waldo"},
 			},
-				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}}},
+				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "baz"}},
 				name:   "sum"}},
 	}
 	for _, tt := range tests {
@@ -216,6 +219,7 @@ func TestGroupedDataFrame_Sum(t *testing.T) {
 				groups:      tt.fields.groups,
 				orderedKeys: tt.fields.orderedKeys,
 				df:          tt.fields.df,
+				labelNames:  tt.fields.labelNames,
 				err:         tt.fields.err,
 			}
 			if got := g.Sum(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {

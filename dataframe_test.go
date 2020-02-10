@@ -1397,3 +1397,239 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_PromoteToColLevel(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		name string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"stack column", fields{
+			values: []*valueContainer{
+				{slice: []int{2018, 2018, 2019, 2019}, isNull: []bool{false, false, false, false}, name: "year"},
+				{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
+			},
+			colLevelNames: []string{"*0"},
+		}, args{"year"},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"a", "b", "", ""}, isNull: []bool{false, false, true, true}, name: "2018|foo"},
+					{slice: []string{"", "", "c", "d"}, isNull: []bool{true, true, false, false}, name: "2019|foo"}},
+				labels: []*valueContainer{
+					{slice: []string{"0", "1", "2", "3"}, isNull: []bool{false, false, false, false}, name: "*0"},
+				},
+				colLevelNames: []string{"year", "*0"},
+			}},
+		{"stack repeat labels", fields{
+			values: []*valueContainer{
+				{slice: []int{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []string{"A", "B", "B", "C"}, isNull: []bool{false, false, false, false}, name: "bar"},
+				{slice: []int{2018, 2018, 2019, 2019}, isNull: []bool{false, false, false, false}, name: "year"},
+			},
+			colLevelNames: []string{"*0"},
+		}, args{"year"},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"1", "2", ""}, isNull: []bool{false, false, true}, name: "2018|foo"},
+					{slice: []string{"", "3", "4"}, isNull: []bool{true, false, false}, name: "2019|foo"}},
+				labels: []*valueContainer{
+					{slice: []string{"A", "B", "C"}, isNull: []bool{false, false, false}, name: "bar"},
+				},
+				colLevelNames: []string{"year", "*0"},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.PromoteToColLevel(tt.args.name); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.PromoteToColLevel() = %v, want %v", got.values[0], tt.want.values[0])
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+			}
+		})
+	}
+}
+
+// func TestDataFrame_UnstackColLevel(t *testing.T) {
+// 	type fields struct {
+// 		labels        []*valueContainer
+// 		values        []*valueContainer
+// 		name          string
+// 		err           error
+// 		colLevelNames []string
+// 	}
+// 	type args struct {
+// 		level int
+// 	}
+// 	tests := []struct {
+// 		name   string
+// 		fields fields
+// 		args   args
+// 		want   *DataFrame
+// 	}{
+// 		{"unstack column", fields{
+// 			values: []*valueContainer{
+// 				{slice: []string{"a", "b", "", ""}, isNull: []bool{false, false, true, true}, name: "2018|foo"},
+// 				{slice: []string{"", "", "c", "d"}, isNull: []bool{true, true, false, false}, name: "2019|foo"}},
+// 			labels: []*valueContainer{
+// 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
+// 			},
+// 			colLevelNames: []string{"year", "*0"},
+// 		}, args{0},
+// 			&DataFrame{
+// 				values: []*valueContainer{
+// 					{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false}, name: "foo"}},
+// 				labels: []*valueContainer{
+// 					{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
+// 					{slice: []string{"2018", "2018", "2019", "2019"}, isNull: []bool{false, false, false, false}, name: "year"},
+// 				},
+// 				colLevelNames: []string{"*0"},
+// 			}},
+// 		{"unstack column", fields{
+// 			values: []*valueContainer{
+// 				{slice: []string{"a", "b", "", ""}, isNull: []bool{false, false, true, true}, name: "2018|foo"},
+// 				{slice: []string{"", "", "c", "d"}, isNull: []bool{true, true, false, false}, name: "2019|foo"}},
+// 			labels: []*valueContainer{
+// 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
+// 			},
+// 			colLevelNames: []string{"year", "bar"},
+// 		}, args{1},
+// 			&DataFrame{
+// 				values: []*valueContainer{
+// 					{slice: []string{"a", "b", "", ""}, isNull: []bool{false, false, false, false}, name: "2018"},
+// 					{slice: []string{"", "", "c", "d"}, isNull: []bool{false, false}, name: "2019"}},
+// 				labels: []*valueContainer{
+// 					{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
+// 					{slice: []string{"foo", "foo", "foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
+// 				colLevelNames: []string{"*0"}},
+// 		},
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			df := &DataFrame{
+// 				labels:        tt.fields.labels,
+// 				values:        tt.fields.values,
+// 				name:          tt.fields.name,
+// 				err:           tt.fields.err,
+// 				colLevelNames: tt.fields.colLevelNames,
+// 			}
+// 			if got := df.UnstackColLevel(tt.args.level); !reflect.DeepEqual(got, tt.want) {
+// 				t.Errorf("DataFrame.UnstackColLevel() = %v, want %v", got, tt.want)
+// 			}
+// 		})
+// 	}
+// }
+
+func TestDataFrame_PivotTable(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		labels  string
+		columns string
+		values  string
+		aggFn   string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"normal", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
+				{slice: []float64{2018, 2018, 2019, 2019}, isNull: []bool{false, false, false, false}, name: "year"},
+				{slice: []string{"A", "B", "B", "B"}, isNull: []bool{false, false, false, false}, name: "type"}},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+			args{labels: "type", columns: "year", values: "amount", aggFn: "sum"},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "2018"},
+				{slice: []string{"", "7"}, isNull: []bool{true, false}, name: "2019"},
+			},
+				labels: []*valueContainer{
+					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
+				colLevelNames: []string{"year"},
+				name:          "sum"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.PivotTable(tt.args.labels, tt.args.columns, tt.args.values, tt.args.aggFn); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.PivotTable() = %v, want %v", got, tt.want)
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+			}
+		})
+	}
+}
+
+func TestDataFrame_dropColLevel(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		level int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"pass", fields{
+			values:        []*valueContainer{{name: "foo|bar"}},
+			colLevelNames: []string{"qux", "quux"}},
+			args{1},
+			&DataFrame{
+				values:        []*valueContainer{{name: "foo"}},
+				colLevelNames: []string{"qux"},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			df.dropColLevel(tt.args.level)
+		})
+	}
+}

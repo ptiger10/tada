@@ -108,6 +108,7 @@ type GroupedDataFrame struct {
 	groups      map[string][]int
 	orderedKeys []string
 	df          *DataFrame
+	labelNames  []string
 	err         error
 }
 

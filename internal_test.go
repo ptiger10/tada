@@ -233,21 +233,27 @@ func Test_labelsToMap(t *testing.T) {
 		want  map[string][]int
 		want1 map[string]int
 		want2 []string
+		want3 map[int]int
 	}{
 		{"normal", args{[]*valueContainer{{slice: []float64{1}}, {slice: []string{"foo"}}}, []int{0, 1}},
-			map[string][]int{"1|foo": []int{0}}, map[string]int{"1|foo": 0}, []string{"1|foo"}},
+			map[string][]int{"1|foo": []int{0}}, map[string]int{"1|foo": 0},
+			[]string{"1|foo"}, map[int]int{0: 0}},
 		{"reversed", args{[]*valueContainer{{slice: []float64{1}}, {slice: []string{"foo"}}}, []int{1, 0}},
-			map[string][]int{"foo|1": []int{0}}, map[string]int{"foo|1": 0}, []string{"foo|1"}},
+			map[string][]int{"foo|1": []int{0}}, map[string]int{"foo|1": 0},
+			[]string{"foo|1"}, map[int]int{0: 0}},
 		{"skip", args{[]*valueContainer{{slice: []float64{1}}, {slice: []string{"foo"}}, {slice: []bool{true}}}, []int{2, 0}},
-			map[string][]int{"true|1": []int{0}}, map[string]int{"true|1": 0}, []string{"true|1"}},
+			map[string][]int{"true|1": []int{0}}, map[string]int{"true|1": 0},
+			[]string{"true|1"}, map[int]int{0: 0}},
 		{"multiple same", args{[]*valueContainer{{slice: []float64{1, 1}}, {slice: []string{"foo", "foo"}}}, []int{0, 1}},
-			map[string][]int{"1|foo": []int{0, 1}}, map[string]int{"1|foo": 0}, []string{"1|foo"}},
+			map[string][]int{"1|foo": []int{0, 1}}, map[string]int{"1|foo": 0},
+			[]string{"1|foo"}, map[int]int{0: 0, 1: 0}},
 		{"multiple different", args{[]*valueContainer{{slice: []float64{2, 1}}, {slice: []string{"foo", "bar"}}}, []int{0, 1}},
-			map[string][]int{"2|foo": []int{0}, "1|bar": []int{1}}, map[string]int{"1|bar": 1, "2|foo": 0}, []string{"2|foo", "1|bar"}},
+			map[string][]int{"2|foo": []int{0}, "1|bar": []int{1}}, map[string]int{"1|bar": 1, "2|foo": 0},
+			[]string{"2|foo", "1|bar"}, map[int]int{0: 0, 1: 1}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, got2 := labelsToMap(tt.args.labels, tt.args.index)
+			got, got1, got2, got3 := labelsToMap(tt.args.labels, tt.args.index)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("labelsToMap() got = %v, want %v", got, tt.want)
 			}
@@ -256,6 +262,9 @@ func Test_labelsToMap(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got2, tt.want2) {
 				t.Errorf("labelsToMap() got2 = %v, want %v", got2, tt.want2)
+			}
+			if !reflect.DeepEqual(got3, tt.want3) {
+				t.Errorf("labelsToMap() got3 = %v, want %v", got3, tt.want3)
 			}
 		})
 	}

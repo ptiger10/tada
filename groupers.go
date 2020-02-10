@@ -88,13 +88,12 @@ func (g GroupedSeries) Std() *Series {
 func (g GroupedDataFrame) mathFunc(
 	name string, cols []string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *DataFrame {
 	if len(g.groups) == 0 {
-		return dataFrameWithError(errors.New("GroupBy(): no groups"))
+		return dataFrameWithError(errors.New("no groups"))
 	}
-	sampleKey := g.orderedKeys[0]
-	numLevels := len(splitLabelIntoLevels(sampleKey, true))
+	numLevels := len(g.labelNames)
 
 	// isolate columns to return
-	var colIndex []int
+	colIndex := make([]int, len(cols))
 	if len(cols) == 0 {
 		colIndex = makeIntRange(0, len(g.df.values))
 	} else {
@@ -120,11 +119,9 @@ func (g GroupedDataFrame) mathFunc(
 	// prepare [][]string container to receive row-level labels
 	labelLevels := make([][]string, numLevels)
 	labelIsNull := make([][]bool, numLevels)
-	labelNames := make([]string, numLevels)
 	for lvl := 0; lvl < numLevels; lvl++ {
 		labelLevels[lvl] = make([]string, len(g.groups))
 		labelIsNull[lvl] = make([]bool, len(g.groups))
-		labelNames[lvl] = g.df.labels[lvl].name
 	}
 	// iterate over rows
 	for rowNumber, key := range g.orderedKeys {
@@ -145,15 +142,16 @@ func (g GroupedDataFrame) mathFunc(
 	retLabels := make([]*valueContainer, len(labelLevels))
 	retValues := make([]*valueContainer, len(colIndex))
 	for j := range retLabels {
-		retLabels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: labelNames[j]}
+		retLabels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: g.labelNames[j]}
 	}
 	for k := range retValues {
 		retValues[k] = &valueContainer{slice: vals[k], isNull: valuesIsNull[k], name: names[k]}
 	}
 	return &DataFrame{
-		values: retValues,
-		labels: retLabels,
-		name:   name,
+		values:        retValues,
+		labels:        retLabels,
+		name:          name,
+		colLevelNames: g.df.colLevelNames,
 	}
 }
 

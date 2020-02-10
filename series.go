@@ -565,7 +565,7 @@ func (s *Series) GroupBy(names ...string) GroupedSeries {
 			return GroupedSeries{err: fmt.Errorf("GroupBy(): %v", err)}
 		}
 	}
-	g, _, orderedKeys := labelsToMap(s.labels, index)
+	g, _, orderedKeys, _ := labelsToMap(s.labels, index)
 	return GroupedSeries{
 		groups:      g,
 		orderedKeys: orderedKeys,
