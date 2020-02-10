@@ -266,6 +266,13 @@ func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
 	for l := range retColLevelNames {
 		retColLevelNames[l] = fmt.Sprintf("*%d", l)
 	}
+	// create default column names
+	if len(retColLevelNames) == 0 {
+		retColLevelNames = append(retColLevelNames, "default")
+	}
+	for k := range retVals {
+		retVals[k].name = fmt.Sprintf("%v", k)
+	}
 	return &DataFrame{
 		values:        retVals,
 		labels:        retLabels,
@@ -299,12 +306,12 @@ func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 	}
 	for col := range csv {
 		if col < cfg.NumLabelCols {
-			// write label values, offset for header rows
+			// write label values as slice, offset for header rows
 			valsToWrite := csv[col][cfg.NumHeaderRows:]
 			labels[col] = valsToWrite
 			labelsIsNull[col] = setNullsFromInterface(valsToWrite)
 		} else {
-			// write column values, offset for label cols and header rows
+			// write column values as slice, offset for label cols and header rows
 			valsToWrite := csv[col+cfg.NumLabelCols][cfg.NumHeaderRows:]
 			vals[col] = valsToWrite
 			valsIsNull[col] = setNullsFromInterface(valsToWrite)
@@ -337,6 +344,12 @@ func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 	retColLevelNames := make([]string, cfg.NumHeaderRows)
 	for l := range retColLevelNames {
 		retColLevelNames[l] = fmt.Sprintf("*%d", l)
+	}
+	if len(retColLevelNames) == 0 {
+		retColLevelNames = append(retColLevelNames, "default")
+	}
+	for k := range retVals {
+		retVals[k].name = fmt.Sprintf("%v", k)
 	}
 	return &DataFrame{
 		values:        retVals,
@@ -410,9 +423,17 @@ func ReadInterface(input [][]interface{}, config *ReadConfig) *DataFrame {
 	return readCSVByRows(str, config)
 }
 
-// ReadStructs stub
-func ReadStructs(interface{}) *DataFrame {
-	return nil
+// ReadMatrix stub
+func ReadMatrix(mat Matrix) *DataFrame {
+	numRows, numCols := mat.Dims()
+	csv := make([][]string, numCols)
+	for k := range csv {
+		csv[k] = make([]string, numRows)
+		for i := 0; i < numRows; i++ {
+			csv[k][i] = fmt.Sprint(mat.At(i, k))
+		}
+	}
+	return readCSVByCols(csv, &ReadConfig{})
 }
 
 // -- GETTERS

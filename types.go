@@ -37,6 +37,12 @@ type DataFrame struct {
 	colLevelNames []string
 }
 
+// Matrix is an interface which is compatible with gonum's mat.Matrix interface
+type Matrix interface {
+	Dims() (r, c int)
+	At(i, j int) float64
+}
+
 type floatValueContainer struct {
 	slice  []float64
 	isNull []bool

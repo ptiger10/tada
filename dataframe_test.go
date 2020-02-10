@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/d4l3k/messagediff"
+	"gonum.org/v1/gonum/mat"
 )
 
 func TestNewDataFrame(t *testing.T) {
@@ -1702,6 +1703,36 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 			}
 			if got := df.ApplyFormat(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.ApplyFormat() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReadMatrix(t *testing.T) {
+	type args struct {
+		mat Matrix
+	}
+	tests := []struct {
+		name string
+		args args
+		want *DataFrame
+	}{
+		{name: "gonum mat/matrix",
+			args: args{mat: mat.NewDense(1, 2, []float64{1, 2})},
+			want: &DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"1"}, isNull: []bool{false}, name: "0"},
+					{slice: []string{"2"}, isNull: []bool{false}, name: "1"}},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				name:          "",
+				colLevelNames: []string{"default"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ReadMatrix(tt.args.mat); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ReadMatrix() = %v, want %v", got, tt.want)
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
