@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-var levelSeparator = "|"
-
 // GroupedSeries
 
 // Err returns the underlying error, if any

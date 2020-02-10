@@ -698,7 +698,7 @@ func TestDataFrame_Valid(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := df.Valid(tt.args.subset...); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.Valid() = %v, want %v", got.values[0], tt.want.values[0])
+				t.Errorf("DataFrame.Valid() = %v, want %v", got.values, tt.want.values)
 			}
 		})
 	}
@@ -1725,7 +1725,7 @@ func TestReadMatrix(t *testing.T) {
 					{slice: []string{"2"}, isNull: []bool{false}, name: "1"}},
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				name:          "",
-				colLevelNames: []string{"default"}},
+				colLevelNames: []string{"*0"}},
 		},
 	}
 	for _, tt := range tests {

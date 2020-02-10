@@ -5,6 +5,9 @@ import (
 	"time"
 )
 
+var levelSeparator = "|"
+var maxRows = 50
+
 type valueContainer struct {
 	slice  interface{}
 	isNull []bool

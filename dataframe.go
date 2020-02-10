@@ -279,7 +279,7 @@ func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
 	}
 	// create default column names
 	if len(retColLevelNames) == 0 {
-		retColLevelNames = append(retColLevelNames, "default")
+		retColLevelNames = append(retColLevelNames, "*0")
 		for k := range retVals {
 			retVals[k].name = fmt.Sprintf("%v", k)
 		}
@@ -358,7 +358,7 @@ func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 		retColLevelNames[l] = fmt.Sprintf("*%d", l)
 	}
 	if len(retColLevelNames) == 0 {
-		retColLevelNames = append(retColLevelNames, "default")
+		retColLevelNames = append(retColLevelNames, "*0")
 	}
 	for k := range retVals {
 		retVals[k].name = fmt.Sprintf("%v", k)
@@ -455,15 +455,23 @@ func removeDefaultNameIndicator(name string) string {
 }
 
 func (df *DataFrame) String() string {
-	csv := df.ToCSV()
+	// do not try to print all rows
+	csv := df.Head(maxRows).ToCSV()
 	for k := range csv[0] {
 		csv[0][k] = removeDefaultNameIndicator(csv[0][k])
+	}
+	var caption string
+	if df.name != "" {
+		caption = fmt.Sprintf("name: %v", df.name)
 	}
 	var buf bytes.Buffer
 	table := tablewriter.NewWriter(&buf)
 	table.SetHeader(csv[0])
 	table.AppendBulk(csv[1:])
 	table.SetAutoMergeCells(true)
+	if caption != "" {
+		table.SetCaption(true, caption)
+	}
 	table.Render()
 	return string(buf.Bytes())
 }
@@ -612,7 +620,7 @@ func (df *DataFrame) Head(n int) *DataFrame {
 	for j := range df.labels {
 		retLabels[j] = df.labels[j].head(n)
 	}
-	return &DataFrame{values: retVals, labels: retLabels, name: df.name}
+	return &DataFrame{values: retVals, labels: retLabels, name: df.name, colLevelNames: df.colLevelNames}
 }
 
 // Tail returns the last `n` rows of the Series. If `n` is greater than the length of the Series, returns the entire Series.
@@ -629,7 +637,7 @@ func (df *DataFrame) Tail(n int) *DataFrame {
 	for j := range df.labels {
 		retLabels[j] = df.labels[j].tail(n)
 	}
-	return &DataFrame{values: retVals, labels: retLabels, name: df.name}
+	return &DataFrame{values: retVals, labels: retLabels, name: df.name, colLevelNames: df.colLevelNames}
 }
 
 // Range returns the rows of the DataFrame starting at `first` and `ending` with last (inclusive).
@@ -649,7 +657,7 @@ func (df *DataFrame) Range(first, last int) *DataFrame {
 	for j := range df.labels {
 		retLabels[j] = df.labels[j].rangeSlice(first, last)
 	}
-	return &DataFrame{values: retVals, labels: retLabels, name: df.name}
+	return &DataFrame{values: retVals, labels: retLabels, name: df.name, colLevelNames: df.colLevelNames}
 }
 
 // Valid returns rows with all non-null values.

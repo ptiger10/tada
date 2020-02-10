@@ -3,7 +3,7 @@ package tada
 import "fmt"
 
 func ExampleDataFrame() {
-	df := NewDataFrame([]interface{}{[]float64{1, 2}, []string{"foo", "bar"}}).SetCols([]string{"a", "b"})
+	df := NewDataFrame([]interface{}{[]float64{1, 2}, []string{"foo", "bar"}}).SetCols([]string{"a", "b"}).SetName("qux")
 	fmt.Println(df)
 	// Output:
 	// +---+---+-----+
@@ -12,6 +12,7 @@ func ExampleDataFrame() {
 	// | 0 | 1 | foo |
 	// | 1 | 2 | bar |
 	// +---+---+-----+
+	// name: qux
 }
 
 func ExampleSeries() {
