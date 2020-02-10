@@ -145,8 +145,30 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 			cols[lvl].slice = input
 			cols[lvl].isNull = isNull
 		}
+	case reflect.Ptr:
+		v, ok := input.(*Series)
+		if !ok {
+			return nil, fmt.Errorf("unsupported input: *Series is only supported pointer")
+		}
+
+		if v.Len() != requiredLen {
+			return nil, fmt.Errorf(
+				"cannot replace items in column %s: length of input Series does not match existing length (%d != %d)",
+				name, v.Len(), requiredLen)
+		}
+		// `name` does not already exist: append new level
+		lvl, err := findColWithName(name, cols)
+		if err != nil {
+			cols = append(cols, v.values)
+			cols[len(cols)-1].name = name
+		} else {
+			// `name` already exists: overwrite existing level
+			cols[lvl] = v.values
+			cols[lvl].name = name
+		}
+
 	default:
-		return nil, fmt.Errorf("unsupported input kind: must be either slice or string")
+		return nil, fmt.Errorf("unsupported input kind: must be either slice, string, or Series")
 	}
 	return cols, nil
 }

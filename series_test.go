@@ -455,6 +455,21 @@ func TestSeries_WithLabels(t *testing.T) {
 					{slice: []string{""}, isNull: []bool{true}, name: "qux"},
 				}},
 		},
+		{"append new Series",
+			fields{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
+				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
+			args{"qux", &Series{
+				values: &valueContainer{slice: []string{""}, isNull: []bool{true}},
+				labels: []*valueContainer{{slice: []string{"anything"}, isNull: []bool{false}, name: "bar"}}},
+			},
+			&Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
+				labels: []*valueContainer{
+					{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"},
+					{slice: []string{""}, isNull: []bool{true}, name: "qux"},
+				}},
+		},
 		{"fail: string name not in labels",
 			fields{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
@@ -481,7 +496,7 @@ func TestSeries_WithLabels(t *testing.T) {
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
 			args{"qux", map[string]interface{}{"foo": "bar"}},
-			&Series{err: errors.New("WithLabels(): unsupported input kind: must be either slice or string")},
+			&Series{err: errors.New("WithLabels(): unsupported input kind: must be either slice, string, or Series")},
 		},
 	}
 	for _, tt := range tests {
@@ -492,7 +507,8 @@ func TestSeries_WithLabels(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := s.WithLabels(tt.args.name, tt.args.arg); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.WithLabels() = %v, want %v", got.err, tt.want.err)
+				t.Errorf("Series.WithLabels() = %v, want %v", got.labels, tt.want)
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}

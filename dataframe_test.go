@@ -538,6 +538,24 @@ func TestDataFrame_WithCol(t *testing.T) {
 					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				name: "bar"},
 		},
+		{"replace with Series", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name: "bar"},
+			args{"baz", &Series{
+				values: &valueContainer{slice: []float64{10}, isNull: []bool{false}, name: "baz"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				{slice: []float64{10}, isNull: []bool{false}, name: "baz"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				name: "bar"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -548,7 +566,7 @@ func TestDataFrame_WithCol(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := df.WithCol(tt.args.name, tt.args.input); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.WithCol() = %v, want %v", got.values[0], tt.want.values[0])
+				t.Errorf("DataFrame.WithCol() = %v, want %v", got.values, tt.want.values)
 			}
 		})
 	}
