@@ -76,9 +76,10 @@ func (s *Series) Copy() *Series {
 func (s *Series) ToDataFrame() *DataFrame {
 	s = s.Copy()
 	return &DataFrame{
-		values: []*valueContainer{s.values},
-		labels: s.labels,
-		err:    s.err,
+		values:        []*valueContainer{s.values},
+		labels:        s.labels,
+		colLevelNames: []string{"default"},
+		err:           s.err,
 	}
 }
 
@@ -93,6 +94,10 @@ func (s *Series) ToCSV() [][]string {
 }
 
 // -- GETTERS
+
+func (s *Series) String() string {
+	return s.ToDataFrame().String()
+}
 
 // Err returns the most recent error attached to the Series, if any.
 func (s *Series) Err() error {

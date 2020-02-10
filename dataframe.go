@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+
+	"github.com/olekukonko/tablewriter"
 )
 
 // -- CONSTRUCTORS
@@ -448,6 +450,24 @@ func ReadMatrix(mat Matrix) *DataFrame {
 
 // -- GETTERS
 
+func removeDefaultNameIndicator(name string) string {
+	return regexp.MustCompile(`^\*`).ReplaceAllString(name, "")
+}
+
+func (df *DataFrame) String() string {
+	csv := df.ToCSV()
+	for k := range csv[0] {
+		csv[0][k] = removeDefaultNameIndicator(csv[0][k])
+	}
+	var buf bytes.Buffer
+	table := tablewriter.NewWriter(&buf)
+	table.SetHeader(csv[0])
+	table.AppendBulk(csv[1:])
+	table.SetAutoMergeCells(true)
+	table.Render()
+	return string(buf.Bytes())
+}
+
 // Len returns the number of rows in each column of the DataFrame.
 func (df *DataFrame) Len() int {
 	return reflect.ValueOf(df.values[0].slice).Len()
@@ -861,7 +881,8 @@ func (df *DataFrameMutator) ResetLabels(index ...int) {
 			df.dataframe.resetWithError(fmt.Errorf("ResetLabels(): index out of range (%d > %d)", i, df.dataframe.numLevels()-1))
 		}
 		newVal := df.dataframe.labels[i]
-		newVal.name = regexp.MustCompile(`^\*`).ReplaceAllString(newVal.name, "")
+		// If label level name has default indicator, remove default indicator
+		newVal.name = removeDefaultNameIndicator(newVal.name)
 		df.dataframe.values = append(df.dataframe.values, newVal)
 		df.dataframe.labels, _ = subsetCols(df.dataframe.labels, excludeFromIndex(df.dataframe.numLevels(), i))
 	}
