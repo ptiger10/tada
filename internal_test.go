@@ -775,3 +775,27 @@ func Test_valueContainer_append(t *testing.T) {
 		})
 	}
 }
+
+func Test_cumsum(t *testing.T) {
+	type args struct {
+		vals   []float64
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name string
+		args args
+		want []float64
+	}{
+		{"pass", args{vals: []float64{1, 0, 2}, isNull: []bool{false, true, false}, index: []int{0, 1, 2}},
+			[]float64{1, 1, 3}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cumsum(tt.args.vals, tt.args.isNull, tt.args.index)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("cumsum() got = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

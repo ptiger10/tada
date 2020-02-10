@@ -314,6 +314,24 @@ func (s *SeriesMutator) WithLabels(name string, input interface{}) {
 	s.series.labels = labels
 }
 
+// WithValues stub
+func (s *Series) WithValues(input interface{}) *Series {
+	s.Copy()
+	s.InPlace().WithValues(input)
+	return s
+}
+
+// WithValues stub
+func (s *SeriesMutator) WithValues(input interface{}) {
+	// synthesize a collection of valueContainers, ensuring that name already exists
+	vals, err := withColumn([]*valueContainer{s.series.values}, s.series.values.name, input, s.series.Len())
+	if err != nil {
+		s.series.resetWithError(fmt.Errorf("WithValues(): %v", err))
+	}
+	s.series.values = vals[0]
+	return
+}
+
 // WithRow stub
 func (s *Series) WithRow(label string, values interface{}) *Series {
 	return nil
@@ -728,6 +746,20 @@ func (s *Series) math(mathFunction func([]float64, []bool, []int) (float64, bool
 		s.values.isNull,
 		makeIntRange(0, s.Len()))
 	return output
+}
+
+// aligns output with original series. analogous to Pandas transform concept
+func (s *Series) alignedMath(alignedFunction func([]float64, []bool, []int) []float64) []float64 {
+	retVals := alignedFunction(
+		s.values.float().slice,
+		s.values.isNull,
+		makeIntRange(0, s.Len()))
+	return retVals
+}
+
+// CumSum returns the cumulative sum at each row position
+func (s *Series) CumSum() []float64 {
+	return s.alignedMath(cumsum)
 }
 
 // -- Slicers

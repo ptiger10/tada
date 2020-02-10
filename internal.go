@@ -1097,12 +1097,29 @@ func min(vals []float64, isNull []bool, index []int) (float64, bool) {
 // Compatible with Grouped calculations as well as Series
 func max(vals []float64, isNull []bool, index []int) (float64, bool) {
 	max := math.Inf(-1)
+	var atLeastOneValid bool
 	for _, i := range index {
 		if !isNull[i] {
 			if vals[i] > max {
 				max = vals[i]
 			}
+			atLeastOneValid = true
 		}
 	}
+	if !atLeastOneValid {
+		return 0, true
+	}
 	return max, false
+}
+
+func cumsum(vals []float64, isNull []bool, index []int) []float64 {
+	ret := make([]float64, len(index))
+	var cumsum float64
+	for incrementor, i := range index {
+		if !isNull[i] {
+			cumsum += vals[i]
+		}
+		ret[incrementor] = cumsum
+	}
+	return ret
 }
