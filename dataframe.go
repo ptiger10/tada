@@ -261,9 +261,15 @@ func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
 		labels, isNull := makeDefaultLabels(0, numRows)
 		retLabels = append(retLabels, &valueContainer{slice: labels, isNull: isNull, name: "*0"})
 	}
+	// create default col level names
+	retColLevelNames := make([]string, cfg.NumHeaderRows)
+	for l := range retColLevelNames {
+		retColLevelNames[l] = fmt.Sprintf("*%d", l)
+	}
 	return &DataFrame{
-		values: retVals,
-		labels: retLabels,
+		values:        retVals,
+		labels:        retLabels,
+		colLevelNames: retColLevelNames,
 	}
 }
 
@@ -327,9 +333,15 @@ func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 		labels, isNull := makeDefaultLabels(0, numRows)
 		retLabels = append(retLabels, &valueContainer{slice: labels, isNull: isNull, name: "*0"})
 	}
+	// create default col level names
+	retColLevelNames := make([]string, cfg.NumHeaderRows)
+	for l := range retColLevelNames {
+		retColLevelNames[l] = fmt.Sprintf("*%d", l)
+	}
 	return &DataFrame{
-		values: retVals,
-		labels: retLabels,
+		values:        retVals,
+		labels:        retLabels,
+		colLevelNames: retColLevelNames,
 	}
 
 }
@@ -948,15 +960,15 @@ func (df *DataFrame) Transpose() *DataFrame {
 }
 
 // PromoteToColLevel pivots either a column or label level into a new column level.
-// If stacking would use either the last column or index level, it returns an error.
+// If promoting would use either the last column or index level, it returns an error.
 // Adds new columns - each unique value in the stacked column is stacked above each existing column.
-// Stacking does not add any rows.
+// Can remove rows - returns only one row per unique label combination.
 func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 	index, isCol, err := findNameInColumnsOrLabels(name, df.values, df.labels)
 	if err != nil {
 		return dataFrameWithError(fmt.Errorf("PromoteToColLevel(): %v", err))
 	}
-	var valsToStack *valueContainer
+	var valsToPromote *valueContainer
 
 	// by default, include all label levels
 	residualLabelIndex := makeIntRange(0, len(df.labels))
@@ -964,26 +976,31 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 		if len(df.values) <= 1 {
 			return dataFrameWithError(fmt.Errorf("PromoteToColLevel(): cannot stack only column"))
 		}
-		valsToStack = df.values[index]
+		valsToPromote = df.values[index]
 	} else {
 		if len(df.labels) <= 1 {
 			return dataFrameWithError(fmt.Errorf("PromoteToColLevel(): cannot stack only label level"))
 		}
-		valsToStack = df.labels[index]
+		valsToPromote = df.labels[index]
+		// if a label is selected, remove it from the residual labels
 		residualLabelIndex = excludeFromIndex(len(df.labels), index)
 	}
-	retName := valsToStack.name
-	lookupSource, _, orderedKeys, _ := labelsToMap([]*valueContainer{valsToStack}, []int{0})
+	retName := valsToPromote.name
+	// lookupSource maps the unique values in the promoted column to the rows with that value
+	lookupSource, _, orderedKeys, _ := labelsToMap([]*valueContainer{valsToPromote}, []int{0})
+	// rowToUniqueLabels maps each original row index to its matching index in the return container
+	// this step consolidates duplicate residual labels
 	_, _, uniqueLabels, rowToUniqueLabels := labelsToMap(df.labels, residualLabelIndex)
 
+	// new labels will have as many columns as the residual label index
 	newLabelNames := make([]string, len(residualLabelIndex))
 	newLabels := make([][]string, len(residualLabelIndex))
 	for j, pos := range residualLabelIndex {
 		newLabels[j] = make([]string, len(uniqueLabels))
 		for i := range uniqueLabels {
-			splitName := splitLabelIntoLevels(uniqueLabels[i], true)
-			for l := range splitName {
-				newLabels[j][i] = splitName[l]
+			splitNames := splitLabelIntoLevels(uniqueLabels[i], true)
+			for _, name := range splitNames {
+				newLabels[j][i] = name
 			}
 		}
 		newLabelNames[j] = df.labels[pos].name
@@ -996,9 +1013,9 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 	for k := range newVals {
 		newVals[k] = make([]string, len(uniqueLabels))
 	}
-	// iterate over columns -> unique values of stacked column -> index of each unique value
-	// compare to original value at column and index position
-	// write to unique row in container for each label value
+	// iterate over original columns -> unique values of stacked column -> row index of each unique value
+	// compare to original value at column and row position
+	// write to new row in container for each label value
 	for k := 0; k < df.numColumns(); k++ {
 		for m, orderedKey := range orderedKeys {
 			newColumn := k*len(lookupSource) + m
@@ -1015,6 +1032,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 			}
 		}
 	}
+	// transfer values to final from
 	retVals := make([]*valueContainer, len(newVals))
 	for k := range retVals {
 		retVals[k] = &valueContainer{
@@ -1023,6 +1041,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 			name:   colNames[k],
 		}
 	}
+	// transfer labels to final from
 	retLabels := make([]*valueContainer, len(newLabels))
 	for j := range retLabels {
 		retLabels[j] = &valueContainer{
@@ -1102,16 +1121,12 @@ func (df *DataFrame) Filter(filters ...FilterFn) []int {
 		}
 		// if ColName is not empty, find name in either columns or labels
 		var data *valueContainer
-		index, isCol, err := findNameInColumnsOrLabels(filter.ColName, df.values, df.labels)
-		// could not match on either columns or labels
+		mergedLabelsAndCols := append(df.labels, df.values...)
+		index, err := findColWithName(filter.ColName, mergedLabelsAndCols)
 		if err != nil {
 			return []int{-999}
 		}
-		if isCol {
-			data = df.values[index]
-		} else {
-			data = df.labels[index]
-		}
+		data = mergedLabelsAndCols[index]
 
 		subIndex, err := data.filter(filter)
 		if err != nil {
@@ -1158,23 +1173,15 @@ func (df *DataFrameMutator) Apply(lambda ApplyFn) {
 		}
 	} else {
 		// if ColName is not empty, find name in either columns or labels
-		index, isCol, err := findNameInColumnsOrLabels(lambda.ColName, df.dataframe.values, df.dataframe.labels)
+		mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
+		index, err := findColWithName(lambda.ColName, mergedLabelsAndCols)
 		if err != nil {
 			df.dataframe.resetWithError((fmt.Errorf("Apply(): %v", err)))
 		}
-		// apply to col
-		if isCol {
-			df.dataframe.values[index].slice = df.dataframe.values[index].apply(lambda)
-			df.dataframe.values[index].isNull = isEitherNull(
-				df.dataframe.values[index].isNull,
-				setNullsFromInterface(df.dataframe.values[index].slice))
-			//apply to label level
-		} else {
-			df.dataframe.labels[index].slice = df.dataframe.labels[index].apply(lambda)
-			df.dataframe.labels[index].isNull = isEitherNull(
-				df.dataframe.labels[index].isNull,
-				setNullsFromInterface(df.dataframe.labels[index].slice))
-		}
+		mergedLabelsAndCols[index].slice = mergedLabelsAndCols[index].apply(lambda)
+		mergedLabelsAndCols[index].isNull = isEitherNull(
+			mergedLabelsAndCols[index].isNull,
+			setNullsFromInterface(mergedLabelsAndCols[index].slice))
 	}
 	return
 }
@@ -1254,21 +1261,16 @@ func (df *DataFrameMutator) Sort(by ...Sorter) {
 		// Sorter with empty ColName -> error
 		if by[i].ColName == "" {
 			df.dataframe.resetWithError(fmt.Errorf(
-				"Sort(): Sorter (position %d) does not have ColName", i))
+				"Sort(): Sorter (position %d) must have ColName", i))
 			return
 		}
-		colPosition, isCol, err := findNameInColumnsOrLabels(by[i].ColName, df.dataframe.values, df.dataframe.labels)
-		if err != nil {
-			df.dataframe.resetWithError(fmt.Errorf("Sort(): %v", err))
-			return
-		}
-		if isCol {
-			vals = df.dataframe.values[colPosition].copy()
-		} else {
-			vals = df.dataframe.labels[colPosition].copy()
 
+		mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
+		colPosition, err := findColWithName(by[i].ColName, mergedLabelsAndCols)
+		if err != nil {
+			df.dataframe.resetWithError((fmt.Errorf("Sort(): %v", err)))
 		}
-		// overwrite index with new index
+		vals = mergedLabelsAndCols[colPosition].copy()
 		index = vals.sort(by[i].DType, by[i].Descending, index)
 	}
 	df.Subset(index)
@@ -1294,6 +1296,7 @@ func (df *DataFrame) GroupBy(names ...string) GroupedDataFrame {
 	return df.groupby(index)
 }
 
+// expects index to refer to merged labels and columns
 func (df *DataFrame) groupby(index []int) GroupedDataFrame {
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	g, _, orderedKeys, _ := labelsToMap(mergedLabelsAndCols, index)
@@ -1311,10 +1314,7 @@ func (df *DataFrame) groupby(index []int) GroupedDataFrame {
 
 // PivotTable stub
 func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFrame {
-	// group by
-	// stack
-	// select
-	// apply aggfn
+
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	labelIndex, err := findColWithName(labels, mergedLabelsAndCols)
 	if err != nil {
@@ -1426,4 +1426,14 @@ func (df *DataFrame) Std() *Series {
 // Count stub
 func (df *DataFrame) Count() *Series {
 	return df.math("count", count)
+}
+
+// Min stub
+func (df *DataFrame) Min() *Series {
+	return df.math("min", min)
+}
+
+// Max stub
+func (df *DataFrame) Max() *Series {
+	return df.math("max", max)
 }

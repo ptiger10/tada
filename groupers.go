@@ -85,6 +85,21 @@ func (g GroupedSeries) Std() *Series {
 	return g.mathFunc("std", std)
 }
 
+// Count stub
+func (g GroupedSeries) Count() *Series {
+	return g.mathFunc("count", count)
+}
+
+// Min stub
+func (g GroupedSeries) Min() *Series {
+	return g.mathFunc("min", min)
+}
+
+// Max stub
+func (g GroupedSeries) Max() *Series {
+	return g.mathFunc("max", max)
+}
+
 func (g GroupedDataFrame) mathFunc(
 	name string, cols []string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *DataFrame {
 	if len(g.groups) == 0 {
@@ -173,4 +188,19 @@ func (g GroupedDataFrame) Median(colNames ...string) *DataFrame {
 // Std stub
 func (g GroupedDataFrame) Std(colNames ...string) *DataFrame {
 	return g.mathFunc("std", colNames, std)
+}
+
+// Count stub
+func (g GroupedDataFrame) Count(colNames ...string) *DataFrame {
+	return g.mathFunc("count", colNames, count)
+}
+
+// Min stub
+func (g GroupedDataFrame) Min(colNames ...string) *DataFrame {
+	return g.mathFunc("min", colNames, min)
+}
+
+// Max stub
+func (g GroupedDataFrame) Max(colNames ...string) *DataFrame {
+	return g.mathFunc("max", colNames, max)
 }

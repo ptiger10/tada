@@ -153,13 +153,18 @@ func (vc *valueContainer) float() floatValueContainer {
 func (vc *valueContainer) str() stringValueContainer {
 	newVals := make([]string, reflect.ValueOf(vc.slice).Len())
 	isNull := vc.isNull
-	d := reflect.ValueOf(vc.slice)
-	for i := 0; i < d.Len(); i++ {
-		newVals[i] = fmt.Sprint(d.Index(i).Interface())
+	switch vc.slice.(type) {
+	case []string:
+		newVals = vc.slice.([]string)
+	default:
+		d := reflect.ValueOf(vc.slice)
+		for i := 0; i < d.Len(); i++ {
+			newVals[i] = fmt.Sprint(d.Index(i).Interface())
+		}
 	}
 	ret := stringValueContainer{
-		isNull: isNull,
 		slice:  newVals,
+		isNull: isNull,
 		index:  makeIntRange(0, len(newVals)),
 	}
 	return ret

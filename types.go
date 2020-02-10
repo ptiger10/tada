@@ -84,6 +84,12 @@ type ApplyFn struct {
 	ColName  string
 }
 
+// ApplyFormatFn stub
+type ApplyFormatFn struct {
+	F64      func(val float64) string
+	DateTime func(val time.Time) string
+}
+
 func (lambda ApplyFn) validate() error {
 	if lambda.F64 == nil {
 		if lambda.String == nil {
@@ -100,6 +106,7 @@ type GroupedSeries struct {
 	groups      map[string][]int
 	orderedKeys []string
 	series      *Series
+	labelNames  []string
 	err         error
 }
 

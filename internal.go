@@ -304,6 +304,27 @@ func (vc *valueContainer) rangeSlice(first, last int) *valueContainer {
 	}
 }
 
+func (vc *valueContainer) shift(n int) *valueContainer {
+	v := reflect.ValueOf(vc.slice)
+	vals := reflect.MakeSlice(v.Type(), v.Len(), v.Len())
+	isNull := make([]bool, v.Len())
+	for i := 0; i < v.Len(); i++ {
+		position := i - n
+		if position < 0 || position >= v.Len() {
+			vals.Index(i).Set(reflect.Zero(reflect.TypeOf(vc.slice).Elem()))
+			isNull[i] = true
+		} else {
+			vals.Index(i).Set(v.Index(position))
+			isNull[i] = vc.isNull[position]
+		}
+	}
+	return &valueContainer{
+		slice:  vals.Interface(),
+		isNull: isNull,
+		name:   vc.name,
+	}
+}
+
 func (vc *valueContainer) iterRow(index int) Element {
 	return Element{
 		val:    reflect.ValueOf(vc.slice).Index(index).Interface(),
@@ -451,6 +472,8 @@ func (vc *valueContainer) filter(filter FilterFn) ([]int, error) {
 	}
 	return index, nil
 }
+
+// func (vc *valueContainer) applyFormat(apply ApplyFormatFn)
 
 func (vc *valueContainer) apply(apply ApplyFn) interface{} {
 	var ret interface{}
@@ -987,10 +1010,48 @@ func std(vals []float64, isNull []bool, index []int) (float64, bool) {
 // Compatible with Grouped calculations as well as Series
 func count(vals []float64, isNull []bool, index []int) (float64, bool) {
 	var counter int
+	var atLeastOneValid bool
 	for _, i := range index {
 		if !isNull[i] {
 			counter++
+			atLeastOneValid = true
 		}
 	}
+	if !atLeastOneValid {
+		return 0, true
+	}
 	return float64(counter), false
+}
+
+// min returns the min of the non-null values at the `index` positions in `vals`.
+// Compatible with Grouped calculations as well as Series
+func min(vals []float64, isNull []bool, index []int) (float64, bool) {
+	min := math.Inf(0)
+	var atLeastOneValid bool
+	for _, i := range index {
+		if !isNull[i] {
+			if vals[i] < min {
+				min = vals[i]
+			}
+			atLeastOneValid = true
+		}
+	}
+	if !atLeastOneValid {
+		return 0, true
+	}
+	return min, false
+}
+
+// max returns the max of the non-null values at the `index` positions in `vals`.
+// Compatible with Grouped calculations as well as Series
+func max(vals []float64, isNull []bool, index []int) (float64, bool) {
+	max := math.Inf(-1)
+	for _, i := range index {
+		if !isNull[i] {
+			if vals[i] > max {
+				max = vals[i]
+			}
+		}
+	}
+	return max, false
 }

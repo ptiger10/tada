@@ -240,6 +240,23 @@ func (s *Series) Null() *Series {
 	return s.Subset(index)
 }
 
+// Shift shifts all the values `n` rows upward while keeping labels constant.
+// Returns a new Series.
+func (s *Series) Shift(n int) *Series {
+	s = s.Copy()
+	s.InPlace().Shift(n)
+	return s
+}
+
+// Shift shifts all the values `n` rows upward while keeping labels constant.
+// // Modifies the underlying Series.
+func (s *SeriesMutator) Shift(n int) {
+	if s.series.Len() < n {
+		n = s.series.Len()
+	}
+	s.series.values = s.series.values.shift(n)
+}
+
 // -- SETTERS
 
 // InPlace returns a SeriesMutator, which contains most of the same methods as Series but never returns a new Series.
@@ -481,7 +498,8 @@ func (s *SeriesMutator) Apply(lambda ApplyFn) {
 		return
 	}
 	data.slice = data.apply(lambda)
-	data.isNull = setNullsFromInterface(data.slice)
+	// set to null if null either prior to or after transformation
+	data.isNull = isEitherNull(s.series.values.isNull, setNullsFromInterface(data.slice))
 	return
 }
 
@@ -566,10 +584,15 @@ func (s *Series) GroupBy(names ...string) GroupedSeries {
 		}
 	}
 	g, _, orderedKeys, _ := labelsToMap(s.labels, index)
+	labelNames := make([]string, len(index))
+	for i, pos := range index {
+		labelNames[i] = s.labels[pos].name
+	}
 	return GroupedSeries{
 		groups:      g,
 		orderedKeys: orderedKeys,
 		series:      s,
+		labelNames:  labelNames,
 	}
 }
 
@@ -619,6 +642,16 @@ func (s *Series) Std() float64 {
 func (s *Series) Count() int {
 	count := s.math(count)
 	return int(count)
+}
+
+// Min stub
+func (s *Series) Min() float64 {
+	return s.math(min)
+}
+
+// Max stub
+func (s *Series) Max() float64 {
+	return s.math(max)
 }
 
 func (s *Series) math(mathFunction func([]float64, []bool, []int) (float64, bool)) float64 {

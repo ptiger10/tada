@@ -149,8 +149,8 @@ func TestReadCSVByRows(t *testing.T) {
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-			}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1286,8 +1286,8 @@ func TestDataFrame_GroupBy(t *testing.T) {
 		{"group by all levels, with repeats", fields{
 			values: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}}},
 			labels: []*valueContainer{
-				{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}},
-				{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}},
+				{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a"},
+				{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b"},
 			}},
 			args{nil},
 			GroupedDataFrame{
@@ -1296,9 +1296,10 @@ func TestDataFrame_GroupBy(t *testing.T) {
 				df: &DataFrame{
 					values: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}}},
 					labels: []*valueContainer{
-						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}},
-						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}},
+						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a"},
+						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b"},
 					}},
+				labelNames: []string{"a", "b"},
 			},
 		},
 	}
@@ -1312,6 +1313,8 @@ func TestDataFrame_GroupBy(t *testing.T) {
 			}
 			if got := df.GroupBy(tt.args.names...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.GroupBy() = %v, want %v", got, tt.want)
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+
 			}
 		})
 	}
@@ -1319,10 +1322,11 @@ func TestDataFrame_GroupBy(t *testing.T) {
 
 func TestDataFrame_toCSVByRows(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		colLevelNames []string
+		err           error
 	}
 	type args struct {
 		ignoreLabels bool
@@ -1339,7 +1343,8 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 				values: []*valueContainer{
 					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"},
 					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
 			},
 			args: args{ignoreLabels: false},
 			want: [][]string{
@@ -1353,7 +1358,8 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 				values: []*valueContainer{
 					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo|baz"},
 					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar|qux"}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0", "*1"},
 			},
 			args: args{ignoreLabels: false},
 			want: [][]string{
@@ -1371,6 +1377,7 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"},
 					{slice: []int{10, 11}, isNull: []bool{false, false}, name: "*1"},
 				},
+				colLevelNames: []string{"*0"},
 			},
 			want: [][]string{
 				{"*0", "*1", "foo", "bar"},
@@ -1382,16 +1389,17 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				colLevelNames: tt.fields.colLevelNames,
+				err:           tt.fields.err,
 			}
 			got, err := df.toCSVByRows(tt.args.ignoreLabels)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.toCSVByRows() = %v, want %v", got, tt.want)
 			}
-			if (err == nil) != tt.wantErr {
+			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.toCSVByRows() err = %v, want %v", err, tt.wantErr)
 			}
 		})

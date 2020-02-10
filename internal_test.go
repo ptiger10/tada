@@ -657,3 +657,45 @@ func Test_concatenateLabelsToStrings(t *testing.T) {
 		})
 	}
 }
+
+func Test_valueContainer_shift(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	type args struct {
+		n int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *valueContainer
+	}{
+		{"positive", fields{slice: []string{"1", "2", "3"}, isNull: []bool{false, false, false}, name: "foo"},
+			args{1},
+			&valueContainer{
+				slice: []string{"", "1", "2"}, isNull: []bool{true, false, false}, name: "foo"}},
+		{"negative", fields{slice: []string{"1", "2", "3"}, isNull: []bool{false, false, false}, name: "foo"},
+			args{-1},
+			&valueContainer{
+				slice: []string{"2", "3", ""}, isNull: []bool{false, false, true}, name: "foo"}},
+		{"too many positions", fields{slice: []string{"1", "2", "3"}, isNull: []bool{false, false, false}, name: "foo"},
+			args{5},
+			&valueContainer{
+				slice: []string{"", "", ""}, isNull: []bool{true, true, true}, name: "foo"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			if got := vc.shift(tt.args.n); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("vc.shift() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
