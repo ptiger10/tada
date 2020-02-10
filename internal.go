@@ -347,6 +347,17 @@ func (vc *valueContainer) shift(n int) *valueContainer {
 	}
 }
 
+// convert to string as lowest common denominator
+func (vc *valueContainer) append(other *valueContainer) *valueContainer {
+	retSlice := append(vc.str().slice, other.str().slice...)
+	retIsNull := append(vc.isNull, other.isNull...)
+	return &valueContainer{
+		slice:  retSlice,
+		isNull: retIsNull,
+		name:   vc.name,
+	}
+}
+
 func (vc *valueContainer) iterRow(index int) Element {
 	return Element{
 		val:    reflect.ValueOf(vc.slice).Index(index).Interface(),

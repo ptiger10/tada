@@ -107,7 +107,7 @@ func TestSeries_ToDataFrame(t *testing.T) {
 				values:        []*valueContainer{{slice: []float64{1}, name: "foo", isNull: []bool{false}}},
 				labels:        []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}},
 				err:           errors.New("foo"),
-				colLevelNames: []string{"default"}}},
+				colLevelNames: []string{"*0"}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

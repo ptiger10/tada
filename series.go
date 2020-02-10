@@ -78,7 +78,7 @@ func (s *Series) ToDataFrame() *DataFrame {
 	return &DataFrame{
 		values:        []*valueContainer{s.values},
 		labels:        s.labels,
-		colLevelNames: []string{"default"},
+		colLevelNames: []string{"*0"},
 		err:           s.err,
 	}
 }
@@ -338,6 +338,29 @@ func (s *SeriesMutator) Drop(index int) {
 	for j := range s.series.labels {
 		s.series.labels[j].dropRow(index)
 	}
+}
+
+// Append adds the `other` values as new rows to the Series.
+// Returns a new Series.
+func (s *Series) Append(other *Series) *Series {
+	s.Copy()
+	s.InPlace().Append(other)
+	return s
+}
+
+// Append adds the `other` values as new rows to the Series by coercing all values to string.
+// Returns a new Series.
+func (s *SeriesMutator) Append(other *Series) {
+	if len(other.labels) != len(s.series.labels) {
+		s.series.resetWithError(
+			fmt.Errorf("other Series must have same number of label levels as original Series (%d != %d)",
+				len(other.labels), len(s.series.labels)))
+	}
+	for j := range s.series.labels {
+		s.series.labels[j] = s.series.labels[j].append(other.labels[j])
+	}
+	s.series.values = s.series.values.append(other.values)
+	return
 }
 
 // SetName modifies the name of a Series in place and returns the original Series.

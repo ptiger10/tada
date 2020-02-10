@@ -742,3 +742,36 @@ func Test_valueContainer_applyFormat(t *testing.T) {
 		})
 	}
 }
+
+func Test_valueContainer_append(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	type args struct {
+		other *valueContainer
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *valueContainer
+	}{
+		{"floats", fields{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			args{&valueContainer{slice: []float64{2}, isNull: []bool{false}, name: "bar"}},
+			&valueContainer{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			if got := vc.append(tt.args.other); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.append() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

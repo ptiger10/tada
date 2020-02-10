@@ -841,6 +841,36 @@ func (df *DataFrameMutator) Drop(index int) {
 	return
 }
 
+// Append adds the `other` values as new rows to the DataFrame.
+// Returns a new DataFrame.
+func (df *DataFrame) Append(other *DataFrame) *DataFrame {
+	df.Copy()
+	df.InPlace().Append(other)
+	return df
+}
+
+// Append adds the `other` values as new rows to the Series by coercing all values to string.
+// Returns a new Series.
+func (df *DataFrameMutator) Append(other *DataFrame) {
+	if len(other.labels) != len(df.dataframe.labels) {
+		df.dataframe.resetWithError(
+			fmt.Errorf("other DataFrame must have same number of label levels as original DataFrame (%d != %d)",
+				len(other.labels), len(df.dataframe.labels)))
+	}
+	if len(other.values) != len(df.dataframe.values) {
+		df.dataframe.resetWithError(
+			fmt.Errorf("other DataFrame must have same number of columns as original DataFrame (%d != %d)",
+				len(other.values), len(df.dataframe.values)))
+	}
+	for j := range df.dataframe.labels {
+		df.dataframe.labels[j] = df.dataframe.labels[j].append(other.labels[j])
+	}
+	for k := range df.dataframe.values {
+		df.dataframe.values[k] = df.dataframe.values[k].append(other.values[k])
+	}
+	return
+}
+
 // SetLabels removes the row at the specified index.
 // Returns a new DataFrame.
 func (df *DataFrame) SetLabels(colNames ...string) *DataFrame {
