@@ -472,9 +472,9 @@ func (s *Series) After(comparison time.Time) []int {
 // -- APPLY
 
 // Apply stub
-func (s *Series) Apply(function ApplyFn) *Series {
+func (s *Series) Apply(lambda ApplyFn) *Series {
 	s.Copy()
-	s.InPlace().Apply(function)
+	s.InPlace().Apply(lambda)
 	return s
 }
 
@@ -498,6 +498,36 @@ func (s *SeriesMutator) Apply(lambda ApplyFn) {
 		return
 	}
 	data.slice = data.apply(lambda)
+	// set to null if null either prior to or after transformation
+	data.isNull = isEitherNull(s.series.values.isNull, setNullsFromInterface(data.slice))
+	return
+}
+
+// ApplyFormat stub
+func (s *Series) ApplyFormat(lambda ApplyFormatFn) *Series {
+	s.Copy()
+	s.InPlace().ApplyFormat(lambda)
+	return s
+}
+
+// ApplyFormat stub
+func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
+	err := lambda.validate()
+	if err != nil {
+		s.series.resetWithError((fmt.Errorf("Apply(): %v", err)))
+		return
+	}
+	var data *valueContainer
+	// if colName is not specified, use the main values
+	if lambda.ColName == "" || lambda.ColName == s.series.values.name {
+		data = s.series.values
+	} else if lvl, err := findColWithName(lambda.ColName, s.series.labels); err == nil {
+		data = s.series.labels[lvl]
+	} else {
+		s.series.resetWithError(fmt.Errorf("Apply(): %v", err))
+		return
+	}
+	data.slice = data.applyFormat(lambda)
 	// set to null if null either prior to or after transformation
 	data.isNull = isEitherNull(s.series.values.isNull, setNullsFromInterface(data.slice))
 	return

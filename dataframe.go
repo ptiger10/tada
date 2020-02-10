@@ -1186,6 +1186,44 @@ func (df *DataFrameMutator) Apply(lambda ApplyFn) {
 	return
 }
 
+// ApplyFormat stub
+func (df *DataFrame) ApplyFormat(lambda ApplyFormatFn) *DataFrame {
+	df.Copy()
+	df.InPlace().ApplyFormat(lambda)
+	return df
+}
+
+// ApplyFormat stub
+// Modifies the underlying DataFrame in place.
+func (df *DataFrameMutator) ApplyFormat(lambda ApplyFormatFn) {
+	err := lambda.validate()
+	if err != nil {
+		df.dataframe.resetWithError((fmt.Errorf("ApplyFormat(): %v", err)))
+		return
+	}
+	// if ColName is empty, apply lambda to all columns
+	if lambda.ColName == "" {
+		for k := range df.dataframe.values {
+			df.dataframe.values[k].slice = df.dataframe.values[k].applyFormat(lambda)
+			df.dataframe.values[k].isNull = isEitherNull(
+				df.dataframe.values[k].isNull,
+				setNullsFromInterface(df.dataframe.values[k].slice))
+		}
+	} else {
+		// if ColName is not empty, find name in either columns or labels
+		mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
+		index, err := findColWithName(lambda.ColName, mergedLabelsAndCols)
+		if err != nil {
+			df.dataframe.resetWithError((fmt.Errorf("ApplyFormat(): %v", err)))
+		}
+		mergedLabelsAndCols[index].slice = mergedLabelsAndCols[index].applyFormat(lambda)
+		mergedLabelsAndCols[index].isNull = isEitherNull(
+			mergedLabelsAndCols[index].isNull,
+			setNullsFromInterface(mergedLabelsAndCols[index].slice))
+	}
+	return
+}
+
 // -- MERGERS
 
 // Merge stub

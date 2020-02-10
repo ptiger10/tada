@@ -3,6 +3,7 @@ package tada
 import (
 	"math"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -695,6 +696,48 @@ func Test_valueContainer_shift(t *testing.T) {
 			}
 			if got := vc.shift(tt.args.n); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("vc.shift() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_applyFormat(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	type args struct {
+		apply ApplyFormatFn
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   interface{}
+	}{
+		{"float",
+			fields{slice: []float64{.75}, isNull: []bool{false}},
+			args{ApplyFormatFn{F64: func(v float64) string {
+				return strconv.FormatFloat(v, 'f', 1, 64)
+			}}},
+			[]string{"0.8"}},
+		{"datetime",
+			fields{slice: []time.Time{time.Date(2019, 1, 1, 0, 0, 0, 0, time.UTC)}, isNull: []bool{false}},
+			args{ApplyFormatFn{DateTime: func(v time.Time) string {
+				return v.Format("2006-01-02")
+			}}},
+			[]string{"2019-01-01"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			if got := vc.applyFormat(tt.args.apply); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.applyFormat() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -3,6 +3,7 @@ package tada
 import (
 	"errors"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -875,22 +876,22 @@ func TestSeries_Apply(t *testing.T) {
 		args   args
 		want   *Series
 	}{
-		// {"apply to series values by default",
-		// 	fields{
-		// 		values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
-		// 		labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
-		// 	args{ApplyFn{F64: func(v float64) float64 { return v * 2 }}},
-		// 	&Series{
-		// 		values: &valueContainer{slice: []float64{0, 2}, isNull: []bool{false, false}},
-		// 		labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
-		// {"apply to label level and coerce to float",
-		// 	fields{
-		// 		values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
-		// 		labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-		// 	args{ApplyFn{F64: func(v float64) float64 { return v * 2 }, ColName: "*0"}},
-		// 	&Series{
-		// 		values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
-		// 		labels: []*valueContainer{{name: "*0", slice: []float64{0, 2}, isNull: []bool{false, false}}}}},
+		{"apply to series values by default",
+			fields{
+				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{ApplyFn{F64: func(v float64) float64 { return v * 2 }}},
+			&Series{
+				values: &valueContainer{slice: []float64{0, 2}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
+		{"apply to label level and coerce to float",
+			fields{
+				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{ApplyFn{F64: func(v float64) float64 { return v * 2 }, ColName: "*0"}},
+			&Series{
+				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{name: "*0", slice: []float64{0, 2}, isNull: []bool{false, false}}}}},
 		{"apply with prior null",
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{true, false}},
@@ -1406,6 +1407,44 @@ func TestSeries_Shift(t *testing.T) {
 			if got := s.Shift(tt.args.n); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.Shift() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+			}
+		})
+	}
+}
+
+func TestSeries_ApplyFormat(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		lambda ApplyFormatFn
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"apply to series values by default",
+			fields{
+				values: &valueContainer{slice: []float64{0, .25}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{ApplyFormatFn{F64: func(v float64) string { return strconv.FormatFloat(v, 'f', 1, 64) }}},
+			&Series{
+				values: &valueContainer{slice: []string{"0.0", "0.2"}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.ApplyFormat(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.ApplyFormat() = %v, want %v", got.values, tt.want.values)
 			}
 		})
 	}

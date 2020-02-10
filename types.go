@@ -88,6 +88,7 @@ type ApplyFn struct {
 type ApplyFormatFn struct {
 	F64      func(val float64) string
 	DateTime func(val time.Time) string
+	ColName  string
 }
 
 func (lambda ApplyFn) validate() error {
@@ -96,6 +97,15 @@ func (lambda ApplyFn) validate() error {
 			if lambda.DateTime == nil {
 				return fmt.Errorf("no apply function provided")
 			}
+		}
+	}
+	return nil
+}
+
+func (lambda ApplyFormatFn) validate() error {
+	if lambda.F64 == nil {
+		if lambda.DateTime == nil {
+			return fmt.Errorf("no apply function provided")
 		}
 	}
 	return nil

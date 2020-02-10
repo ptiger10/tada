@@ -473,7 +473,25 @@ func (vc *valueContainer) filter(filter FilterFn) ([]int, error) {
 	return index, nil
 }
 
-// func (vc *valueContainer) applyFormat(apply ApplyFormatFn)
+func (vc *valueContainer) applyFormat(apply ApplyFormatFn) interface{} {
+	var ret interface{}
+	if apply.F64 != nil {
+		slice := vc.float().slice
+		retSlice := make([]string, len(slice))
+		for i := range slice {
+			retSlice[i] = apply.F64(slice[i])
+		}
+		ret = retSlice
+	} else if apply.DateTime != nil {
+		slice := vc.dateTime().slice
+		retSlice := make([]string, len(slice))
+		for i := range slice {
+			retSlice[i] = apply.DateTime(slice[i])
+		}
+		ret = retSlice
+	}
+	return ret
+}
 
 func (vc *valueContainer) apply(apply ApplyFn) interface{} {
 	var ret interface{}

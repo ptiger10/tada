@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -1638,6 +1639,52 @@ func TestDataFrame_dropColLevel(t *testing.T) {
 				colLevelNames: tt.fields.colLevelNames,
 			}
 			df.dropColLevel(tt.args.level)
+		})
+	}
+}
+
+func TestDataFrame_ApplyFormat(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		lambda ApplyFormatFn
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"float64 on all columns", fields{
+			values: []*valueContainer{{slice: []float64{.51}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:   "baz"},
+			args{ApplyFormatFn{ColName: "foo", F64: func(v float64) string {
+				return strconv.FormatFloat(v, 'f', 1, 64)
+			}}},
+			&DataFrame{
+				values: []*valueContainer{{slice: []string{"0.5"}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				name:   "baz"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.ApplyFormat(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.ApplyFormat() = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }
