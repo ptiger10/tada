@@ -794,6 +794,27 @@ func (s *Series) CumSum() *Series {
 	}
 }
 
+// Rank stub
+func (s *Series) Rank() *Series {
+	slice := s.alignedMath(rank)
+	isNull := make([]bool, s.Len())
+	for i, val := range slice {
+		if val == -999 {
+			isNull[i] = true
+		} else {
+			isNull[i] = false
+		}
+	}
+	return &Series{
+		values: &valueContainer{
+			slice:  slice,
+			isNull: isNull,
+			name:   "rank",
+		},
+		labels: s.labels,
+	}
+}
+
 // Cut stub
 func (s *Series) Cut(bins []float64, andLess, andMore bool, labels []string) *Series {
 	retSlice, err := s.values.cut(bins, andLess, andMore, labels)

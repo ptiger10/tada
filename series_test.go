@@ -1560,3 +1560,35 @@ func TestSeries_Cut(t *testing.T) {
 		})
 	}
 }
+
+func TestSeries_Rank(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass", fields{
+			values: &valueContainer{slice: []float64{3, 2, 0}, isNull: []bool{false, false, true}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			&Series{
+				values: &valueContainer{slice: []float64{2, 1, -999}, isNull: []bool{false, false, true}, name: "rank"},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Rank(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Rank() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

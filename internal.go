@@ -109,7 +109,7 @@ func findNameInColumnsOrLabels(name string, cols []*valueContainer, labels []*va
 // findColWithName returns the position of the first level within `cols` with a name matching `name`, or an error if no level matches
 func findColWithName(name string, cols []*valueContainer) (int, error) {
 	for j := range cols {
-		if cols[j].name == name {
+		if strings.ToLower(cols[j].name) == strings.ToLower(name) {
 			return j, nil
 		}
 	}
@@ -1162,15 +1162,6 @@ func cumsum(vals []float64, isNull []bool, index []int) []float64 {
 	return ret
 }
 
-// func quartile(vals []float64, isNull []bool, index []int) []float64 {
-// 	validVals := make([]float64)
-// 	for _, i := range index {
-// 		if !isNull[i] {
-// 			validVals = append(validVals)
-// 		}
-// 	}
-// }
-
 func (lambda ApplyFn) validate() error {
 	if lambda.F64 == nil {
 		if lambda.String == nil {
@@ -1245,4 +1236,41 @@ func (vc *valueContainer) cut(bins []float64, andLess, andMore bool, labels []st
 
 	return ret, nil
 
+}
+
+func rank(vals []float64, isNull []bool, index []int) []float64 {
+	ret := make([]float64, len(index))
+	newVals := make([]float64, len(index))
+	newIndex := make([]int, len(index))
+	newIsNull := make([]bool, len(index))
+	for i := range index {
+		newVals[i] = vals[i]
+		newIndex[i] = i
+		newIsNull[i] = isNull[i]
+	}
+	floats := &floatValueContainer{slice: newVals, index: newIndex, isNull: newIsNull}
+	sort.Stable(floats)
+	var offset float64
+	for i := range floats.slice {
+		originalPosition := floats.index[i]
+		if floats.isNull[i] {
+			ret[originalPosition] = -999
+			offset++
+			continue
+		}
+		if i > 0 {
+
+			if floats.slice[i] == floats.slice[i-1] {
+				ret[originalPosition] = ret[floats.index[i-1]]
+				// every time a duplicate value is found, increment the offset
+				offset++
+			} else {
+				// reduce the index count by the offset amount
+				ret[originalPosition] = float64(i) + 1 - offset
+			}
+		} else {
+			ret[originalPosition] = float64(i) + 1
+		}
+	}
+	return ret
 }

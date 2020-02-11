@@ -969,3 +969,75 @@ func Test_valueContainer_cut(t *testing.T) {
 		})
 	}
 }
+
+func Test_rank(t *testing.T) {
+	type args struct {
+		vals   []float64
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name string
+		args args
+		want []float64
+	}{
+		{"no repeats", args{vals: []float64{4, 5, 3}, isNull: []bool{false, false, false}, index: []int{0, 1, 2}},
+			[]float64{2, 3, 1}},
+		{"no repeats, null", args{vals: []float64{4, 0, 5, 3}, isNull: []bool{false, true, false, false},
+			index: []int{0, 1, 2, 3}}, []float64{2, -999, 3, 1}},
+		{"repeats", args{vals: []float64{4, 5, 4, 3}, isNull: []bool{false, false, false, false}, index: []int{0, 1, 2, 3}},
+			[]float64{2, 3, 2, 1}},
+		{"more repeats", args{vals: []float64{3, 2, 0, 4, 1, 3}, isNull: []bool{false, false, true, false, false, false},
+			index: []int{0, 1, 2, 3, 4, 5}},
+			[]float64{3, 2, -999, 4, 1, 3}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := rank(tt.args.vals, tt.args.isNull, tt.args.index); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("rank() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_findColWithName(t *testing.T) {
+	type args struct {
+		name string
+		cols []*valueContainer
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantErr bool
+	}{
+		{"pass", args{"foo", []*valueContainer{
+			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+			{slice: []int{0}, isNull: []bool{false}, name: "foo"}}},
+			1, false},
+		{"pass - uppercase search", args{"FOO", []*valueContainer{
+			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+			{slice: []int{0}, isNull: []bool{false}, name: "foo"}}},
+			1, false},
+		{"pass - title case name", args{"foo", []*valueContainer{
+			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+			{slice: []int{0}, isNull: []bool{false}, name: "Foo"}}},
+			1, false},
+		{"fail - not found", args{"foo", []*valueContainer{
+			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+			{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
+			0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := findColWithName(tt.args.name, tt.args.cols)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("findColWithName() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("findColWithName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
