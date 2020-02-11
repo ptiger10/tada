@@ -1041,3 +1041,30 @@ func Test_findColWithName(t *testing.T) {
 		})
 	}
 }
+
+func Test_percentile(t *testing.T) {
+	type args struct {
+		vals   []float64
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name string
+		args args
+		want []float64
+	}{
+		{"no null", args{vals: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, index: []int{0, 1, 2, 3}},
+			[]float64{25, 50, 75, 100}},
+		{"repeats", args{vals: []float64{1, 2, 2, 4}, isNull: []bool{false, false, false, false}, index: []int{0, 1, 2, 3}},
+			[]float64{25, 50, 50, 100}},
+		{"null", args{vals: []float64{0, 1, 2, 3, 4}, isNull: []bool{true, false, false, false, false},
+			index: []int{0, 1, 2, 3, 4}}, []float64{-999, 25, 50, 75, 100}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := percentile(tt.args.vals, tt.args.isNull, tt.args.index); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("percentile() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

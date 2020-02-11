@@ -1238,39 +1238,71 @@ func (vc *valueContainer) cut(bins []float64, andLess, andMore bool, labels []st
 
 }
 
+// null is returned as -999
 func rank(vals []float64, isNull []bool, index []int) []float64 {
 	ret := make([]float64, len(index))
+	// copy all existing values at index positions
 	newVals := make([]float64, len(index))
-	newIndex := make([]int, len(index))
 	newIsNull := make([]bool, len(index))
 	for i := range index {
 		newVals[i] = vals[i]
-		newIndex[i] = i
 		newIsNull[i] = isNull[i]
 	}
-	floats := &floatValueContainer{slice: newVals, index: newIndex, isNull: newIsNull}
+	// sort floats
+	floats := &floatValueContainer{slice: newVals, index: makeIntRange(0, len(index)), isNull: newIsNull}
 	sort.Stable(floats)
 	var offset float64
+	// iterate over sorted values and write results back to []float aligned with original
+	// the incrementor here is the naive ranking, but must be adjsuted for nulls and duplicates
 	for i := range floats.slice {
 		originalPosition := floats.index[i]
+		// ranking is 1-based, index is 0-based
+		rank := float64(i) + 1
+
+		// handle null
 		if floats.isNull[i] {
 			ret[originalPosition] = -999
-			offset++
+			offset--
 			continue
 		}
-		if i > 0 {
-
-			if floats.slice[i] == floats.slice[i-1] {
-				ret[originalPosition] = ret[floats.index[i-1]]
-				// every time a duplicate value is found, increment the offset
-				offset++
-			} else {
-				// reduce the index count by the offset amount
-				ret[originalPosition] = float64(i) + 1 - offset
-			}
-		} else {
-			ret[originalPosition] = float64(i) + 1
+		// no duplicates prior to first value
+		if i == 0 {
+			ret[originalPosition] = rank
+			continue
 		}
+		// handle duplicates
+		if floats.slice[i] == floats.slice[i-1] {
+			// if duplicate, look up original position immediately prior and increment the offset
+			ret[originalPosition] = ret[floats.index[i-1]]
+			offset--
+		} else {
+			// reduce the rank by the offset amount
+			ret[originalPosition] = rank + offset
+		}
+	}
+	return ret
+}
+
+func percentile(vals []float64, isNull []bool, index []int) []float64 {
+	ret := make([]float64, len(index))
+	// copy all existing values at index positions
+	newVals := make([]float64, len(index))
+	newIsNull := make([]bool, len(index))
+	var validCount int
+	for i := range index {
+		newVals[i] = vals[i]
+		newIsNull[i] = isNull[i]
+		if !isNull[i] {
+			validCount++
+		}
+	}
+	for i := range newVals {
+		if newIsNull[i] {
+			ret[i] = -999
+			continue
+		}
+		percentile := (newVals[i] / float64(validCount)) * 100
+		ret[i] = percentile
 	}
 	return ret
 }
