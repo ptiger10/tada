@@ -470,6 +470,27 @@ func (s *Series) Filter(filters ...FilterFn) []int {
 	return index
 }
 
+// Where stub
+func (s *Series) Where(filters []FilterFn, ifTrue, ifFalse string) *Series {
+	ret := make([]string, s.Len())
+	index := s.Filter(filters...)
+	for _, i := range index {
+		ret[i] = ifTrue
+	}
+	inverseIndex := difference(makeIntRange(0, s.Len()), index)
+	for _, i := range inverseIndex {
+		ret[i] = ifFalse
+	}
+	return &Series{
+		values: &valueContainer{
+			slice:  ret,
+			isNull: s.values.isNull,
+			name:   s.values.name,
+		},
+		labels: s.labels,
+	}
+}
+
 // GT coerces Series values to float64 and returns each row position with a non-null value greater than `comparison`.
 func (s *Series) GT(comparison float64) []int {
 	return s.values.gt(comparison)

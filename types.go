@@ -1,7 +1,6 @@
 package tada
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -79,9 +78,9 @@ type Element struct {
 
 // FilterFn stub
 type FilterFn struct {
-	F64      func(val float64, isNull bool) bool
-	String   func(val string, isNull bool) bool
-	DateTime func(val time.Time, isNull bool) bool
+	F64      func(val float64) bool
+	String   func(val string) bool
+	DateTime func(val time.Time) bool
 	ColName  string
 }
 
@@ -98,26 +97,6 @@ type ApplyFormatFn struct {
 	F64      func(val float64) string
 	DateTime func(val time.Time) string
 	ColName  string
-}
-
-func (lambda ApplyFn) validate() error {
-	if lambda.F64 == nil {
-		if lambda.String == nil {
-			if lambda.DateTime == nil {
-				return fmt.Errorf("no apply function provided")
-			}
-		}
-	}
-	return nil
-}
-
-func (lambda ApplyFormatFn) validate() error {
-	if lambda.F64 == nil {
-		if lambda.DateTime == nil {
-			return fmt.Errorf("no apply function provided")
-		}
-	}
-	return nil
 }
 
 // GroupedSeries stub

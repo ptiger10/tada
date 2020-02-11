@@ -723,8 +723,8 @@ func TestSeries_Filter(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{[]FilterFn{{F64: func(val float64, isNull bool) bool {
-				if val > 1 && !isNull {
+			args{[]FilterFn{{F64: func(val float64) bool {
+				if val > 1 {
 					return true
 				}
 				return false
@@ -734,13 +734,13 @@ func TestSeries_Filter(t *testing.T) {
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []string{"bar", "foo", "baz"}, isNull: []bool{false, false, false}}}},
 			args{[]FilterFn{
-				{F64: func(val float64, isNull bool) bool {
+				{F64: func(val float64) bool {
 					if val > 1 {
 						return true
 					}
 					return false
 				}},
-				{ColName: "*0", String: func(val string, isNull bool) bool {
+				{ColName: "*0", String: func(val string) bool {
 					if strings.Contains(val, "a") {
 						return true
 					}
@@ -1462,6 +1462,59 @@ func TestSeries_ApplyFormat(t *testing.T) {
 			}
 			if got := s.ApplyFormat(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.ApplyFormat() = %v, want %v", got.values, tt.want.values)
+			}
+		})
+	}
+}
+
+func TestSeries_Where(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		filters []FilterFn
+		ifTrue  string
+		ifFalse string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"multiple filters",
+			fields{
+				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{[]FilterFn{
+				{ColName: "qux", F64: func(v float64) bool {
+					if v > 1 {
+						return true
+					}
+					return false
+				}},
+				{String: func(v string) bool {
+					if strings.Contains(v, "ba") {
+						return true
+					}
+					return false
+				}},
+			}, "yes", "no"},
+			&Series{
+				values: &valueContainer{slice: []string{"no", "no", "yes"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Where(tt.args.filters, tt.args.ifTrue, tt.args.ifFalse); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Where() = %v, want %v", got, tt.want)
 			}
 		})
 	}

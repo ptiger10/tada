@@ -176,16 +176,17 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 func intersection(slices [][]int) []int {
 	set := make(map[int]int)
 	for _, slice := range slices {
-		for i := range slice {
-			if _, ok := set[slice[i]]; !ok {
-				set[slice[i]] = 1
+		for _, i := range slice {
+			if _, ok := set[i]; !ok {
+				set[i] = 1
 			} else {
-				set[slice[i]]++
+				set[i]++
 			}
 		}
 	}
 	var ret []int
 	for k, v := range set {
+		// this means that the value appeared in every slice
 		if v == len(slices) {
 			ret = append(ret, k)
 		}
@@ -205,6 +206,25 @@ func union(slices [][]int) []int {
 		}
 	}
 	sort.Ints(ret)
+	return ret
+}
+
+func difference(slice1 []int, slice2 []int) []int {
+	var ret []int
+	set := make(map[int]bool)
+	for _, i := range slice1 {
+		set[i] = true
+	}
+	for _, i := range slice2 {
+		if _, ok := set[i]; ok {
+			set[i] = false
+		}
+	}
+	for k, v := range set {
+		if v {
+			ret = append(ret, k)
+		}
+	}
 	return ret
 }
 
@@ -365,8 +385,8 @@ func (vc *valueContainer) iterRow(index int) Element {
 }
 
 func (vc *valueContainer) gt(comparison float64) []int {
-	index, _ := vc.filter(FilterFn{F64: func(v float64, isNull bool) bool {
-		if v > comparison && !isNull {
+	index, _ := vc.filter(FilterFn{F64: func(v float64) bool {
+		if v > comparison {
 			return true
 		}
 		return false
@@ -375,8 +395,8 @@ func (vc *valueContainer) gt(comparison float64) []int {
 }
 
 func (vc *valueContainer) lt(comparison float64) []int {
-	index, _ := vc.filter(FilterFn{F64: func(v float64, isNull bool) bool {
-		if v < comparison && !isNull {
+	index, _ := vc.filter(FilterFn{F64: func(v float64) bool {
+		if v < comparison {
 			return true
 		}
 		return false
@@ -385,8 +405,8 @@ func (vc *valueContainer) lt(comparison float64) []int {
 }
 
 func (vc *valueContainer) gte(comparison float64) []int {
-	index, _ := vc.filter(FilterFn{F64: func(v float64, isNull bool) bool {
-		if v >= comparison && !isNull {
+	index, _ := vc.filter(FilterFn{F64: func(v float64) bool {
+		if v >= comparison {
 			return true
 		}
 		return false
@@ -395,8 +415,8 @@ func (vc *valueContainer) gte(comparison float64) []int {
 }
 
 func (vc *valueContainer) lte(comparison float64) []int {
-	index, _ := vc.filter(FilterFn{F64: func(v float64, isNull bool) bool {
-		if v <= comparison && !isNull {
+	index, _ := vc.filter(FilterFn{F64: func(v float64) bool {
+		if v <= comparison {
 			return true
 		}
 		return false
@@ -405,8 +425,8 @@ func (vc *valueContainer) lte(comparison float64) []int {
 }
 
 func (vc *valueContainer) floateq(comparison float64) []int {
-	index, _ := vc.filter(FilterFn{F64: func(v float64, isNull bool) bool {
-		if v == comparison && !isNull {
+	index, _ := vc.filter(FilterFn{F64: func(v float64) bool {
+		if v == comparison {
 			return true
 		}
 		return false
@@ -415,8 +435,8 @@ func (vc *valueContainer) floateq(comparison float64) []int {
 }
 
 func (vc *valueContainer) floatneq(comparison float64) []int {
-	index, _ := vc.filter(FilterFn{F64: func(v float64, isNull bool) bool {
-		if v != comparison && !isNull {
+	index, _ := vc.filter(FilterFn{F64: func(v float64) bool {
+		if v != comparison {
 			return true
 		}
 		return false
@@ -425,8 +445,8 @@ func (vc *valueContainer) floatneq(comparison float64) []int {
 }
 
 func (vc *valueContainer) eq(comparison string) []int {
-	index, _ := vc.filter(FilterFn{String: func(v string, isNull bool) bool {
-		if v == comparison && !isNull {
+	index, _ := vc.filter(FilterFn{String: func(v string) bool {
+		if v == comparison {
 			return true
 		}
 		return false
@@ -435,8 +455,8 @@ func (vc *valueContainer) eq(comparison string) []int {
 }
 
 func (vc *valueContainer) neq(comparison string) []int {
-	index, _ := vc.filter(FilterFn{String: func(v string, isNull bool) bool {
-		if v != comparison && !isNull {
+	index, _ := vc.filter(FilterFn{String: func(v string) bool {
+		if v != comparison {
 			return true
 		}
 		return false
@@ -445,8 +465,8 @@ func (vc *valueContainer) neq(comparison string) []int {
 }
 
 func (vc *valueContainer) contains(substr string) []int {
-	index, _ := vc.filter(FilterFn{String: func(v string, isNull bool) bool {
-		if strings.Contains(v, substr) && !isNull {
+	index, _ := vc.filter(FilterFn{String: func(v string) bool {
+		if strings.Contains(v, substr) {
 			return true
 		}
 		return false
@@ -455,8 +475,8 @@ func (vc *valueContainer) contains(substr string) []int {
 }
 
 func (vc *valueContainer) before(comparison time.Time) []int {
-	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time, isNull bool) bool {
-		if v.Before(comparison) && !isNull {
+	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
+		if v.Before(comparison) {
 			return true
 		}
 		return false
@@ -465,8 +485,8 @@ func (vc *valueContainer) before(comparison time.Time) []int {
 }
 
 func (vc *valueContainer) after(comparison time.Time) []int {
-	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time, isNull bool) bool {
-		if v.After(comparison) && !isNull {
+	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
+		if v.After(comparison) {
 			return true
 		}
 		return false
@@ -478,25 +498,22 @@ func (vc *valueContainer) filter(filter FilterFn) ([]int, error) {
 	var index []int
 	if filter.F64 != nil {
 		slice := vc.float().slice
-		isNull := vc.float().isNull
 		for i := range slice {
-			if filter.F64(slice[i], isNull[i]) {
+			if filter.F64(slice[i]) && !vc.isNull[i] {
 				index = append(index, i)
 			}
 		}
 	} else if filter.String != nil {
 		slice := vc.str().slice
-		isNull := vc.str().isNull
 		for i := range slice {
-			if filter.String(slice[i], isNull[i]) {
+			if filter.String(slice[i]) && !vc.isNull[i] {
 				index = append(index, i)
 			}
 		}
 	} else if filter.DateTime != nil {
 		slice := vc.dateTime().slice
-		isNull := vc.dateTime().isNull
 		for i := range slice {
-			if filter.DateTime(slice[i], isNull[i]) {
+			if filter.DateTime(slice[i]) && !vc.isNull[i] {
 				index = append(index, i)
 			}
 		}
@@ -1143,4 +1160,33 @@ func cumsum(vals []float64, isNull []bool, index []int) []float64 {
 		ret[incrementor] = cumsum
 	}
 	return ret
+}
+
+// func quartile(vals []float64, isNull []bool, index []int) []float64 {
+// 	validVals := make([]float64)
+// 	for _, i := range index {
+// 		if !isNull[i] {
+// 			validVals = append(validVals)
+// 		}
+// 	}
+// }
+
+func (lambda ApplyFn) validate() error {
+	if lambda.F64 == nil {
+		if lambda.String == nil {
+			if lambda.DateTime == nil {
+				return fmt.Errorf("no apply function provided")
+			}
+		}
+	}
+	return nil
+}
+
+func (lambda ApplyFormatFn) validate() error {
+	if lambda.F64 == nil {
+		if lambda.DateTime == nil {
+			return fmt.Errorf("no apply function provided")
+		}
+	}
+	return nil
 }

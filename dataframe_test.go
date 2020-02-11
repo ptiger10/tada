@@ -877,13 +877,13 @@ func TestDataFrame_Filter(t *testing.T) {
 				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, false, false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
 			args{[]FilterFn{
-				{F64: func(v float64, isNull bool) bool {
+				{F64: func(v float64) bool {
 					if v < 2 {
 						return true
 					}
 					return false
 				}, ColName: "foo"},
-				{String: func(v string, isNull bool) bool {
+				{String: func(v string) bool {
 					if strings.Contains(v, "oo") {
 						return true
 					}

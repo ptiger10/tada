@@ -861,3 +861,24 @@ func Test_last(t *testing.T) {
 		})
 	}
 }
+
+func Test_difference(t *testing.T) {
+	type args struct {
+		slice1 []int
+		slice2 []int
+	}
+	tests := []struct {
+		name string
+		args args
+		want []int
+	}{
+		{"pass", args{[]int{0, 1, 2}, []int{1}}, []int{0, 2}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := difference(tt.args.slice1, tt.args.slice2); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("difference() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
