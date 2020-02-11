@@ -758,8 +758,18 @@ func (s *Series) alignedMath(alignedFunction func([]float64, []bool, []int) []fl
 }
 
 // CumSum returns the cumulative sum at each row position
-func (s *Series) CumSum() []float64 {
-	return s.alignedMath(cumsum)
+func (s *Series) CumSum() *Series {
+	isNull := make([]bool, s.Len())
+	for i := range isNull {
+		isNull[i] = false
+	}
+	return &Series{
+		values: &valueContainer{
+			slice:  s.alignedMath(cumsum),
+			isNull: isNull,
+			name:   "cumsum"},
+		labels: s.labels,
+	}
 }
 
 // -- Slicers
