@@ -786,9 +786,27 @@ func (s *Series) CumSum() *Series {
 	}
 	return &Series{
 		values: &valueContainer{
-			slice:  s.alignedMath(cumsum),
+			slice: s.alignedMath(cumsum),
+			// no null values possible
 			isNull: isNull,
 			name:   "cumsum"},
+		labels: s.labels,
+	}
+}
+
+// Cut stub
+func (s *Series) Cut(bins []float64, andLess, andMore bool, labels []string) *Series {
+	retSlice, err := s.values.cut(bins, andLess, andMore, labels)
+	if err != nil {
+		return seriesWithError(fmt.Errorf("Cut(): %v", err))
+	}
+	retVals := &valueContainer{
+		slice:  retSlice,
+		isNull: setNullsFromInterface(retSlice),
+		name:   s.values.name,
+	}
+	return &Series{
+		values: retVals,
 		labels: s.labels,
 	}
 }

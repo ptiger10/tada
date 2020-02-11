@@ -882,3 +882,90 @@ func Test_difference(t *testing.T) {
 		})
 	}
 }
+
+func Test_valueContainer_cut(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	type args struct {
+		bins    []float64
+		andLess bool
+		andMore bool
+		labels  []string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{"supplied labels, no less, no more",
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{bins: []float64{1, 3, 5}, andLess: false, andMore: false, labels: []string{"low", "high"}},
+			[]string{"low", "low", "high", "high"}, false},
+		{"supplied labels, less, no more",
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{bins: []float64{2, 3, 4}, andLess: true, andMore: false, labels: []string{"low", "medium", "high"}},
+			[]string{"low", "medium", "high", ""}, false},
+		{"supplied labels, no less, more",
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{bins: []float64{2, 3, 4}, andLess: false, andMore: true, labels: []string{"low", "medium", "high"}},
+			[]string{"", "low", "medium", "high"}, false},
+		{"supplied labels, less, more",
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{bins: []float64{2, 3, 4}, andLess: true, andMore: true, labels: []string{"low", "medium", "high", "higher"}},
+			[]string{"low", "medium", "high", "higher"}, false},
+		{"default labels, no less, no more",
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{bins: []float64{1, 3, 5}, andLess: false, andMore: false, labels: nil},
+			[]string{"1-3", "1-3", "3-5", "3-5"}, false},
+		{"default labels, less, no more",
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{bins: []float64{2, 3, 4}, andLess: true, andMore: false, labels: nil},
+			[]string{"<2", "2-3", "3-4", ""}, false},
+		{"default labels, no less, more",
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{bins: []float64{2, 3, 4}, andLess: false, andMore: true, labels: nil},
+			[]string{"", "2-3", "3-4", ">=4"}, false},
+		{"default labels, less, more",
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{bins: []float64{2, 3, 4}, andLess: true, andMore: true, labels: nil},
+			[]string{"<2", "2-3", "3-4", ">=4"}, false},
+		{"fail: zero bins",
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{bins: []float64{}, andLess: false, andMore: false, labels: []string{}},
+			nil, true},
+		{"fail: bin - label mismatch",
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{bins: []float64{1, 2, 3}, andLess: false, andMore: false, labels: []string{"foo"}},
+			nil, true},
+		{"fail: bin - label mismatch, less, no more",
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{bins: []float64{1, 2, 3}, andLess: true, andMore: false, labels: []string{"foo", "bar"}},
+			nil, true},
+		{"fail: bin - label mismatch, no less, more",
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{bins: []float64{1, 2, 3}, andLess: false, andMore: true, labels: []string{"foo", "bar"}},
+			nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			got, err := vc.cut(tt.args.bins, tt.args.andLess, tt.args.andMore, tt.args.labels)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("valueContainer.cut() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.cut() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

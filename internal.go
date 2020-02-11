@@ -1190,3 +1190,59 @@ func (lambda ApplyFormatFn) validate() error {
 	}
 	return nil
 }
+
+// left-inclusive, right-exclusive
+func (vc *valueContainer) cut(bins []float64, andLess, andMore bool, labels []string) ([]string, error) {
+	if len(bins) == 0 {
+		return nil, fmt.Errorf("must supply at least one bin edge")
+	}
+	originalBinCount := len(bins)
+	var useDefaultLabels bool
+	// create default labels
+	if len(labels) == 0 {
+		useDefaultLabels = true
+		labels = make([]string, len(bins)-1)
+		// do not iterate over the last edge to avoid range error
+		for i := 0; i < len(bins)-1; i++ {
+			labels[i] = fmt.Sprintf("%v-%v", bins[i], bins[i+1])
+		}
+	}
+	if andLess {
+		if useDefaultLabels {
+			labels = append([]string{fmt.Sprintf("<%v", bins[0])}, labels...)
+		}
+		bins = append([]float64{math.Inf(-1)}, bins...)
+	}
+	if andMore {
+		if useDefaultLabels {
+			labels = append(labels, fmt.Sprintf(">=%v", bins[len(bins)-1]))
+		}
+		bins = append(bins, math.Inf(1))
+	}
+	var andLessEdge, andMoreEdge int
+	if andLess {
+		andLessEdge = 1
+	}
+	if andMore {
+		andMoreEdge = 1
+	}
+	if len(bins)-1 != len(labels) {
+		return nil, fmt.Errorf("number of bin edges (including andLess and andMore), "+
+			"must be one more than number of supplied labels: (%d + %d + %d) != (%d + 1)",
+			originalBinCount, andLessEdge, andMoreEdge, len(labels))
+	}
+	vals := vc.float().slice
+	ret := make([]string, len(vals))
+	for i, val := range vals {
+		// do not iterate over the last edge to avoid range error
+		for incrementor := 0; incrementor < len(bins)-1; incrementor++ {
+			if val >= bins[incrementor] && val < bins[incrementor+1] {
+				ret[i] = labels[incrementor]
+				break
+			}
+		}
+	}
+
+	return ret, nil
+
+}

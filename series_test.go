@@ -1519,3 +1519,44 @@ func TestSeries_Where(t *testing.T) {
 		})
 	}
 }
+
+func TestSeries_Cut(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		bins    []float64
+		andLess bool
+		andMore bool
+		labels  []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"pass", fields{
+			values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{
+				bins: []float64{2, 3}, andLess: false, andMore: true, labels: nil},
+			&Series{
+				values: &valueContainer{slice: []string{"", "2-3", ">=3"}, isNull: []bool{true, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Cut(tt.args.bins, tt.args.andLess, tt.args.andMore, tt.args.labels); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Cut() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
