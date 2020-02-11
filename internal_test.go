@@ -799,3 +799,65 @@ func Test_cumsum(t *testing.T) {
 		})
 	}
 }
+
+func Test_first(t *testing.T) {
+	type args struct {
+		vals   []string
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  string
+		want1 bool
+	}{
+		{"valid", args{vals: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, index: []int{0, 1, 2}},
+			"foo", false},
+		{"null", args{vals: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, index: []int{1}},
+			"", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := first(tt.args.vals, tt.args.isNull, tt.args.index)
+			if got != tt.want {
+				t.Errorf("first() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("first() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func Test_last(t *testing.T) {
+	type args struct {
+		vals   []string
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  string
+		want1 bool
+	}{
+		{"valid", args{vals: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, index: []int{0, 1, 2}},
+			"baz", false},
+		{"skip", args{vals: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, index: []int{0, 1}},
+			"foo", false},
+		{"null", args{vals: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, index: []int{1}},
+			"", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := last(tt.args.vals, tt.args.isNull, tt.args.index)
+			if got != tt.want {
+				t.Errorf("last() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("last() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}

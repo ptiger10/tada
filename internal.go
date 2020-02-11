@@ -1112,6 +1112,27 @@ func max(vals []float64, isNull []bool, index []int) (float64, bool) {
 	return max, false
 }
 
+// returns the first non-null value as a string
+func first(vals []string, isNull []bool, index []int) (string, bool) {
+	for _, i := range index {
+		if !isNull[i] {
+			return vals[i], false
+		}
+	}
+	return "", true
+}
+
+// returns the last non-null value as a string
+func last(vals []string, isNull []bool, index []int) (string, bool) {
+	for i := len(index) - 1; i >= 0; i-- {
+		if !isNull[index[i]] {
+			return vals[index[i]], false
+		}
+	}
+	return "", true
+}
+
+// cumsum is an aligned function, meaning it aligns with the original rows
 func cumsum(vals []float64, isNull []bool, index []int) []float64 {
 	ret := make([]float64, len(index))
 	var cumsum float64

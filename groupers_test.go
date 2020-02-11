@@ -1,9 +1,10 @@
 package tada
 
 import (
-	"github.com/d4l3k/messagediff"
 	"reflect"
 	"testing"
+
+	"github.com/d4l3k/messagediff"
 )
 
 func TestGroupedSeries_Sum(t *testing.T) {
@@ -225,6 +226,46 @@ func TestGroupedDataFrame_Sum(t *testing.T) {
 			if got := g.Sum(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GroupedDataFrame.Sum() = %v, want %v", got.values[0], tt.want.values[0])
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+			}
+		})
+	}
+}
+
+func TestGroupedSeries_First(t *testing.T) {
+	type fields struct {
+		groups      map[string][]int
+		orderedKeys []string
+		series      *Series
+		labelNames  []string
+		err         error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{name: "single level",
+			fields: fields{
+				groups:      map[string][]int{"foo": []int{0, 1}, "bar": []int{2, 3}},
+				orderedKeys: []string{"foo", "bar"},
+				labelNames:  []string{"*0"},
+				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			want: &Series{values: &valueContainer{slice: []string{"1", "3"}, isNull: []bool{false, false}, name: "first"},
+				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := GroupedSeries{
+				groups:      tt.fields.groups,
+				orderedKeys: tt.fields.orderedKeys,
+				series:      tt.fields.series,
+				labelNames:  tt.fields.labelNames,
+				err:         tt.fields.err,
+			}
+			if got := g.First(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedSeries.First() = %v, want %v", got, tt.want)
 			}
 		})
 	}
