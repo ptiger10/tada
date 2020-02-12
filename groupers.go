@@ -16,13 +16,13 @@ func (g GroupedSeries) Err() error {
 // control for inadvertent splitting just because the name has the level separator using `toSplit`
 func splitLabelIntoLevels(label string, toSplit bool) []string {
 	if toSplit {
-		return strings.Split(label, levelSeparator)
+		return strings.Split(label, optionLevelSeparator)
 	}
 	return []string{label}
 }
 
 func joinLevelsIntoLabel(levels []string) string {
-	return strings.Join(levels, levelSeparator)
+	return strings.Join(levels, optionLevelSeparator)
 }
 
 func (g GroupedSeries) stringFunc(name string, fn func(val []string, isNull []bool, index []int) (string, bool)) *Series {

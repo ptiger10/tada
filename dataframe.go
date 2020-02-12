@@ -513,7 +513,7 @@ func removeDefaultNameIndicator(name string) string {
 
 func (df *DataFrame) String() string {
 	// do not try to print all rows
-	csv := df.Head(maxRows).ToCSV()
+	csv := df.Head(optionMaxRows).ToCSV()
 	for k := range csv[0] {
 		csv[0][k] = removeDefaultNameIndicator(csv[0][k])
 	}
@@ -525,7 +525,7 @@ func (df *DataFrame) String() string {
 	table := tablewriter.NewWriter(&buf)
 	table.SetHeader(csv[0])
 	table.AppendBulk(csv[1:])
-	table.SetAutoMergeCells(true)
+	table.SetAutoMergeCells(optionAutoMerge)
 	if caption != "" {
 		table.SetCaption(true, caption)
 	}
