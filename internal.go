@@ -1182,8 +1182,8 @@ func (lambda ApplyFormatFn) validate() error {
 	return nil
 }
 
-// left-inclusive, right-exclusive
-func (vc *valueContainer) cut(bins []float64, andLess, andMore bool, labels []string) ([]string, error) {
+// left-exclusive, right-inclusive
+func (vc *valueContainer) cut(bins []float64, includeLess, includeMore bool, labels []string) ([]string, error) {
 	if len(bins) == 0 {
 		return nil, fmt.Errorf("must supply at least one bin edge")
 	}
@@ -1198,23 +1198,23 @@ func (vc *valueContainer) cut(bins []float64, andLess, andMore bool, labels []st
 			labels[i] = fmt.Sprintf("%v-%v", bins[i], bins[i+1])
 		}
 	}
-	if andLess {
+	if includeLess {
 		if useDefaultLabels {
-			labels = append([]string{fmt.Sprintf("<%v", bins[0])}, labels...)
+			labels = append([]string{fmt.Sprintf("<=%v", bins[0])}, labels...)
 		}
 		bins = append([]float64{math.Inf(-1)}, bins...)
 	}
-	if andMore {
+	if includeMore {
 		if useDefaultLabels {
-			labels = append(labels, fmt.Sprintf(">=%v", bins[len(bins)-1]))
+			labels = append(labels, fmt.Sprintf(">%v", bins[len(bins)-1]))
 		}
 		bins = append(bins, math.Inf(1))
 	}
 	var andLessEdge, andMoreEdge int
-	if andLess {
+	if includeLess {
 		andLessEdge = 1
 	}
-	if andMore {
+	if includeMore {
 		andMoreEdge = 1
 	}
 	if len(bins)-1 != len(labels) {
@@ -1227,7 +1227,8 @@ func (vc *valueContainer) cut(bins []float64, andLess, andMore bool, labels []st
 	for i, val := range vals {
 		// do not iterate over the last edge to avoid range error
 		for incrementor := 0; incrementor < len(bins)-1; incrementor++ {
-			if val >= bins[incrementor] && val < bins[incrementor+1] {
+			// check if value is within bin
+			if val > bins[incrementor] && val <= bins[incrementor+1] {
 				ret[i] = labels[incrementor]
 				break
 			}
