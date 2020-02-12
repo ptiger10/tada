@@ -107,19 +107,15 @@ func Test_makeDefaultLabels(t *testing.T) {
 	tests := []struct {
 		name       string
 		args       args
-		wantLabels []int
-		wantIsNull []bool
+		wantLabels *valueContainer
 	}{
-		{"normal", args{0, 2}, []int{0, 1}, []bool{false, false}},
+		{"normal", args{0, 2}, &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotLabels, gotIsNull := makeDefaultLabels(tt.args.min, tt.args.max)
+			gotLabels := makeDefaultLabels(tt.args.min, tt.args.max)
 			if !reflect.DeepEqual(gotLabels, tt.wantLabels) {
 				t.Errorf("makeDefaultLabels() gotLabels = %v, want %v", gotLabels, tt.wantLabels)
-			}
-			if !reflect.DeepEqual(gotIsNull, tt.wantIsNull) {
-				t.Errorf("makeDefaultLabels() gotIsNull = %v, want %v", gotIsNull, tt.wantIsNull)
 			}
 		})
 	}

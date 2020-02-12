@@ -38,15 +38,20 @@ func isSlice(input interface{}) bool {
 	return reflect.TypeOf(input).Kind() == reflect.Slice
 }
 
-// makeDefaultLabels returns a sequential series of numbers (inclusive of min, exclusive of max) and a companion isNull slice.
-func makeDefaultLabels(min, max int) (labels []int, isNull []bool) {
-	labels = make([]int, max-min)
-	isNull = make([]bool, len(labels))
+// makeDefaultLabels returns a valueContainer with a
+// sequential series of numbers (inclusive of min, exclusive of max), a companion isNull slice, and a name.
+func makeDefaultLabels(min, max int) *valueContainer {
+	labels := make([]int, max-min)
+	isNull := make([]bool, len(labels))
 	for i := range labels {
 		labels[i] = min + i
 		isNull[i] = false
 	}
-	return
+	return &valueContainer{
+		slice:  labels,
+		isNull: isNull,
+		name:   "*0",
+	}
 }
 
 // makeIntRange returns a sequential series of numbers (inclusive of min, exclusive of max)
@@ -211,17 +216,24 @@ func union(slices [][]int) []int {
 
 func difference(slice1 []int, slice2 []int) []int {
 	var ret []int
+	// mark as true if contained in slice1
 	set := make(map[int]bool)
 	for _, i := range slice1 {
 		set[i] = true
 	}
+	// mark as false if contained in slice2 as well
 	for _, i := range slice2 {
 		if _, ok := set[i]; ok {
 			set[i] = false
 		}
 	}
-	for k, v := range set {
-		if v {
+	orderedKeys := make([]int, 0)
+	for k := range set {
+		orderedKeys = append(orderedKeys, k)
+	}
+	sort.Ints(orderedKeys)
+	for k := range orderedKeys {
+		if set[k] {
 			ret = append(ret, k)
 		}
 	}

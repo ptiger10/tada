@@ -34,8 +34,8 @@ func NewSeries(slice interface{}, labels ...interface{}) *Series {
 	retLabels := make([]*valueContainer, len(labels))
 	if len(retLabels) == 0 {
 		// default labels
-		defaultLabels, isNull := makeDefaultLabels(0, reflect.ValueOf(slice).Len())
-		retLabels = append(retLabels, &valueContainer{slice: defaultLabels, isNull: isNull, name: "*0"})
+		defaultLabels := makeDefaultLabels(0, reflect.ValueOf(slice).Len())
+		retLabels = append(retLabels, defaultLabels)
 	} else {
 		for i := range retLabels {
 			input := labels[i]

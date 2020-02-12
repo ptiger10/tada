@@ -1542,9 +1542,9 @@ func TestSeries_Cut(t *testing.T) {
 			values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{
-				bins: []float64{2, 3}, andLess: false, andMore: true, labels: nil},
+				bins: []float64{1, 2}, andLess: false, andMore: true, labels: nil},
 			&Series{
-				values: &valueContainer{slice: []string{"", "2-3", ">=3"}, isNull: []bool{true, false, false}},
+				values: &valueContainer{slice: []string{"", "1-2", ">2"}, isNull: []bool{true, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
 	}
 	for _, tt := range tests {

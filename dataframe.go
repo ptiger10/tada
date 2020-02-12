@@ -22,7 +22,7 @@ func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 	for i, slice := range slices {
 		if !isSlice(slice) {
 			return &DataFrame{err: fmt.Errorf(
-				"NewDataFrame(): unsupported kind (%v) in `slices` (position %v); must be slice", reflect.TypeOf(slice), i)}
+				"NewDataFrame(): unsupported kind (%v) in `slices` (position %v); must be slice", reflect.TypeOf(slice).Kind(), i)}
 		}
 		if reflect.ValueOf(slice).Len() == 0 {
 			return &DataFrame{err: fmt.Errorf("NewDataFrame(): empty slice in slices (position %v): cannot be empty", i)}
@@ -43,10 +43,11 @@ func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 	// handle labels
 	retLabels := make([]*valueContainer, len(labels))
 	if len(retLabels) == 0 {
-		// default labels
-		defaultLabels, isNull := makeDefaultLabels(0, reflect.ValueOf(slices[0]).Len())
-		retLabels = append(retLabels, &valueContainer{slice: defaultLabels, isNull: isNull, name: "*0"})
+		// handle default labels
+		defaultLabels := makeDefaultLabels(0, reflect.ValueOf(slices[0]).Len())
+		retLabels = append(retLabels, defaultLabels)
 	} else {
+		// handle supplied labels
 		for i := range retLabels {
 			slice := labels[i]
 			if !isSlice(slice) {
@@ -104,15 +105,16 @@ func (df *DataFrame) toCSVByRows(ignoreLabels bool) ([][]string, error) {
 	if df.values == nil {
 		return nil, fmt.Errorf("cannot export empty dataframe")
 	}
+	// make final container with rows as major dimension
 	ret := make([][]string, df.numColLevels()+df.Len())
 	for i := range ret {
-		var offset int
+		var newCols int
 		if !ignoreLabels {
-			offset = df.numLevels() + df.numColumns()
+			newCols = df.numLevels() + df.numColumns()
 		} else {
-			offset = df.numColumns()
+			newCols = df.numColumns()
 		}
-		ret[i] = make([]string, offset)
+		ret[i] = make([]string, newCols)
 	}
 	if !ignoreLabels {
 		for j := range df.labels {
@@ -269,8 +271,8 @@ func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
 	}
 	// create default labels if no labels
 	if len(retLabels) == 0 {
-		labels, isNull := makeDefaultLabels(0, numRows)
-		retLabels = append(retLabels, &valueContainer{slice: labels, isNull: isNull, name: "*0"})
+		defaultLabels := makeDefaultLabels(0, numRows)
+		retLabels = append(retLabels, defaultLabels)
 	}
 	// create default col level names
 	retColLevelNames := make([]string, cfg.NumHeaderRows)
@@ -349,8 +351,8 @@ func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 	}
 	// create default labels if no labels
 	if len(retLabels) == 0 {
-		labels, isNull := makeDefaultLabels(0, numRows)
-		retLabels = append(retLabels, &valueContainer{slice: labels, isNull: isNull, name: "*0"})
+		defaultLabels := makeDefaultLabels(0, numRows)
+		retLabels = append(retLabels, defaultLabels)
 	}
 	// create default col level names
 	retColLevelNames := make([]string, cfg.NumHeaderRows)
@@ -372,7 +374,7 @@ func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 }
 
 // ReadCSV stub
-func ReadCSV(path string, config *ReadConfig) *DataFrame {
+func ReadCSV(path string, config *ReadConfig) (*DataFrame, error) {
 	if config == nil {
 		config = &ReadConfig{
 			NumHeaderRows: 1,
@@ -382,7 +384,7 @@ func ReadCSV(path string, config *ReadConfig) *DataFrame {
 
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("ReadCSV(): %s", err))
+		return nil, fmt.Errorf("ReadCSV(): %s", err)
 	}
 	reader := csv.NewReader(bytes.NewReader(data))
 	if config.Delimiter != 0 {
@@ -391,21 +393,21 @@ func ReadCSV(path string, config *ReadConfig) *DataFrame {
 
 	csv, err := reader.ReadAll()
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("ReadCSV(): %s", err))
+		return nil, fmt.Errorf("ReadCSV(): %s", err)
 	}
 
 	if len(csv) == 0 {
-		return dataFrameWithError(fmt.Errorf("ReadCSV(): csv must have at least one row"))
+		return nil, fmt.Errorf("ReadCSV(): %s", err)
 	}
 	if len(csv[0]) == 0 {
-		return dataFrameWithError(fmt.Errorf("ReadCSV(): csv must at least one column"))
+		return nil, fmt.Errorf("ReadCSV(): %s", err)
 	}
-	return readCSVByRows(csv, config)
+	return readCSVByRows(csv, config), nil
 
 }
 
 // ReadInterface stub
-func ReadInterface(input [][]interface{}, config *ReadConfig) *DataFrame {
+func ReadInterface(input [][]interface{}, config *ReadConfig) (*DataFrame, error) {
 	if config == nil {
 		config = &ReadConfig{
 			NumHeaderRows: 1,
@@ -414,10 +416,10 @@ func ReadInterface(input [][]interface{}, config *ReadConfig) *DataFrame {
 	}
 
 	if len(input) == 0 {
-		return dataFrameWithError(fmt.Errorf("ReadInterface(): `input` must have at least one row"))
+		return nil, fmt.Errorf("ReadInterface(): `input` must have at least one row")
 	}
 	if len(input[0]) == 0 {
-		return dataFrameWithError(fmt.Errorf("ReadInterface(): `input` must at least one column"))
+		return nil, fmt.Errorf("ReadInterface(): `input` must at least one column")
 	}
 	// convert [][]interface to [][]string
 	str := make([][]string, len(input))
@@ -430,9 +432,9 @@ func ReadInterface(input [][]interface{}, config *ReadConfig) *DataFrame {
 		}
 	}
 	if config.MajorDimIsCols {
-		return readCSVByCols(str, config)
+		return readCSVByCols(str, config), nil
 	}
-	return readCSVByRows(str, config)
+	return readCSVByRows(str, config), nil
 }
 
 // ReadMatrix stub
@@ -446,6 +448,58 @@ func ReadMatrix(mat Matrix) *DataFrame {
 		}
 	}
 	return readCSVByCols(csv, &ReadConfig{})
+}
+
+func readStruct(slice interface{}) ([]*valueContainer, error) {
+	if !isSlice(slice) {
+		return nil, fmt.Errorf("unsupported kind (%v); must be slice", reflect.TypeOf(slice).Kind())
+	}
+	if kind := reflect.TypeOf(slice).Elem().Kind(); kind != reflect.Struct {
+		return nil, fmt.Errorf("unsupported kind (%v); must be slice of structs", reflect.TypeOf(slice).Elem().Kind())
+	}
+	v := reflect.ValueOf(slice)
+	if v.Len() == 0 {
+		return nil, fmt.Errorf("slice must contain at least one struct")
+	}
+	strct := v.Index(0)
+	numCols := strct.NumField()
+	retValues := make([][]string, numCols)
+	retNames := make([]string, numCols)
+	for k := 0; k < numCols; k++ {
+		for i := 0; i < v.Len(); i++ {
+			strct := v.Index(i)
+			if i == 0 {
+				retNames[k] = strct.Type().Field(k).Name
+				retValues[k] = make([]string, v.Len())
+			}
+			retValues[k][i] = fmt.Sprint(strct.Field(k).Interface())
+		}
+	}
+	// transfer to final container
+	ret := make([]*valueContainer, numCols)
+	for k := range ret {
+		ret[k] = &valueContainer{
+			slice:  retValues[k],
+			isNull: setNullsFromInterface(retValues[k]),
+			name:   retNames[k],
+		}
+	}
+	return ret, nil
+}
+
+// ReadStruct stub
+func ReadStruct(slice interface{}) (*DataFrame, error) {
+	values, err := readStruct(slice)
+	if err != nil {
+		return nil, fmt.Errorf("ReadStruct(): %v", err)
+	}
+	defaultLabels := makeDefaultLabels(0, reflect.ValueOf(slice).Len())
+	return &DataFrame{
+		values:        values,
+		labels:        []*valueContainer{defaultLabels},
+		colLevelNames: []string{"*0"},
+	}, nil
+
 }
 
 // -- GETTERS
@@ -925,8 +979,8 @@ func (df *DataFrameMutator) ResetLabels(index ...int) {
 		df.dataframe.labels, _ = subsetCols(df.dataframe.labels, excludeFromIndex(df.dataframe.numLevels(), i))
 	}
 	if df.dataframe.numLevels() == 0 {
-		labels, isNull := makeDefaultLabels(0, df.dataframe.Len())
-		df.dataframe.labels[0] = &valueContainer{slice: labels, isNull: isNull, name: "*0"}
+		defaultLabels := makeDefaultLabels(0, df.dataframe.Len())
+		df.dataframe.labels[0] = defaultLabels
 	}
 	return
 }

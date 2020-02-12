@@ -1737,3 +1737,43 @@ func TestReadMatrix(t *testing.T) {
 		})
 	}
 }
+
+type testStruct struct {
+	Name string
+	Age  int
+}
+
+func TestReadStruct(t *testing.T) {
+	type args struct {
+		slice interface{}
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *DataFrame
+		wantErr bool
+	}{
+		{"pass", args{[]testStruct{{"foo", 1}, {"bar", 2}}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "Name"},
+					{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "Age"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				name:          "",
+				colLevelNames: []string{"*0"}},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ReadStruct(tt.args.slice)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReadStruct() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ReadStruct() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
