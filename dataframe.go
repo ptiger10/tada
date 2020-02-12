@@ -377,7 +377,21 @@ func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 }
 
 // ReadCSV stub
-func ReadCSV(path string, config *ReadConfig) (*DataFrame, error) {
+func ReadCSV(csv [][]string, config *ReadConfig) (*DataFrame, error) {
+	if len(csv) == 0 {
+		return nil, fmt.Errorf("ReadCSV(): csv must have at least one row")
+	}
+	if len(csv[0]) == 0 {
+		return nil, fmt.Errorf("ReadCSV(): csv must have at least one column")
+	}
+	if config.MajorDimIsCols {
+		return readCSVByCols(csv, config), nil
+	}
+	return readCSVByRows(csv, config), nil
+}
+
+// ImportCSV stub
+func ImportCSV(path string, config *ReadConfig) (*DataFrame, error) {
 	if config == nil {
 		config = &ReadConfig{
 			NumHeaderRows: 1,
@@ -387,7 +401,7 @@ func ReadCSV(path string, config *ReadConfig) (*DataFrame, error) {
 
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("ReadCSV(): %s", err)
+		return nil, fmt.Errorf("ImportCSV(): %s", err)
 	}
 	reader := csv.NewReader(bytes.NewReader(data))
 	if config.Delimiter != 0 {
@@ -396,14 +410,14 @@ func ReadCSV(path string, config *ReadConfig) (*DataFrame, error) {
 
 	csv, err := reader.ReadAll()
 	if err != nil {
-		return nil, fmt.Errorf("ReadCSV(): %s", err)
+		return nil, fmt.Errorf("ImportCSV(): %s", err)
 	}
 
 	if len(csv) == 0 {
-		return nil, fmt.Errorf("ReadCSV(): %s", err)
+		return nil, fmt.Errorf("ImportCSV(): csv must have at least one row")
 	}
 	if len(csv[0]) == 0 {
-		return nil, fmt.Errorf("ReadCSV(): %s", err)
+		return nil, fmt.Errorf("ImportCSV(): csv must have at least one column")
 	}
 	return readCSVByRows(csv, config), nil
 
