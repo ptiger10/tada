@@ -736,18 +736,27 @@ func (df *DataFrame) Range(first, last int) *DataFrame {
 	return &DataFrame{values: retVals, labels: retLabels, name: df.name, colLevelNames: df.colLevelNames}
 }
 
-// DropNull returns rows with all non-null values.
-// If `subset` is supplied, returns all the rows with all non-null values in the specified columns.
+// DropNull removes rows with null values.
+// If `subset` is supplied, removes any rows with null values in any of the specified columns.
 // Returns a new DataFrame.
 func (df *DataFrame) DropNull(subset ...string) *DataFrame {
+	df = df.Copy()
+	df.InPlace().DropNull(subset...)
+	return df
+}
+
+// DropNull removes rows with null values.
+// If `subset` is supplied, removes any rows with null values in any of the specified columns.
+// Modifies the underlying DataFrame.
+func (df *DataFrameMutator) DropNull(subset ...string) {
 	var index []int
 	if len(subset) == 0 {
-		index = makeIntRange(0, len(df.values))
+		index = makeIntRange(0, len(df.dataframe.values))
 	} else {
 		for _, name := range subset {
-			i, err := findColWithName(name, df.values)
+			i, err := findColWithName(name, df.dataframe.values)
 			if err != nil {
-				return dataFrameWithError(fmt.Errorf("DropNull(): %v", err))
+				df.dataframe.resetWithError(fmt.Errorf("DropNull(): %v", err))
 			}
 			index = append(index, i)
 		}
@@ -756,10 +765,10 @@ func (df *DataFrame) DropNull(subset ...string) *DataFrame {
 
 	subIndexes := make([][]int, len(index))
 	for k := range index {
-		subIndexes[k] = df.values[k].valid()
+		subIndexes[k] = df.dataframe.values[k].valid()
 	}
 	allValid := intersection(subIndexes)
-	return df.Subset(allValid)
+	df.Subset(allValid)
 }
 
 // Null returns all the rows with any null values.

@@ -205,10 +205,5 @@ quux 2019      3
 foo  1 5
 
 
-
-
-
-
-
-
-
+## To do
+- DF.WithCol() check for right level of column names
