@@ -233,17 +233,17 @@ func (s *Series) Range(first, last int) *Series {
 	return &Series{values: retVals, labels: retLabels}
 }
 
-// Valid returns all the rows with non-null values.
+// DropNull returns all the rows with non-null values.
 // Returns a new Series.
-func (s *Series) Valid() *Series {
+func (s *Series) DropNull() *Series {
 	s = s.Copy()
-	s.InPlace().Valid()
+	s.InPlace().DropNull()
 	return s
 }
 
-// Valid returns all the rows with non-null values.
+// DropNull returns all the rows with non-null values.
 // Modifies the underlying Series.
-func (s *SeriesMutator) Valid() {
+func (s *SeriesMutator) DropNull() {
 	index := s.series.values.valid()
 	s.Subset(index)
 }

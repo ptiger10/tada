@@ -763,7 +763,7 @@ func lookup(how string,
 		return lookupWithAnchor(values2.name, labels2, rightOn, values1, labels1, leftOn), nil
 	case "inner":
 		s := lookupWithAnchor(values1.name, labels1, leftOn, values2, labels2, rightOn)
-		s = s.Valid()
+		s = s.DropNull()
 		return s, nil
 	default:
 		return nil, fmt.Errorf("unsupported how: must be `left`, `right`, or `inner`")
@@ -786,7 +786,7 @@ func lookupDataFrame(how string,
 	case "inner":
 		df := lookupDataFrameWithAnchor(name, mergedLabelsCols1, labels1, leftOn,
 			values2, mergedLabelsCols2, rightOn, excludeRight)
-		df = df.Valid()
+		df = df.DropNull()
 		return df, nil
 	default:
 		return nil, fmt.Errorf("unsupported how: must be `left`, `right`, or `inner`")

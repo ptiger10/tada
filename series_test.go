@@ -370,8 +370,8 @@ func TestSeries_Valid(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Valid(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.Valid() = %v, want %v", got, tt.want)
+			if got := s.DropNull(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.DropNull() = %v, want %v", got, tt.want)
 			}
 		})
 	}

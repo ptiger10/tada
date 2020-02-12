@@ -714,10 +714,10 @@ func (df *DataFrame) Range(first, last int) *DataFrame {
 	return &DataFrame{values: retVals, labels: retLabels, name: df.name, colLevelNames: df.colLevelNames}
 }
 
-// Valid returns rows with all non-null values.
+// DropNull returns rows with all non-null values.
 // If `subset` is supplied, returns all the rows with all non-null values in the specified columns.
 // Returns a new DataFrame.
-func (df *DataFrame) Valid(subset ...string) *DataFrame {
+func (df *DataFrame) DropNull(subset ...string) *DataFrame {
 	var index []int
 	if len(subset) == 0 {
 		index = makeIntRange(0, len(df.values))
@@ -725,7 +725,7 @@ func (df *DataFrame) Valid(subset ...string) *DataFrame {
 		for _, name := range subset {
 			i, err := findColWithName(name, df.values)
 			if err != nil {
-				return dataFrameWithError(fmt.Errorf("Valid(): %v", err))
+				return dataFrameWithError(fmt.Errorf("DropNull(): %v", err))
 			}
 			index = append(index, i)
 		}

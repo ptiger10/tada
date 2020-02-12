@@ -696,8 +696,8 @@ func TestDataFrame_Valid(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.Valid(tt.args.subset...); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.Valid() = %v, want %v", got.values, tt.want.values)
+			if got := df.DropNull(tt.args.subset...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.DropNull() = %v, want %v", got.values, tt.want.values)
 			}
 		})
 	}
