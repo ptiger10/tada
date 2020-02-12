@@ -80,6 +80,7 @@ func TestSeries_Copy(t *testing.T) {
 			if reflect.DeepEqual(got, s) {
 				t.Errorf("Series.Copy() = retained reference to original values")
 			}
+			got = s.Copy()
 			got.err = errors.New("foo")
 			if reflect.DeepEqual(got, s) {
 				t.Errorf("Series.Copy() retained reference to original error")

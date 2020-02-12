@@ -86,10 +86,11 @@ func TestDataFrame_ToSeries(t *testing.T) {
 
 func TestDataFrame_Copy(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		colLevelNames []string
+		err           error
 	}
 	tests := []struct {
 		name   string
@@ -101,21 +102,22 @@ func TestDataFrame_Copy(t *testing.T) {
 				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"},
 				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "1"}},
 			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-			name:   "baz"},
+			name:   "baz", colLevelNames: []string{"*0"}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"},
 				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "1"}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				name:   "baz"},
+				name:   "baz", colLevelNames: []string{"*0"}},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				colLevelNames: tt.fields.colLevelNames,
+				err:           tt.fields.err,
 			}
 			got := df.Copy()
 			if !reflect.DeepEqual(got, tt.want) {
@@ -125,9 +127,20 @@ func TestDataFrame_Copy(t *testing.T) {
 			if reflect.DeepEqual(got, df) {
 				t.Errorf("DataFrame.Copy() = retained reference to original values")
 			}
+			got = df.Copy()
 			got.err = errors.New("foo")
 			if reflect.DeepEqual(got, df) {
 				t.Errorf("DataFrame.Copy() retained reference to original error")
+			}
+			got = df.Copy()
+			got.name = "qux"
+			if reflect.DeepEqual(got, df) {
+				t.Errorf("DataFrame.Copy() retained reference to original name")
+			}
+			got = df.Copy()
+			got.colLevelNames[0] = "*1"
+			if reflect.DeepEqual(got, df) {
+				t.Errorf("DataFrame.Copy() retained reference to original col level names")
 			}
 		})
 	}

@@ -81,12 +81,15 @@ func (df *DataFrame) Copy() *DataFrame {
 	for j := range df.labels {
 		labels[j] = df.labels[j].copy()
 	}
+	colLevelNames := make([]string, len(df.colLevelNames))
+	copy(colLevelNames, df.colLevelNames)
 
 	return &DataFrame{
-		values: values,
-		labels: labels,
-		err:    df.err,
-		name:   df.name,
+		values:        values,
+		labels:        labels,
+		err:           df.err,
+		colLevelNames: colLevelNames,
+		name:          df.name,
 	}
 }
 
