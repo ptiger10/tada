@@ -906,6 +906,10 @@ func Test_valueContainer_cut(t *testing.T) {
 			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
 			args{bins: []float64{0, 2, 4}, andLess: false, andMore: false, labels: []string{"low", "high"}},
 			[]string{"low", "low", "high", "high"}, false},
+		{"supplied labels, no less, no more, with null",
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, true}, name: "foo"},
+			args{bins: []float64{0, 2, 4}, andLess: false, andMore: false, labels: []string{"low", "high"}},
+			[]string{"low", "low", "high", ""}, false},
 		{"supplied labels, less, no more",
 			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: true, andMore: false, labels: []string{"low", "medium", "high"}},
@@ -1053,17 +1057,75 @@ func Test_percentile(t *testing.T) {
 		args args
 		want []float64
 	}{
-		{"no null", args{vals: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, index: []int{0, 1, 2, 3}},
-			[]float64{25, 50, 75, 100}},
+		{"no null", args{vals: []float64{1, 2, 3, 6}, isNull: []bool{false, false, false, false}, index: []int{0, 1, 2, 3}},
+			[]float64{0, .25, .5, .75}},
 		{"repeats", args{vals: []float64{1, 2, 2, 4}, isNull: []bool{false, false, false, false}, index: []int{0, 1, 2, 3}},
-			[]float64{25, 50, 50, 100}},
+			[]float64{0, .25, .25, .75}},
 		{"null", args{vals: []float64{0, 1, 2, 3, 4}, isNull: []bool{true, false, false, false, false},
-			index: []int{0, 1, 2, 3, 4}}, []float64{-999, 25, 50, 75, 100}},
+			index: []int{0, 1, 2, 3, 4}}, []float64{-999, 0, .25, .5, .75}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := percentile(tt.args.vals, tt.args.isNull, tt.args.index); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("percentile() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_pcut(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	type args struct {
+		bins   []float64
+		labels []string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{"default labels",
+			fields{slice: []float64{5, 6, 7, 8}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{bins: []float64{0, .5, 1}, labels: nil},
+			[]string{"0-0.5", "0-0.5", "0.5-1", "0.5-1"}, false},
+		{"supplied labels",
+			fields{slice: []float64{-1, 2, 6, 10, 12}, isNull: []bool{false, false, false, false, false}},
+			args{bins: []float64{0, .5, 1}, labels: []string{"Bottom 50%", "Top 50%"}},
+			[]string{"Bottom 50%", "Bottom 50%", "Bottom 50%", "Top 50%", "Top 50%"}, false},
+		{"default labels, nulls, repeats",
+			fields{slice: []float64{5, 0, 6, 7, 7, 7, 8},
+				isNull: []bool{false, true, false, false, false, false, false}},
+			args{bins: []float64{0, .2, .4, .6, .8, 1}, labels: nil},
+			[]string{"0-0.2", "", "0-0.2", "0.2-0.4", "0.2-0.4", "0.2-0.4", "0.8-1"}, false},
+		{"fail: above 1",
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{bins: []float64{0, .5, 1.5}, labels: []string{"Bottom 50%", "Top 50%"}},
+			nil, true},
+		{"fail: below 0",
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{bins: []float64{-0.1, .5, 1}, labels: []string{"Bottom 50%", "Top 50%"}},
+			nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			got, err := vc.pcut(tt.args.bins, tt.args.labels)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("valueContainer.pcut() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.pcut() = %v, want %v", got, tt.want)
 			}
 		})
 	}

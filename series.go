@@ -832,6 +832,23 @@ func (s *Series) Cut(bins []float64, andLess, andMore bool, labels []string) *Se
 	}
 }
 
+// PercentileCut stub
+func (s *Series) PercentileCut(bins []float64, labels []string) *Series {
+	retSlice, err := s.values.pcut(bins, labels)
+	if err != nil {
+		return seriesWithError(fmt.Errorf("Cut(): %v", err))
+	}
+	retVals := &valueContainer{
+		slice:  retSlice,
+		isNull: setNullsFromInterface(retSlice),
+		name:   s.values.name,
+	}
+	return &Series{
+		values: retVals,
+		labels: s.labels,
+	}
+}
+
 // -- Slicers
 
 // SliceFloat64 coerces the Series values into []float64.

@@ -1592,3 +1592,42 @@ func TestSeries_Rank(t *testing.T) {
 		})
 	}
 }
+
+func TestSeries_PercentileCut(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		bins   []float64
+		labels []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"pass", fields{
+			values: &valueContainer{slice: []float64{1, 3, 5}, isNull: []bool{false, false, false}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{
+				bins: []float64{0, .5, 1}, labels: []string{"Bottom 50%", "Top 50%"}},
+			&Series{
+				values: &valueContainer{slice: []string{"Bottom 50%", "Bottom 50%", "Top 50%"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.PercentileCut(tt.args.bins, tt.args.labels); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.PercentileCut() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

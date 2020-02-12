@@ -1182,8 +1182,11 @@ func (lambda ApplyFormatFn) validate() error {
 	return nil
 }
 
-// left-exclusive, right-inclusive
-func (vc *valueContainer) cut(bins []float64, includeLess, includeMore bool, labels []string) ([]string, error) {
+// left-exclusive, right-inclusive by default
+// expects vals and isNull to be same length
+func cut(vals []float64, isNull []bool,
+	bins []float64, leftInclusive bool, rightExclusive bool,
+	includeLess, includeMore bool, labels []string) ([]string, error) {
 	if len(bins) == 0 {
 		return nil, fmt.Errorf("must supply at least one bin edge")
 	}
@@ -1200,16 +1203,25 @@ func (vc *valueContainer) cut(bins []float64, includeLess, includeMore bool, lab
 	}
 	if includeLess {
 		if useDefaultLabels {
-			labels = append([]string{fmt.Sprintf("<=%v", bins[0])}, labels...)
+			str := "<=%v"
+			if leftInclusive {
+				str = "<%v"
+			}
+			labels = append([]string{fmt.Sprintf(str, bins[0])}, labels...)
 		}
 		bins = append([]float64{math.Inf(-1)}, bins...)
 	}
 	if includeMore {
 		if useDefaultLabels {
-			labels = append(labels, fmt.Sprintf(">%v", bins[len(bins)-1]))
+			str := ">%v"
+			if rightExclusive {
+				str = ">=%v"
+			}
+			labels = append(labels, fmt.Sprintf(str, bins[len(bins)-1]))
 		}
 		bins = append(bins, math.Inf(1))
 	}
+	// validate correct number of bins
 	var andLessEdge, andMoreEdge int
 	if includeLess {
 		andLessEdge = 1
@@ -1218,50 +1230,58 @@ func (vc *valueContainer) cut(bins []float64, includeLess, includeMore bool, lab
 		andMoreEdge = 1
 	}
 	if len(bins)-1 != len(labels) {
-		return nil, fmt.Errorf("number of bin edges (including andLess and andMore), "+
+		return nil, fmt.Errorf("number of bin edges (+ includeLess + includeMore), "+
 			"must be one more than number of supplied labels: (%d + %d + %d) != (%d + 1)",
 			originalBinCount, andLessEdge, andMoreEdge, len(labels))
 	}
-	vals := vc.float().slice
 	ret := make([]string, len(vals))
 	for i, val := range vals {
+		if isNull[i] {
+			continue
+		}
 		// do not iterate over the last edge to avoid range error
-		for incrementor := 0; incrementor < len(bins)-1; incrementor++ {
+		for binEdge := 0; binEdge < len(bins)-1; binEdge++ {
 			// check if value is within bin
-			if val > bins[incrementor] && val <= bins[incrementor+1] {
-				ret[i] = labels[incrementor]
-				break
+			if leftInclusive && rightExclusive {
+				if val >= bins[binEdge] && val < bins[binEdge+1] {
+					ret[i] = labels[binEdge]
+					break
+				}
+			} else if !leftInclusive && !rightExclusive {
+				// default: leftExclusive and rightInclusive
+				if val > bins[binEdge] && val <= bins[binEdge+1] {
+					ret[i] = labels[binEdge]
+					break
+				}
+			} else {
+				// avoid this scenario
+				return nil, fmt.Errorf("internal error: bad cut() conditions")
 			}
 		}
 	}
 
 	return ret, nil
-
 }
 
-// null is returned as -999
-func rank(vals []float64, isNull []bool, index []int) []float64 {
-	ret := make([]float64, len(index))
-	// copy all existing values at index positions
-	newVals := make([]float64, len(index))
-	newIsNull := make([]bool, len(index))
-	for i := range index {
-		newVals[i] = vals[i]
-		newIsNull[i] = isNull[i]
-	}
-	// sort floats
-	floats := &floatValueContainer{slice: newVals, index: makeIntRange(0, len(index)), isNull: newIsNull}
-	sort.Stable(floats)
+func (vc *valueContainer) cut(bins []float64, includeLess, includeMore bool, labels []string) ([]string, error) {
+	leftInclusive := false
+	rightExclusive := false
+	return cut(vc.float().slice, vc.isNull, bins, leftInclusive, rightExclusive, includeLess, includeMore, labels)
+}
+
+func (vc *floatValueContainer) rank() []float64 {
+	ret := make([]float64, len(vc.slice))
+	sort.Stable(vc)
 	var offset float64
 	// iterate over sorted values and write results back to []float aligned with original
 	// the incrementor here is the naive ranking, but must be adjsuted for nulls and duplicates
-	for i := range floats.slice {
-		originalPosition := floats.index[i]
+	for i := range vc.slice {
+		originalPosition := vc.index[i]
 		// ranking is 1-based, index is 0-based
 		rank := float64(i) + 1
 
 		// handle null
-		if floats.isNull[i] {
+		if vc.isNull[i] {
 			ret[originalPosition] = -999
 			offset--
 			continue
@@ -1272,9 +1292,10 @@ func rank(vals []float64, isNull []bool, index []int) []float64 {
 			continue
 		}
 		// handle duplicates
-		if floats.slice[i] == floats.slice[i-1] {
+		if vc.slice[i] == vc.slice[i-1] {
+			priorOriginal := vc.index[i-1]
 			// if duplicate, look up original position immediately prior and increment the offset
-			ret[originalPosition] = ret[floats.index[i-1]]
+			ret[originalPosition] = ret[priorOriginal]
 			offset--
 		} else {
 			// reduce the rank by the offset amount
@@ -1284,26 +1305,82 @@ func rank(vals []float64, isNull []bool, index []int) []float64 {
 	return ret
 }
 
-func percentile(vals []float64, isNull []bool, index []int) []float64 {
-	ret := make([]float64, len(index))
+// null is returned as -999
+func rank(vals []float64, isNull []bool, index []int) []float64 {
+
 	// copy all existing values at index positions
 	newVals := make([]float64, len(index))
 	newIsNull := make([]bool, len(index))
-	var validCount int
 	for i := range index {
 		newVals[i] = vals[i]
 		newIsNull[i] = isNull[i]
-		if !isNull[i] {
+	}
+	// sort floats
+	floats := &floatValueContainer{slice: newVals, index: makeIntRange(0, len(index)), isNull: newIsNull}
+	return floats.rank()
+}
+
+func (vc *floatValueContainer) percentile() []float64 {
+	ret := make([]float64, len(vc.slice))
+	var validCount int
+	for i := range vc.isNull {
+		if !vc.isNull[i] {
 			validCount++
 		}
 	}
-	for i := range newVals {
-		if newIsNull[i] {
-			ret[i] = -999
+	rank := vc.rank()
+
+	var counter int
+	for i := range rank {
+		originalPosition := vc.index[i]
+		percentile := float64(counter) / float64(validCount)
+		// handle null
+		if vc.isNull[i] {
+			ret[originalPosition] = -999
 			continue
 		}
-		percentile := (newVals[i] / float64(validCount)) * 100
-		ret[i] = percentile
+		// no duplicates in first row
+		if i == 0 {
+			ret[originalPosition] = percentile
+			counter++
+			continue
+		}
+		// handle repeat ranks (ie duplicate rows)
+		if vc.slice[i] == vc.slice[i-1] {
+			priorOriginal := vc.index[i-1]
+			ret[originalPosition] = ret[priorOriginal]
+		} else {
+			ret[originalPosition] = percentile
+		}
+		counter++
 	}
 	return ret
+}
+
+// exclusive definition: what % of all values are below this value
+// -999 for null values
+func percentile(vals []float64, isNull []bool, index []int) []float64 {
+	// copy all existing values at index positions
+	newVals := make([]float64, len(index))
+	newIsNull := make([]bool, len(index))
+	for i := range index {
+		newVals[i] = vals[i]
+		newIsNull[i] = isNull[i]
+	}
+	floats := &floatValueContainer{slice: newVals, index: makeIntRange(0, len(index)), isNull: newIsNull}
+
+	return floats.percentile()
+}
+
+// percentile cut
+func (vc *valueContainer) pcut(bins []float64, labels []string) ([]string, error) {
+	for i, edge := range bins {
+		if edge < 0 || edge > 1 {
+			return nil, fmt.Errorf("all bin edges must be between 0 and 1 (%v at edge %d", edge, i)
+		}
+	}
+	pctile := percentile(vc.float().slice, vc.isNull, makeIntRange(0, len(vc.isNull)))
+	leftInclusive := true
+	rightExclusive := true
+	return cut(pctile, vc.isNull, bins, leftInclusive, rightExclusive, false, false, labels)
 }
