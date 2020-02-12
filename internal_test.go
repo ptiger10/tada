@@ -131,6 +131,7 @@ func Test_intersection(t *testing.T) {
 		want []int
 	}{
 		{"1 match", args{[][]int{{0, 1}, {1, 2}}}, []int{1}},
+		{"all matches", args{[][]int{{2, 1}, {1, 2}}}, []int{1, 2}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -214,6 +215,28 @@ func Test_lookup(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("lookup() = %v, want %v", got.labels[0], tt.want.labels[0])
+			}
+		})
+	}
+}
+
+func Test_difference(t *testing.T) {
+	type args struct {
+		slice1 []int
+		slice2 []int
+	}
+	tests := []struct {
+		name string
+		args args
+		want []int
+	}{
+		{"pass", args{[]int{0, 1, 2}, []int{1}}, []int{0, 2}},
+		{"reverse", args{[]int{2, 1, 0}, []int{1}}, []int{0, 2}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := difference(tt.args.slice1, tt.args.slice2); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("difference() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -853,27 +876,6 @@ func Test_last(t *testing.T) {
 			}
 			if got1 != tt.want1 {
 				t.Errorf("last() got1 = %v, want %v", got1, tt.want1)
-			}
-		})
-	}
-}
-
-func Test_difference(t *testing.T) {
-	type args struct {
-		slice1 []int
-		slice2 []int
-	}
-	tests := []struct {
-		name string
-		args args
-		want []int
-	}{
-		{"pass", args{[]int{0, 1, 2}, []int{1}}, []int{0, 2}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := difference(tt.args.slice1, tt.args.slice2); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("difference() = %v, want %v", got, tt.want)
 			}
 		})
 	}

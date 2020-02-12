@@ -190,10 +190,15 @@ func intersection(slices [][]int) []int {
 		}
 	}
 	var ret []int
-	for k, v := range set {
+	orderedKeys := make([]int, 0)
+	for k := range set {
+		orderedKeys = append(orderedKeys, k)
+	}
+	sort.Ints(orderedKeys)
+	for _, key := range orderedKeys {
 		// this means that the value appeared in every slice
-		if v == len(slices) {
-			ret = append(ret, k)
+		if set[key] == len(slices) {
+			ret = append(ret, key)
 		}
 	}
 	return ret
@@ -232,7 +237,7 @@ func difference(slice1 []int, slice2 []int) []int {
 		orderedKeys = append(orderedKeys, k)
 	}
 	sort.Ints(orderedKeys)
-	for k := range orderedKeys {
+	for _, k := range orderedKeys {
 		if set[k] {
 			ret = append(ret, k)
 		}

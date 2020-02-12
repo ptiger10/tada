@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/d4l3k/messagediff"
-	"gonum.org/v1/gonum/mat"
 )
 
 func TestNewDataFrame(t *testing.T) {
@@ -1708,6 +1707,18 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 	}
 }
 
+type testMatrix struct {
+	values [][]float64
+}
+
+func (mat testMatrix) Dims() (r, c int) {
+	return len(mat.values), len(mat.values[0])
+}
+
+func (mat testMatrix) At(i, j int) float64 {
+	return mat.values[i][j]
+}
+
 func TestReadMatrix(t *testing.T) {
 	type args struct {
 		mat Matrix
@@ -1717,8 +1728,8 @@ func TestReadMatrix(t *testing.T) {
 		args args
 		want *DataFrame
 	}{
-		{name: "gonum mat/matrix",
-			args: args{mat: mat.NewDense(1, 2, []float64{1, 2})},
+		{name: "matrix with same signature as gonum mat/matrix",
+			args: args{mat: testMatrix{values: [][]float64{{1, 2}}}},
 			want: &DataFrame{
 				values: []*valueContainer{
 					{slice: []string{"1"}, isNull: []bool{false}, name: "0"},
