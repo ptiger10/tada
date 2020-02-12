@@ -535,6 +535,11 @@ func (df *DataFrame) Len() int {
 	return reflect.ValueOf(df.values[0].slice).Len()
 }
 
+// Err returns the most recent error attached to the DataFrame, if any.
+func (df *DataFrame) Err() error {
+	return df.err
+}
+
 // numLevels returns the number of label columns in the DataFrame.
 func (df *DataFrame) numLevels() int {
 	return len(df.labels)

@@ -761,9 +761,27 @@ func (s *Series) Max() float64 {
 	return s.math(max)
 }
 
+// Earliest stub
+func (s *Series) Earliest() time.Time {
+	return s.timeFunc(earliest)
+}
+
+// Latest stub
+func (s *Series) Latest() time.Time {
+	return s.timeFunc(latest)
+}
+
 func (s *Series) math(mathFunction func([]float64, []bool, []int) (float64, bool)) float64 {
 	output, _ := mathFunction(
 		s.values.float().slice,
+		s.values.isNull,
+		makeIntRange(0, s.Len()))
+	return output
+}
+
+func (s *Series) timeFunc(timeFunction func([]time.Time, []bool, []int) (time.Time, bool)) time.Time {
+	output, _ := timeFunction(
+		s.values.dateTime().slice,
 		s.values.isNull,
 		makeIntRange(0, s.Len()))
 	return output

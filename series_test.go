@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/d4l3k/messagediff"
 )
@@ -1627,6 +1628,64 @@ func TestSeries_PercentileCut(t *testing.T) {
 			}
 			if got := s.PercentileCut(tt.args.bins, tt.args.labels); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.PercentileCut() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Earliest(t *testing.T) {
+	date := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   time.Time
+	}{
+		{"pass", fields{values: &valueContainer{
+			slice: []time.Time{date, date.AddDate(0, 0, 1)}, isNull: []bool{false, false}}}, date},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Earliest(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Earliest() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Latest(t *testing.T) {
+	date := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   time.Time
+	}{
+		{"pass", fields{values: &valueContainer{
+			slice: []time.Time{date, date.AddDate(0, 0, 1)}, isNull: []bool{false, false}}}, date.AddDate(0, 0, 1)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Latest(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Latest() = %v, want %v", got, tt.want)
 			}
 		})
 	}

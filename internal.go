@@ -1146,6 +1146,44 @@ func max(vals []float64, isNull []bool, index []int) (float64, bool) {
 	return max, false
 }
 
+// earliest returns the earliest of the non-null values at the `index` positions in `vals`.
+// Compatible with Grouped calculations as well as Series
+func earliest(vals []time.Time, isNull []bool, index []int) (time.Time, bool) {
+	min := time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC)
+	var atLeastOneValid bool
+	for _, i := range index {
+		if !isNull[i] {
+			if vals[i].Before(min) {
+				min = vals[i]
+			}
+			atLeastOneValid = true
+		}
+	}
+	if !atLeastOneValid {
+		return time.Time{}, true
+	}
+	return min, false
+}
+
+// latest returns the latest of the non-null values at the `index` positions in `vals`.
+// Compatible with Grouped calculations as well as Series
+func latest(vals []time.Time, isNull []bool, index []int) (time.Time, bool) {
+	max := time.Time{}
+	var atLeastOneValid bool
+	for _, i := range index {
+		if !isNull[i] {
+			if vals[i].After(max) {
+				max = vals[i]
+			}
+			atLeastOneValid = true
+		}
+	}
+	if !atLeastOneValid {
+		return time.Time{}, true
+	}
+	return max, false
+}
+
 // returns the first non-null value as a string
 func first(vals []string, isNull []bool, index []int) (string, bool) {
 	for _, i := range index {
