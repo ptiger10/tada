@@ -178,10 +178,11 @@ func TestReadCSVByRows(t *testing.T) {
 
 func TestDataFrame_Subset(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		colLevelNames []string
+		name          string
+		err           error
 	}
 	type args struct {
 		index []int
@@ -196,22 +197,25 @@ func TestDataFrame_Subset(t *testing.T) {
 			values: []*valueContainer{
 				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"},
 				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "1"}},
-			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-			name:   "baz"},
+			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{[]int{0}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "0"},
 				{slice: []string{"foo"}, isNull: []bool{false}, name: "1"}},
-				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				name:   "baz"}},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				colLevelNames: tt.fields.colLevelNames,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
 			}
 			if got := df.Subset(tt.args.index); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.Subset() = %v, want %v", got, tt.want)
@@ -222,10 +226,11 @@ func TestDataFrame_Subset(t *testing.T) {
 
 func TestDataFrame_SubsetLabels(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		colLevelNames []string
+		name          string
+		err           error
 	}
 	type args struct {
 		index []int
@@ -244,21 +249,24 @@ func TestDataFrame_SubsetLabels(t *testing.T) {
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
 				{slice: []int{10}, isNull: []bool{false}, name: "*10"},
 			},
-			name: "baz"},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{[]int{1}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "0"},
 				{slice: []string{"foo"}, isNull: []bool{false}, name: "1"}},
-				labels: []*valueContainer{{slice: []int{10}, isNull: []bool{false}, name: "*10"}},
-				name:   "baz"}},
+				labels:        []*valueContainer{{slice: []int{10}, isNull: []bool{false}, name: "*10"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				colLevelNames: tt.fields.colLevelNames,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
 			}
 			if got := df.SubsetLabels(tt.args.index); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.SubsetLabels() = %v, want %v", got, tt.want)
@@ -269,10 +277,11 @@ func TestDataFrame_SubsetLabels(t *testing.T) {
 
 func TestDataFrame_SubsetCols(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		colLevelNames []string
+		name          string
+		err           error
 	}
 	type args struct {
 		index []int
@@ -291,22 +300,25 @@ func TestDataFrame_SubsetCols(t *testing.T) {
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
 				{slice: []int{10}, isNull: []bool{false}, name: "*10"},
 			},
-			name: "baz"},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{[]int{1}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"foo"}, isNull: []bool{false}, name: "1"}},
 				labels: []*valueContainer{
 					{slice: []int{0}, isNull: []bool{false}, name: "*0"},
 					{slice: []int{10}, isNull: []bool{false}, name: "*10"}},
-				name: "baz"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				colLevelNames: tt.fields.colLevelNames,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
 			}
 			if got := df.SubsetCols(tt.args.index); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.SubsetCols() = %v, want %v", got, tt.want)
@@ -660,10 +672,11 @@ func TestDataFrame_WithLabels(t *testing.T) {
 
 func TestDataFrame_Valid(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		colLevelNames []string
+		name          string
+		err           error
 	}
 	type args struct {
 		subset []string
@@ -678,36 +691,41 @@ func TestDataFrame_Valid(t *testing.T) {
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{true, false, false}, name: "0"},
 				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, true, false}, name: "1"}},
-			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
-			name:   "baz"},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{nil},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{2}, isNull: []bool{false}, name: "0"},
 				{slice: []string{"bar"}, isNull: []bool{false}, name: "1"}},
-				labels: []*valueContainer{{slice: []int{2}, isNull: []bool{false}, name: "*0"}},
-				name:   "baz"},
+				labels:        []*valueContainer{{slice: []int{2}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"},
 		},
 		{"subset", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{true, false, false}, name: "0"},
 				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, true, false}, name: "1"}},
-			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
-			name:   "baz"},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{[]string{"0"}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"},
 				{slice: []string{"", "bar"}, isNull: []bool{true, false}, name: "1"}},
-				labels: []*valueContainer{{slice: []int{1, 2}, isNull: []bool{false, false}, name: "*0"}},
-				name:   "baz"},
+				labels:        []*valueContainer{{slice: []int{1, 2}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				colLevelNames: tt.fields.colLevelNames,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
 			}
 			if got := df.DropNull(tt.args.subset...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.DropNull() = %v, want %v", got.values, tt.want.values)
@@ -718,10 +736,11 @@ func TestDataFrame_Valid(t *testing.T) {
 
 func TestDataFrame_Null(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		colLevelNames []string
+		name          string
+		err           error
 	}
 	type args struct {
 		subset []string
@@ -736,36 +755,41 @@ func TestDataFrame_Null(t *testing.T) {
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{true, false, false}, name: "0"},
 				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, true, false}, name: "1"}},
-			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
-			name:   "baz"},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{nil},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "0"},
 				{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "1"}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				name:   "baz"},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"},
 		},
 		{"subset", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{true, false, false}, name: "0"},
 				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, true, false}, name: "1"}},
-			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
-			name:   "baz"},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{[]string{"0"}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{0}, isNull: []bool{true}, name: "0"},
 				{slice: []string{"foo"}, isNull: []bool{false}, name: "1"}},
-				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				name:   "baz"},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				colLevelNames: tt.fields.colLevelNames,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
 			}
 			if got := df.Null(tt.args.subset...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.Null() = %v, want %v", got.values[0], tt.want.values[0])

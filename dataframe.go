@@ -5,10 +5,10 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"reflect"
 	"regexp"
-	"strings"
 
 	"github.com/olekukonko/tablewriter"
 )
@@ -104,51 +104,38 @@ func (df *DataFrame) ToSeries() *Series {
 	}
 }
 
-func (df *DataFrame) toCSVByRows(ignoreLabels bool) ([][]string, error) {
-	if df.values == nil {
-		return nil, fmt.Errorf("cannot export empty dataframe")
+// ToCSV converts a DataFrame to a [][]string with rows as the major dimension
+func (df *DataFrame) ToCSV(ignoreLabels bool) [][]string {
+	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
+	if err != nil {
+		return nil
 	}
-	// make final container with rows as major dimension
-	ret := make([][]string, df.numColLevels()+df.Len())
-	for i := range ret {
-		var newCols int
-		if !ignoreLabels {
-			newCols = df.numLevels() + df.numColumns()
-		} else {
-			newCols = df.numColumns()
-		}
-		ret[i] = make([]string, newCols)
+	return transposedStringValues
+}
+
+// ExportCSV converts a DataFrame to a [][]string with rows as the major dimension, and writes the output to a csv file.
+func (df *DataFrame) ExportCSV(file string, ignoreLabels bool) error {
+	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
+	if err != nil {
+		return fmt.Errorf("ToCSV(): %v", err)
 	}
-	if !ignoreLabels {
-		for j := range df.labels {
-			// write label headers, index at first header row
-			ret[df.numColLevels()-1][j] = df.labels[j].name
-			v := df.labels[j].str().slice
-			// write label values, offset by header rows
-			for i := range v {
-				ret[i+df.numColLevels()][j] = v[i]
-			}
-		}
+	var b bytes.Buffer
+	w := csv.NewWriter(&b)
+	err = w.WriteAll(transposedStringValues)
+	if err != nil {
+		return fmt.Errorf("ToCSV(): %v", err)
 	}
-	// if there are multiple column headers, those rows will be blank above the index header
-	for k := range df.values {
-		var offset int
-		if !ignoreLabels {
-			offset = df.numLevels()
-		}
-		// if number of col levels is only one, return the name as a single-item slice
-		multiColHeaders := splitLabelIntoLevels(df.values[k].name, df.numColLevels() > 1)
-		for l := 0; l < df.numColLevels(); l++ {
-			// write multi column headers, offset by label levels
-			ret[l][k+offset] = multiColHeaders[l]
-		}
-		v := df.values[k].str().slice
-		// write label values, offset by header rows and label levels
-		for i := range v {
-			ret[i+df.numColLevels()][k+offset] = v[i]
-		}
+	// ducks error because process is controlled
+	err = ioutil.WriteFile(file, b.Bytes(), 0666)
+	if err != nil {
+		return fmt.Errorf("ToCSV(): %v", err)
 	}
-	return ret, nil
+	return nil
+}
+
+// ToMockCSV writes a mock csv to dst modeled after the csv referenced at src
+func (df *DataFrame) ToMockCSV(src [][]string, dst io.Writer, config *ReadConfig) error {
+	return nil
 }
 
 // ToInterface exports a DataFrame to a [][]interface with rows as the major dimension.
@@ -167,213 +154,6 @@ func (df *DataFrame) ToInterface(ignoreLabels bool) ([][]interface{}, error) {
 		}
 	}
 	return ret, nil
-}
-
-// ToCSV converts a DataFrame to a [][]string with rows as the major dimension
-func (df *DataFrame) ToCSV() [][]string {
-	transposedStringValues, err := df.toCSVByRows(false)
-	if err != nil {
-		return nil
-	}
-	return transposedStringValues
-}
-
-// ExportCSV converts a DataFrame to a [][]string with rows as the major dimension, and writes the output to a csv file.
-func (df *DataFrame) ExportCSV(file string, config *WriteConfig) error {
-	if config == nil {
-		config = &WriteConfig{
-			Delimiter: ',',
-		}
-	}
-
-	transposedStringValues, err := df.toCSVByRows(config.IgnoreLabels)
-	if err != nil {
-		return fmt.Errorf("ToCSV(): %v", err)
-	}
-	var b bytes.Buffer
-	w := csv.NewWriter(&b)
-	w.Comma = config.Delimiter
-	err = w.WriteAll(transposedStringValues)
-	if err != nil {
-		return fmt.Errorf("ToCSV(): %v", err)
-	}
-	// ducks error because process is controlled
-	err = ioutil.WriteFile(file, b.Bytes(), 0666)
-	if err != nil {
-		return fmt.Errorf("ToCSV(): %v", err)
-	}
-	return nil
-}
-
-func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
-	levelSeparator := "|"
-	numCols := len(csv[0]) - cfg.NumLabelCols
-	numRows := len(csv) - cfg.NumHeaderRows
-
-	// prepare intermediary values containers
-	vals := make([][]string, numCols)
-	valsIsNull := make([][]bool, numCols)
-	valsNames := make([][]string, numCols)
-	for k := range vals {
-		vals[k] = make([]string, numRows)
-		valsIsNull[k] = make([]bool, numRows)
-		valsNames[k] = make([]string, cfg.NumHeaderRows)
-	}
-
-	// prepare intermediary label containers
-	labels := make([][]string, cfg.NumLabelCols)
-	labelsIsNull := make([][]bool, cfg.NumLabelCols)
-	labelsNames := make([][]string, cfg.NumLabelCols)
-	for j := range labels {
-		labels[j] = make([]string, numRows)
-		labelsIsNull[j] = make([]bool, numRows)
-		labelsNames[j] = make([]string, cfg.NumHeaderRows)
-	}
-
-	// iterate over csv and transpose rows and columns
-	for row := range csv {
-		for column := range csv[row] {
-			if row < cfg.NumHeaderRows {
-				if column < cfg.NumLabelCols {
-					// write header rows to labels, no offset
-					labelsNames[column][row] = csv[row][column]
-				} else {
-					// write header rows to cols, offset for label cols
-					valsNames[column-cfg.NumLabelCols][row] = csv[row][column]
-				}
-				continue
-			}
-			if column < cfg.NumLabelCols {
-				// write values to labels, offset for header rows
-				labels[column][row-cfg.NumHeaderRows] = csv[row][column]
-				labelsIsNull[column][row-cfg.NumHeaderRows] = isNullString(csv[row][column])
-			} else {
-				// write values to cols, offset for label cols and header rows
-				vals[column-cfg.NumLabelCols][row-cfg.NumHeaderRows] = csv[row][column]
-				valsIsNull[column-cfg.NumLabelCols][row-cfg.NumHeaderRows] = isNullString(csv[row][column])
-			}
-		}
-	}
-
-	// transfer values to final value containers
-	retLabels := make([]*valueContainer, len(labels))
-	retVals := make([]*valueContainer, len(vals))
-	for k := range retVals {
-		retVals[k] = &valueContainer{
-			slice:  vals[k],
-			isNull: valsIsNull[k],
-			name:   strings.Join(valsNames[k], levelSeparator),
-		}
-	}
-	for j := range retLabels {
-		retLabels[j] = &valueContainer{
-			slice:  labels[j],
-			isNull: labelsIsNull[j],
-			name:   strings.Join(labelsNames[j], levelSeparator),
-		}
-	}
-	// create default labels if no labels
-	if len(retLabels) == 0 {
-		defaultLabels := makeDefaultLabels(0, numRows)
-		retLabels = append(retLabels, defaultLabels)
-	}
-	// create default col level names
-	retColLevelNames := make([]string, cfg.NumHeaderRows)
-	for l := range retColLevelNames {
-		retColLevelNames[l] = fmt.Sprintf("*%d", l)
-	}
-	// create default column names
-	if len(retColLevelNames) == 0 {
-		retColLevelNames = append(retColLevelNames, "*0")
-		for k := range retVals {
-			retVals[k].name = fmt.Sprintf("%v", k)
-		}
-	}
-
-	return &DataFrame{
-		values:        retVals,
-		labels:        retLabels,
-		colLevelNames: retColLevelNames,
-	}
-}
-
-func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
-	levelSeparator := "|"
-	numRows := len(csv[0]) - cfg.NumHeaderRows
-	numCols := len(csv) - cfg.NumLabelCols
-
-	// prepare intermediary values containers
-	vals := make([][]string, numCols)
-	valsIsNull := make([][]bool, numCols)
-	valsNames := make([]string, numCols)
-
-	// prepare intermediary label containers
-	labels := make([][]string, cfg.NumLabelCols)
-	labelsIsNull := make([][]bool, cfg.NumLabelCols)
-	labelsNames := make([]string, cfg.NumLabelCols)
-
-	// iterate over all cols to get header names
-	for j := 0; j < cfg.NumLabelCols; j++ {
-		// write label headers, no offset
-		labelsNames[j] = strings.Join(csv[j][:cfg.NumHeaderRows], levelSeparator)
-	}
-	for k := 0; k < numCols; k++ {
-		// write col headers, offset for label cols
-		valsNames[k] = strings.Join(csv[k+cfg.NumLabelCols][:cfg.NumHeaderRows], levelSeparator)
-	}
-	for col := range csv {
-		if col < cfg.NumLabelCols {
-			// write label values as slice, offset for header rows
-			valsToWrite := csv[col][cfg.NumHeaderRows:]
-			labels[col] = valsToWrite
-			labelsIsNull[col] = setNullsFromInterface(valsToWrite)
-		} else {
-			// write column values as slice, offset for label cols and header rows
-			valsToWrite := csv[col+cfg.NumLabelCols][cfg.NumHeaderRows:]
-			vals[col] = valsToWrite
-			valsIsNull[col] = setNullsFromInterface(valsToWrite)
-		}
-	}
-
-	// transfer values to final value containers
-	retLabels := make([]*valueContainer, len(labels))
-	retVals := make([]*valueContainer, len(vals))
-	for k := range retVals {
-		retVals[k] = &valueContainer{
-			slice:  vals[k],
-			isNull: valsIsNull[k],
-			name:   valsNames[k],
-		}
-	}
-	for j := range retLabels {
-		retLabels[j] = &valueContainer{
-			slice:  labels[j],
-			isNull: labelsIsNull[j],
-			name:   labelsNames[j],
-		}
-	}
-	// create default labels if no labels
-	if len(retLabels) == 0 {
-		defaultLabels := makeDefaultLabels(0, numRows)
-		retLabels = append(retLabels, defaultLabels)
-	}
-	// create default col level names
-	retColLevelNames := make([]string, cfg.NumHeaderRows)
-	for l := range retColLevelNames {
-		retColLevelNames[l] = fmt.Sprintf("*%d", l)
-	}
-	if len(retColLevelNames) == 0 {
-		retColLevelNames = append(retColLevelNames, "*0")
-	}
-	for k := range retVals {
-		retVals[k].name = fmt.Sprintf("%v", k)
-	}
-	return &DataFrame{
-		values:        retVals,
-		labels:        retLabels,
-		colLevelNames: retColLevelNames,
-	}
-
 }
 
 // ReadCSV stub
@@ -395,7 +175,6 @@ func ImportCSV(path string, config *ReadConfig) (*DataFrame, error) {
 	if config == nil {
 		config = &ReadConfig{
 			NumHeaderRows: 1,
-			Delimiter:     ',',
 		}
 	}
 
@@ -404,9 +183,6 @@ func ImportCSV(path string, config *ReadConfig) (*DataFrame, error) {
 		return nil, fmt.Errorf("ImportCSV(): %s", err)
 	}
 	reader := csv.NewReader(bytes.NewReader(data))
-	if config.Delimiter != 0 {
-		reader.Comma = config.Delimiter
-	}
 
 	csv, err := reader.ReadAll()
 	if err != nil {
@@ -428,7 +204,6 @@ func ReadInterface(input [][]interface{}, config *ReadConfig) (*DataFrame, error
 	if config == nil {
 		config = &ReadConfig{
 			NumHeaderRows: 1,
-			Delimiter:     ',',
 		}
 	}
 
@@ -467,43 +242,6 @@ func ReadMatrix(mat Matrix) *DataFrame {
 	return readCSVByCols(csv, &ReadConfig{})
 }
 
-func readStruct(slice interface{}) ([]*valueContainer, error) {
-	if !isSlice(slice) {
-		return nil, fmt.Errorf("unsupported kind (%v); must be slice", reflect.TypeOf(slice).Kind())
-	}
-	if kind := reflect.TypeOf(slice).Elem().Kind(); kind != reflect.Struct {
-		return nil, fmt.Errorf("unsupported kind (%v); must be slice of structs", reflect.TypeOf(slice).Elem().Kind())
-	}
-	v := reflect.ValueOf(slice)
-	if v.Len() == 0 {
-		return nil, fmt.Errorf("slice must contain at least one struct")
-	}
-	strct := v.Index(0)
-	numCols := strct.NumField()
-	retValues := make([][]string, numCols)
-	retNames := make([]string, numCols)
-	for k := 0; k < numCols; k++ {
-		for i := 0; i < v.Len(); i++ {
-			strct := v.Index(i)
-			if i == 0 {
-				retNames[k] = strct.Type().Field(k).Name
-				retValues[k] = make([]string, v.Len())
-			}
-			retValues[k][i] = fmt.Sprint(strct.Field(k).Interface())
-		}
-	}
-	// transfer to final container
-	ret := make([]*valueContainer, numCols)
-	for k := range ret {
-		ret[k] = &valueContainer{
-			slice:  retValues[k],
-			isNull: setNullsFromInterface(retValues[k]),
-			name:   retNames[k],
-		}
-	}
-	return ret, nil
-}
-
 // ReadStruct stub
 func ReadStruct(slice interface{}) (*DataFrame, error) {
 	values, err := readStruct(slice)
@@ -527,7 +265,7 @@ func removeDefaultNameIndicator(name string) string {
 
 func (df *DataFrame) String() string {
 	// do not try to print all rows
-	csv := df.Head(optionMaxRows).ToCSV()
+	csv := df.Head(optionMaxRows).ToCSV(false)
 	for k := range csv[0] {
 		csv[0][k] = removeDefaultNameIndicator(csv[0][k])
 	}
@@ -577,7 +315,18 @@ func (df *DataFrame) ListColumns() []string {
 
 // ListLevels returns the name and position of all the label levels in the DataFrame
 func (df *DataFrame) ListLevels() []string {
-	return listNames(df.values)
+	return listNames(df.labels)
+}
+
+// HasCols returns an error if the DataFrame does not contain all of the `colNames` supplied.
+func (df *DataFrame) HasCols(colNames ...string) error {
+	for _, name := range colNames {
+		_, err := findColWithName(name, df.values)
+		if err != nil {
+			return fmt.Errorf("HasCols(): %v", err)
+		}
+	}
+	return nil
 }
 
 // InPlace returns a DataFrameMutator, which contains most of the same methods as DataFrame but never returns a new DataFrame.

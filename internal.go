@@ -265,6 +265,259 @@ func maxIntSlice(slice []int) int {
 	return max
 }
 
+func (df *DataFrame) toCSVByRows(ignoreLabels bool) ([][]string, error) {
+	if df.values == nil {
+		return nil, fmt.Errorf("cannot export empty dataframe")
+	}
+	// make final container with rows as major dimension
+	ret := make([][]string, df.numColLevels()+df.Len())
+	for i := range ret {
+		var newCols int
+		if !ignoreLabels {
+			newCols = df.numLevels() + df.numColumns()
+		} else {
+			newCols = df.numColumns()
+		}
+		ret[i] = make([]string, newCols)
+	}
+	if !ignoreLabels {
+		for j := range df.labels {
+			// write label headers, index at first header row
+			ret[df.numColLevels()-1][j] = df.labels[j].name
+			v := df.labels[j].str().slice
+			// write label values, offset by header rows
+			for i := range v {
+				ret[i+df.numColLevels()][j] = v[i]
+			}
+		}
+	}
+	// if there are multiple column headers, those rows will be blank above the index header
+	for k := range df.values {
+		var offset int
+		if !ignoreLabels {
+			offset = df.numLevels()
+		}
+		// if number of col levels is only one, return the name as a single-item slice
+		multiColHeaders := splitLabelIntoLevels(df.values[k].name, df.numColLevels() > 1)
+		for l := 0; l < df.numColLevels(); l++ {
+			// write multi column headers, offset by label levels
+			ret[l][k+offset] = multiColHeaders[l]
+		}
+		v := df.values[k].str().slice
+		// write label values, offset by header rows and label levels
+		for i := range v {
+			ret[i+df.numColLevels()][k+offset] = v[i]
+		}
+	}
+	return ret, nil
+}
+
+func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
+	numCols := len(csv[0]) - cfg.NumLabelCols
+	numRows := len(csv) - cfg.NumHeaderRows
+
+	// prepare intermediary values containers
+	vals := make([][]string, numCols)
+	valsIsNull := make([][]bool, numCols)
+	valsNames := make([][]string, numCols)
+	for k := range vals {
+		vals[k] = make([]string, numRows)
+		valsIsNull[k] = make([]bool, numRows)
+		valsNames[k] = make([]string, cfg.NumHeaderRows)
+	}
+
+	// prepare intermediary label containers
+	labels := make([][]string, cfg.NumLabelCols)
+	labelsIsNull := make([][]bool, cfg.NumLabelCols)
+	labelsNames := make([][]string, cfg.NumLabelCols)
+	for j := range labels {
+		labels[j] = make([]string, numRows)
+		labelsIsNull[j] = make([]bool, numRows)
+		labelsNames[j] = make([]string, cfg.NumHeaderRows)
+	}
+
+	// iterate over csv and transpose rows and columns
+	for row := range csv {
+		for column := range csv[row] {
+			if row < cfg.NumHeaderRows {
+				if column < cfg.NumLabelCols {
+					// write header rows to labels, no offset
+					labelsNames[column][row] = csv[row][column]
+				} else {
+					// write header rows to cols, offset for label cols
+					valsNames[column-cfg.NumLabelCols][row] = csv[row][column]
+				}
+				continue
+			}
+			if column < cfg.NumLabelCols {
+				// write values to labels, offset for header rows
+				labels[column][row-cfg.NumHeaderRows] = csv[row][column]
+				labelsIsNull[column][row-cfg.NumHeaderRows] = isNullString(csv[row][column])
+			} else {
+				// write values to cols, offset for label cols and header rows
+				vals[column-cfg.NumLabelCols][row-cfg.NumHeaderRows] = csv[row][column]
+				valsIsNull[column-cfg.NumLabelCols][row-cfg.NumHeaderRows] = isNullString(csv[row][column])
+			}
+		}
+	}
+
+	// transfer values to final value containers
+	retLabels := make([]*valueContainer, len(labels))
+	retVals := make([]*valueContainer, len(vals))
+	for k := range retVals {
+		retVals[k] = &valueContainer{
+			slice:  vals[k],
+			isNull: valsIsNull[k],
+			name:   strings.Join(valsNames[k], optionLevelSeparator),
+		}
+	}
+	for j := range retLabels {
+		retLabels[j] = &valueContainer{
+			slice:  labels[j],
+			isNull: labelsIsNull[j],
+			name:   strings.Join(labelsNames[j], optionLevelSeparator),
+		}
+	}
+	// create default labels if no labels
+	if len(retLabels) == 0 {
+		defaultLabels := makeDefaultLabels(0, numRows)
+		retLabels = append(retLabels, defaultLabels)
+	}
+	// create default col level names
+	retColLevelNames := make([]string, cfg.NumHeaderRows)
+	for l := range retColLevelNames {
+		retColLevelNames[l] = fmt.Sprintf("*%d", l)
+	}
+	// create default column names
+	if len(retColLevelNames) == 0 {
+		retColLevelNames = append(retColLevelNames, "*0")
+		for k := range retVals {
+			retVals[k].name = fmt.Sprintf("%v", k)
+		}
+	}
+
+	return &DataFrame{
+		values:        retVals,
+		labels:        retLabels,
+		colLevelNames: retColLevelNames,
+	}
+}
+
+func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
+	numRows := len(csv[0]) - cfg.NumHeaderRows
+	numCols := len(csv) - cfg.NumLabelCols
+
+	// prepare intermediary values containers
+	vals := make([][]string, numCols)
+	valsIsNull := make([][]bool, numCols)
+	valsNames := make([]string, numCols)
+
+	// prepare intermediary label containers
+	labels := make([][]string, cfg.NumLabelCols)
+	labelsIsNull := make([][]bool, cfg.NumLabelCols)
+	labelsNames := make([]string, cfg.NumLabelCols)
+
+	// iterate over all cols to get header names
+	for j := 0; j < cfg.NumLabelCols; j++ {
+		// write label headers, no offset
+		labelsNames[j] = strings.Join(csv[j][:cfg.NumHeaderRows], optionLevelSeparator)
+	}
+	for k := 0; k < numCols; k++ {
+		// write col headers, offset for label cols
+		valsNames[k] = strings.Join(csv[k+cfg.NumLabelCols][:cfg.NumHeaderRows], optionLevelSeparator)
+	}
+	for col := range csv {
+		if col < cfg.NumLabelCols {
+			// write label values as slice, offset for header rows
+			valsToWrite := csv[col][cfg.NumHeaderRows:]
+			labels[col] = valsToWrite
+			labelsIsNull[col] = setNullsFromInterface(valsToWrite)
+		} else {
+			// write column values as slice, offset for label cols and header rows
+			valsToWrite := csv[col+cfg.NumLabelCols][cfg.NumHeaderRows:]
+			vals[col] = valsToWrite
+			valsIsNull[col] = setNullsFromInterface(valsToWrite)
+		}
+	}
+
+	// transfer values to final value containers
+	retLabels := make([]*valueContainer, len(labels))
+	retVals := make([]*valueContainer, len(vals))
+	for k := range retVals {
+		retVals[k] = &valueContainer{
+			slice:  vals[k],
+			isNull: valsIsNull[k],
+			name:   valsNames[k],
+		}
+	}
+	for j := range retLabels {
+		retLabels[j] = &valueContainer{
+			slice:  labels[j],
+			isNull: labelsIsNull[j],
+			name:   labelsNames[j],
+		}
+	}
+	// create default labels if no labels
+	if len(retLabels) == 0 {
+		defaultLabels := makeDefaultLabels(0, numRows)
+		retLabels = append(retLabels, defaultLabels)
+	}
+	// create default col level names
+	retColLevelNames := make([]string, cfg.NumHeaderRows)
+	for l := range retColLevelNames {
+		retColLevelNames[l] = fmt.Sprintf("*%d", l)
+	}
+	if len(retColLevelNames) == 0 {
+		retColLevelNames = append(retColLevelNames, "*0")
+	}
+	for k := range retVals {
+		retVals[k].name = fmt.Sprintf("%v", k)
+	}
+	return &DataFrame{
+		values:        retVals,
+		labels:        retLabels,
+		colLevelNames: retColLevelNames,
+	}
+
+}
+
+func readStruct(slice interface{}) ([]*valueContainer, error) {
+	if !isSlice(slice) {
+		return nil, fmt.Errorf("unsupported kind (%v); must be slice", reflect.TypeOf(slice).Kind())
+	}
+	if kind := reflect.TypeOf(slice).Elem().Kind(); kind != reflect.Struct {
+		return nil, fmt.Errorf("unsupported kind (%v); must be slice of structs", reflect.TypeOf(slice).Elem().Kind())
+	}
+	v := reflect.ValueOf(slice)
+	if v.Len() == 0 {
+		return nil, fmt.Errorf("slice must contain at least one struct")
+	}
+	strct := v.Index(0)
+	numCols := strct.NumField()
+	retValues := make([][]string, numCols)
+	retNames := make([]string, numCols)
+	for k := 0; k < numCols; k++ {
+		for i := 0; i < v.Len(); i++ {
+			strct := v.Index(i)
+			if i == 0 {
+				retNames[k] = strct.Type().Field(k).Name
+				retValues[k] = make([]string, v.Len())
+			}
+			retValues[k][i] = fmt.Sprint(strct.Field(k).Interface())
+		}
+	}
+	// transfer to final container
+	ret := make([]*valueContainer, numCols)
+	for k := range ret {
+		ret[k] = &valueContainer{
+			slice:  retValues[k],
+			isNull: setNullsFromInterface(retValues[k]),
+			name:   retNames[k],
+		}
+	}
+	return ret, nil
+}
+
 func (vc *valueContainer) valid() []int {
 	index := make([]int, 0)
 	for i, isNull := range vc.isNull {

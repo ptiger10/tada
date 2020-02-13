@@ -84,13 +84,13 @@ func (s *Series) ToDataFrame() *DataFrame {
 }
 
 // ToCSV converts a Series to a DataFrame and returns as [][]string.
-func (s *Series) ToCSV() [][]string {
+func (s *Series) ToCSV(ignoreLabels bool) [][]string {
 	df := &DataFrame{
 		values: []*valueContainer{s.values},
 		labels: s.labels,
 		err:    s.err,
 	}
-	return df.ToCSV()
+	return df.ToCSV(ignoreLabels)
 }
 
 // -- GETTERS
