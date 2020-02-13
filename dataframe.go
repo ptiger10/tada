@@ -9,7 +9,9 @@ import (
 	"io/ioutil"
 	"reflect"
 	"regexp"
+	"strconv"
 
+	"github.com/araddon/dateparse"
 	"github.com/olekukonko/tablewriter"
 )
 
@@ -91,69 +93,6 @@ func (df *DataFrame) Copy() *DataFrame {
 		colLevelNames: colLevelNames,
 		name:          df.name,
 	}
-}
-
-// ToSeries stub
-func (df *DataFrame) ToSeries() *Series {
-	if len(df.values) != 1 {
-		return seriesWithError(fmt.Errorf("ToSeries(): DataFrame must have a single column"))
-	}
-	return &Series{
-		values: df.values[0],
-		labels: df.labels,
-	}
-}
-
-// ToCSV converts a DataFrame to a [][]string with rows as the major dimension
-func (df *DataFrame) ToCSV(ignoreLabels bool) [][]string {
-	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
-	if err != nil {
-		return nil
-	}
-	return transposedStringValues
-}
-
-// ExportCSV converts a DataFrame to a [][]string with rows as the major dimension, and writes the output to a csv file.
-func (df *DataFrame) ExportCSV(file string, ignoreLabels bool) error {
-	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
-	if err != nil {
-		return fmt.Errorf("ToCSV(): %v", err)
-	}
-	var b bytes.Buffer
-	w := csv.NewWriter(&b)
-	err = w.WriteAll(transposedStringValues)
-	if err != nil {
-		return fmt.Errorf("ToCSV(): %v", err)
-	}
-	// ducks error because process is controlled
-	err = ioutil.WriteFile(file, b.Bytes(), 0666)
-	if err != nil {
-		return fmt.Errorf("ToCSV(): %v", err)
-	}
-	return nil
-}
-
-// ToMockCSV writes a mock csv to dst modeled after the csv referenced at src
-func (df *DataFrame) ToMockCSV(src [][]string, dst io.Writer, config *ReadConfig) error {
-	return nil
-}
-
-// ToInterface exports a DataFrame to a [][]interface with rows as the major dimension.
-func (df *DataFrame) ToInterface(ignoreLabels bool) ([][]interface{}, error) {
-	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
-	if err != nil {
-		return nil, fmt.Errorf("ToInterface(): %v", err)
-	}
-	ret := make([][]interface{}, len(transposedStringValues))
-	for k := range ret {
-		ret[k] = make([]interface{}, len(transposedStringValues[0]))
-	}
-	for i := range transposedStringValues {
-		for k := range transposedStringValues[i] {
-			ret[i][k] = transposedStringValues[i][k]
-		}
-	}
-	return ret, nil
 }
 
 // ReadCSV stub
@@ -254,7 +193,146 @@ func ReadStruct(slice interface{}) (*DataFrame, error) {
 		labels:        []*valueContainer{defaultLabels},
 		colLevelNames: []string{"*0"},
 	}, nil
+}
 
+// ToSeries stub
+func (df *DataFrame) ToSeries() *Series {
+	if len(df.values) != 1 {
+		return seriesWithError(fmt.Errorf("ToSeries(): DataFrame must have a single column"))
+	}
+	return &Series{
+		values: df.values[0],
+		labels: df.labels,
+	}
+}
+
+// ToCSV converts a DataFrame to a [][]string with rows as the major dimension
+func (df *DataFrame) ToCSV(ignoreLabels bool) [][]string {
+	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
+	if err != nil {
+		return nil
+	}
+	return transposedStringValues
+}
+
+// ExportCSV converts a DataFrame to a [][]string with rows as the major dimension, and writes the output to a csv file.
+func (df *DataFrame) ExportCSV(file string, ignoreLabels bool) error {
+	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
+	if err != nil {
+		return fmt.Errorf("ToCSV(): %v", err)
+	}
+	var b bytes.Buffer
+	w := csv.NewWriter(&b)
+	err = w.WriteAll(transposedStringValues)
+	if err != nil {
+		return fmt.Errorf("ToCSV(): %v", err)
+	}
+	// ducks error because process is controlled
+	err = ioutil.WriteFile(file, b.Bytes(), 0666)
+	if err != nil {
+		return fmt.Errorf("ToCSV(): %v", err)
+	}
+	return nil
+}
+
+// ToInterface exports a DataFrame to a [][]interface with rows as the major dimension.
+func (df *DataFrame) ToInterface(ignoreLabels bool) ([][]interface{}, error) {
+	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
+	if err != nil {
+		return nil, fmt.Errorf("ToInterface(): %v", err)
+	}
+	ret := make([][]interface{}, len(transposedStringValues))
+	for k := range ret {
+		ret[k] = make([]interface{}, len(transposedStringValues[0]))
+	}
+	for i := range transposedStringValues {
+		for k := range transposedStringValues[i] {
+			ret[i][k] = transposedStringValues[i][k]
+		}
+	}
+	return ret, nil
+}
+
+// WriteMockCSV writes a mock csv to `w` modeled after `src`.
+func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig) error {
+	if config == nil {
+		config = &ReadConfig{NumHeaderRows: 1}
+	}
+	numPreviewRows := 10
+	inferredTypes := make([]map[DType]int, 0)
+	var headers [][]string
+	// default: major dimension is rows
+	if !config.MajorDimIsCols {
+		if len(src) == 0 {
+			return fmt.Errorf("WriteMockCSV(): csv must have at least one row")
+		}
+		if len(src[0]) == 0 {
+			return fmt.Errorf("WriteMockCSV(): csv must have at least one column")
+		}
+		maxRows := len(src)
+		if maxRows < numPreviewRows {
+			numPreviewRows = maxRows
+		}
+		// copy headers
+		for i := 0; i < config.NumHeaderRows; i++ {
+			headers = append(headers, src[i])
+		}
+		for range src[0] {
+			inferredTypes = append(inferredTypes, map[DType]int{Float: 0, DateTime: 0, String: 0})
+		}
+
+		// offset preview by header rows
+		preview := src[config.NumHeaderRows : numPreviewRows+config.NumHeaderRows]
+		for i := range preview {
+			for k := range preview[i] {
+				dtype := inferType(src[i][k])
+				inferredTypes[k][dtype]++
+			}
+		}
+	} else {
+		if len(src) == 0 {
+			return fmt.Errorf("WriteMockCSV(): csv must have at least one column")
+		}
+		if len(src[0]) == 0 {
+			return fmt.Errorf("WriteMockCSV(): csv must have at least one row")
+		}
+		maxRows := len(src[0])
+		if maxRows < numPreviewRows {
+			numPreviewRows = maxRows
+		}
+		// copy headers
+
+		for range src {
+			inferredTypes = append(inferredTypes, map[DType]int{Float: 0, DateTime: 0, String: 0})
+		}
+
+		for k := range src {
+			headers = append(headers, make([]string, config.NumHeaderRows))
+			for l := 0; l < config.NumHeaderRows; l++ {
+				headers[k][l] = src[k][l]
+			}
+			// offset by header rows
+			for i := range src[config.NumHeaderRows : numPreviewRows+config.NumHeaderRows] {
+				dtype := inferType(src[k][i])
+				inferredTypes[k][dtype]++
+			}
+		}
+	}
+	numMockRows := 10
+	mock := mockCSVFromDTypes(inferredTypes, numMockRows)
+	mock = append(headers, mock...)
+	writer := csv.NewWriter(w)
+	return writer.WriteAll(mock)
+}
+
+func inferType(input string) DType {
+	if _, err := dateparse.ParseAny(input); err == nil {
+		return DateTime
+	}
+	if _, err := strconv.ParseFloat(input, 64); err != nil {
+		return Float
+	}
+	return String
 }
 
 // -- GETTERS

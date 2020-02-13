@@ -1166,3 +1166,33 @@ func Test_valueContainer_sort(t *testing.T) {
 		})
 	}
 }
+
+func Test_mockCSVFromDTypes(t *testing.T) {
+	randSeed = 2
+	type args struct {
+		dtypes      []map[DType]int
+		numMockRows int
+	}
+	tests := []struct {
+		name string
+		args args
+		want [][]string
+	}{
+		{"pass",
+			args{
+				[]map[DType]int{
+					{Float: 3, String: 0, DateTime: 0},
+					{Float: 0, String: 3, DateTime: 0},
+					{Float: 0, String: 1, DateTime: 2}},
+				2},
+			[][]string{{"", "1"}, {"", "baz"}, {"12/1/2019", "12/1/2019"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := mockCSVFromDTypes(tt.args.dtypes, tt.args.numMockRows); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("mockCSVFromDTypes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

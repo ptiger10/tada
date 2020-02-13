@@ -3,6 +3,7 @@ package tada
 import (
 	"fmt"
 	"math"
+	"math/rand"
 	"reflect"
 	"sort"
 	"strings"
@@ -516,6 +517,51 @@ func readStruct(slice interface{}) ([]*valueContainer, error) {
 		}
 	}
 	return ret, nil
+}
+
+func mockCSVFromDTypes(dtypes []map[DType]int, numMockRows int) [][]string {
+	rand.Seed(randSeed)
+	dominantDTypes := make([]DType, len(dtypes))
+	var highestCount int
+	var dominantDType DType
+	// determine the dominant data type per column
+	for k := range dtypes {
+		for key, v := range dtypes[k] {
+			if v > highestCount {
+				dominantDType = key
+			}
+		}
+		dominantDTypes[k] = dominantDType
+	}
+	ret := make([][]string, len(dtypes))
+	for k := range ret {
+		ret[k] = mockString(dominantDTypes[k], numMockRows)
+	}
+	return ret
+}
+
+func mockString(dtype DType, numRows int) []string {
+	ret := make([]string, numRows)
+	var options []string
+	switch dtype {
+	case Float:
+		options = []string{"1", "2", "3"}
+	case DateTime:
+		options = []string{"12/1/2019", "1/1/2020", "2/1/2020"}
+	case String:
+		options = []string{"foo", "bar", "baz"}
+	}
+	nullPct := .2
+	for i := range ret {
+		f := rand.Float64()
+		if f < nullPct {
+			ret[i] = ""
+			continue
+		}
+		randomIndex := rand.Intn(len(options))
+		ret[i] = options[randomIndex]
+	}
+	return ret
 }
 
 func (vc *valueContainer) valid() []int {
