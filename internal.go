@@ -598,6 +598,10 @@ func isEitherNull(isNull1, isNull2 []bool) []bool {
 
 func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int {
 	var srt sort.Interface
+	nulls := make([]int, 0)
+	notNulls := make([]int, 0)
+	var sortedIsNull []bool
+	var sortedIndex []int
 	switch dtype {
 	case Float:
 		d := vc.float()
@@ -607,7 +611,9 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 			srt = sort.Reverse(srt)
 		}
 		sort.Stable(srt)
-		return d.index
+		sortedIsNull = d.isNull
+		sortedIndex = d.index
+
 	case String:
 		d := vc.str()
 		d.index = index
@@ -616,7 +622,9 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 			srt = sort.Reverse(srt)
 		}
 		sort.Stable(srt)
-		return d.index
+		sortedIsNull = d.isNull
+		sortedIndex = d.index
+
 	case DateTime:
 		d := vc.dateTime()
 		d.index = index
@@ -625,10 +633,18 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 			srt = sort.Reverse(srt)
 		}
 		sort.Stable(srt)
-		return d.index
+		sortedIsNull = d.isNull
+		sortedIndex = d.index
 	}
-
-	return nil
+	// move all null values to the bottom
+	for i := range sortedIsNull {
+		if sortedIsNull[i] {
+			nulls = append(nulls, sortedIndex[i])
+		} else {
+			notNulls = append(notNulls, sortedIndex[i])
+		}
+	}
+	return append(notNulls, nulls...)
 }
 
 // convertColNamesToIndexPositions converts a slice of label or column names to index positions.
@@ -722,7 +738,7 @@ func matchLabelPositions(labels1 []string, labels2 map[string]int) []int {
 func (s *Series) combineMath(other *Series, ignoreMissing bool, fn func(v1 float64, v2 float64) float64) *Series {
 	retFloat := make([]float64, s.Len())
 	retIsNull := make([]bool, s.Len())
-	lookupVals := s.Lookup(other, "left", nil, nil)
+	lookupVals := s.Lookup(other)
 	lookupFloat := lookupVals.SliceFloat64()
 	lookupNulls := lookupVals.SliceNulls()
 	originalFloat := s.SliceFloat64()

@@ -613,12 +613,17 @@ func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
 // -- MERGERS
 
 // Lookup stub
-func (s *Series) Lookup(other *Series, how string, leftOn []string, rightOn []string) *Series {
+func (s *Series) Lookup(other *Series) *Series {
+	return s.LookupAdvanced(other, "left", nil, nil)
+}
+
+// LookupAdvanced stub
+func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, rightOn []string) *Series {
 	var leftKeys, rightKeys []int
 	var err error
 	if len(leftOn) == 0 || len(rightOn) == 0 {
 		if !(len(leftOn) == 0 && len(rightOn) == 0) {
-			return seriesWithError(fmt.Errorf("Lookup(): if either leftOn or rightOn is empty, both must be empty"))
+			return seriesWithError(fmt.Errorf("LookupAdvanced(): if either leftOn or rightOn is empty, both must be empty"))
 		}
 	}
 	if len(leftOn) == 0 {
@@ -626,16 +631,16 @@ func (s *Series) Lookup(other *Series, how string, leftOn []string, rightOn []st
 	} else {
 		leftKeys, err = convertColNamesToIndexPositions(leftOn, s.labels)
 		if err != nil {
-			return seriesWithError(fmt.Errorf("Lookup(): %v", err))
+			return seriesWithError(fmt.Errorf("LookupAdvanced(): %v", err))
 		}
 		rightKeys, err = convertColNamesToIndexPositions(rightOn, other.labels)
 		if err != nil {
-			return seriesWithError(fmt.Errorf("Lookup(): %v", err))
+			return seriesWithError(fmt.Errorf("LookupAdvanced(): %v", err))
 		}
 	}
 	ret, err := lookup(how, s.values, s.labels, leftKeys, other.values, other.labels, rightKeys)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("Lookup(): %v", err))
+		return seriesWithError(fmt.Errorf("LookupAdvanced(): %v", err))
 	}
 	return ret
 }

@@ -660,30 +660,30 @@ func TestSeries_Sort(t *testing.T) {
 		args   args
 		want   *Series
 	}{
-		// {"sort values as float by default",
-		// 	fields{
-		// 		values: &valueContainer{slice: []float64{3, 1, 2}, isNull: []bool{false, false, false}},
-		// 		labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-		// 	args{nil},
-		// 	&Series{
-		// 		values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
-		// 		labels: []*valueContainer{{slice: []int{1, 2, 0}, isNull: []bool{false, false, false}}}}},
-		// {"sort string descending",
-		// 	fields{
-		// 		values: &valueContainer{slice: []string{"bar", "foo"}, isNull: []bool{false, false}},
-		// 		labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
-		// 	args{[]Sorter{Sorter{DType: String, Descending: true}}},
-		// 	&Series{
-		// 		values: &valueContainer{slice: []string{"foo", "bar"}, isNull: []bool{false, false}},
-		// 		labels: []*valueContainer{{slice: []int{1, 0}, isNull: []bool{false, false}}}}},
-		// {"sort labels as string then as float",
-		// 	fields{
-		// 		values: &valueContainer{slice: []string{"baz", "foo", "baz"}, isNull: []bool{false, false, false}},
-		// 		labels: []*valueContainer{{name: "*0", slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-		// 	args{[]Sorter{Sorter{DType: String}, Sorter{ColName: "*0", Descending: true}}},
-		// 	&Series{
-		// 		values: &valueContainer{slice: []string{"baz", "baz", "foo"}, isNull: []bool{false, false, false}},
-		// 		labels: []*valueContainer{{name: "*0", slice: []int{2, 0, 1}, isNull: []bool{false, false, false}}}}},
+		{"sort values as float by default",
+			fields{
+				values: &valueContainer{slice: []float64{3, 1, 2}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{nil},
+			&Series{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{1, 2, 0}, isNull: []bool{false, false, false}}}}},
+		{"sort string descending",
+			fields{
+				values: &valueContainer{slice: []string{"bar", "foo"}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{[]Sorter{Sorter{DType: String, Descending: true}}},
+			&Series{
+				values: &valueContainer{slice: []string{"foo", "bar"}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{1, 0}, isNull: []bool{false, false}}}}},
+		{"sort labels as string then as float",
+			fields{
+				values: &valueContainer{slice: []string{"baz", "foo", "baz"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{name: "*0", slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{[]Sorter{Sorter{DType: String}, Sorter{ColName: "*0", Descending: true}}},
+			&Series{
+				values: &valueContainer{slice: []string{"baz", "baz", "foo"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{name: "*0", slice: []int{2, 0, 1}, isNull: []bool{false, false, false}}}}},
 		{"fail: bad label level name",
 			fields{
 				values: &valueContainer{slice: []string{"baz", "foo", "baz"}, isNull: []bool{false, false, false}},
@@ -807,7 +807,7 @@ func TestSeries_IterRows(t *testing.T) {
 	}
 }
 
-func TestSeries_Lookup(t *testing.T) {
+func TestSeries_LookupAdvanced(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -873,8 +873,8 @@ func TestSeries_Lookup(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Lookup(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.Lookup() = %v, want %v", got.values, tt.want.values)
+			if got := s.LookupAdvanced(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.LookupAdvanced() = %v, want %v", got.values, tt.want.values)
 			}
 		})
 	}

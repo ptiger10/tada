@@ -1128,3 +1128,41 @@ func Test_valueContainer_pcut(t *testing.T) {
 		})
 	}
 }
+
+func Test_valueContainer_sort(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	type args struct {
+		dtype      DType
+		descending bool
+		index      []int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"no nulls",
+			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{dtype: Float, descending: false, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
+		{"nulls",
+			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, true, false}, name: "foo"},
+			args{dtype: Float, descending: false, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			if got := vc.sort(tt.args.dtype, tt.args.descending, tt.args.index); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.sort() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
