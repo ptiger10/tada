@@ -1,6 +1,7 @@
 package tada
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
@@ -1821,6 +1822,41 @@ func TestReadStruct(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ReadStruct() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestWriteMockCSV(t *testing.T) {
+	want1 := `corge,qux
+,foo
+,baz
+1,foo
+`
+	randSeed = 2
+	type args struct {
+		src        [][]string
+		config     *ReadConfig
+		outputRows int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantW   string
+		wantErr bool
+	}{
+		{"pass", args{src: [][]string{{"corge", "qux"}, {"1", "foo"}, {"1", "foo"}}, config: nil, outputRows: 3},
+			want1, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &bytes.Buffer{}
+			if err := WriteMockCSV(tt.args.src, w, tt.args.config, tt.args.outputRows); (err != nil) != tt.wantErr {
+				t.Errorf("WriteMockCSV() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotW := w.String(); gotW != tt.wantW {
+				t.Errorf("WriteMockCSV() = %v, want %v", gotW, tt.wantW)
 			}
 		})
 	}

@@ -9,10 +9,9 @@ import (
 	"io/ioutil"
 	"reflect"
 	"regexp"
-	"strconv"
 
-	"github.com/araddon/dateparse"
 	"github.com/olekukonko/tablewriter"
+	"github.com/ptiger10/tablediff"
 )
 
 // -- CONSTRUCTORS
@@ -253,8 +252,15 @@ func (df *DataFrame) ToInterface(ignoreLabels bool) ([][]interface{}, error) {
 	return ret, nil
 }
 
+// EqualsCSV converts a dataframe to csv, compares it to another csv, and evaluates whether the two match and isolates their differences
+func (df *DataFrame) EqualsCSV(csv [][]string, ignoreLabels bool) (bool, *tablediff.Differences) {
+	compare := df.ToCSV(ignoreLabels)
+	diffs, eq := tablediff.Diff(compare, csv)
+	return eq, diffs
+}
+
 // WriteMockCSV writes a mock csv to `w` modeled after `src`.
-func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig) error {
+func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows int) error {
 	if config == nil {
 		config = &ReadConfig{NumHeaderRows: 1}
 	}
@@ -269,7 +275,7 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig) error {
 		if len(src[0]) == 0 {
 			return fmt.Errorf("WriteMockCSV(): csv must have at least one column")
 		}
-		maxRows := len(src)
+		maxRows := len(src) - config.NumHeaderRows
 		if maxRows < numPreviewRows {
 			numPreviewRows = maxRows
 		}
@@ -285,7 +291,7 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig) error {
 		preview := src[config.NumHeaderRows : numPreviewRows+config.NumHeaderRows]
 		for i := range preview {
 			for k := range preview[i] {
-				dtype := inferType(src[i][k])
+				dtype := inferType(src[i+config.NumHeaderRows][k])
 				inferredTypes[k][dtype]++
 			}
 		}
@@ -318,21 +324,10 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig) error {
 			}
 		}
 	}
-	numMockRows := 10
-	mock := mockCSVFromDTypes(inferredTypes, numMockRows)
-	mock = append(headers, mock...)
+	mockCSV := mockCSVFromDTypes(inferredTypes, outputRows)
+	mockCSV = append(headers, mockCSV...)
 	writer := csv.NewWriter(w)
-	return writer.WriteAll(mock)
-}
-
-func inferType(input string) DType {
-	if _, err := dateparse.ParseAny(input); err == nil {
-		return DateTime
-	}
-	if _, err := strconv.ParseFloat(input, 64); err != nil {
-		return Float
-	}
-	return String
+	return writer.WriteAll(mockCSV)
 }
 
 // -- GETTERS

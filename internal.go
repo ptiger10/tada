@@ -6,8 +6,11 @@ import (
 	"math/rand"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/araddon/dateparse"
 )
 
 func (s *Series) resetWithError(err error) {
@@ -519,6 +522,16 @@ func readStruct(slice interface{}) ([]*valueContainer, error) {
 	return ret, nil
 }
 
+func inferType(input string) DType {
+	if _, err := dateparse.ParseAny(input); err == nil {
+		return DateTime
+	}
+	if _, err := strconv.ParseFloat(input, 64); err == nil {
+		return Float
+	}
+	return String
+}
+
 func mockCSVFromDTypes(dtypes []map[DType]int, numMockRows int) [][]string {
 	rand.Seed(randSeed)
 	dominantDTypes := make([]DType, len(dtypes))
@@ -533,15 +546,17 @@ func mockCSVFromDTypes(dtypes []map[DType]int, numMockRows int) [][]string {
 		}
 		dominantDTypes[k] = dominantDType
 	}
-	ret := make([][]string, len(dtypes))
-	for k := range ret {
-		ret[k] = mockString(dominantDTypes[k], numMockRows)
+	ret := make([][]string, numMockRows)
+	for i := range ret {
+		ret[i] = make([]string, len(dtypes))
+		for k := range ret[i] {
+			ret[i][k] = mockString(dominantDTypes[k])
+		}
 	}
 	return ret
 }
 
-func mockString(dtype DType, numRows int) []string {
-	ret := make([]string, numRows)
+func mockString(dtype DType) string {
 	var options []string
 	switch dtype {
 	case Float:
@@ -552,16 +567,12 @@ func mockString(dtype DType, numRows int) []string {
 		options = []string{"foo", "bar", "baz"}
 	}
 	nullPct := .2
-	for i := range ret {
-		f := rand.Float64()
-		if f < nullPct {
-			ret[i] = ""
-			continue
-		}
-		randomIndex := rand.Intn(len(options))
-		ret[i] = options[randomIndex]
+	f := rand.Float64()
+	if f < nullPct {
+		return ""
 	}
-	return ret
+	randomIndex := rand.Intn(len(options))
+	return options[randomIndex]
 }
 
 func (vc *valueContainer) valid() []int {

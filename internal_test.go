@@ -1178,20 +1178,50 @@ func Test_mockCSVFromDTypes(t *testing.T) {
 		args args
 		want [][]string
 	}{
-		{"pass",
+		{"2x rows",
 			args{
 				[]map[DType]int{
 					{Float: 3, String: 0, DateTime: 0},
 					{Float: 0, String: 3, DateTime: 0},
 					{Float: 0, String: 1, DateTime: 2}},
 				2},
-			[][]string{{"", "1"}, {"", "baz"}, {"12/1/2019", "12/1/2019"}},
+			[][]string{{"", "foo", ""}, {"3", "foo", "12/1/2019"}},
+		},
+		{"3x rows",
+			args{
+				[]map[DType]int{
+					{Float: 1, String: 0, DateTime: 0},
+					{Float: 0, String: 1, DateTime: 0}},
+				3},
+			[][]string{{"", "foo"}, {"", "baz"}, {"1", "foo"}},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := mockCSVFromDTypes(tt.args.dtypes, tt.args.numMockRows); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("mockCSVFromDTypes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_inferType(t *testing.T) {
+	type args struct {
+		input string
+	}
+	tests := []struct {
+		name string
+		args args
+		want DType
+	}{
+		{"date", args{"1/1/20"}, DateTime},
+		{"float", args{"1"}, Float},
+		{"string", args{"foo"}, String},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := inferType(tt.args.input); got != tt.want {
+				t.Errorf("inferType() = %v, want %v", got, tt.want)
 			}
 		})
 	}
