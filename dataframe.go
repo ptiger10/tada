@@ -1315,7 +1315,7 @@ func (df *DataFrameMutator) Sort(by ...Sorter) {
 
 // GroupBy stub
 // includes label levels and columns
-func (df *DataFrame) GroupBy(names ...string) GroupedDataFrame {
+func (df *DataFrame) GroupBy(names ...string) *GroupedDataFrame {
 	var index []int
 	var err error
 	mergedLabelsAndCols := append(df.labels, df.values...)
@@ -1325,21 +1325,21 @@ func (df *DataFrame) GroupBy(names ...string) GroupedDataFrame {
 	} else {
 		index, err = convertColNamesToIndexPositions(names, mergedLabelsAndCols)
 		if err != nil {
-			return GroupedDataFrame{err: fmt.Errorf("GroupBy(): %v", err)}
+			return &GroupedDataFrame{err: fmt.Errorf("GroupBy(): %v", err)}
 		}
 	}
 	return df.groupby(index)
 }
 
 // expects index to refer to merged labels and columns
-func (df *DataFrame) groupby(index []int) GroupedDataFrame {
+func (df *DataFrame) groupby(index []int) *GroupedDataFrame {
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	g, _, orderedKeys, _ := labelsToMap(mergedLabelsAndCols, index)
 	names := make([]string, len(index))
 	for i, pos := range index {
 		names[i] = mergedLabelsAndCols[pos].name
 	}
-	return GroupedDataFrame{
+	return &GroupedDataFrame{
 		groups:      g,
 		orderedKeys: orderedKeys,
 		df:          df,

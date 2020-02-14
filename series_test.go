@@ -1350,7 +1350,7 @@ func TestSeries_GroupBy(t *testing.T) {
 		name   string
 		fields fields
 		args   args
-		want   GroupedSeries
+		want   *GroupedSeries
 	}{
 		{"group by all levels, with repeats", fields{
 			values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
@@ -1359,7 +1359,7 @@ func TestSeries_GroupBy(t *testing.T) {
 				{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b"},
 			}},
 			args{nil},
-			GroupedSeries{
+			&GroupedSeries{
 				groups:      map[string][]int{"0|foo": []int{0, 1}, "1|foo": []int{2}, "2|bar": []int{3}},
 				orderedKeys: []string{"0|foo", "1|foo", "2|bar"},
 				series: &Series{

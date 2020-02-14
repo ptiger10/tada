@@ -9,7 +9,7 @@ import (
 // GroupedSeries
 
 // Err returns the underlying error, if any
-func (g GroupedSeries) Err() error {
+func (g *GroupedSeries) Err() error {
 	return g.err
 }
 
@@ -25,7 +25,7 @@ func joinLevelsIntoLabel(levels []string) string {
 	return strings.Join(levels, optionLevelSeparator)
 }
 
-func (g GroupedSeries) stringFunc(name string, fn func(val []string, isNull []bool, index []int) (string, bool)) *Series {
+func (g *GroupedSeries) stringFunc(name string, fn func(val []string, isNull []bool, index []int) (string, bool)) *Series {
 	if len(g.groups) == 0 {
 		return seriesWithError(errors.New("GroupBy(): no groups"))
 	}
@@ -63,7 +63,7 @@ func (g GroupedSeries) stringFunc(name string, fn func(val []string, isNull []bo
 	}
 }
 
-func (g GroupedSeries) alignedMath(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
+func (g *GroupedSeries) alignedMath(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
 	vals := make([]float64, g.series.Len())
 	isNull := make([]bool, len(vals))
 	referenceVals := g.series.values.float().slice
@@ -81,7 +81,7 @@ func (g GroupedSeries) alignedMath(name string, fn func(val []float64, isNull []
 	}
 }
 
-func (g GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
+func (g *GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
 	if len(g.groups) == 0 {
 		return seriesWithError(errors.New("GroupBy(): no groups"))
 	}
@@ -120,7 +120,7 @@ func (g GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []boo
 }
 
 // Sum stub
-func (g GroupedSeries) Sum() *Series {
+func (g *GroupedSeries) Sum() *Series {
 	if g.aligned {
 		return g.alignedMath(g.series.values.name+"_sum", sum)
 	}
@@ -128,46 +128,64 @@ func (g GroupedSeries) Sum() *Series {
 }
 
 // Mean stub
-func (g GroupedSeries) Mean() *Series {
+func (g *GroupedSeries) Mean() *Series {
+	if g.aligned {
+		return g.alignedMath(g.series.values.name+"_mean", mean)
+	}
 	return g.mathFunc("mean", mean)
 }
 
 // Median stub
-func (g GroupedSeries) Median() *Series {
+func (g *GroupedSeries) Median() *Series {
+	if g.aligned {
+		return g.alignedMath(g.series.values.name+"_median", median)
+	}
 	return g.mathFunc("median", median)
 }
 
 // Std stub
-func (g GroupedSeries) Std() *Series {
+func (g *GroupedSeries) Std() *Series {
+	if g.aligned {
+		return g.alignedMath(g.series.values.name+"_std", std)
+	}
 	return g.mathFunc("std", std)
 }
 
 // Count stub
-func (g GroupedSeries) Count() *Series {
+func (g *GroupedSeries) Count() *Series {
+	if g.aligned {
+		return g.alignedMath(g.series.values.name+"_count", count)
+	}
 	return g.mathFunc("count", count)
 }
 
 // Min stub
-func (g GroupedSeries) Min() *Series {
+func (g *GroupedSeries) Min() *Series {
+	if g.aligned {
+		return g.alignedMath(g.series.values.name+"_min", min)
+	}
 	return g.mathFunc("min", min)
 }
 
 // Max stub
-func (g GroupedSeries) Max() *Series {
+func (g *GroupedSeries) Max() *Series {
+	if g.aligned {
+		return g.alignedMath(g.series.values.name+"_max", max)
+	}
 	return g.mathFunc("max", max)
 }
 
 // First stub
-func (g GroupedSeries) First() *Series {
+func (g *GroupedSeries) First() *Series {
 	return g.stringFunc("first", first)
 }
 
 // Last stub
-func (g GroupedSeries) Last() *Series {
+func (g *GroupedSeries) Last() *Series {
 	return g.stringFunc("last", last)
 }
 
-func (g GroupedDataFrame) stringFunc(
+func (g *GroupedDataFrame) stringFunc(
 	name string, cols []string, fn func(val []string, isNull []bool, index []int) (string, bool)) *DataFrame {
 	numLevels := len(g.labelNames)
 
@@ -233,7 +251,7 @@ func (g GroupedDataFrame) stringFunc(
 	}
 }
 
-func (g GroupedDataFrame) mathFunc(
+func (g *GroupedDataFrame) mathFunc(
 	name string, cols []string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *DataFrame {
 	if len(g.groups) == 0 {
 		return dataFrameWithError(errors.New("no groups"))
@@ -304,46 +322,52 @@ func (g GroupedDataFrame) mathFunc(
 }
 
 // Sum stub
-func (g GroupedDataFrame) Sum(colNames ...string) *DataFrame {
+func (g *GroupedDataFrame) Sum(colNames ...string) *DataFrame {
 	return g.mathFunc("sum", colNames, sum)
 }
 
 // Mean stub
-func (g GroupedDataFrame) Mean(colNames ...string) *DataFrame {
+func (g *GroupedDataFrame) Mean(colNames ...string) *DataFrame {
 	return g.mathFunc("mean", colNames, mean)
 }
 
 // Median stub
-func (g GroupedDataFrame) Median(colNames ...string) *DataFrame {
+func (g *GroupedDataFrame) Median(colNames ...string) *DataFrame {
 	return g.mathFunc("median", colNames, median)
 }
 
 // Std stub
-func (g GroupedDataFrame) Std(colNames ...string) *DataFrame {
+func (g *GroupedDataFrame) Std(colNames ...string) *DataFrame {
 	return g.mathFunc("std", colNames, std)
 }
 
 // Count stub
-func (g GroupedDataFrame) Count(colNames ...string) *DataFrame {
+func (g *GroupedDataFrame) Count(colNames ...string) *DataFrame {
 	return g.mathFunc("count", colNames, count)
 }
 
 // Min stub
-func (g GroupedDataFrame) Min(colNames ...string) *DataFrame {
+func (g *GroupedDataFrame) Min(colNames ...string) *DataFrame {
 	return g.mathFunc("min", colNames, min)
 }
 
 // Max stub
-func (g GroupedDataFrame) Max(colNames ...string) *DataFrame {
+func (g *GroupedDataFrame) Max(colNames ...string) *DataFrame {
 	return g.mathFunc("max", colNames, max)
 }
 
 // First stub
-func (g GroupedDataFrame) First(colNames ...string) *DataFrame {
+func (g *GroupedDataFrame) First(colNames ...string) *DataFrame {
 	return g.stringFunc("first", colNames, first)
 }
 
 // Last stub
-func (g GroupedDataFrame) Last(colNames ...string) *DataFrame {
+func (g *GroupedDataFrame) Last(colNames ...string) *DataFrame {
 	return g.stringFunc("last", colNames, last)
+}
+
+// Align stub
+func (g *GroupedSeries) Align() *GroupedSeries {
+	g.aligned = true
+	return g
 }

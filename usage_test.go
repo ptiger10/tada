@@ -1,5 +1,10 @@
 package tada
 
+import (
+	"fmt"
+	"testing"
+)
+
 // func TestUsage(t *testing.T) {
 // 	df := NewDataFrame(
 // 		[]interface{}{[]float64{1, 2, 3}, []float64{4, 5, 6}}, []string{"foo", "foo", "baz"}).
@@ -15,3 +20,8 @@ package tada
 // 	var b strings.Builder
 // 	WriteMockCSV(c, &b, nil)
 // }
+
+func TestAlign(t *testing.T) {
+	s := NewSeries([]float64{1, 2, 3}, []string{"foo", "foo", "bar"})
+	fmt.Println(s.GroupBy().Align().Sum())
+}

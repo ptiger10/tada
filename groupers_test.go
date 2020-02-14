@@ -349,3 +349,36 @@ func TestGroupedSeries_alignedMath(t *testing.T) {
 		})
 	}
 }
+
+func TestGroupedSeries_Align(t *testing.T) {
+	type fields struct {
+		groups      map[string][]int
+		orderedKeys []string
+		series      *Series
+		labelNames  []string
+		aligned     bool
+		err         error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *GroupedSeries
+	}{
+		{"pass", fields{orderedKeys: []string{"foo"}, aligned: false}, &GroupedSeries{orderedKeys: []string{"foo"}, aligned: true}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeries{
+				groups:      tt.fields.groups,
+				orderedKeys: tt.fields.orderedKeys,
+				series:      tt.fields.series,
+				labelNames:  tt.fields.labelNames,
+				aligned:     tt.fields.aligned,
+				err:         tt.fields.err,
+			}
+			if got := g.Align(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedSeries.Align() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
