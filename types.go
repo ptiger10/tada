@@ -102,6 +102,7 @@ type GroupedSeries struct {
 	orderedKeys []string
 	series      *Series
 	labelNames  []string
+	aligned     bool
 	err         error
 }
 

@@ -63,10 +63,29 @@ func (g GroupedSeries) stringFunc(name string, fn func(val []string, isNull []bo
 	}
 }
 
+func (g GroupedSeries) alignedMath(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
+	vals := make([]float64, g.series.Len())
+	isNull := make([]bool, len(vals))
+	referenceVals := g.series.values.float().slice
+	for _, v := range g.groups {
+		output, outputIsNull := fn(referenceVals, g.series.values.isNull, v)
+		for _, i := range v {
+			vals[i] = output
+			isNull[i] = outputIsNull
+		}
+	}
+	values := &valueContainer{slice: vals, isNull: isNull, name: name}
+	return &Series{
+		values: values,
+		labels: g.series.labels,
+	}
+}
+
 func (g GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
 	if len(g.groups) == 0 {
 		return seriesWithError(errors.New("GroupBy(): no groups"))
 	}
+	referenceVals := g.series.values.float().slice
 	vals := make([]float64, len(g.groups))
 	numLevels := len(g.labelNames)
 	labelLevels := make([][]string, numLevels)
@@ -81,7 +100,7 @@ func (g GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []boo
 	}
 
 	for rowNumber, key := range g.orderedKeys {
-		output, isNull := fn(g.series.values.float().slice, g.series.values.isNull, g.groups[key])
+		output, isNull := fn(referenceVals, g.series.values.isNull, g.groups[key])
 		vals[rowNumber] = output
 		valueIsNull[rowNumber] = isNull
 		splitKey := splitLabelIntoLevels(key, true)
@@ -102,6 +121,9 @@ func (g GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []boo
 
 // Sum stub
 func (g GroupedSeries) Sum() *Series {
+	if g.aligned {
+		return g.alignedMath(g.series.values.name+"_sum", sum)
+	}
 	return g.mathFunc("sum", sum)
 }
 
