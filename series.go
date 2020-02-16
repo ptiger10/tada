@@ -109,8 +109,8 @@ func (s *Series) Len() int {
 	return reflect.ValueOf(s.values.slice).Len()
 }
 
-// Levels returns the number of columns of labels in the Series.
-func (s *Series) Levels() int {
+// numLevels returns the number of columns of labels in the Series.
+func (s *Series) numLevels() int {
 	return len(s.labels)
 }
 
@@ -195,7 +195,7 @@ func (s *Series) Head(n int) *Series {
 		n = s.Len()
 	}
 	retVals := s.values.head(n)
-	retLabels := make([]*valueContainer, s.Levels())
+	retLabels := make([]*valueContainer, s.numLevels())
 	for j := range s.labels {
 		retLabels[j] = s.labels[j].head(n)
 	}
@@ -209,7 +209,7 @@ func (s *Series) Tail(n int) *Series {
 		n = s.Len()
 	}
 	retVals := s.values.tail(n)
-	retLabels := make([]*valueContainer, s.Levels())
+	retLabels := make([]*valueContainer, s.numLevels())
 	for j := range s.labels {
 		retLabels[j] = s.labels[j].tail(n)
 	}
@@ -226,7 +226,7 @@ func (s *Series) Range(first, last int) *Series {
 		return seriesWithError(fmt.Errorf("Range(): last index out of range (%d > %d)", last, s.Len()-1))
 	}
 	retVals := s.values.rangeSlice(first, last)
-	retLabels := make([]*valueContainer, s.Levels())
+	retLabels := make([]*valueContainer, s.numLevels())
 	for j := range s.labels {
 		retLabels[j] = s.labels[j].rangeSlice(first, last)
 	}
@@ -688,7 +688,7 @@ func (s *Series) GroupBy(names ...string) *GroupedSeries {
 	var err error
 	// if no names supplied, group by all label levels
 	if len(names) == 0 {
-		index = makeIntRange(0, s.Levels())
+		index = makeIntRange(0, s.numLevels())
 	} else {
 		index, err = convertColNamesToIndexPositions(names, s.labels)
 		if err != nil {
@@ -696,15 +696,15 @@ func (s *Series) GroupBy(names ...string) *GroupedSeries {
 		}
 	}
 	g, _, orderedKeys, _ := labelsToMap(s.labels, index)
-	labelNames := make([]string, len(index))
+	levelNames := make([]string, len(index))
 	for i, pos := range index {
-		labelNames[i] = s.labels[pos].name
+		levelNames[i] = s.labels[pos].name
 	}
 	return &GroupedSeries{
 		groups:      g,
 		orderedKeys: orderedKeys,
 		series:      s,
-		labelNames:  labelNames,
+		levelNames:  levelNames,
 	}
 }
 
@@ -719,7 +719,7 @@ func (s *Series) IterRows() []map[string]Element {
 	ret := make([]map[string]Element, s.Len())
 	for i := 0; i < s.Len(); i++ {
 		// all label levels + the main Series values
-		ret[i] = make(map[string]Element, s.Levels()+1)
+		ret[i] = make(map[string]Element, s.numLevels()+1)
 		for j := range s.labels {
 			ret[i][s.labels[j].name] = s.labels[j].iterRow(i)
 		}
@@ -882,7 +882,7 @@ func (s *Series) SliceFloat64(labelLevel ...int) []float64 {
 		return s.values.float().slice
 	}
 	lvl := labelLevel[0]
-	if lvl >= s.Levels() {
+	if lvl >= s.numLevels() {
 		return nil
 	}
 	return s.labels[lvl].float().slice
@@ -896,7 +896,7 @@ func (s *Series) SliceString(labelLevel ...int) []string {
 		return s.values.str().slice
 	}
 	lvl := labelLevel[0]
-	if lvl >= s.Levels() {
+	if lvl >= s.numLevels() {
 		return nil
 	}
 	return s.labels[lvl].str().slice
@@ -910,7 +910,7 @@ func (s *Series) SliceTime(labelLevel ...int) []time.Time {
 		return s.values.dateTime().slice
 	}
 	lvl := labelLevel[0]
-	if lvl >= s.Levels() {
+	if lvl >= s.numLevels() {
 		return nil
 	}
 	return s.labels[lvl].dateTime().slice
@@ -924,7 +924,7 @@ func (s *Series) SliceNulls(labelLevel ...int) []bool {
 		return s.values.isNull
 	}
 	lvl := labelLevel[0]
-	if lvl >= s.Levels() {
+	if lvl >= s.numLevels() {
 		return nil
 	}
 	return s.labels[lvl].isNull

@@ -22,6 +22,6 @@ import (
 // }
 
 func TestAlign(t *testing.T) {
-	s := NewSeries([]float64{1, 2, 3}, []string{"foo", "foo", "bar"})
-	fmt.Println(s.GroupBy().Align().Sum())
+	df := NewDataFrame([]interface{}{[]float64{1, 2, 6}, []int{10, 20, 30}}, []string{"foo", "bar", "foo"}).SetCols([]string{"qux", "quux"})
+	fmt.Println(df.GroupBy().Align("qux").Min())
 }

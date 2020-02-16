@@ -182,6 +182,62 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 	return cols, nil
 }
 
+// -- MATRIX MANIPULATION
+
+// expects every item in `slices` to be a slice, and for len(slices) to equal len(isNull) and len(names)
+func copyInterfaceIntoValueContainers(slices []interface{}, isNull [][]bool, names []string) []*valueContainer {
+	ret := make([]*valueContainer, len(names))
+	for k := range slices {
+		ret[k] = &valueContainer{
+			slice:  slices[k],
+			isNull: isNull[k],
+			name:   names[k],
+		}
+	}
+	return ret
+}
+
+// convert strings to interface
+func copyStringsIntoValueContainers(slices [][]string, isNull [][]bool, names []string) []*valueContainer {
+	slicesInterface := make([]interface{}, len(slices))
+	for k := range slices {
+		slicesInterface[k] = slices[k]
+	}
+	return copyInterfaceIntoValueContainers(slicesInterface, isNull, names)
+}
+
+// columns as major dimension
+func makeStringMatrix(numCols, numRows int) [][]string {
+	ret := make([][]string, numCols)
+	for k := 0; k < numCols; k++ {
+		ret[k] = make([]string, numRows)
+	}
+	return ret
+}
+
+// columns as major dimension
+func makeBoolMatrix(numCols, numRows int) [][]bool {
+	ret := make([][]bool, numCols)
+	for k := 0; k < numCols; k++ {
+		ret[k] = make([]bool, numRows)
+	}
+	return ret
+}
+
+func copyGroupedLabels(labels []string, levelNames []string) []*valueContainer {
+	labelLevels := makeStringMatrix(len(levelNames), len(labels))
+	labelIsNull := makeBoolMatrix(len(levelNames), len(labels))
+
+	for i := range labels {
+		splitLabels := splitLabelIntoLevels(labels[i], true)
+		for j := range splitLabels {
+			labelLevels[j][i] = splitLabels[j]
+			labelIsNull[j][i] = false
+		}
+	}
+	return copyStringsIntoValueContainers(labelLevels, labelIsNull, levelNames)
+}
+
 func intersection(slices [][]int) []int {
 	set := make(map[int]int)
 	for _, slice := range slices {

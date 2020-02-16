@@ -30,16 +30,16 @@ func (g *GroupedSeries) stringFunc(name string, fn func(val []string, isNull []b
 		return seriesWithError(errors.New("GroupBy(): no groups"))
 	}
 	vals := make([]string, len(g.groups))
-	numLevels := len(g.labelNames)
+	numLevels := len(g.levelNames)
 	valueIsNull := make([]bool, len(g.groups))
 
 	labelLevels := make([][]string, numLevels)
 	labelIsNull := make([][]bool, numLevels)
-	labelNames := make([]string, numLevels)
+	levelNames := make([]string, numLevels)
 	for lvl := 0; lvl < numLevels; lvl++ {
 		labelLevels[lvl] = make([]string, len(g.groups))
 		labelIsNull[lvl] = make([]bool, len(g.groups))
-		labelNames[lvl] = g.series.labels[lvl].name
+		levelNames[lvl] = g.series.labels[lvl].name
 	}
 
 	// iterate over rows
@@ -55,7 +55,7 @@ func (g *GroupedSeries) stringFunc(name string, fn func(val []string, isNull []b
 	}
 	labels := make([]*valueContainer, len(labelLevels))
 	for j := range labelLevels {
-		labels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: labelNames[j]}
+		labels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: levelNames[j]}
 	}
 	return &Series{
 		values: &valueContainer{slice: vals, isNull: valueIsNull, name: name},
@@ -63,13 +63,52 @@ func (g *GroupedSeries) stringFunc(name string, fn func(val []string, isNull []b
 	}
 }
 
-func (g *GroupedSeries) alignedMath(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
+// Apply stub
+func (g *GroupedSeries) Apply(name string, lambda GroupApplyFn) *Series {
+	if lambda.F64 != nil {
+		fn := func(val []float64, isNull []bool, index []int) (float64, bool) {
+			return lambda.F64(val), false
+		}
+		if g.aligned {
+			return g.applyAlignedFloat(name, lambda.F64)
+		}
+		return g.mathFunc(name, fn)
+	} else if lambda.String != nil {
+
+	}
+	return nil
+}
+
+func (g *GroupedSeries) applyAlignedFloat(name string, fn func([]float64) float64) *Series {
 	vals := make([]float64, g.series.Len())
 	isNull := make([]bool, len(vals))
 	referenceVals := g.series.values.float().slice
-	for _, v := range g.groups {
-		output, outputIsNull := fn(referenceVals, g.series.values.isNull, v)
-		for _, i := range v {
+	for _, index := range g.groups {
+		subsetVals := make([]float64, 0)
+		for _, i := range index {
+			if !isNull[i] {
+				subsetVals = append(subsetVals, referenceVals[i])
+			}
+		}
+		output := fn(subsetVals)
+		for _, i := range index {
+			vals[i] = output
+		}
+	}
+	values := &valueContainer{slice: vals, isNull: isNull, name: name}
+	return &Series{
+		values: values,
+		labels: g.series.labels,
+	}
+}
+
+func (g *GroupedSeries) alignedMath(name string, fn func([]float64, []bool, []int) (float64, bool)) *Series {
+	vals := make([]float64, g.series.Len())
+	isNull := make([]bool, len(vals))
+	referenceVals := g.series.values.float().slice
+	for _, index := range g.groups {
+		output, outputIsNull := fn(referenceVals, g.series.values.isNull, index)
+		for _, i := range index {
 			vals[i] = output
 			isNull[i] = outputIsNull
 		}
@@ -87,35 +126,19 @@ func (g *GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []bo
 	}
 	referenceVals := g.series.values.float().slice
 	vals := make([]float64, len(g.groups))
-	numLevels := len(g.labelNames)
-	labelLevels := make([][]string, numLevels)
-	labelIsNull := make([][]bool, numLevels)
-	labelNames := make([]string, numLevels)
 
 	valueIsNull := make([]bool, len(g.groups))
-	for lvl := 0; lvl < numLevels; lvl++ {
-		labelLevels[lvl] = make([]string, len(g.groups))
-		labelIsNull[lvl] = make([]bool, len(g.groups))
-		labelNames[lvl] = g.series.labels[lvl].name
-	}
 
 	for rowNumber, key := range g.orderedKeys {
+		// evaluate func
 		output, isNull := fn(referenceVals, g.series.values.isNull, g.groups[key])
 		vals[rowNumber] = output
 		valueIsNull[rowNumber] = isNull
-		splitKey := splitLabelIntoLevels(key, true)
-		for j := range splitKey {
-			labelLevels[j][rowNumber] = splitKey[j]
-			labelIsNull[j][rowNumber] = false
-		}
 	}
-	labels := make([]*valueContainer, len(labelLevels))
-	for j := range labelLevels {
-		labels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: labelNames[j]}
-	}
+
 	return &Series{
 		values: &valueContainer{slice: vals, isNull: valueIsNull, name: name},
-		labels: labels,
+		labels: copyGroupedLabels(g.orderedKeys, g.levelNames),
 	}
 }
 
@@ -185,9 +208,14 @@ func (g *GroupedSeries) Last() *Series {
 	return g.stringFunc("last", last)
 }
 
+// Err returns the underlying error, if any
+func (g *GroupedDataFrame) Err() error {
+	return g.err
+}
+
 func (g *GroupedDataFrame) stringFunc(
 	name string, cols []string, fn func(val []string, isNull []bool, index []int) (string, bool)) *DataFrame {
-	numLevels := len(g.labelNames)
+	numLevels := len(g.levelNames)
 
 	// isolate columns to return
 	colIndex := make([]int, len(cols))
@@ -238,7 +266,7 @@ func (g *GroupedDataFrame) stringFunc(
 	retLabels := make([]*valueContainer, len(labelLevels))
 	retValues := make([]*valueContainer, len(colIndex))
 	for j := range retLabels {
-		retLabels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: g.labelNames[j]}
+		retLabels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: g.levelNames[j]}
 	}
 	for k := range retValues {
 		retValues[k] = &valueContainer{slice: vals[k], isNull: valuesIsNull[k], name: names[k]}
@@ -256,7 +284,7 @@ func (g *GroupedDataFrame) mathFunc(
 	if len(g.groups) == 0 {
 		return dataFrameWithError(errors.New("no groups"))
 	}
-	numLevels := len(g.labelNames)
+	numLevels := len(g.levelNames)
 
 	// isolate columns to return
 	colIndex := make([]int, len(cols))
@@ -308,7 +336,7 @@ func (g *GroupedDataFrame) mathFunc(
 	retLabels := make([]*valueContainer, len(labelLevels))
 	retValues := make([]*valueContainer, len(colIndex))
 	for j := range retLabels {
-		retLabels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: g.labelNames[j]}
+		retLabels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: g.levelNames[j]}
 	}
 	for k := range retValues {
 		retValues[k] = &valueContainer{slice: vals[k], isNull: valuesIsNull[k], name: names[k]}
@@ -370,4 +398,21 @@ func (g *GroupedDataFrame) Last(colNames ...string) *DataFrame {
 func (g *GroupedSeries) Align() *GroupedSeries {
 	g.aligned = true
 	return g
+}
+
+// Align isolates the column matching `colName` and aligns subsequent group aggregations with the original DataFrame labels.
+func (g *GroupedDataFrame) Align(colName string) *GroupedSeries {
+	_, err := findColWithName(colName, g.df.values)
+	if err != nil {
+		return &GroupedSeries{
+			err: err,
+		}
+	}
+	return &GroupedSeries{
+		groups:      g.groups,
+		orderedKeys: g.orderedKeys,
+		series:      g.df.Col(colName),
+		levelNames:  g.levelNames,
+		aligned:     true,
+	}
 }

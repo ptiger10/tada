@@ -89,6 +89,13 @@ type ApplyFn struct {
 	ColName  string
 }
 
+// GroupApplyFn stub
+type GroupApplyFn struct {
+	F64      func(val []float64) float64
+	String   func(val []string) string
+	DateTime func(val []time.Time) time.Time
+}
+
 // ApplyFormatFn stub
 type ApplyFormatFn struct {
 	F64      func(val float64) string
@@ -101,7 +108,7 @@ type GroupedSeries struct {
 	groups      map[string][]int
 	orderedKeys []string
 	series      *Series
-	labelNames  []string
+	levelNames  []string
 	aligned     bool
 	err         error
 }
@@ -111,7 +118,7 @@ type GroupedDataFrame struct {
 	groups      map[string][]int
 	orderedKeys []string
 	df          *DataFrame
-	labelNames  []string
+	levelNames  []string
 	err         error
 }
 

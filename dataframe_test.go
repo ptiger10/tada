@@ -1356,7 +1356,7 @@ func TestDataFrame_GroupBy(t *testing.T) {
 						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a"},
 						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b"},
 					}},
-				labelNames: []string{"a", "b"},
+				levelNames: []string{"a", "b"},
 			},
 		},
 	}

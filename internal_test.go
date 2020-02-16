@@ -290,6 +290,106 @@ func Test_labelsToMap(t *testing.T) {
 	}
 }
 
+func Test_copyInterfaceIntoValueContainers(t *testing.T) {
+	type args struct {
+		slices []interface{}
+		isNull [][]bool
+		names  []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []*valueContainer
+	}{
+		{"pass", args{
+			slices: []interface{}{[]string{"foo"}, []float64{1}},
+			isNull: [][]bool{{false}, {false}},
+			names:  []string{"corge", "waldo"},
+		},
+			[]*valueContainer{
+				{slice: []string{"foo"}, isNull: []bool{false}, name: "corge"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "waldo"},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := copyInterfaceIntoValueContainers(tt.args.slices, tt.args.isNull, tt.args.names); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("copyInterfaceIntoValueContainers() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_copyGroupedLabels(t *testing.T) {
+	type args struct {
+		labels     []string
+		levelNames []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []*valueContainer
+	}{
+		{"pass", args{labels: []string{"foo|0", "bar|1"}, levelNames: []string{"corge", "waldo"}},
+			[]*valueContainer{
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "corge"},
+				{slice: []string{"0", "1"}, isNull: []bool{false, false}, name: "waldo"},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := copyGroupedLabels(tt.args.labels, tt.args.levelNames); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("copyGroupedLabels() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_makeBoolMatrix(t *testing.T) {
+	type args struct {
+		numCols int
+		numRows int
+	}
+	tests := []struct {
+		name string
+		args args
+		want [][]bool
+	}{
+		{"2 col, 1 row", args{2, 1}, [][]bool{{false}, {false}}},
+		{"1 col, 2 row", args{1, 2}, [][]bool{{false, false}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := makeBoolMatrix(tt.args.numCols, tt.args.numRows); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("makeBoolMatrix() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_makeStringMatrix(t *testing.T) {
+	type args struct {
+		numCols int
+		numRows int
+	}
+	tests := []struct {
+		name string
+		args args
+		want [][]string
+	}{
+		{"2 col, 1 row", args{2, 1}, [][]string{{""}, {""}}},
+		{"1 col, 2 row", args{1, 2}, [][]string{{"", ""}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := makeStringMatrix(tt.args.numCols, tt.args.numRows); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("makeStringMatrix() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func Test_valueContainer_gt(t *testing.T) {
 	type fields struct {
 		slice  interface{}
@@ -1168,7 +1268,7 @@ func Test_valueContainer_sort(t *testing.T) {
 }
 
 func Test_mockCSVFromDTypes(t *testing.T) {
-	randSeed = 2
+	randSeed = 3
 	type args struct {
 		dtypes      []map[DType]int
 		numMockRows int
@@ -1185,7 +1285,7 @@ func Test_mockCSVFromDTypes(t *testing.T) {
 					{Float: 0, String: 3, DateTime: 0},
 					{Float: 0, String: 1, DateTime: 2}},
 				2},
-			[][]string{{"", "foo", ""}, {"3", "foo", "12/1/2019"}},
+			[][]string{{"3", "foo", "12/1/2019"}, {"1", "foo", "12/1/2019"}},
 		},
 		{"3x rows",
 			args{
@@ -1193,7 +1293,7 @@ func Test_mockCSVFromDTypes(t *testing.T) {
 					{Float: 1, String: 0, DateTime: 0},
 					{Float: 0, String: 1, DateTime: 0}},
 				3},
-			[][]string{{"", "foo"}, {"", "baz"}, {"1", "foo"}},
+			[][]string{{"3", "foo"}, {"1", "foo"}, {"1", "foo"}},
 		},
 	}
 	for _, tt := range tests {

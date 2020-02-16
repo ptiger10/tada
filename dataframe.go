@@ -1029,7 +1029,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 			}
 		}
 	}
-	// transfer values to final from
+	// transfer values to final form
 	retVals := make([]*valueContainer, len(newVals))
 	for k := range retVals {
 		retVals[k] = &valueContainer{
@@ -1038,7 +1038,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 			name:   colNames[k],
 		}
 	}
-	// transfer labels to final from
+	// transfer labels to final form
 	retLabels := make([]*valueContainer, len(newLabels))
 	for j := range retLabels {
 		retLabels[j] = &valueContainer{
@@ -1343,7 +1343,7 @@ func (df *DataFrame) groupby(index []int) *GroupedDataFrame {
 		groups:      g,
 		orderedKeys: orderedKeys,
 		df:          df,
-		labelNames:  names,
+		levelNames:  names,
 	}
 }
 

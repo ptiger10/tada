@@ -12,7 +12,7 @@ func TestGroupedSeries_Sum(t *testing.T) {
 		groups      map[string][]int
 		orderedKeys []string
 		series      *Series
-		labelNames  []string
+		levelNames  []string
 		aligned     bool
 		err         error
 	}
@@ -26,7 +26,7 @@ func TestGroupedSeries_Sum(t *testing.T) {
 			fields: fields{
 				groups:      map[string][]int{"foo": []int{0, 1}, "bar": []int{2, 3}},
 				orderedKeys: []string{"foo", "bar"},
-				labelNames:  []string{"*0"},
+				levelNames:  []string{"*0"},
 				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
@@ -37,7 +37,7 @@ func TestGroupedSeries_Sum(t *testing.T) {
 			fields: fields{
 				groups:      map[string][]int{"foo": []int{0, 1}, "bar": []int{2, 3}},
 				orderedKeys: []string{"foo", "bar"},
-				labelNames:  []string{"*0"},
+				levelNames:  []string{"*0"},
 				aligned:     true,
 				series: &Series{
 					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
@@ -48,6 +48,20 @@ func TestGroupedSeries_Sum(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
+		{
+			name: "two levels - not aligned",
+			fields: fields{
+				groups:      map[string][]int{"foo|0": []int{0, 1}, "bar|0": []int{2, 3}},
+				orderedKeys: []string{"foo|0", "bar|0"},
+				levelNames:  []string{"*0", "*1"},
+				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
+						{slice: []int{0, 0, 0, 0}, isNull: []bool{false, false, false, false}, name: "*1"}}}},
+			want: &Series{values: &valueContainer{slice: []float64{3, 7}, isNull: []bool{false, false}, name: "sum"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
+					{slice: []string{"0", "0"}, isNull: []bool{false, false}, name: "*1"}}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -55,12 +69,12 @@ func TestGroupedSeries_Sum(t *testing.T) {
 				groups:      tt.fields.groups,
 				orderedKeys: tt.fields.orderedKeys,
 				series:      tt.fields.series,
-				labelNames:  tt.fields.labelNames,
+				levelNames:  tt.fields.levelNames,
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
 			if got := g.Sum(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GroupedSeries.Sum() = %v, want %v", got.labels, tt.want.labels)
+				t.Errorf("GroupedSeries.Sum() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
@@ -71,7 +85,7 @@ func TestGroupedSeries_Mean(t *testing.T) {
 	type fields struct {
 		groups      map[string][]int
 		orderedKeys []string
-		labelNames  []string
+		levelNames  []string
 		series      *Series
 		err         error
 	}
@@ -85,7 +99,7 @@ func TestGroupedSeries_Mean(t *testing.T) {
 			fields: fields{
 				groups:      map[string][]int{"foo": []int{0, 1}, "bar": []int{2, 3}},
 				orderedKeys: []string{"foo", "bar"},
-				labelNames:  []string{"*0"},
+				levelNames:  []string{"*0"},
 				series: &Series{
 					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
 					labels: []*valueContainer{
@@ -98,7 +112,7 @@ func TestGroupedSeries_Mean(t *testing.T) {
 			g := &GroupedSeries{
 				groups:      tt.fields.groups,
 				orderedKeys: tt.fields.orderedKeys,
-				labelNames:  tt.fields.labelNames,
+				levelNames:  tt.fields.levelNames,
 				series:      tt.fields.series,
 				err:         tt.fields.err,
 			}
@@ -113,7 +127,7 @@ func TestGroupedSeries_Median(t *testing.T) {
 	type fields struct {
 		groups      map[string][]int
 		orderedKeys []string
-		labelNames  []string
+		levelNames  []string
 		series      *Series
 		err         error
 	}
@@ -127,7 +141,7 @@ func TestGroupedSeries_Median(t *testing.T) {
 			fields: fields{
 				groups:      map[string][]int{"foo": []int{0, 1}, "bar": []int{2, 3}},
 				orderedKeys: []string{"foo", "bar"},
-				labelNames:  []string{"*0"},
+				levelNames:  []string{"*0"},
 				series: &Series{
 					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
 					labels: []*valueContainer{
@@ -140,7 +154,7 @@ func TestGroupedSeries_Median(t *testing.T) {
 			fields: fields{
 				groups:      map[string][]int{"foo": []int{0, 1, 2}, "bar": []int{3, 4, 5}},
 				orderedKeys: []string{"foo", "bar"},
-				labelNames:  []string{"*0"},
+				levelNames:  []string{"*0"},
 				series: &Series{
 					values: &valueContainer{
 						slice: []float64{1, 2, 4, 5, 6, 8}, isNull: []bool{false, false, false, false, false, false}},
@@ -155,7 +169,7 @@ func TestGroupedSeries_Median(t *testing.T) {
 			g := &GroupedSeries{
 				groups:      tt.fields.groups,
 				orderedKeys: tt.fields.orderedKeys,
-				labelNames:  tt.fields.labelNames,
+				levelNames:  tt.fields.levelNames,
 				series:      tt.fields.series,
 				err:         tt.fields.err,
 			}
@@ -170,7 +184,7 @@ func TestGroupedSeries_Std(t *testing.T) {
 	type fields struct {
 		groups      map[string][]int
 		orderedKeys []string
-		labelNames  []string
+		levelNames  []string
 		series      *Series
 		err         error
 	}
@@ -184,7 +198,7 @@ func TestGroupedSeries_Std(t *testing.T) {
 			fields: fields{
 				groups:      map[string][]int{"foo": []int{0, 1}, "bar": []int{2, 3}},
 				orderedKeys: []string{"foo", "bar"},
-				labelNames:  []string{"*0"},
+				levelNames:  []string{"*0"},
 				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4},
 					isNull: []bool{false, false, false, false}},
 					labels: []*valueContainer{
@@ -197,7 +211,7 @@ func TestGroupedSeries_Std(t *testing.T) {
 			g := &GroupedSeries{
 				groups:      tt.fields.groups,
 				orderedKeys: tt.fields.orderedKeys,
-				labelNames:  tt.fields.labelNames,
+				levelNames:  tt.fields.levelNames,
 				series:      tt.fields.series,
 				err:         tt.fields.err,
 			}
@@ -213,7 +227,7 @@ func TestGroupedDataFrame_Sum(t *testing.T) {
 		groups      map[string][]int
 		orderedKeys []string
 		df          *DataFrame
-		labelNames  []string
+		levelNames  []string
 		err         error
 	}
 	type args struct {
@@ -236,7 +250,7 @@ func TestGroupedDataFrame_Sum(t *testing.T) {
 				},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "baz"}}},
-				labelNames: []string{"baz"}},
+				levelNames: []string{"baz"}},
 			args: args{nil},
 			want: &DataFrame{values: []*valueContainer{
 				{slice: []float64{3, 7}, isNull: []bool{false, false}, name: "corge"},
@@ -251,7 +265,7 @@ func TestGroupedDataFrame_Sum(t *testing.T) {
 				groups:      tt.fields.groups,
 				orderedKeys: tt.fields.orderedKeys,
 				df:          tt.fields.df,
-				labelNames:  tt.fields.labelNames,
+				levelNames:  tt.fields.levelNames,
 				err:         tt.fields.err,
 			}
 			if got := g.Sum(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {
@@ -267,7 +281,7 @@ func TestGroupedSeries_First(t *testing.T) {
 		groups      map[string][]int
 		orderedKeys []string
 		series      *Series
-		labelNames  []string
+		levelNames  []string
 		err         error
 	}
 	tests := []struct {
@@ -279,7 +293,7 @@ func TestGroupedSeries_First(t *testing.T) {
 			fields: fields{
 				groups:      map[string][]int{"foo": []int{0, 1}, "bar": []int{2, 3}},
 				orderedKeys: []string{"foo", "bar"},
-				labelNames:  []string{"*0"},
+				levelNames:  []string{"*0"},
 				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
@@ -292,7 +306,7 @@ func TestGroupedSeries_First(t *testing.T) {
 				groups:      tt.fields.groups,
 				orderedKeys: tt.fields.orderedKeys,
 				series:      tt.fields.series,
-				labelNames:  tt.fields.labelNames,
+				levelNames:  tt.fields.levelNames,
 				err:         tt.fields.err,
 			}
 			if got := g.First(); !reflect.DeepEqual(got, tt.want) {
@@ -307,7 +321,7 @@ func TestGroupedSeries_alignedMath(t *testing.T) {
 		groups      map[string][]int
 		orderedKeys []string
 		series      *Series
-		labelNames  []string
+		levelNames  []string
 		aligned     bool
 		err         error
 	}
@@ -324,7 +338,7 @@ func TestGroupedSeries_alignedMath(t *testing.T) {
 		{"pass", fields{
 			groups:      map[string][]int{"foo": []int{0, 1}, "bar": []int{2, 3}},
 			orderedKeys: []string{"foo", "bar"},
-			labelNames:  []string{"*0"},
+			levelNames:  []string{"*0"},
 			series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
@@ -339,7 +353,7 @@ func TestGroupedSeries_alignedMath(t *testing.T) {
 				groups:      tt.fields.groups,
 				orderedKeys: tt.fields.orderedKeys,
 				series:      tt.fields.series,
-				labelNames:  tt.fields.labelNames,
+				levelNames:  tt.fields.levelNames,
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
@@ -355,7 +369,7 @@ func TestGroupedSeries_Align(t *testing.T) {
 		groups      map[string][]int
 		orderedKeys []string
 		series      *Series
-		labelNames  []string
+		levelNames  []string
 		aligned     bool
 		err         error
 	}
@@ -372,12 +386,123 @@ func TestGroupedSeries_Align(t *testing.T) {
 				groups:      tt.fields.groups,
 				orderedKeys: tt.fields.orderedKeys,
 				series:      tt.fields.series,
-				labelNames:  tt.fields.labelNames,
+				levelNames:  tt.fields.levelNames,
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
 			if got := g.Align(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GroupedSeries.Align() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGroupedSeries_Apply(t *testing.T) {
+	type fields struct {
+		groups      map[string][]int
+		orderedKeys []string
+		series      *Series
+		levelNames  []string
+		aligned     bool
+		err         error
+	}
+	type args struct {
+		name   string
+		lambda GroupApplyFn
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"aligned", fields{
+			groups:      map[string][]int{"foo": []int{0, 1}, "bar": []int{2, 3}},
+			orderedKeys: []string{"foo", "bar"},
+			levelNames:  []string{"*0"},
+			aligned:     true,
+			series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			args{"qux_sum", GroupApplyFn{F64: func(vals []float64) float64 {
+				var sum float64
+				for i := range vals {
+					sum += vals[i]
+				}
+				return sum
+			}}},
+			&Series{values: &valueContainer{slice: []float64{3, 3, 7, 7}, isNull: []bool{false, false, false, false}, name: "qux_sum"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeries{
+				groups:      tt.fields.groups,
+				orderedKeys: tt.fields.orderedKeys,
+				series:      tt.fields.series,
+				levelNames:  tt.fields.levelNames,
+				aligned:     tt.fields.aligned,
+				err:         tt.fields.err,
+			}
+			if got := g.Apply(tt.args.name, tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedSeries.Apply() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGroupedSeries_mathFunc(t *testing.T) {
+	type fields struct {
+		groups      map[string][]int
+		orderedKeys []string
+		series      *Series
+		levelNames  []string
+		aligned     bool
+		err         error
+	}
+	type args struct {
+		name string
+		fn   func(val []float64, isNull []bool, index []int) (float64, bool)
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"sum", fields{
+			groups:      map[string][]int{"foo": []int{0, 1}, "bar": []int{2, 3}},
+			orderedKeys: []string{"foo", "bar"},
+			levelNames:  []string{"*0"},
+			aligned:     false,
+			series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			args{"sum", func(val []float64, isNull []bool, index []int) (float64, bool) {
+				var sum float64
+				for _, i := range index {
+					sum += val[i]
+				}
+				return sum, false
+			}},
+			&Series{values: &valueContainer{slice: []float64{3, 7}, isNull: []bool{false, false}, name: "sum"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeries{
+				groups:      tt.fields.groups,
+				orderedKeys: tt.fields.orderedKeys,
+				series:      tt.fields.series,
+				levelNames:  tt.fields.levelNames,
+				aligned:     tt.fields.aligned,
+				err:         tt.fields.err,
+			}
+			if got := g.mathFunc(tt.args.name, tt.args.fn); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedSeries.mathFunc() = %v, want %v", got, tt.want)
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
