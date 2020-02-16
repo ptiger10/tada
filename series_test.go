@@ -27,6 +27,14 @@ func TestNewSeries(t *testing.T) {
 		{"[]float64, supplied labels", args{slice: []float64{1}, labels: []interface{}{[]string{"bar"}}},
 			&Series{values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"bar"}, isNull: []bool{false}, name: "*0"}}}},
+		{"[]Elements values", args{slice: []Element{{1, false}, {"foo", false}}, labels: nil},
+			&Series{values: &valueContainer{slice: []interface{}{1, "foo"}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}}},
+		{"[]Elements labels", args{slice: []float64{1, 2}, labels: []interface{}{[]Element{{1, false}, {"foo", false}}}},
+			&Series{values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []interface{}{1, "foo"}, isNull: []bool{false, false}, name: "*0"}}}},
+		{"unsupported input: empty slice", args{slice: []float64{}},
+			&Series{err: errors.New("NewSeries(): slice cannot be empty")}},
 		{"unsupported input: string scalar", args{slice: "foo"},
 			&Series{err: errors.New("NewSeries(): unsupported kind (string); must be slice")}},
 		{"unsupported input: complex slice", args{slice: []complex64{1}},
@@ -118,8 +126,85 @@ func TestSeries_ToDataFrame(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.ToDataFrame(); !reflect.DeepEqual(got, tt.want) {
+			got := s.ToDataFrame()
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.ToDataFrame() = %v, want %v", got, tt.want)
+			}
+			got.labels[0] = &valueContainer{slice: []float64{10}, name: "baz", isNull: []bool{false}}
+			if reflect.DeepEqual(got.labels, s.labels) {
+				t.Errorf("Series.ToDataFrame() retained reference to original labels")
+			}
+		})
+	}
+}
+
+func TestSeries_ToCSV(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		ignoreLabels bool
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   [][]string
+	}{
+		{"pass", fields{
+			values: &valueContainer{slice: []float64{1}, name: "foo", isNull: []bool{false}},
+			labels: []*valueContainer{{slice: []int{1}, name: "bar", isNull: []bool{false}}}},
+			args{false},
+			[][]string{{"bar", "foo"}, {"1", "1"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.ToCSV(tt.args.ignoreLabels); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.ToCSV() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Err(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		wantErr bool
+	}{
+		{"error present",
+			fields{
+				values: &valueContainer{slice: []float64{1}, name: "foo", isNull: []bool{false}},
+				labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}},
+				err:    errors.New("foo")},
+			true},
+		{"no error present",
+			fields{
+				values: &valueContainer{slice: []float64{1}, name: "foo", isNull: []bool{false}},
+				labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}},
+			false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if err := s.Err(); (err != nil) != tt.wantErr {
+				t.Errorf("Series.Err() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}
@@ -148,6 +233,13 @@ func TestSeries_Subset(t *testing.T) {
 			&Series{
 				values: &valueContainer{slice: []float64{3, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{2, 0}, isNull: []bool{false, false}}}}},
+		{"likely invalid filter",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{[]int{-999}},
+			&Series{
+				err: errors.New("Subset(): likely invalid filter (every filter must have at least one filter function; if ColName is supplied, it must be valid)")}},
 		{"fail: index out of range",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
@@ -329,8 +421,29 @@ func TestSeries_Range(t *testing.T) {
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
 			args{1, 2},
 			&Series{
-				values: &valueContainer{slice: []float64{2, 3}, isNull: []bool{false, false}},
-				labels: []*valueContainer{{slice: []int{1, 2}, isNull: []bool{false, false}}}}},
+				values: &valueContainer{slice: []float64{2}, isNull: []bool{false}},
+				labels: []*valueContainer{{slice: []int{1}, isNull: []bool{false}}}}},
+		{"fail - first",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{3, 4},
+			&Series{
+				err: errors.New("Range(): first index out of range (3 > 2)")}},
+		{"fail - last",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{2, 4},
+			&Series{
+				err: errors.New("Range(): last index out of range (4 > 3)")}},
+		{"fail - first > last",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{2, 1},
+			&Series{
+				err: errors.New("Range(): first is greater than last (2 > 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -458,7 +571,7 @@ func TestSeries_WithLabels(t *testing.T) {
 					{slice: []string{""}, isNull: []bool{true}, name: "qux"},
 				}},
 		},
-		{"append new Series",
+		{"append new Series - ignore new Series labels",
 			fields{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
@@ -510,8 +623,116 @@ func TestSeries_WithLabels(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := s.WithLabels(tt.args.name, tt.args.arg); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.WithLabels() = %v, want %v", got.labels, tt.want)
+				t.Errorf("Series.WithLabels() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+			}
+		})
+	}
+}
+
+func TestSeries_WithValues(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		input interface{}
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"overwrite values",
+			fields{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "qux"},
+				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
+			args{[]string{"baz"}},
+			&Series{
+				values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
+		},
+		{"change name",
+			fields{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "qux"},
+				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
+			args{"baz"},
+			&Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "baz"},
+				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
+		},
+		{"fail",
+			fields{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "qux"},
+				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
+			args{[]float64{1, 2, 3}},
+			&Series{err: errors.New("WithValues(): cannot replace items in column qux: length of input does not match existing length (3 != 1)")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.WithValues(tt.args.input); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.WithValues() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Append(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		other *Series
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"pass - coerce to string, maintain value/level names",
+			fields{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "qux"},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "bar"}}},
+			args{&Series{
+				values: &valueContainer{slice: []int{2}, isNull: []bool{false}, name: "corge"},
+				labels: []*valueContainer{{slice: []bool{true}, isNull: []bool{false}, name: "baz"}}}},
+			&Series{
+				values: &valueContainer{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "qux"},
+				labels: []*valueContainer{{slice: []string{"0", "true"}, isNull: []bool{false, false}, name: "bar"}}},
+		},
+		{"fail - different number of levels",
+			fields{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "qux"},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "bar"}}},
+			args{&Series{
+				values: &valueContainer{slice: []int{2}, isNull: []bool{false}, name: "corge"},
+				labels: []*valueContainer{
+					{slice: []bool{true}, isNull: []bool{false}, name: "baz"},
+					{slice: []bool{true}, isNull: []bool{false}, name: "baz"},
+				}}},
+			&Series{
+				err: errors.New("Append(): other Series must have same number of label levels as original Series (2 != 1)")}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Append(tt.args.other); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Append() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -595,6 +816,37 @@ func TestSeries_SetName(t *testing.T) {
 			}
 			if got := s.SetName(tt.args.name); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.SetName() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Name(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{"normal",
+			fields{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "baz"},
+				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}}}},
+			"baz"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Name(); got != tt.want {
+				t.Errorf("Series.Name() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -928,7 +1180,7 @@ func TestSeries_Apply(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := s.Apply(tt.args.function); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.Apply() = %v, want %v", got.labels, tt.want)
+				t.Errorf("Series.Apply() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
@@ -1415,6 +1667,18 @@ func TestSeries_Shift(t *testing.T) {
 					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "a"},
 				}},
 		},
+		{"overwrite n to max",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+				labels: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "a"},
+				}},
+			args{5},
+			&Series{
+				values: &valueContainer{slice: []float64{0, 0}, isNull: []bool{true, true}},
+				labels: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "a"},
+				}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

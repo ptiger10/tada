@@ -715,12 +715,12 @@ func (vc *valueContainer) tail(n int) *valueContainer {
 	}
 }
 
-// rangeSlice returns the rows starting with first and ending with last (inclusive)
+// rangeSlice returns the rows starting with first and ending with last (exclusive)
 func (vc *valueContainer) rangeSlice(first, last int) *valueContainer {
 	v := reflect.ValueOf(vc.slice)
 	var retIsNull []bool
-	retVals := v.Slice(first, last+1)
-	retIsNull = vc.isNull[first : last+1]
+	retVals := v.Slice(first, last)
+	retIsNull = vc.isNull[first:last]
 
 	return &valueContainer{
 		slice:  retVals.Interface(),

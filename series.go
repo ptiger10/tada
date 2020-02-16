@@ -48,7 +48,7 @@ func NewSeries(slice interface{}, labels ...interface{}) *Series {
 					"NewSeries(): unable to calculate null values at level %d ([]%v not supported)", i, reflect.TypeOf(input).Elem()))
 			}
 			// handle special case of []Element: convert to []interface{}
-			elements := handleElementsSlice(slice)
+			elements := handleElementsSlice(input)
 			if elements != nil {
 				input = elements
 			}
@@ -86,9 +86,10 @@ func (s *Series) ToDataFrame() *DataFrame {
 // ToCSV converts a Series to a DataFrame and returns as [][]string.
 func (s *Series) ToCSV(ignoreLabels bool) [][]string {
 	df := &DataFrame{
-		values: []*valueContainer{s.values},
-		labels: s.labels,
-		err:    s.err,
+		values:        []*valueContainer{s.values},
+		labels:        s.labels,
+		colLevelNames: []string{"*0"},
+		err:           s.err,
 	}
 	return df.ToCSV(ignoreLabels)
 }
@@ -155,7 +156,8 @@ func (s *Series) Subset(index []int) *Series {
 func (s *SeriesMutator) Subset(index []int) {
 	if reflect.DeepEqual(index, []int{-999}) {
 		s.series.resetWithError(errors.New(
-			"Subset(): invalid filter (every filter must have at least one filter function; if ColName is supplied, it must be valid)"))
+			"Subset(): likely invalid filter (every filter must have at least one filter function; if ColName is supplied, it must be valid)"))
+		return
 	}
 	err := s.series.values.subsetRows(index)
 	if err != nil {
@@ -216,14 +218,17 @@ func (s *Series) Tail(n int) *Series {
 	return &Series{values: retVals, labels: retLabels}
 }
 
-// Range returns the rows of the Series starting at `first` and `ending` with last (inclusive).
-// If either `first` or `last` is greater than the length of the Series, a Series error is returned.
+// Range returns the rows of the Series starting at `first` and `ending` immediately prior to last (left-inclusive, right-exclusive).
+// If either `first` or `last` is out of range, a Series error is returned.
 // In all cases, returns a new Series.
 func (s *Series) Range(first, last int) *Series {
+	if first > last {
+		return seriesWithError(fmt.Errorf("Range(): first is greater than last (%d > %d)", first, last))
+	}
 	if first >= s.Len() {
 		return seriesWithError(fmt.Errorf("Range(): first index out of range (%d > %d)", first, s.Len()-1))
-	} else if last >= s.Len() {
-		return seriesWithError(fmt.Errorf("Range(): last index out of range (%d > %d)", last, s.Len()-1))
+	} else if last > s.Len() {
+		return seriesWithError(fmt.Errorf("Range(): last index out of range (%d > %d)", last, s.Len()))
 	}
 	retVals := s.values.rangeSlice(first, last)
 	retLabels := make([]*valueContainer, s.numLevels())
@@ -310,6 +315,7 @@ func (s *SeriesMutator) WithLabels(name string, input interface{}) {
 	labels, err := withColumn(s.series.labels, name, input, s.series.Len())
 	if err != nil {
 		s.series.resetWithError(fmt.Errorf("WithLabels(): %v", err))
+		return
 	}
 	s.series.labels = labels
 }
@@ -327,14 +333,10 @@ func (s *SeriesMutator) WithValues(input interface{}) {
 	vals, err := withColumn([]*valueContainer{s.series.values}, s.series.values.name, input, s.series.Len())
 	if err != nil {
 		s.series.resetWithError(fmt.Errorf("WithValues(): %v", err))
+		return
 	}
 	s.series.values = vals[0]
 	return
-}
-
-// WithRow stub
-func (s *Series) WithRow(label string, values interface{}) *Series {
-	return nil
 }
 
 // Drop removes the row at the specified index.
@@ -371,8 +373,9 @@ func (s *Series) Append(other *Series) *Series {
 func (s *SeriesMutator) Append(other *Series) {
 	if len(other.labels) != len(s.series.labels) {
 		s.series.resetWithError(
-			fmt.Errorf("other Series must have same number of label levels as original Series (%d != %d)",
+			fmt.Errorf("Append(): other Series must have same number of label levels as original Series (%d != %d)",
 				len(other.labels), len(s.series.labels)))
+		return
 	}
 	for j := range s.series.labels {
 		s.series.labels[j] = s.series.labels[j].append(other.labels[j])
