@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/d4l3k/messagediff"
+	"github.com/ptiger10/tablediff"
 )
 
 func TestNewDataFrame(t *testing.T) {
@@ -162,36 +163,6 @@ func TestDataFrame_Copy(t *testing.T) {
 	}
 }
 
-func TestReadCSVByRows(t *testing.T) {
-	type args struct {
-		csv    [][]string
-		config *ReadConfig
-	}
-	tests := []struct {
-		name string
-		args args
-		want *DataFrame
-	}{
-		{"1 header row, 2 columns, no index",
-			args{
-				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				config: &ReadConfig{NumHeaderRows: 1}},
-			&DataFrame{values: []*valueContainer{
-				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := readCSVByRows(tt.args.csv, tt.args.config); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readCSVByRows() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
-			}
-		})
-	}
-}
-
 func TestDataFrame_Subset(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
@@ -235,6 +206,59 @@ func TestDataFrame_Subset(t *testing.T) {
 			}
 			if got := df.Subset(tt.args.index); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.Subset() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReadCSV(t *testing.T) {
+	type args struct {
+		csv    [][]string
+		config *ReadConfig
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *DataFrame
+		wantErr bool
+	}{
+		{"1 header row, 2 columns, no index",
+			args{
+				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
+				config: &ReadConfig{NumHeaderRows: 1}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}}, false},
+		{"1 header row, 2 columns, no index, nil config",
+			args{
+				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
+				config: nil},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}}, false},
+		{"column as major dimension",
+			args{
+				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
+				config: &ReadConfig{MajorDimIsCols: true, NumHeaderRows: 1}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ReadCSV(tt.args.csv, tt.args.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReadCSV() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ReadCSV() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1509,92 +1533,6 @@ func TestDataFrame_GroupBy(t *testing.T) {
 	}
 }
 
-func TestDataFrame_toCSVByRows(t *testing.T) {
-	type fields struct {
-		labels        []*valueContainer
-		values        []*valueContainer
-		name          string
-		colLevelNames []string
-		err           error
-	}
-	type args struct {
-		ignoreLabels bool
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    [][]string
-		wantErr bool
-	}{
-		{name: "one col level",
-			fields: fields{
-				values: []*valueContainer{
-					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"},
-					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"},
-			},
-			args: args{ignoreLabels: false},
-			want: [][]string{
-				{"*0", "foo", "bar"},
-				{"0", "1", "a"},
-				{"1", "2", "b"},
-			},
-			wantErr: false},
-		{name: "two col levels",
-			fields: fields{
-				values: []*valueContainer{
-					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo|baz"},
-					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar|qux"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0", "*1"},
-			},
-			args: args{ignoreLabels: false},
-			want: [][]string{
-				{"", "foo", "bar"},
-				{"*0", "baz", "qux"},
-				{"0", "1", "a"},
-				{"1", "2", "b"},
-			}},
-		{name: "two label levels",
-			fields: fields{
-				values: []*valueContainer{
-					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"},
-					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"}},
-				labels: []*valueContainer{
-					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"},
-					{slice: []int{10, 11}, isNull: []bool{false, false}, name: "*1"},
-				},
-				colLevelNames: []string{"*0"},
-			},
-			want: [][]string{
-				{"*0", "*1", "foo", "bar"},
-				{"0", "10", "1", "a"},
-				{"1", "11", "2", "b"},
-			},
-			wantErr: false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			df := &DataFrame{
-				labels:        tt.fields.labels,
-				values:        tt.fields.values,
-				name:          tt.fields.name,
-				colLevelNames: tt.fields.colLevelNames,
-				err:           tt.fields.err,
-			}
-			got, err := df.toCSVByRows(tt.args.ignoreLabels)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.toCSVByRows() = %v, want %v", got, tt.want)
-			}
-			if (err != nil) != tt.wantErr {
-				t.Errorf("DataFrame.toCSVByRows() err = %v, want %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
 func TestDataFrame_PromoteToColLevel(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
@@ -1979,6 +1917,18 @@ func TestWriteMockCSV(t *testing.T) {
 	}{
 		{"pass", args{src: [][]string{{"corge", "qux"}, {"1", "foo"}, {"1", "foo"}}, config: nil, outputRows: 3},
 			want1, false},
+		{"fail - no rows", args{src: nil, config: nil, outputRows: 3},
+			"", true},
+		{"fail - no cols", args{src: [][]string{}, config: nil, outputRows: 3},
+			"", true},
+		{"columns as major dim",
+			args{src: [][]string{{"corge", "1", "1"}, {"qux", "foo", "foo"}},
+				config: &ReadConfig{MajorDimIsCols: true, NumHeaderRows: 1}, outputRows: 3},
+			want1, false},
+		{"fail - no rows", args{src: nil, config: &ReadConfig{MajorDimIsCols: true}, outputRows: 3},
+			"", true},
+		{"fail - no cols", args{src: [][]string{}, config: &ReadConfig{MajorDimIsCols: true}, outputRows: 3},
+			"", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1989,6 +1939,174 @@ func TestWriteMockCSV(t *testing.T) {
 			}
 			if gotW := w.String(); gotW != tt.wantW {
 				t.Errorf("WriteMockCSV() = %v, want %v", gotW, tt.wantW)
+			}
+		})
+	}
+}
+
+func TestDataFrame_ListColumns(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []string
+	}{
+		{"pass", fields{
+			values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:   "baz"},
+			[]string{"foo"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.ListColumns(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.ListColumns() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_ListLevels(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []string
+	}{
+		{"pass", fields{
+			values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:   "baz"},
+			[]string{"*0"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.ListLevels(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.ListLevels() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_HasCols(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		colNames []string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "bar"},
+			},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:   "baz"},
+			args{[]string{"foo", "bar"}}, false},
+		{"fail", fields{
+			values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:   "baz"},
+			args{[]string{"foo", "corge"}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if err := df.HasCols(tt.args.colNames...); (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.HasCols() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestDataFrame_EqualsCSV(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		csv          [][]string
+		ignoreLabels bool
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   bool
+		want1  *tablediff.Differences
+	}{
+		{name: "pass",
+			fields: fields{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"},
+			args:  args{[][]string{{"*0", "foo"}, {"0", "1"}}, false},
+			want:  true,
+			want1: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			got, got1 := df.EqualsCSV(tt.args.csv, tt.args.ignoreLabels)
+			if got != tt.want {
+				t.Errorf("DataFrame.EqualsCSV() got = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got1, tt.want1) {
+				t.Errorf("DataFrame.EqualsCSV() got1 = %#v, want %#v", got1, tt.want1)
 			}
 		})
 	}

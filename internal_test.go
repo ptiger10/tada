@@ -1493,3 +1493,320 @@ func Test_valueContainer_apply(t *testing.T) {
 		})
 	}
 }
+
+func Test_withColumn(t *testing.T) {
+	type args struct {
+		cols        []*valueContainer
+		name        string
+		input       interface{}
+		requiredLen int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*valueContainer
+		wantErr bool
+	}{
+		{"rename", args{
+			cols: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+			}, name: "foo", input: "corge", requiredLen: 2},
+			[]*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "corge"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+			}, false,
+		},
+		{"overwrite", args{
+			cols: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+			}, name: "foo", input: []int{3, 4}, requiredLen: 2},
+			[]*valueContainer{
+				{slice: []int{3, 4}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+			}, false,
+		},
+		{"append", args{
+			cols: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+			}, name: "corge", input: []int{3, 4}, requiredLen: 2},
+			[]*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []int{3, 4}, isNull: []bool{false, false}, name: "corge"},
+			}, false,
+		},
+		{"overwrite Series", args{
+			cols: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+			}, name: "foo", input: &Series{values: &valueContainer{
+				slice: []float64{3, 4}, isNull: []bool{false, false},
+			}}, requiredLen: 2},
+			[]*valueContainer{
+				{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+			}, false,
+		},
+		{"append Series", args{
+			cols: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+			}, name: "corge", input: &Series{values: &valueContainer{
+				slice: []float64{3, 4}, isNull: []bool{false, false},
+			}}, requiredLen: 2},
+			[]*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "corge"},
+			}, false,
+		},
+		{"fail - unsupported type", args{
+			cols: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+			}, name: "corge", input: []complex64{3, 4}, requiredLen: 2},
+			nil, true,
+		},
+		{"fail - wrong length", args{
+			cols: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+			}, name: "foo", input: []float64{0, 1, 2, 3, 4}, requiredLen: 2},
+			nil, true,
+		},
+		{"fail - wrong length", args{
+			cols: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+			}, name: "foo", input: []float64{0, 1, 2, 3, 4}, requiredLen: 2},
+			nil, true,
+		},
+		{"fail - not Series pointer", args{
+			cols: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+			}, name: "foo", input: &time.Time{}, requiredLen: 2},
+			nil, true,
+		},
+		{"fail - Series of wrong length", args{
+			cols: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+			}, name: "foo", input: &Series{values: &valueContainer{
+				slice: []float64{1, 2, 3}, isNull: []bool{false, false, false},
+			}}, requiredLen: 2},
+			nil, true,
+		},
+		{"fail - unsupported input", args{
+			cols: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+			}, name: "foo", input: map[string]int{}, requiredLen: 2},
+			nil, true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := withColumn(tt.args.cols, tt.args.name, tt.args.input, tt.args.requiredLen)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("withColumn() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("withColumn() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_toCSVByRows(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		colLevelNames []string
+		err           error
+	}
+	type args struct {
+		ignoreLabels bool
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    [][]string
+		wantErr bool
+	}{
+		{name: "one col level",
+			fields: fields{
+				values: []*valueContainer{
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"},
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+			},
+			args: args{ignoreLabels: false},
+			want: [][]string{
+				{"*0", "foo", "bar"},
+				{"0", "1", "a"},
+				{"1", "2", "b"},
+			},
+			wantErr: false},
+		{name: "one col level - ignore labels",
+			fields: fields{
+				values: []*valueContainer{
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"},
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+			},
+			args: args{ignoreLabels: true},
+			want: [][]string{
+				{"foo", "bar"},
+				{"1", "a"},
+				{"2", "b"},
+			},
+			wantErr: false},
+		{name: "two col levels",
+			fields: fields{
+				values: []*valueContainer{
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo|baz"},
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar|qux"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0", "*1"},
+			},
+			args: args{ignoreLabels: false},
+			want: [][]string{
+				{"", "foo", "bar"},
+				{"*0", "baz", "qux"},
+				{"0", "1", "a"},
+				{"1", "2", "b"},
+			}},
+		{name: "two label levels",
+			fields: fields{
+				values: []*valueContainer{
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"},
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"}},
+				labels: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"},
+					{slice: []int{10, 11}, isNull: []bool{false, false}, name: "*1"},
+				},
+				colLevelNames: []string{"*0"},
+			},
+			want: [][]string{
+				{"*0", "*1", "foo", "bar"},
+				{"0", "10", "1", "a"},
+				{"1", "11", "2", "b"},
+			},
+			wantErr: false},
+		{name: "fail - no values",
+			fields: fields{
+				values: nil,
+				labels: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"},
+					{slice: []int{10, 11}, isNull: []bool{false, false}, name: "*1"},
+				},
+				colLevelNames: []string{"*0"},
+			},
+			want: nil, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				colLevelNames: tt.fields.colLevelNames,
+				err:           tt.fields.err,
+			}
+			got, err := df.toCSVByRows(tt.args.ignoreLabels)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.toCSVByRows() = %v, want %v", got, tt.want)
+			}
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.toCSVByRows() err = %v, want %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func Test_readCSVByRows(t *testing.T) {
+	type args struct {
+		csv    [][]string
+		config *ReadConfig
+	}
+	tests := []struct {
+		name string
+		args args
+		want *DataFrame
+	}{
+		{"1 header row, 2 columns, no label levels",
+			args{
+				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
+				config: &ReadConfig{NumHeaderRows: 1}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}}},
+		{"1 header row, 1 column, 1 label level",
+			args{
+				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
+				config: &ReadConfig{NumHeaderRows: 1, NumLabelCols: 1}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
+				labels: []*valueContainer{
+					{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"}},
+				colLevelNames: []string{"*0"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := readCSVByRows(tt.args.csv, tt.args.config); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("readCSVByRows() = %v, want %v", got, tt.want)
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+			}
+		})
+	}
+}
+
+func Test_readCSVByCols(t *testing.T) {
+	type args struct {
+		csv    [][]string
+		config *ReadConfig
+	}
+	tests := []struct {
+		name string
+		args args
+		want *DataFrame
+	}{
+		{"1 header row, 2 columns, no label levels",
+			args{
+				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
+				config: &ReadConfig{NumHeaderRows: 1}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}}},
+		{"1 header row, 1 column, 1 label levels",
+			args{
+				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
+				config: &ReadConfig{NumHeaderRows: 1, NumLabelCols: 1}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
+				labels: []*valueContainer{
+					{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
+				},
+				colLevelNames: []string{"*0"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := readCSVByCols(tt.args.csv, tt.args.config); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("readCSVByCols() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

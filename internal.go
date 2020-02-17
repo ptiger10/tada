@@ -227,23 +227,6 @@ func makeStringMatrix(numCols, numRows int) [][]string {
 	return ret
 }
 
-// columns as major dimension; expect
-func makeInterfaceMatrixWithDTypes(dtypes []reflect.Type, numRows int) []interface{} {
-	ret := make([]interface{}, len(dtypes))
-	for k := 0; k < len(dtypes); k++ {
-		ret[k] = reflect.MakeSlice(dtypes[k], numRows, numRows)
-	}
-	return ret
-}
-
-func extractDTypes(values []*valueContainer) []reflect.Type {
-	originalDTypes := make([]reflect.Type, len(values))
-	for k := range originalDTypes {
-		originalDTypes[k] = reflect.ValueOf(values[k]).Type()
-	}
-	return originalDTypes
-}
-
 // columns as major dimension
 func makeBoolMatrix(numCols, numRows int) [][]bool {
 	ret := make([][]bool, numCols)
@@ -334,26 +317,6 @@ func difference(slice1 []int, slice2 []int) []int {
 	return ret
 }
 
-func minIntSlice(slice []int) int {
-	var min int
-	for _, val := range slice {
-		if val < min {
-			min = val
-		}
-	}
-	return min
-}
-
-func maxIntSlice(slice []int) int {
-	var max int
-	for _, val := range slice {
-		if val > max {
-			max = val
-		}
-	}
-	return max
-}
-
 func (df *DataFrame) toCSVByRows(ignoreLabels bool) ([][]string, error) {
 	if df.values == nil {
 		return nil, fmt.Errorf("cannot export empty dataframe")
@@ -401,6 +364,7 @@ func (df *DataFrame) toCSVByRows(ignoreLabels bool) ([][]string, error) {
 	return ret, nil
 }
 
+// expects non-nil cfg
 func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
 	numCols := len(csv[0]) - cfg.NumLabelCols
 	numRows := len(csv) - cfg.NumHeaderRows
@@ -424,18 +388,21 @@ func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
 					levelNames[column][row] = csv[row][column]
 				} else {
 					// write header rows to cols, offset for label cols
-					valsNames[column-cfg.NumLabelCols][row] = csv[row][column]
+					offsetFromLabelCols := column - cfg.NumLabelCols
+					valsNames[offsetFromLabelCols][row] = csv[row][column]
 				}
 				continue
 			}
+			offsetFromHeaderRows := row - cfg.NumHeaderRows
 			if column < cfg.NumLabelCols {
 				// write values to labels, offset for header rows
-				labels[column][row-cfg.NumHeaderRows] = csv[row][column]
-				labelsIsNull[column][row-cfg.NumHeaderRows] = isNullString(csv[row][column])
+				labels[column][offsetFromHeaderRows] = csv[row][column]
+				labelsIsNull[column][offsetFromHeaderRows] = isNullString(csv[row][column])
 			} else {
+				offsetFromLabelCols := column - cfg.NumLabelCols
 				// write values to cols, offset for label cols and header rows
-				vals[column-cfg.NumLabelCols][row-cfg.NumHeaderRows] = csv[row][column]
-				valsIsNull[column-cfg.NumLabelCols][row-cfg.NumHeaderRows] = isNullString(csv[row][column])
+				vals[offsetFromLabelCols][offsetFromHeaderRows] = csv[row][column]
+				valsIsNull[offsetFromLabelCols][offsetFromHeaderRows] = isNullString(csv[row][column])
 			}
 		}
 	}
@@ -467,14 +434,7 @@ func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
 	}
 }
 
-func defaultLabelsIfEmpty(labels []*valueContainer, numRows int) []*valueContainer {
-	if len(labels) == 0 {
-		defaultLabels := makeDefaultLabels(0, numRows)
-		labels = append(labels, defaultLabels)
-	}
-	return labels
-}
-
+// expects non-nil cfg
 func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 	numRows := len(csv[0]) - cfg.NumHeaderRows
 	numCols := len(csv) - cfg.NumLabelCols
@@ -496,19 +456,21 @@ func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 	}
 	for k := 0; k < numCols; k++ {
 		// write col headers, offset for label cols
-		valsNames[k] = strings.Join(csv[k+cfg.NumLabelCols][:cfg.NumHeaderRows], optionLevelSeparator)
+		offsetFromLabelCols := k + cfg.NumLabelCols
+		valsNames[k] = strings.Join(csv[offsetFromLabelCols][:cfg.NumHeaderRows], optionLevelSeparator)
 	}
-	for col := range csv {
-		if col < cfg.NumLabelCols {
+	for column := range csv {
+		if column < cfg.NumLabelCols {
 			// write label values as slice, offset for header rows
-			valsToWrite := csv[col][cfg.NumHeaderRows:]
-			labels[col] = valsToWrite
-			labelsIsNull[col] = setNullsFromInterface(valsToWrite)
+			valsToWrite := csv[column][cfg.NumHeaderRows:]
+			labels[column] = valsToWrite
+			labelsIsNull[column] = setNullsFromInterface(valsToWrite)
 		} else {
 			// write column values as slice, offset for label cols and header rows
-			valsToWrite := csv[col+cfg.NumLabelCols][cfg.NumHeaderRows:]
-			vals[col] = valsToWrite
-			valsIsNull[col] = setNullsFromInterface(valsToWrite)
+			offsetFromLabelCols := column - cfg.NumLabelCols
+			valsToWrite := csv[column][cfg.NumHeaderRows:]
+			vals[offsetFromLabelCols] = valsToWrite
+			valsIsNull[offsetFromLabelCols] = setNullsFromInterface(valsToWrite)
 		}
 	}
 
@@ -530,7 +492,13 @@ func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 	}
 
 }
-
+func defaultLabelsIfEmpty(labels []*valueContainer, numRows int) []*valueContainer {
+	if len(labels) == 0 {
+		defaultLabels := makeDefaultLabels(0, numRows)
+		labels = append(labels, defaultLabels)
+	}
+	return labels
+}
 func defaultColsIfNoHeader(numHeaderRows int, columns []*valueContainer) ([]string, []*valueContainer) {
 	if numHeaderRows <= 0 {
 		// if no header rows, change the names of the columns to be 0, 1...
@@ -545,6 +513,13 @@ func defaultColsIfNoHeader(numHeaderRows int, columns []*valueContainer) ([]stri
 		ret[l] = fmt.Sprintf("*%d", l)
 	}
 	return ret, columns
+}
+
+func defaultConfigIfNil(config *ReadConfig) *ReadConfig {
+	if config == nil {
+		config = &ReadConfig{NumHeaderRows: 1}
+	}
+	return config
 }
 
 func readStruct(slice interface{}) ([]*valueContainer, error) {

@@ -102,6 +102,8 @@ func ReadCSV(csv [][]string, config *ReadConfig) (*DataFrame, error) {
 	if len(csv[0]) == 0 {
 		return nil, fmt.Errorf("ReadCSV(): csv must have at least one column")
 	}
+	config = defaultConfigIfNil(config)
+
 	if config.MajorDimIsCols {
 		return readCSVByCols(csv, config), nil
 	}
@@ -110,11 +112,7 @@ func ReadCSV(csv [][]string, config *ReadConfig) (*DataFrame, error) {
 
 // ImportCSV stub
 func ImportCSV(path string, config *ReadConfig) (*DataFrame, error) {
-	if config == nil {
-		config = &ReadConfig{
-			NumHeaderRows: 1,
-		}
-	}
+	config = defaultConfigIfNil(config)
 
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -139,11 +137,7 @@ func ImportCSV(path string, config *ReadConfig) (*DataFrame, error) {
 
 // ReadInterface stub
 func ReadInterface(input [][]interface{}, config *ReadConfig) (*DataFrame, error) {
-	if config == nil {
-		config = &ReadConfig{
-			NumHeaderRows: 1,
-		}
-	}
+	config = defaultConfigIfNil(config)
 
 	if len(input) == 0 {
 		return nil, fmt.Errorf("ReadInterface(): `input` must have at least one row")
@@ -261,9 +255,7 @@ func (df *DataFrame) EqualsCSV(csv [][]string, ignoreLabels bool) (bool, *tabled
 
 // WriteMockCSV writes a mock csv to `w` modeled after `src`.
 func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows int) error {
-	if config == nil {
-		config = &ReadConfig{NumHeaderRows: 1}
-	}
+	config = defaultConfigIfNil(config)
 	numPreviewRows := 10
 	inferredTypes := make([]map[DType]int, 0)
 	var headers [][]string
@@ -295,6 +287,7 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 				inferredTypes[k][dtype]++
 			}
 		}
+		// major dimension is rows
 	} else {
 		if len(src) == 0 {
 			return fmt.Errorf("WriteMockCSV(): csv must have at least one column")
@@ -302,24 +295,31 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 		if len(src[0]) == 0 {
 			return fmt.Errorf("WriteMockCSV(): csv must have at least one row")
 		}
-		maxRows := len(src[0])
+		maxRows := len(src[0]) - config.NumHeaderRows
 		if maxRows < numPreviewRows {
 			numPreviewRows = maxRows
 		}
-		// copy headers
 
+		// prepare inferredTypes map
 		for range src {
 			inferredTypes = append(inferredTypes, map[DType]int{Float: 0, DateTime: 0, String: 0})
 		}
 
-		for k := range src {
-			headers = append(headers, make([]string, config.NumHeaderRows))
-			for l := 0; l < config.NumHeaderRows; l++ {
-				headers[k][l] = src[k][l]
+		// copy headers
+		headers = make([][]string, 0)
+		for l := 0; l < config.NumHeaderRows; l++ {
+			headers = append(headers, make([]string, len(src)))
+			for k := range src {
+				headers[l][k] = src[k][l]
 			}
+		}
+
+		// iterate over each column
+		for k := range src {
 			// offset by header rows
-			for i := range src[config.NumHeaderRows : numPreviewRows+config.NumHeaderRows] {
-				dtype := inferType(src[k][i])
+			values := src[k][config.NumHeaderRows : numPreviewRows+config.NumHeaderRows]
+			for i := range values {
+				dtype := inferType(values[i])
 				inferredTypes[k][dtype]++
 			}
 		}
