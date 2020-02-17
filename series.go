@@ -594,7 +594,7 @@ func (s *Series) ApplyFormat(lambda ApplyFormatFn) *Series {
 func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
 	err := lambda.validate()
 	if err != nil {
-		s.series.resetWithError((fmt.Errorf("Apply(): %v", err)))
+		s.series.resetWithError((fmt.Errorf("ApplyFormat(): %v", err)))
 		return
 	}
 	var data *valueContainer
@@ -604,7 +604,7 @@ func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
 	} else if lvl, err := findColWithName(lambda.ColName, s.series.labels); err == nil {
 		data = s.series.labels[lvl]
 	} else {
-		s.series.resetWithError(fmt.Errorf("Apply(): %v", err))
+		s.series.resetWithError(fmt.Errorf("ApplyFormat(): %v", err))
 		return
 	}
 	data.slice = data.applyFormat(lambda)
@@ -862,7 +862,7 @@ func (s *Series) Cut(bins []float64, andLess, andMore bool, labels []string) *Se
 func (s *Series) PercentileCut(bins []float64, labels []string) *Series {
 	retSlice, err := s.values.pcut(bins, labels)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("Cut(): %v", err))
+		return seriesWithError(fmt.Errorf("PercentileCut(): %v", err))
 	}
 	retVals := &valueContainer{
 		slice:  retSlice,

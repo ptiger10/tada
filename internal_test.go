@@ -4,6 +4,7 @@ import (
 	"math"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -1322,6 +1323,54 @@ func Test_inferType(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := inferType(tt.args.input); got != tt.want {
 				t.Errorf("inferType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_apply(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	type args struct {
+		apply ApplyFn
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   interface{}
+	}{
+		{"float", fields{
+			slice:  []float64{1, 2},
+			isNull: []bool{false, false},
+			name:   "foo"},
+			args{ApplyFn{F64: func(v float64) float64 { return v * 2 }}},
+			[]float64{2, 4}},
+		{"string", fields{
+			slice:  []string{"foo", "bar"},
+			isNull: []bool{false, false},
+			name:   "foo"},
+			args{ApplyFn{String: func(s string) string { return strings.Replace(s, "o", "a", -1) }}},
+			[]string{"faa", "bar"}},
+		{"date", fields{
+			slice:  []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
+			isNull: []bool{false},
+			name:   "foo"},
+			args{ApplyFn{DateTime: func(v time.Time) time.Time { return v.AddDate(0, 0, 1) }}},
+			[]time.Time{time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			if got := vc.apply(tt.args.apply); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.apply() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -1001,6 +1001,26 @@ func TestSeries_Filter(t *testing.T) {
 					return false
 				}},
 			}}, []int{2}},
+		{"all values",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			args{nil}, []int{0, 1, 2}},
+		{"fail: no filter function",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{[]FilterFn{{ColName: "*0"}}}, []int{-999}},
+		{"fail: no matching col",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{[]FilterFn{{ColName: "corge"}}}, []int{-999}},
+		{"fail: failure in multi filter",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			args{[]FilterFn{{ColName: "*0"}, {ColName: "corge"}}}, []int{-999}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1011,6 +1031,415 @@ func TestSeries_Filter(t *testing.T) {
 			}
 			if got := s.Filter(tt.args.filters...); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.Filter() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_GT(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		comparison float64
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"gt",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{1},
+			[]int{1, 2},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.GT(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.GT() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_GTE(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		comparison float64
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"gte",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{1},
+			[]int{0, 1, 2},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.GTE(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.GTE() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_LT(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		comparison float64
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"lt",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{2},
+			[]int{0},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.LT(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.LT() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_LTE(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		comparison float64
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"lte",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{2},
+			[]int{0, 1},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.LTE(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.LTE() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_FloatEQ(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		comparison float64
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"eq",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{2},
+			[]int{1},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.FloatEQ(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.FloatEQ() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_FloatNEQ(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		comparison float64
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"neq",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{2},
+			[]int{0, 2},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.FloatNEQ(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.FloatNEQ() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_EQ(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		comparison string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"eq",
+			fields{
+				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{"foo"},
+			[]int{0},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.EQ(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.EQ() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_NEQ(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		comparison string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"eq",
+			fields{
+				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{"foo"},
+			[]int{1, 2},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.NEQ(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.NEQ() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Contains(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		comparison string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"contains",
+			fields{
+				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{"ba"},
+			[]int{1, 2},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Contains(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Contains() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Before(t *testing.T) {
+	sample := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		comparison time.Time
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"before",
+			fields{
+				values: &valueContainer{slice: []time.Time{sample, sample.AddDate(0, 0, 1), sample.AddDate(0, 0, 2)}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{sample.AddDate(0, 0, 1)},
+			[]int{0},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Before(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Before() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_After(t *testing.T) {
+	sample := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		comparison time.Time
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"after",
+			fields{
+				values: &valueContainer{slice: []time.Time{sample, sample.AddDate(0, 0, 1), sample.AddDate(0, 0, 2)}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{sample.AddDate(0, 0, 1)},
+			[]int{2},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.After(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.After() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1117,6 +1546,46 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 					{name: "waldo", slice: []string{"baz", "bar"}, isNull: []bool{false, false}},
 					{name: "corge", slice: []int{0, 1}, isNull: []bool{false, false}}}},
 		},
+		{"fail - leftOn but not rightOn", fields{
+			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+			labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
+			args{
+				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
+					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
+				how:    "left",
+				leftOn: []string{"foo"}, rightOn: nil},
+			&Series{err: errors.New("LookupAdvanced(): if either leftOn or rightOn is empty, both must be empty")},
+		},
+		{"fail - no matching left key", fields{
+			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+			labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
+			args{
+				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
+					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
+				how:    "left",
+				leftOn: []string{"bar"}, rightOn: []string{"foo"}},
+			&Series{err: errors.New("LookupAdvanced(): name (bar) does not match any existing column")},
+		},
+		{"fail - no matching right key", fields{
+			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+			labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
+			args{
+				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
+					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
+				how:    "left",
+				leftOn: []string{"foo"}, rightOn: []string{"bar"}},
+			&Series{err: errors.New("LookupAdvanced(): name (bar) does not match any existing column")},
+		},
+		{"fail - no matching right key", fields{
+			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+			labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
+			args{
+				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
+					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
+				how:    "other",
+				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
+			&Series{err: errors.New("LookupAdvanced(): unsupported how: must be `left`, `right`, or `inner`")},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1126,7 +1595,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := s.LookupAdvanced(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.LookupAdvanced() = %v, want %v", got.values, tt.want.values)
+				t.Errorf("Series.LookupAdvanced() = %v, want %v", got.err, tt.want.err)
 			}
 		})
 	}
@@ -1171,6 +1640,20 @@ func TestSeries_Apply(t *testing.T) {
 			&Series{
 				values: &valueContainer{slice: []float64{0, 2}, isNull: []bool{true, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}}},
+		{"fail: no function supplied",
+			fields{
+				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{ApplyFn{ColName: "*0"}},
+			&Series{
+				err: errors.New("Apply(): no apply function provided")}},
+		{"fail: no matching col",
+			fields{
+				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{ApplyFn{ColName: "corge", F64: func(float64) float64 { return 1 }}},
+			&Series{
+				err: errors.New("Apply(): name (corge) does not match any existing column")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1180,8 +1663,68 @@ func TestSeries_Apply(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := s.Apply(tt.args.function); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.Apply() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+				t.Errorf("Series.Apply() = %v, want %v", got.err, tt.want.err)
+			}
+		})
+	}
+}
+
+func TestSeries_ApplyFormat(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		lambda ApplyFormatFn
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"apply to series values by default",
+			fields{
+				values: &valueContainer{slice: []float64{0, .25}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{ApplyFormatFn{F64: func(v float64) string { return strconv.FormatFloat(v, 'f', 1, 64) }}},
+			&Series{
+				values: &valueContainer{slice: []string{"0.0", "0.2"}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
+		{"apply to level",
+			fields{
+				values: &valueContainer{slice: []float64{0, .25}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"}}},
+			args{ApplyFormatFn{ColName: "foo",
+				F64: func(v float64) string { return strconv.FormatFloat(v, 'f', 1, 64) }}},
+			&Series{
+				values: &valueContainer{slice: []float64{0, 0.25}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []string{"0.0", "1.0"}, isNull: []bool{false, false}, name: "foo"}}}},
+		{"fail: no function supplied",
+			fields{
+				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{ApplyFormatFn{ColName: "*0"}},
+			&Series{
+				err: errors.New("ApplyFormat(): no apply function provided")}},
+		{"fail: no matching col",
+			fields{
+				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{ApplyFormatFn{ColName: "corge", F64: func(float64) string { return "foo" }}},
+			&Series{
+				err: errors.New("ApplyFormat(): name (corge) does not match any existing column")}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.ApplyFormat(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.ApplyFormat() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1621,8 +2164,35 @@ func TestSeries_GroupBy(t *testing.T) {
 						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b"},
 					}},
 				levelNames: []string{"a", "b"},
-			},
-		},
+			}},
+		{"group by specific level", fields{
+			values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
+			labels: []*valueContainer{
+				{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a"},
+				{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b"},
+			}},
+			args{[]string{"b"}},
+			&GroupedSeries{
+				groups:      map[string][]int{"foo": []int{0, 1, 2}, "bar": []int{3}},
+				orderedKeys: []string{"foo", "bar"},
+				series: &Series{
+					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
+					labels: []*valueContainer{
+						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a"},
+						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b"},
+					}},
+				levelNames: []string{"b"},
+			}},
+		{"fail - no matching level", fields{
+			values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
+			labels: []*valueContainer{
+				{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a"},
+				{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b"},
+			}},
+			args{[]string{"corge"}},
+			&GroupedSeries{
+				err: errors.New("GroupBy(): name (corge) does not match any existing column"),
+			}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1690,44 +2260,6 @@ func TestSeries_Shift(t *testing.T) {
 			if got := s.Shift(tt.args.n); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.Shift() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
-			}
-		})
-	}
-}
-
-func TestSeries_ApplyFormat(t *testing.T) {
-	type fields struct {
-		values *valueContainer
-		labels []*valueContainer
-		err    error
-	}
-	type args struct {
-		lambda ApplyFormatFn
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *Series
-	}{
-		{"apply to series values by default",
-			fields{
-				values: &valueContainer{slice: []float64{0, .25}, isNull: []bool{false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFormatFn{F64: func(v float64) string { return strconv.FormatFloat(v, 'f', 1, 64) }}},
-			&Series{
-				values: &valueContainer{slice: []string{"0.0", "0.2"}, isNull: []bool{false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values: tt.fields.values,
-				labels: tt.fields.labels,
-				err:    tt.fields.err,
-			}
-			if got := s.ApplyFormat(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.ApplyFormat() = %v, want %v", got.values, tt.want.values)
 			}
 		})
 	}
@@ -1812,6 +2344,13 @@ func TestSeries_Cut(t *testing.T) {
 			&Series{
 				values: &valueContainer{slice: []string{"", "1-2", ">2"}, isNull: []bool{true, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
+		{"fail - too many labels", fields{
+			values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{
+				bins: []float64{1, 2}, andLess: false, andMore: false, labels: []string{"foo", "bar"}},
+			&Series{
+				err: errors.New("Cut(): number of bin edges (+ includeLess + includeMore), must be one more than number of supplied labels: (2 + 0 + 0) != (2 + 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1821,7 +2360,39 @@ func TestSeries_Cut(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := s.Cut(tt.args.bins, tt.args.andLess, tt.args.andMore, tt.args.labels); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.Cut() = %v, want %v", got, tt.want)
+				t.Errorf("Series.Cut() = %v, want %v", got.err, tt.want.err)
+			}
+		})
+	}
+}
+
+func TestSeries_CumSum(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass", fields{
+			values: &valueContainer{slice: []float64{3, 2, 0}, isNull: []bool{false, false, true}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			&Series{
+				values: &valueContainer{slice: []float64{3, 5, 5}, isNull: []bool{false, false, false}, name: "cumsum"},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.CumSum(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.CumSum() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1883,6 +2454,13 @@ func TestSeries_PercentileCut(t *testing.T) {
 			&Series{
 				values: &valueContainer{slice: []string{"Bottom 50%", "Bottom 50%", "Top 50%"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
+		{"fail - too many labels", fields{
+			values: &valueContainer{slice: []float64{1, 3, 5}, isNull: []bool{false, false, false}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{
+				bins: []float64{0, .5, 1}, labels: []string{"Bottom 50%", "Too Many Labels", "Top 50%"}},
+			&Series{
+				err: errors.New("PercentileCut(): number of bin edges (+ includeLess + includeMore), must be one more than number of supplied labels: (3 + 0 + 0) != (3 + 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1951,6 +2529,197 @@ func TestSeries_Latest(t *testing.T) {
 			}
 			if got := s.Latest(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.Latest() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_SliceFloat64(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		labelLevel []int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []float64
+	}{
+		{"default values", fields{
+			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			args{nil},
+			[]float64{1, 0},
+		},
+		{"label level 1", fields{
+			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			args{[]int{0}},
+			[]float64{0, 1},
+		},
+		{"fail - index out of range", fields{
+			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			args{[]int{10}},
+			nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.SliceFloat64(tt.args.labelLevel...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.SliceFloat64() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_SliceString(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		labelLevel []int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []string
+	}{
+		{"default values", fields{
+			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			args{nil},
+			[]string{"1", "0"},
+		},
+		{"label level 1", fields{
+			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			args{[]int{0}},
+			[]string{"0", "1"},
+		},
+		{"fail - index out of range", fields{
+			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			args{[]int{10}},
+			nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.SliceString(tt.args.labelLevel...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.SliceString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_SliceNulls(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		labelLevel []int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []bool
+	}{
+		{"default values", fields{
+			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			args{nil},
+			[]bool{false, true},
+		},
+		{"label level 1", fields{
+			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			args{[]int{0}},
+			[]bool{false, false},
+		},
+		{"fail - index out of range", fields{
+			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			args{[]int{10}},
+			nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.SliceNulls(tt.args.labelLevel...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.SliceNulls() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+func TestSeries_SliceTime(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		labelLevel []int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []time.Time
+	}{
+		{"default values", fields{
+			values: &valueContainer{slice: []string{"2020/1/1"}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
+			args{nil},
+			[]time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
+		},
+		{"label level 1", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{{slice: []string{"2020/1/1"}, isNull: []bool{false}, name: "qux"}}},
+			args{[]int{0}},
+			[]time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
+		},
+		{"fail - index out of range", fields{
+			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			args{[]int{10}},
+			nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.SliceTime(tt.args.labelLevel...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.SliceTime() = %v, want %v", got, tt.want)
 			}
 		})
 	}
