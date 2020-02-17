@@ -406,24 +406,14 @@ func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
 	numRows := len(csv) - cfg.NumHeaderRows
 
 	// prepare intermediary values containers
-	vals := make([][]string, numCols)
-	valsIsNull := make([][]bool, numCols)
-	valsNames := make([][]string, numCols)
-	for k := range vals {
-		vals[k] = make([]string, numRows)
-		valsIsNull[k] = make([]bool, numRows)
-		valsNames[k] = make([]string, cfg.NumHeaderRows)
-	}
+	vals := makeStringMatrix(numCols, numRows)
+	valsIsNull := makeBoolMatrix(numCols, numRows)
+	valsNames := makeStringMatrix(numCols, cfg.NumHeaderRows)
 
 	// prepare intermediary label containers
-	labels := make([][]string, cfg.NumLabelCols)
-	labelsIsNull := make([][]bool, cfg.NumLabelCols)
-	labelsNames := make([][]string, cfg.NumLabelCols)
-	for j := range labels {
-		labels[j] = make([]string, numRows)
-		labelsIsNull[j] = make([]bool, numRows)
-		labelsNames[j] = make([]string, cfg.NumHeaderRows)
-	}
+	labels := makeStringMatrix(cfg.NumLabelCols, numRows)
+	labelsIsNull := makeBoolMatrix(cfg.NumLabelCols, numRows)
+	levelNames := makeStringMatrix(cfg.NumLabelCols, cfg.NumHeaderRows)
 
 	// iterate over csv and transpose rows and columns
 	for row := range csv {
@@ -431,7 +421,7 @@ func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
 			if row < cfg.NumHeaderRows {
 				if column < cfg.NumLabelCols {
 					// write header rows to labels, no offset
-					labelsNames[column][row] = csv[row][column]
+					levelNames[column][row] = csv[row][column]
 				} else {
 					// write header rows to cols, offset for label cols
 					valsNames[column-cfg.NumLabelCols][row] = csv[row][column]
@@ -450,46 +440,39 @@ func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
 		}
 	}
 
-	// transfer values to final value containers
-	retLabels := make([]*valueContainer, len(labels))
-	retVals := make([]*valueContainer, len(vals))
-	for k := range retVals {
-		retVals[k] = &valueContainer{
-			slice:  vals[k],
-			isNull: valsIsNull[k],
-			name:   strings.Join(valsNames[k], optionLevelSeparator),
-		}
+	retNames := make([]string, len(valsNames))
+	for k := range valsNames {
+		retNames[k] = strings.Join(valsNames[k], optionLevelSeparator)
 	}
-	for j := range retLabels {
-		retLabels[j] = &valueContainer{
-			slice:  labels[j],
-			isNull: labelsIsNull[j],
-			name:   strings.Join(labelsNames[j], optionLevelSeparator),
-		}
+	retLevelNames := make([]string, len(levelNames))
+	for k := range levelNames {
+		retLevelNames[k] = strings.Join(levelNames[k], optionLevelSeparator)
 	}
+
+	// transfer values and labels to final value containers
+	retVals := copyStringsIntoValueContainers(vals, valsIsNull, retNames)
+	retLabels := copyStringsIntoValueContainers(labels, labelsIsNull, retLevelNames)
+
 	// create default labels if no labels
-	if len(retLabels) == 0 {
-		defaultLabels := makeDefaultLabels(0, numRows)
-		retLabels = append(retLabels, defaultLabels)
-	}
+	retLabels = defaultLabelsIfEmpty(retLabels, numRows)
+
 	// create default col level names
-	retColLevelNames := make([]string, cfg.NumHeaderRows)
-	for l := range retColLevelNames {
-		retColLevelNames[l] = fmt.Sprintf("*%d", l)
-	}
-	// create default column names
-	if len(retColLevelNames) == 0 {
-		retColLevelNames = append(retColLevelNames, "*0")
-		for k := range retVals {
-			retVals[k].name = fmt.Sprintf("%v", k)
-		}
-	}
+	var retColLevelNames []string
+	retColLevelNames, retVals = defaultColsIfNoHeader(cfg.NumHeaderRows, retVals)
 
 	return &DataFrame{
 		values:        retVals,
 		labels:        retLabels,
 		colLevelNames: retColLevelNames,
 	}
+}
+
+func defaultLabelsIfEmpty(labels []*valueContainer, numRows int) []*valueContainer {
+	if len(labels) == 0 {
+		defaultLabels := makeDefaultLabels(0, numRows)
+		labels = append(labels, defaultLabels)
+	}
+	return labels
 }
 
 func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
@@ -529,45 +512,39 @@ func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 		}
 	}
 
-	// transfer values to final value containers
-	retLabels := make([]*valueContainer, len(labels))
-	retVals := make([]*valueContainer, len(vals))
-	for k := range retVals {
-		retVals[k] = &valueContainer{
-			slice:  vals[k],
-			isNull: valsIsNull[k],
-			name:   valsNames[k],
-		}
-	}
-	for j := range retLabels {
-		retLabels[j] = &valueContainer{
-			slice:  labels[j],
-			isNull: labelsIsNull[j],
-			name:   labelsNames[j],
-		}
-	}
+	// transfer values and labels to final value containers
+	retVals := copyStringsIntoValueContainers(vals, valsIsNull, valsNames)
+	retLabels := copyStringsIntoValueContainers(labels, labelsIsNull, labelsNames)
+
 	// create default labels if no labels
-	if len(retLabels) == 0 {
-		defaultLabels := makeDefaultLabels(0, numRows)
-		retLabels = append(retLabels, defaultLabels)
-	}
+	retLabels = defaultLabelsIfEmpty(retLabels, numRows)
+
 	// create default col level names
-	retColLevelNames := make([]string, cfg.NumHeaderRows)
-	for l := range retColLevelNames {
-		retColLevelNames[l] = fmt.Sprintf("*%d", l)
-	}
-	if len(retColLevelNames) == 0 {
-		retColLevelNames = append(retColLevelNames, "*0")
-	}
-	for k := range retVals {
-		retVals[k].name = fmt.Sprintf("%v", k)
-	}
+	var retColLevelNames []string
+	retColLevelNames, retVals = defaultColsIfNoHeader(cfg.NumHeaderRows, retVals)
+
 	return &DataFrame{
 		values:        retVals,
 		labels:        retLabels,
 		colLevelNames: retColLevelNames,
 	}
 
+}
+
+func defaultColsIfNoHeader(numHeaderRows int, columns []*valueContainer) ([]string, []*valueContainer) {
+	if numHeaderRows <= 0 {
+		// if no header rows, change the names of the columns to be 0, 1...
+		for k := range columns {
+			columns[k].name = fmt.Sprintf("%v", k)
+		}
+		return []string{"*0"}, columns
+	}
+	// if header rows, set the col level names to *0, *1...
+	ret := make([]string, numHeaderRows)
+	for l := range ret {
+		ret[l] = fmt.Sprintf("*%d", l)
+	}
+	return ret, columns
 }
 
 func readStruct(slice interface{}) ([]*valueContainer, error) {
