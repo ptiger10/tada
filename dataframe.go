@@ -19,52 +19,22 @@ import (
 // NewDataFrame stub
 func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 	// handle values
-	var values []*valueContainer
-	for i, slice := range slices {
-		if !isSlice(slice) {
-			return &DataFrame{err: fmt.Errorf(
-				"NewDataFrame(): unsupported kind (%v) in `slices` (position %v); must be slice", reflect.TypeOf(slice).Kind(), i)}
-		}
-		if reflect.ValueOf(slice).Len() == 0 {
-			return &DataFrame{err: fmt.Errorf("NewDataFrame(): empty slice in slices (position %v): cannot be empty", i)}
-		}
-		isNull := setNullsFromInterface(slice)
-		if isNull == nil {
-			return &DataFrame{err: fmt.Errorf(
-				"NewDataFrame(): unable to calculate null values ([]%v not supported)", reflect.TypeOf(slice).Elem())}
-		}
-		// handle special case of []Element: convert to []interface{}
-		elements := handleElementsSlice(slice)
-		if elements != nil {
-			slice = elements
-		}
-		values = append(values, &valueContainer{slice: slice, isNull: isNull, name: fmt.Sprintf("%d", i)})
+	values, err := makeValueContainersFromInterfaces(slices, false)
+	if err != nil {
+		return dataFrameWithError(fmt.Errorf("NewDataFrame(): slices: %v", err))
 	}
-
 	// handle labels
 	retLabels := make([]*valueContainer, len(labels))
 	if len(retLabels) == 0 {
 		// handle default labels
-		defaultLabels := makeDefaultLabels(0, reflect.ValueOf(slices[0]).Len())
+		numRows := reflect.ValueOf(slices[0]).Len()
+		defaultLabels := makeDefaultLabels(0, numRows)
 		retLabels = append(retLabels, defaultLabels)
 	} else {
 		// handle supplied labels
-		for i := range retLabels {
-			slice := labels[i]
-			if !isSlice(slice) {
-				return dataFrameWithError(fmt.Errorf("NewDataFrame(): unsupported label kind (%v) at level %d; must be slice", reflect.TypeOf(slice), i))
-			}
-			isNull := setNullsFromInterface(slice)
-			if isNull == nil {
-				return dataFrameWithError(fmt.Errorf(
-					"NewDataFrame(): unable to calculate null values at level %d ([]%v not supported)", i, reflect.TypeOf(slice).Elem()))
-			}
-			// handle special case of []Element: convert to []interface{}
-			elements := handleElementsSlice(slice)
-			if elements != nil {
-				slice = elements
-			}
-			retLabels[i] = &valueContainer{slice: slice, isNull: isNull, name: fmt.Sprintf("*%d", i)}
+		retLabels, err = makeValueContainersFromInterfaces(labels, true)
+		if err != nil {
+			return dataFrameWithError(fmt.Errorf("NewDataFrame(): labels: %v", err))
 		}
 	}
 

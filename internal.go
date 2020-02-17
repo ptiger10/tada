@@ -43,6 +43,43 @@ func isSlice(input interface{}) bool {
 	return reflect.TypeOf(input).Kind() == reflect.Slice
 }
 
+func makeValueContainerFromInterface(slice interface{}, name string) (*valueContainer, error) {
+	if !isSlice(slice) {
+		return nil, fmt.Errorf("unsupported kind (%v); must be slice", reflect.TypeOf(slice).Kind())
+	}
+	if reflect.ValueOf(slice).Len() == 0 {
+		return nil, fmt.Errorf("empty slice: cannot be empty")
+	}
+	isNull := setNullsFromInterface(slice)
+	if isNull == nil {
+		return nil, fmt.Errorf("unable to calculate null values ([]%v not supported)", reflect.TypeOf(slice).Elem())
+	}
+	// handle special case of []Element: convert to []interface{}
+	elements := handleElementsSlice(slice)
+	if elements != nil {
+		slice = elements
+	}
+	return &valueContainer{
+		slice: slice, isNull: isNull, name: name,
+	}, nil
+}
+
+func makeValueContainersFromInterfaces(slices []interface{}, prefixAsterisk bool) ([]*valueContainer, error) {
+	var namePrefix string
+	if prefixAsterisk {
+		namePrefix = "*"
+	}
+	ret := make([]*valueContainer, len(slices))
+	for i, slice := range slices {
+		vc, err := makeValueContainerFromInterface(slice, namePrefix+fmt.Sprint(i))
+		if err != nil {
+			return nil, fmt.Errorf("error at position %d: %v", i, err)
+		}
+		ret[i] = vc
+	}
+	return ret, nil
+}
+
 // makeDefaultLabels returns a valueContainer with a
 // sequential series of numbers (inclusive of min, exclusive of max), a companion isNull slice, and a name.
 func makeDefaultLabels(min, max int) *valueContainer {

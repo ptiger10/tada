@@ -52,7 +52,8 @@ func TestNewDataFrame(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := NewDataFrame(tt.args.slices, tt.args.labels...); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewDataFrame() = %v, want %v", got.err, tt.want.err)
+				t.Errorf("NewDataFrame() = %v, want %v", got, tt.want)
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}

@@ -78,6 +78,86 @@ func Test_dataFrameWithError(t *testing.T) {
 	}
 }
 
+func Test_makeValueContainerFromInterface(t *testing.T) {
+	type args struct {
+		slice interface{}
+		name  string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *valueContainer
+		wantErr bool
+	}{
+		{"pass", args{[]float64{1}, "0"},
+			&valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "0"}, false},
+		{"pass - elements", args{[]Element{{val: float64(1), isNull: false}}, "0"},
+			&valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "0"}, false},
+		{"fail - empty slice", args{[]float64{}, "0"},
+			nil, true},
+		{"fail - unsupported slice", args{[]complex64{1}, "0"},
+			nil, true},
+		{"fail - not slice", args{"foo", "0"},
+			nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := makeValueContainerFromInterface(tt.args.slice, tt.args.name)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("makeValueContainerFromInterface() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("makeValueContainerFromInterface() = %#v, want %#v", got.slice, tt.want.slice)
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+			}
+		})
+	}
+}
+
+func Test_makeValueContainersFromInterfaces(t *testing.T) {
+	type args struct {
+		slices         []interface{}
+		prefixAsterisk bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*valueContainer
+		wantErr bool
+	}{
+		{"pass, no prefix", args{[]interface{}{[]float64{1}, []string{"foo"}}, false},
+			[]*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "0"},
+				{slice: []string{"foo"}, isNull: []bool{false}, name: "1"}},
+			false,
+		},
+		{"pass, prefix", args{[]interface{}{[]float64{1}, []string{"foo"}}, true},
+			[]*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "*0"},
+				{slice: []string{"foo"}, isNull: []bool{false}, name: "*1"}},
+			false,
+		},
+		{"fail, unsupported", args{[]interface{}{"foo"}, false},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := makeValueContainersFromInterfaces(tt.args.slices, tt.args.prefixAsterisk)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("makeValueContainersFromInterfaces() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("makeValueContainersFromInterfaces() = %v, want %v", got[0], tt.want[0])
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+			}
+		})
+	}
+}
+
 func Test_findMatchingKeysBetweenTwoLabelContainers(t *testing.T) {
 	type args struct {
 		labels1 []*valueContainer
