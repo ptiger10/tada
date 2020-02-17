@@ -1,13 +1,131 @@
 package tada
 
 import (
+	"errors"
 	"math"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/d4l3k/messagediff"
 )
+
+func TestDataFrame_resetWithError(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		err error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{true, false, false}, name: "0"},
+				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, true, false}, name: "1"}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
+			args{errors.New("foo")},
+			&DataFrame{
+				err: errors.New("foo"),
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if df.resetWithError(tt.args.err); !reflect.DeepEqual(df, tt.want) {
+				t.Errorf("df.resetWithError() = %v, want %v", df.err, tt.want.err)
+				t.Errorf(messagediff.PrettyDiff(df, tt.want))
+			}
+		})
+	}
+}
+
+func Test_dataFrameWithError(t *testing.T) {
+	type args struct {
+		err error
+	}
+	tests := []struct {
+		name string
+		args args
+		want *DataFrame
+	}{
+		{"pass", args{errors.New("foo")}, &DataFrame{err: errors.New("foo")}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := dataFrameWithError(tt.args.err); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("dataFrameWithError() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_findMatchingKeysBetweenTwoLabelContainers(t *testing.T) {
+	type args struct {
+		labels1 []*valueContainer
+		labels2 []*valueContainer
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  []int
+		want1 []int
+	}{
+		{"1 match", args{
+			labels1: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*1"},
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
+			},
+			labels2: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+		}, []int{1}, []int{0}},
+		{"duplicates", args{
+			labels1: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
+				{slice: []int{0}, isNull: []bool{false}, name: "*1"},
+			},
+			labels2: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+		}, []int{0}, []int{0}},
+		{"no matches", args{
+			labels1: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*1"},
+			},
+			labels2: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+		}, nil, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := findMatchingKeysBetweenTwoLabelContainers(tt.args.labels1, tt.args.labels2)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("findMatchingKeysBetweenTwoLabelContainers() got = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got1, tt.want1) {
+				t.Errorf("findMatchingKeysBetweenTwoLabelContainers() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
 
 func Test_setNullsFromInterface(t *testing.T) {
 	type args struct {

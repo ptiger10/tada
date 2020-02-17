@@ -929,25 +929,15 @@ func (df *DataFrame) Transpose() *DataFrame {
 			valsIsNull[i][k] = df.values[k].isNull[i]
 		}
 	}
+
+	retColNames := make([]string, len(vals))
+	for k := range colNames {
+		retColNames[k] = joinLevelsIntoLabel(colNames[k])
+	}
 	// transfer to valueContainers
-	retLabels := make([]*valueContainer, df.numColLevels())
-	retVals := make([]*valueContainer, df.Len())
-	// labels
-	for j := range labels {
-		retLabels[j] = &valueContainer{
-			slice:  labels[j],
-			isNull: labelsIsNull[j],
-			name:   labelNames[j],
-		}
-	}
-	// values
-	for k := range retVals {
-		retVals[k] = &valueContainer{
-			slice:  vals[k],
-			isNull: valsIsNull[k],
-			name:   joinLevelsIntoLabel(colNames[k]),
-		}
-	}
+	retLabels := copyStringsIntoValueContainers(labels, labelsIsNull, labelNames)
+	retVals := copyStringsIntoValueContainers(vals, valsIsNull, retColNames)
+
 	return &DataFrame{
 		values:        retVals,
 		labels:        retLabels,
@@ -982,80 +972,82 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 		// if a label is selected, remove it from the residual labels
 		residualLabelIndex = excludeFromIndex(len(df.labels), index)
 	}
-	retName := valsToPromote.name
+	retColLevelNames := append([]string{valsToPromote.name}, df.colLevelNames...)
 	// lookupSource maps the unique values in the promoted column to the rows with that value
 	lookupSource, _, orderedKeys, _ := labelsToMap([]*valueContainer{valsToPromote}, []int{0})
 	// rowToUniqueLabels maps each original row index to its matching index in the return container
 	// this step consolidates duplicate residual labels
 	_, _, uniqueLabels, rowToUniqueLabels := labelsToMap(df.labels, residualLabelIndex)
 
-	// new labels will have as many columns as the residual label index
-	newLabelNames := make([]string, len(residualLabelIndex))
-	newLabels := make([][]string, len(residualLabelIndex))
+	// new labels will have as many columns as the residual label index and as many rows as the number of unique labels
+	newLevelNames := make([]string, len(residualLabelIndex))
+	newLabels := makeStringMatrix(len(residualLabelIndex), len(uniqueLabels))
 	for j, pos := range residualLabelIndex {
-		newLabels[j] = make([]string, len(uniqueLabels))
 		for i := range uniqueLabels {
-			splitNames := splitLabelIntoLevels(uniqueLabels[i], true)
-			for _, name := range splitNames {
-				newLabels[j][i] = name
+			splitLabelNames := splitLabelIntoLevels(uniqueLabels[i], true)
+			for _, labelName := range splitLabelNames {
+				newLabels[j][i] = labelName
 			}
 		}
-		newLabelNames[j] = df.labels[pos].name
+		newLevelNames[j] = df.labels[pos].name
 	}
 
 	// new values will have as many columns as unique values in the column-to-be-stacked * existing columns
 	// (minus the stacked column * existing columns, if a column is selected and not label level)
-	newVals := make([][]string, len(lookupSource)*df.numColumns())
-	colNames := make([]string, len(lookupSource)*df.numColumns())
-	for k := range newVals {
-		newVals[k] = make([]string, len(uniqueLabels))
+	numNewCols := len(lookupSource) * df.numColumns()
+	colNames := make([]string, numNewCols)
+	newVals := make([]interface{}, numNewCols)
+	newIsNull := makeBoolMatrix(numNewCols, len(uniqueLabels))
+	for k := range newIsNull {
+		for i := range newIsNull[k] {
+			// by default, set all nulls to true
+			newIsNull[k][i] = true
+		}
 	}
+
 	// iterate over original columns -> unique values of stacked column -> row index of each unique value
 	// compare to original value at column and row position
 	// write to new row in container for each label value
 	for k := 0; k < df.numColumns(); k++ {
+		// skip column if it is derivative of the original - then drop those columns later
+		if k == index && isCol {
+			continue
+		}
+		originalVals := reflect.ValueOf(df.values[k].slice)
 		for m, orderedKey := range orderedKeys {
-			newColumn := k*len(lookupSource) + m
-			// skip column if it is derivative of the original
-			if k == index && isCol {
-				continue
-			}
+			newColumnIndex := k*len(lookupSource) + m
 			newHeader := joinLevelsIntoLabel([]string{orderedKey, df.values[k].name})
-			colNames[newColumn] = newHeader
-			originalVals := df.values[k].str().slice
+			colNames[newColumnIndex] = newHeader
+			newVals[newColumnIndex] = reflect.MakeSlice(originalVals.Type(), len(uniqueLabels), len(uniqueLabels)).Interface()
+
+			// write to new column and new row index
 			for _, i := range lookupSource[orderedKey] {
-				newRow := rowToUniqueLabels[i]
-				newVals[newColumn][newRow] = originalVals[i]
+				newRowIndex := rowToUniqueLabels[i]
+				// if value is found in original data, it is not null in new data
+				newIsNull[newColumnIndex][newRowIndex] = false
+				reflect.ValueOf(newVals[newColumnIndex]).
+					Index(newRowIndex).
+					Set(originalVals.Index(i))
 			}
 		}
 	}
-	// transfer values to final form
-	retVals := make([]*valueContainer, len(newVals))
-	for k := range retVals {
-		retVals[k] = &valueContainer{
-			slice:  newVals[k],
-			isNull: setNullsFromInterface(newVals[k]),
-			name:   colNames[k],
-		}
-	}
-	// transfer labels to final form
-	retLabels := make([]*valueContainer, len(newLabels))
-	for j := range retLabels {
-		retLabels[j] = &valueContainer{
-			slice:  newLabels[j],
-			isNull: setNullsFromInterface(newLabels[j]),
-			name:   newLabelNames[j],
-		}
-	}
-	// if a column is selected, drop cols that are a derivative of the original
+	// if a column was selected for promotion, drop all cols that are a derivative of the original
 	if isCol {
-		retVals = append(retVals[:index*len(lookupSource)],
-			retVals[index*len(lookupSource)+len(lookupSource):]...)
+		toDropStart := index * len(lookupSource)
+		toDropEnd := toDropStart + len(lookupSource)
+		newVals = append(newVals[:toDropStart], newVals[toDropEnd:]...)
+		colNames = append(colNames[:toDropStart], colNames[toDropEnd:]...)
+		newIsNull = append(newIsNull[:toDropStart], newIsNull[toDropEnd:]...)
 	}
+
+	// transfer values and labels to final form
+	retVals := copyInterfaceIntoValueContainers(newVals, newIsNull, colNames)
+	retLabels := copyStringsIntoValueContainers(newLabels, nil, newLevelNames)
+
 	return &DataFrame{
 		values:        retVals,
 		labels:        retLabels,
-		colLevelNames: append([]string{retName}, df.colLevelNames...),
+		colLevelNames: retColLevelNames,
 		name:          df.name,
 	}
 }

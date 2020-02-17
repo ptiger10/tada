@@ -24,6 +24,7 @@ func (df *DataFrame) resetWithError(err error) {
 	df.labels = nil
 	df.name = ""
 	df.err = err
+	df.colLevelNames = nil
 }
 
 func seriesWithError(err error) *Series {
@@ -84,14 +85,18 @@ func handleElementsSlice(input interface{}) []interface{} {
 func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels2 []*valueContainer) ([]int, []int) {
 	var leftKeys, rightKeys []int
 	searched := make(map[string]bool)
+	// add every level name to the map in order to skip duplicates
 	for j := range labels1 {
 		key := labels1[j].name
+		// if level name already in map, skip
 		if _, ok := searched[key]; ok {
 			continue
+			// if level name not already in map, add to map
 		} else {
 			searched[key] = true
 		}
 		for k := range labels2 {
+			// compare to every name in labels2
 			if key == labels2[k].name {
 				leftKeys = append(leftKeys, j)
 				rightKeys = append(rightKeys, k)
@@ -102,7 +107,7 @@ func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels
 	return leftKeys, rightKeys
 }
 
-// if name is not found in either columns nor labels, return error
+// if name is found in neither columns nor labels, return error
 func findNameInColumnsOrLabels(name string, cols []*valueContainer, labels []*valueContainer) (index int, isCol bool, err error) {
 	// first check column names
 	if lvl, err := findColWithName(name, cols); err == nil {
@@ -185,8 +190,15 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 // -- MATRIX MANIPULATION
 
 // expects every item in `slices` to be a slice, and for len(slices) to equal len(isNull) and len(names)
+// if isNull is nil, sets null values from `slices`
 func copyInterfaceIntoValueContainers(slices []interface{}, isNull [][]bool, names []string) []*valueContainer {
 	ret := make([]*valueContainer, len(names))
+	if isNull == nil {
+		isNull = make([][]bool, len(slices))
+		for k := range slices {
+			isNull[k] = setNullsFromInterface(slices[k])
+		}
+	}
 	for k := range slices {
 		ret[k] = &valueContainer{
 			slice:  slices[k],
@@ -197,7 +209,7 @@ func copyInterfaceIntoValueContainers(slices []interface{}, isNull [][]bool, nam
 	return ret
 }
 
-// convert strings to interface
+// convert strings to interface. if isNull is nil, sets null values from `slices`
 func copyStringsIntoValueContainers(slices [][]string, isNull [][]bool, names []string) []*valueContainer {
 	slicesInterface := make([]interface{}, len(slices))
 	for k := range slices {
@@ -213,6 +225,23 @@ func makeStringMatrix(numCols, numRows int) [][]string {
 		ret[k] = make([]string, numRows)
 	}
 	return ret
+}
+
+// columns as major dimension; expect
+func makeInterfaceMatrixWithDTypes(dtypes []reflect.Type, numRows int) []interface{} {
+	ret := make([]interface{}, len(dtypes))
+	for k := 0; k < len(dtypes); k++ {
+		ret[k] = reflect.MakeSlice(dtypes[k], numRows, numRows)
+	}
+	return ret
+}
+
+func extractDTypes(values []*valueContainer) []reflect.Type {
+	originalDTypes := make([]reflect.Type, len(values))
+	for k := range originalDTypes {
+		originalDTypes[k] = reflect.ValueOf(values[k]).Type()
+	}
+	return originalDTypes
 }
 
 // columns as major dimension
@@ -953,7 +982,7 @@ func (vc *valueContainer) apply(apply ApplyFn) interface{} {
 	return ret
 }
 
-// expects slices to be same-lengthed
+// expects slices to be same-lengthed; if either is true at position x, ret is true at position x
 func isEitherNull(isNull1, isNull2 []bool) []bool {
 	ret := make([]bool, len(isNull1))
 	for i := 0; i < len(isNull1); i++ {
@@ -1027,7 +1056,7 @@ func convertColNamesToIndexPositions(names []string, columns []*valueContainer) 
 	return ret, nil
 }
 
-// concatenateLabelsToStringsreduces all label levels referenced in the index to a single slice of concatenated strings
+// concatenateLabelsToStrings reduces all label levels referenced in the index to a single slice of concatenated strings
 func concatenateLabelsToStrings(labels []*valueContainer, index []int) []string {
 	sep := "|"
 	labelStrings := make([][]string, len(index))
@@ -1089,6 +1118,7 @@ func labelsToMap(labels []*valueContainer, index []int) (
 	return
 }
 
+// if labels1[i] is in labels2, ret[i] = labels2[labels1[i]], else ret[i] = -1
 func matchLabelPositions(labels1 []string, labels2 map[string]int) []int {
 	ret := make([]int, len(labels1))
 	for i, key := range labels1 {
@@ -1105,10 +1135,10 @@ func (s *Series) combineMath(other *Series, ignoreMissing bool, fn func(v1 float
 	retFloat := make([]float64, s.Len())
 	retIsNull := make([]bool, s.Len())
 	lookupVals := s.Lookup(other)
-	lookupFloat := lookupVals.SliceFloat64()
-	lookupNulls := lookupVals.SliceNulls()
-	originalFloat := s.SliceFloat64()
-	originalNulls := s.SliceNulls()
+	lookupFloat := lookupVals.values.float().slice
+	lookupNulls := lookupVals.values.isNull
+	originalFloat := s.values.float().slice
+	originalNulls := s.values.isNull
 	for i := range originalFloat {
 		// handle null lookup
 		if lookupNulls[i] {

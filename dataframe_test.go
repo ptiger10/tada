@@ -32,11 +32,26 @@ func TestNewDataFrame(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
 		},
+		{"fail - unsupported kind", args{
+			[]interface{}{"foo"}, nil},
+			&DataFrame{
+				err: errors.New("NewDataFrame(): unsupported kind (string) in `slices` (position 0); must be slice")},
+		},
+		{"fail - empty slice", args{
+			[]interface{}{[]float64{}}, nil},
+			&DataFrame{
+				err: errors.New("NewDataFrame(): empty slice in slices (position 0): cannot be empty")},
+		},
+		{"fail - unsupported values type", args{
+			[]interface{}{[]complex64{1}}, nil},
+			&DataFrame{
+				err: errors.New("NewDataFrame(): unable to calculate null values ([]complex64 not supported)")},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := NewDataFrame(tt.args.slices, tt.args.labels...); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewDataFrame() = %v, want %v", got, tt.want)
+				t.Errorf("NewDataFrame() = %v, want %v", got.err, tt.want.err)
 			}
 		})
 	}
@@ -441,8 +456,8 @@ func TestDataFrame_Range(t *testing.T) {
 			name: "baz"},
 			args{1, 2},
 			&DataFrame{values: []*valueContainer{
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "0"}},
-				labels: []*valueContainer{{slice: []int{1, 2}, isNull: []bool{false, false}, name: "*0"}},
+				{slice: []string{"bar"}, isNull: []bool{false}, name: "0"}},
+				labels: []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
 				name:   "baz"}},
 	}
 	for _, tt := range tests {
@@ -1230,6 +1245,123 @@ func TestDataFrame_Std(t *testing.T) {
 	}
 }
 
+func TestDataFrame_Count(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "bar"},
+			},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "baz"}},
+		},
+			&Series{
+				values: &valueContainer{slice: []float64{2, 2}, isNull: []bool{false, false}, name: "count"},
+				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.Count(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Count() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_Min(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "bar"},
+			},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "baz"}},
+		},
+			&Series{
+				values: &valueContainer{slice: []float64{1, 3}, isNull: []bool{false, false}, name: "min"},
+				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.Min(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Min() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_Max(t *testing.T) {
+	type fields struct {
+		labels []*valueContainer
+		values []*valueContainer
+		name   string
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "bar"},
+			},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "baz"}},
+		},
+			&Series{
+				values: &valueContainer{slice: []float64{2, 4}, isNull: []bool{false, false}, name: "max"},
+				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				name:   tt.fields.name,
+				err:    tt.fields.err,
+			}
+			if got := df.Max(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Max() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestDataFrame_Lookup(t *testing.T) {
 	type fields struct {
 		labels []*valueContainer
@@ -1480,10 +1612,10 @@ func TestDataFrame_PromoteToColLevel(t *testing.T) {
 		args   args
 		want   *DataFrame
 	}{
-		{"stack column", fields{
+		{"stack column - string", fields{
 			values: []*valueContainer{
 				{slice: []int{2018, 2018, 2019, 2019}, isNull: []bool{false, false, false, false}, name: "year"},
-				{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false}, name: "foo"}},
+				{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "foo"}},
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
 			},
@@ -1498,7 +1630,7 @@ func TestDataFrame_PromoteToColLevel(t *testing.T) {
 				},
 				colLevelNames: []string{"year", "*0"},
 			}},
-		{"stack repeat labels", fields{
+		{"stack labels with repeats - int", fields{
 			values: []*valueContainer{
 				{slice: []int{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"}},
 			labels: []*valueContainer{
@@ -1509,8 +1641,8 @@ func TestDataFrame_PromoteToColLevel(t *testing.T) {
 		}, args{"year"},
 			&DataFrame{
 				values: []*valueContainer{
-					{slice: []string{"1", "2", ""}, isNull: []bool{false, false, true}, name: "2018|foo"},
-					{slice: []string{"", "3", "4"}, isNull: []bool{true, false, false}, name: "2019|foo"}},
+					{slice: []int{1, 2, 0}, isNull: []bool{false, false, true}, name: "2018|foo"},
+					{slice: []int{0, 3, 4}, isNull: []bool{true, false, false}, name: "2019|foo"}},
 				labels: []*valueContainer{
 					{slice: []string{"A", "B", "C"}, isNull: []bool{false, false, false}, name: "bar"},
 				},
@@ -1527,7 +1659,7 @@ func TestDataFrame_PromoteToColLevel(t *testing.T) {
 				colLevelNames: tt.fields.colLevelNames,
 			}
 			if got := df.PromoteToColLevel(tt.args.name); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.PromoteToColLevel() = %v, want %v", got.values[0], tt.want.values[0])
+				t.Errorf("DataFrame.PromoteToColLevel() = %v, want %v", got.values[1], tt.want.values[1])
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
@@ -1634,8 +1766,8 @@ func TestDataFrame_PivotTable(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{labels: "type", columns: "year", values: "amount", aggFn: "sum"},
 			&DataFrame{values: []*valueContainer{
-				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "2018"},
-				{slice: []string{"", "7"}, isNull: []bool{true, false}, name: "2019"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "2018"},
+				{slice: []float64{0, 7}, isNull: []bool{true, false}, name: "2019"},
 			},
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
