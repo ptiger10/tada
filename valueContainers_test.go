@@ -384,7 +384,7 @@ func Test_valueContainer_float(t *testing.T) {
 		{"[]bool", fields{slice: []bool{false, true, false}, isNull: []bool{false, false, true}},
 			floatValueContainer{slice: []float64{0, 1, 0}, isNull: []bool{false, false, true}, index: []int{0, 1, 2}}},
 		{"[]interface", fields{slice: []interface{}{"3.5", float64(1), int(1), uint(1), d, false}, isNull: []bool{false, false, false, false, false, false}},
-			floatValueContainer{slice: []float64{3.5, 1, 1, 1, 0, 0}, isNull: []bool{false, false, false, true, false, false}, index: []int{0, 1, 2, 3, 4, 5}}},
+			floatValueContainer{slice: []float64{3.5, 1, 1, 1, 0, 0}, isNull: []bool{false, false, false, false, true, false}, index: []int{0, 1, 2, 3, 4, 5}}},
 		{"[]int", fields{slice: []int{1}, isNull: []bool{false}},
 			floatValueContainer{slice: []float64{1}, isNull: []bool{false}, index: []int{0}}},
 	}

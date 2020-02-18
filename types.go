@@ -106,6 +106,9 @@ type ApplyFormatFn struct {
 // GroupedSeries stub
 type GroupedSeries struct {
 	groups      map[string][]int
+	newGroups   map[string]int
+	rowIndices  [][]int
+	newLabels   []*valueContainer
 	orderedKeys []string
 	series      *Series
 	levelNames  []string

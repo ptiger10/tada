@@ -2154,14 +2154,17 @@ func TestSeries_GroupBy(t *testing.T) {
 			}},
 			args{nil},
 			&GroupedSeries{
-				groups:      map[string][]int{"0|foo": []int{0, 1}, "1|foo": []int{2}, "2|bar": []int{3}},
-				orderedKeys: []string{"0|foo", "1|foo", "2|bar"},
+				rowIndices: [][]int{{0, 1}, {2}, {3}},
+				newGroups:  map[string]int{"0|foo": 0, "1|foo": 2, "2|bar": 3},
+				newLabels: []*valueContainer{
+					{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "a"},
+					{slice: []string{"foo", "foo", "bar"}, isNull: []bool{false, false, false}, name: "b"}},
 				series: &Series{
 					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
 					labels: []*valueContainer{
 						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a"},
-						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b"},
-					}},
+						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b"}},
+				},
 				levelNames: []string{"a", "b"},
 			}},
 		{"group by specific level", fields{
@@ -2172,8 +2175,10 @@ func TestSeries_GroupBy(t *testing.T) {
 			}},
 			args{[]string{"b"}},
 			&GroupedSeries{
-				groups:      map[string][]int{"foo": []int{0, 1, 2}, "bar": []int{3}},
-				orderedKeys: []string{"foo", "bar"},
+				rowIndices: [][]int{{0, 1, 2}, {3}},
+				newGroups:  map[string]int{"foo": 0, "bar": 3},
+				newLabels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "b"}},
 				series: &Series{
 					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
 					labels: []*valueContainer{

@@ -674,15 +674,15 @@ func (vc *valueContainer) subsetRows(index []int) error {
 	return nil
 }
 
-// subsetCols returns a new set of valueContainers containing only the columns specified by index.
+// subsetContainers returns a new set of valueContainers containing only the columns specified by index.
 // If any position is out of range, returns error
-func subsetCols(cols []*valueContainer, index []int) ([]*valueContainer, error) {
+func subsetContainers(containers []*valueContainer, index []int) ([]*valueContainer, error) {
 	retLabels := make([]*valueContainer, len(index))
 	for indexPosition, indexValue := range index {
-		if indexValue >= len(cols) {
-			return nil, fmt.Errorf("index out of range (%d > %d)", indexValue, len(cols)-1)
+		if indexValue >= len(containers) {
+			return nil, fmt.Errorf("index out of range (%d > %d)", indexValue, len(containers)-1)
 		}
-		retLabels[indexPosition] = cols[indexValue]
+		retLabels[indexPosition] = containers[indexValue]
 	}
 	return retLabels, nil
 }
@@ -1049,15 +1049,92 @@ func concatenateLabelsToStrings(labels []*valueContainer, index []int) []string 
 	return ret
 }
 
+// reduceContainers reduces the containers referenced in the index
+// to 1) a new []*valueContainer with slices with one unique combination of labels per row (same type as original labels),
+// 2) an []int that maps each new row
+// back to the rows in the original containers with the matching label combo
+// 3) a map[string]int that is the set of all unique label combinations and corresponding row in the []int map
+// and 4) a map[int]int that maps each original row index to its row index in the new containers
+func reduceContainers(containers []*valueContainer, index []int) (
+	newContainers []*valueContainer, originalRowIndexes [][]int,
+	uniqueLabels map[string]int, oldToNewRowMapping map[int]int) {
+	subset, _ := subsetContainers(containers, index)
+	// coerce label levels to string for use as map keys
+	stringifiedContainers := make([][]string, len(subset))
+	// create receiver for unique labels of same type as original levels
+	newContainers = make([]*valueContainer, len(subset))
+	for j := range subset {
+		stringifiedContainers[j] = subset[j].str().slice
+		newContainers[j] = &valueContainer{
+			slice:  reflect.MakeSlice(reflect.TypeOf(subset[j].slice), 0, 0).Interface(),
+			name:   subset[j].name,
+			isNull: make([]bool, 0),
+		}
+	}
+	numRows := len(stringifiedContainers[0])
+	// create receiver for the original row indexes for each unique label combo
+	uniqueLabelRows := make(map[string][]int)
+	uniqueLabels = make(map[string]int)
+	// create receiver for the unique label combos in order
+	orderedKeys := make([]string, 0)
+	// key: original row index, value: new row index for the same unique label combo found at original row index
+	// there will be one key for each row in the original data
+	oldToNewRowMapping = make(map[int]int, numRows)
+	// helper map for oldToNewRowMapping - key: unique label combo, value: new row index for that unique label combo
+	orderedKeyIndex := make(map[string]int)
+	// iterate over rows in original containers
+	for i := 0; i < numRows; i++ {
+		// make map key from stringified levels
+		labelComponents := make([]string, len(stringifiedContainers))
+		for j := range stringifiedContainers {
+			labelComponents[j] = stringifiedContainers[j][i]
+		}
+		key := joinLevelsIntoLabel(labelComponents)
+		// check if label combo already exists
+		if _, ok := uniqueLabelRows[key]; !ok {
+			// if label combo does not exist:
+			// add to set
+			uniqueLabels[key] = i
+			// add int position of the original row to the map
+			uniqueLabelRows[key] = []int{i}
+
+			// write label values to new containers, in order of appearance
+			for j := range subset {
+				src := reflect.ValueOf(subset[j].slice).Index(i)
+				dst := reflect.ValueOf(newContainers[j].slice)
+				newContainers[j].slice = reflect.Append(dst, src).Interface()
+				newContainers[j].isNull = append(newContainers[j].isNull, subset[j].isNull[i])
+			}
+			// count the number of existing ordered keys to identify the new row index of this unique label combo
+			orderedKeyIndex[key] = len(orderedKeys)
+			// add key to list to maintain order in which unique label combos appear
+			orderedKeys = append(orderedKeys, key)
+
+		} else {
+			// if so: add int position of this row
+			uniqueLabelRows[key] = append(uniqueLabelRows[key], i)
+		}
+		// relate each row index in the old containers to a row in the new containers with deduplicated labels
+		oldToNewRowMapping[i] = orderedKeyIndex[key]
+	}
+	// transfer row indexes in order of new unique label combos
+	originalRowIndexes = make([][]int, len(orderedKeys))
+	for i, key := range orderedKeys {
+		originalRowIndexes[i] = uniqueLabelRows[key]
+	}
+	return
+
+}
+
 // labelsToMap reduces all label levels referenced in the index to two maps and a slice of strings:
 // 1) map[string][]int: the key is a single concatenated string of the labels
 // and the value is an integer slice of all the positions where the key appears in the labels, preserving the order in which they appear,
 // 2) map[string]int: same key as above, but the value is the integer of the first position where the key appears in the labels.
 // 3) []string: the map keys in the order in which they appear in the Series
+// 4) map[int]int: key is the original index position, value is the new index position for that unique label combination
 func labelsToMap(labels []*valueContainer, index []int) (
 	allIndex map[string][]int, firstIndex map[string]int,
 	orderedKeys []string, originalIndexToUniqueIndex map[int]int) {
-	sep := "|"
 	// coerce all label levels referenced in the index to string
 	labelStrings := make([][]string, len(index))
 	for j := range index {
@@ -1075,7 +1152,7 @@ func labelsToMap(labels []*valueContainer, index []int) (
 		for j := range labelStrings {
 			labelComponents[j] = labelStrings[j][i]
 		}
-		key := strings.Join(labelComponents, sep)
+		key := strings.Join(labelComponents, optionLevelSeparator)
 		if _, ok := allIndex[key]; !ok {
 			allIndex[key] = []int{i}
 			firstIndex[key] = i
@@ -1447,7 +1524,7 @@ func median(vals []float64, isNull []bool, index []int) (float64, bool) {
 	}
 	sort.Float64s(data)
 	if len(data) == 0 {
-		return math.NaN(), true
+		return 0, true
 	}
 	// rounds down if there are even number of elements
 	mNumber := len(data) / 2

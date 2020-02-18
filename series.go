@@ -158,7 +158,7 @@ func (s *Series) SubsetLabels(index []int) *Series {
 // SubsetLabels includes only the columns of labels specified at the index positions, in the order specified.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) SubsetLabels(index []int) {
-	labels, err := subsetCols(s.series.labels, index)
+	labels, err := subsetContainers(s.series.labels, index)
 	if err != nil {
 		s.series.resetWithError(fmt.Errorf("SubsetLabels(): %v", err))
 		return
@@ -675,16 +675,18 @@ func (s *Series) GroupBy(names ...string) *GroupedSeries {
 			return &GroupedSeries{err: fmt.Errorf("GroupBy(): %v", err)}
 		}
 	}
-	g, _, orderedKeys, _ := labelsToMap(s.labels, index)
+	// g, _, orderedKeys, _ := labelsToMap(s.labels, index)
+	newLabels, rowIndices, groups, _ := reduceContainers(s.labels, index)
 	levelNames := make([]string, len(index))
 	for i, pos := range index {
 		levelNames[i] = s.labels[pos].name
 	}
 	return &GroupedSeries{
-		groups:      g,
-		orderedKeys: orderedKeys,
-		series:      s,
-		levelNames:  levelNames,
+		rowIndices: rowIndices,
+		newGroups:  groups,
+		newLabels:  newLabels,
+		series:     s,
+		levelNames: levelNames,
 	}
 }
 

@@ -26,40 +26,22 @@ func joinLevelsIntoLabel(levels []string) string {
 }
 
 func (g *GroupedSeries) stringFunc(name string, fn func(val []string, isNull []bool, index []int) (string, bool)) *Series {
-	if len(g.groups) == 0 {
+	if len(g.rowIndices) == 0 {
 		return seriesWithError(errors.New("GroupBy(): no groups"))
 	}
-	vals := make([]string, len(g.groups))
-	numLevels := len(g.levelNames)
-	valueIsNull := make([]bool, len(g.groups))
+	groupedVals := make([]string, len(g.rowIndices))
+	valueIsNull := make([]bool, len(g.rowIndices))
 
-	labelLevels := make([][]string, numLevels)
-	labelIsNull := make([][]bool, numLevels)
-	levelNames := make([]string, numLevels)
-	for lvl := 0; lvl < numLevels; lvl++ {
-		labelLevels[lvl] = make([]string, len(g.groups))
-		labelIsNull[lvl] = make([]bool, len(g.groups))
-		levelNames[lvl] = g.series.labels[lvl].name
-	}
-
-	// iterate over rows
-	for rowNumber, key := range g.orderedKeys {
-		output, isNull := fn(g.series.values.str().slice, g.series.values.isNull, g.groups[key])
-		vals[rowNumber] = output
-		valueIsNull[rowNumber] = isNull
-		splitKey := splitLabelIntoLevels(key, true)
-		for j := range splitKey {
-			labelLevels[j][rowNumber] = splitKey[j]
-			labelIsNull[j][rowNumber] = false
-		}
-	}
-	labels := make([]*valueContainer, len(labelLevels))
-	for j := range labelLevels {
-		labels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: levelNames[j]}
+	referenceVals := g.series.values.str().slice
+	// iterate over rowsIndices
+	for i, rowIndex := range g.rowIndices {
+		output, isNull := fn(referenceVals, g.series.values.isNull, rowIndex)
+		groupedVals[i] = output
+		valueIsNull[i] = isNull
 	}
 	return &Series{
-		values: &valueContainer{slice: vals, isNull: valueIsNull, name: name},
-		labels: labels,
+		values: &valueContainer{slice: groupedVals, isNull: valueIsNull, name: name},
+		labels: g.newLabels,
 	}
 }
 

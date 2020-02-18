@@ -561,6 +561,76 @@ func Test_labelsToMap(t *testing.T) {
 	}
 }
 
+func Test_reduceContainers(t *testing.T) {
+	type args struct {
+		containers []*valueContainer
+		index      []int
+	}
+	tests := []struct {
+		name                   string
+		args                   args
+		wantNewContainers      []*valueContainer
+		wantOriginalRowIndexes [][]int
+		wantUniqueLabels       map[string]int
+		wantOldToNewRowMapping map[int]int
+	}{
+		{name: "single level",
+			args: args{containers: []*valueContainer{
+				{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []string{"bar", "qux", "bar"}, isNull: []bool{false, false, false}, name: "baz"},
+			},
+				index: []int{1}},
+			wantNewContainers: []*valueContainer{
+				{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, name: "baz"},
+			},
+			wantOriginalRowIndexes: [][]int{{0, 2}, {1}},
+			wantUniqueLabels:       map[string]int{"bar": 0, "qux": 1},
+			wantOldToNewRowMapping: map[int]int{0: 0, 1: 1, 2: 0}},
+		{name: "multi level",
+			args: args{containers: []*valueContainer{
+				{slice: []float64{1, 1, 1}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []string{"bar", "qux", "bar"}, isNull: []bool{false, false, false}, name: "baz"},
+			},
+				index: []int{0, 1}},
+			wantNewContainers: []*valueContainer{
+				{slice: []float64{1, 1}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, name: "baz"},
+			},
+			wantOriginalRowIndexes: [][]int{{0, 2}, {1}},
+			wantUniqueLabels:       map[string]int{"1|bar": 0, "1|qux": 1},
+			wantOldToNewRowMapping: map[int]int{0: 0, 1: 1, 2: 0}},
+		{name: "single level - null",
+			args: args{containers: []*valueContainer{
+				{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []string{"bar", "", "bar"}, isNull: []bool{false, true, false}, name: "baz"},
+			},
+				index: []int{1}},
+			wantNewContainers: []*valueContainer{
+				{slice: []string{"bar", ""}, isNull: []bool{false, true}, name: "baz"},
+			},
+			wantOriginalRowIndexes: [][]int{{0, 2}, {1}},
+			wantUniqueLabels:       map[string]int{"bar": 0, "": 1},
+			wantOldToNewRowMapping: map[int]int{0: 0, 1: 1, 2: 0}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotNewContainers, gotOriginalRowIndexes, gotUniqueLabels, gotOldToNewRowMapping := reduceContainers(tt.args.containers, tt.args.index)
+			if !reflect.DeepEqual(gotNewContainers, tt.wantNewContainers) {
+				t.Errorf("reduceContainers() gotNewContainers = %v, want %v", gotNewContainers[0], tt.wantNewContainers[0])
+			}
+			if !reflect.DeepEqual(gotOriginalRowIndexes, tt.wantOriginalRowIndexes) {
+				t.Errorf("reduceContainers() gotOriginalRowIndexes = %v, want %v", gotOriginalRowIndexes, tt.wantOriginalRowIndexes)
+			}
+			if !reflect.DeepEqual(gotUniqueLabels, tt.wantUniqueLabels) {
+				t.Errorf("reduceContainers() gotUniqueLabels = %v, want %v", gotUniqueLabels, tt.wantUniqueLabels)
+			}
+			if !reflect.DeepEqual(gotOldToNewRowMapping, tt.wantOldToNewRowMapping) {
+				t.Errorf("reduceContainers() gotOldToNewRowMapping = %v, want %v", gotOldToNewRowMapping, tt.wantOldToNewRowMapping)
+			}
+		})
+	}
+}
+
 func Test_copyInterfaceIntoValueContainers(t *testing.T) {
 	type args struct {
 		slices []interface{}

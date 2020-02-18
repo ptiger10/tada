@@ -403,7 +403,7 @@ func (df *DataFrame) SubsetLabels(index []int) *DataFrame {
 // SubsetLabels returns only the labels specified at the index positions, in the order specified.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) SubsetLabels(index []int) {
-	labels, err := subsetCols(df.dataframe.labels, index)
+	labels, err := subsetContainers(df.dataframe.labels, index)
 	if err != nil {
 		df.dataframe.resetWithError(fmt.Errorf("SubsetLabels(): %v", err))
 		return
@@ -423,7 +423,7 @@ func (df *DataFrame) SubsetCols(index []int) *DataFrame {
 // SubsetCols returns only the labels specified at the index positions, in the order specified.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) SubsetCols(index []int) {
-	cols, err := subsetCols(df.dataframe.values, index)
+	cols, err := subsetContainers(df.dataframe.values, index)
 	if err != nil {
 		df.dataframe.resetWithError(fmt.Errorf("SubsetCols(): %v", err))
 		return
@@ -798,7 +798,7 @@ func (df *DataFrameMutator) ResetLabels(labelLevels ...int) {
 		newVal.name = removeDefaultNameIndicator(newVal.name)
 		df.dataframe.values = append(df.dataframe.values, newVal)
 		exclude := excludeFromIndex(df.dataframe.numLevels(), adjustedIndex)
-		df.dataframe.labels, _ = subsetCols(df.dataframe.labels, exclude)
+		df.dataframe.labels, _ = subsetContainers(df.dataframe.labels, exclude)
 	}
 	if df.dataframe.numLevels() == 0 {
 		defaultLabels := makeDefaultLabels(0, df.dataframe.Len())
@@ -965,6 +965,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 	// (minus the stacked column * existing columns, if a column is selected and not label level)
 	numNewCols := len(lookupSource) * df.numColumns()
 	colNames := make([]string, numNewCols)
+	// each item in newVals should be a slice representing a new column
 	newVals := make([]interface{}, numNewCols)
 	newIsNull := makeBoolMatrix(numNewCols, len(uniqueLabels))
 	for k := range newIsNull {
@@ -987,6 +988,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 			newColumnIndex := k*len(lookupSource) + m
 			newHeader := joinLevelsIntoLabel([]string{orderedKey, df.values[k].name})
 			colNames[newColumnIndex] = newHeader
+			// each item in newVals is a slice of the same type as originalVals at that column position
 			newVals[newColumnIndex] = reflect.MakeSlice(originalVals.Type(), len(uniqueLabels), len(uniqueLabels)).Interface()
 
 			// write to new column and new row index

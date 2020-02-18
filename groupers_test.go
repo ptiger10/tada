@@ -51,6 +51,8 @@ func TestGroupedSeries_Err(t *testing.T) {
 func TestGroupedSeries_stringFunc(t *testing.T) {
 	type fields struct {
 		groups      map[string][]int
+		rowIndices  [][]int
+		newLabels   []*valueContainer
 		orderedKeys []string
 		series      *Series
 		levelNames  []string
@@ -70,14 +72,20 @@ func TestGroupedSeries_stringFunc(t *testing.T) {
 		{
 			name: "single level - not aligned",
 			fields: fields{
-				groups:      map[string][]int{"foo": []int{0, 1}, "bar": []int{2, 3}},
+				rowIndices:  [][]int{{0, 1}, {2, 3}},
+				newLabels:   []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
 				orderedKeys: []string{"foo", "bar"},
 				levelNames:  []string{"*0"},
-				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
+				series: &Series{values: &valueContainer{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			args: args{"str", func([]string, []bool, []int) (string, bool) { return "", false }},
-			want: &Series{values: &valueContainer{slice: []string{"", ""}, isNull: []bool{false, false}, name: "str"},
+			args: args{"first", func(vals []string, isNull []bool, index []int) (string, bool) {
+				for _, i := range index {
+					return vals[i], false
+				}
+				return "", true
+			}},
+			want: &Series{values: &valueContainer{slice: []string{"a", "c"}, isNull: []bool{false, false}, name: "first"},
 				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}}},
 		},
 	}
@@ -85,6 +93,8 @@ func TestGroupedSeries_stringFunc(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			g := &GroupedSeries{
 				groups:      tt.fields.groups,
+				rowIndices:  tt.fields.rowIndices,
+				newLabels:   tt.fields.newLabels,
 				orderedKeys: tt.fields.orderedKeys,
 				series:      tt.fields.series,
 				levelNames:  tt.fields.levelNames,
