@@ -417,6 +417,80 @@ func Test_lookup(t *testing.T) {
 	}
 }
 
+func Test_lookupDataFrame(t *testing.T) {
+	type args struct {
+		how           string
+		name          string
+		colLevelNames []string
+		values1       []*valueContainer
+		labels1       []*valueContainer
+		leftOn        []int
+		values2       []*valueContainer
+		labels2       []*valueContainer
+		rightOn       []int
+		excludeLeft   []string
+		excludeRight  []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *DataFrame
+		wantErr bool
+	}{
+		{name: "left", args: args{
+			how: "left", name: "baz", colLevelNames: []string{"*0"},
+			values1: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"}},
+			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}, leftOn: []int{0},
+			values2: []*valueContainer{{slice: []int{10, 20}, isNull: []bool{false, false}, name: "bar"}},
+			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, name: "quux"}}, rightOn: []int{0}},
+			want: &DataFrame{
+				values: []*valueContainer{{slice: []int{10, 0}, isNull: []bool{false, true}, name: "bar"}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}},
+				name:   "baz", colLevelNames: []string{"*0"},
+			},
+			wantErr: false,
+		},
+		{name: "right", args: args{
+			how: "right", name: "baz", colLevelNames: []string{"*0"},
+			values1: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"}},
+			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}, leftOn: []int{0},
+			values2: []*valueContainer{{slice: []int{10, 20}, isNull: []bool{false, false}, name: "bar"}},
+			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, name: "quux"}}, rightOn: []int{0}},
+			want: &DataFrame{
+				values: []*valueContainer{{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"}},
+				labels: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, name: "quux"}},
+				name:   "baz", colLevelNames: []string{"*0"},
+			},
+			wantErr: false,
+		},
+		{name: "inner", args: args{
+			how: "inner", name: "baz", colLevelNames: []string{"*0"},
+			values1: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"}},
+			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}, leftOn: []int{0},
+			values2: []*valueContainer{{slice: []int{10, 20}, isNull: []bool{false, false}, name: "bar"}},
+			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, name: "quux"}}, rightOn: []int{0}},
+			want: &DataFrame{
+				values: []*valueContainer{{slice: []int{10}, isNull: []bool{false}, name: "bar"}},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}},
+				name:   "baz", colLevelNames: []string{"*0"},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := lookupDataFrame(tt.args.how, tt.args.name, tt.args.colLevelNames, tt.args.values1, tt.args.labels1, tt.args.leftOn, tt.args.values2, tt.args.labels2, tt.args.rightOn, tt.args.excludeLeft, tt.args.excludeRight)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("lookupDataFrame() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("lookupDataFrame() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func Test_difference(t *testing.T) {
 	type args struct {
 		slice1 []int
@@ -1427,6 +1501,7 @@ func Test_valueContainer_pcut(t *testing.T) {
 }
 
 func Test_valueContainer_sort(t *testing.T) {
+	d := time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC)
 	type fields struct {
 		slice  interface{}
 		isNull []bool
@@ -1443,12 +1518,33 @@ func Test_valueContainer_sort(t *testing.T) {
 		args   args
 		want   []int
 	}{
-		{"no nulls",
+		{"float - no nulls",
 			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, false, false}, name: "foo"},
 			args{dtype: Float, descending: false, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
-		{"nulls",
+		{"float - no nulls - descending",
+			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{dtype: Float, descending: true, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
+		{"float - nulls",
 			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, true, false}, name: "foo"},
 			args{dtype: Float, descending: false, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
+		{"strings - no nulls",
+			fields{slice: []string{"foo", "bar", "a", "baz"}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{dtype: String, descending: false, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
+		{"strings - no nulls - descending",
+			fields{slice: []string{"foo", "bar", "a", "baz"}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{dtype: String, descending: true, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
+		{"strings - nulls",
+			fields{slice: []string{"foo", "bar", "a", "baz"}, isNull: []bool{false, false, true, false}, name: "foo"},
+			args{dtype: String, descending: false, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
+		{"datetime - no nulls",
+			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{dtype: DateTime, descending: false, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
+		{"datetime - no nulls - descending",
+			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{dtype: DateTime, descending: true, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
+		{"datetime - nulls",
+			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, true, false}, name: "foo"},
+			args{dtype: DateTime, descending: false, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1920,6 +2016,388 @@ func Test_readStruct(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("readStruct() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_cut(t *testing.T) {
+	type args struct {
+		vals           []float64
+		isNull         []bool
+		bins           []float64
+		leftInclusive  bool
+		rightExclusive bool
+		includeLess    bool
+		includeMore    bool
+		labels         []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{"pass - default labels", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
+			leftInclusive: false, rightExclusive: false,
+			includeLess: false, includeMore: false,
+			labels: nil},
+			[]string{"", "1-2", ""}, false},
+		{"pass - supplied labels", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
+			leftInclusive: false, rightExclusive: false,
+			includeLess: false, includeMore: false,
+			labels: []string{"qualifies"}},
+			[]string{"", "qualifies", ""}, false},
+		{"skip nulls", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, true, false}, bins: []float64{1, 2},
+			leftInclusive: false, rightExclusive: false,
+			includeLess: false, includeMore: false,
+			labels: []string{"qualifies"}},
+			[]string{"", "", ""}, false},
+		{"inlcudeLeft - default labels", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
+			leftInclusive: false, rightExclusive: false,
+			includeLess: true, includeMore: false,
+			labels: nil},
+			[]string{"<=1", "1-2", ""}, false},
+		{"inlcudeLeft - default labels - leftInclusive/rightExclusive", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{2, 3},
+			leftInclusive: true, rightExclusive: true,
+			includeLess: true, includeMore: false,
+			labels: nil},
+			[]string{"<2", "2-3", ""}, false},
+		{"includeMore - default labels", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
+			leftInclusive: false, rightExclusive: false,
+			includeLess: false, includeMore: true,
+			labels: nil},
+			[]string{"", "1-2", ">2"}, false},
+		{"includeMore - default labels - leftInclusive/rightExclusive", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
+			leftInclusive: true, rightExclusive: true,
+			includeLess: false, includeMore: true,
+			labels: nil},
+			[]string{"1-2", ">=2", ">=2"}, false},
+		{"fail - no bins", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: nil,
+			leftInclusive: false, rightExclusive: false,
+			includeLess: false, includeMore: false,
+			labels: nil},
+			nil, true},
+		{"fail - bins/label mismatch", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2, 3},
+			leftInclusive: false, rightExclusive: false,
+			includeLess: false, includeMore: false,
+			labels: []string{"a", "b", "c"}},
+			nil, true},
+		{"fail - bad combination of inclusive/exclusive", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2, 3},
+			leftInclusive: true, rightExclusive: false,
+			includeLess: false, includeMore: false,
+			labels: nil},
+			nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := cut(tt.args.vals, tt.args.isNull, tt.args.bins, tt.args.leftInclusive, tt.args.rightExclusive, tt.args.includeLess, tt.args.includeMore, tt.args.labels)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("cut() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("cut() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_sum(t *testing.T) {
+	type args struct {
+		vals   []float64
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  float64
+		want1 bool
+	}{
+		{"at least one valid", args{
+			[]float64{1, 2, 3}, []bool{false, false, false}, []int{0, 1, 2}},
+			6, false},
+		{"all null", args{
+			[]float64{1, 2, 3}, []bool{true, true, true}, []int{0, 1, 2}},
+			0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := sum(tt.args.vals, tt.args.isNull, tt.args.index)
+			if got != tt.want {
+				t.Errorf("sum() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("sum() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func Test_mean(t *testing.T) {
+	type args struct {
+		vals   []float64
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  float64
+		want1 bool
+	}{
+		{"at least one valid", args{
+			[]float64{1, 2, 3}, []bool{false, false, false}, []int{0, 1, 2}},
+			2, false},
+		{"all null", args{
+			[]float64{1, 2, 3}, []bool{true, true, true}, []int{0, 1, 2}},
+			0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := mean(tt.args.vals, tt.args.isNull, tt.args.index)
+			if got != tt.want {
+				t.Errorf("mean() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("mean() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func Test_median(t *testing.T) {
+	type args struct {
+		vals   []float64
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  float64
+		want1 bool
+	}{
+		{"at least one valid", args{
+			[]float64{1, 2, 3}, []bool{false, false, false}, []int{0, 1, 2}},
+			2, false},
+		{"all null", args{
+			[]float64{1, 2, 3}, []bool{true, true, true}, []int{0, 1, 2}},
+			0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := median(tt.args.vals, tt.args.isNull, tt.args.index)
+			if got != tt.want {
+				t.Errorf("median() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("median() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func Test_std(t *testing.T) {
+	type args struct {
+		vals   []float64
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  float64
+		want1 bool
+	}{
+		{"at least one valid", args{
+			[]float64{1, 2, 3}, []bool{false, false, false}, []int{0, 1, 2}},
+			0.816496580927726, false},
+		{"all null", args{
+			[]float64{1, 2, 3}, []bool{true, true, true}, []int{0, 1, 2}},
+			0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := std(tt.args.vals, tt.args.isNull, tt.args.index)
+			if got != tt.want {
+				t.Errorf("std() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("std() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func Test_count(t *testing.T) {
+	type args struct {
+		vals   []float64
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  float64
+		want1 bool
+	}{
+		{"at least one valid", args{
+			[]float64{1, 2, 3}, []bool{false, false, false}, []int{0, 1, 2}},
+			3, false},
+		{"all null", args{
+			[]float64{1, 2, 3}, []bool{true, true, true}, []int{0, 1, 2}},
+			0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := count(tt.args.vals, tt.args.isNull, tt.args.index)
+			if got != tt.want {
+				t.Errorf("count() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("count() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func Test_min(t *testing.T) {
+	type args struct {
+		vals   []float64
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  float64
+		want1 bool
+	}{
+		{"at least one valid", args{
+			[]float64{1, 2, 3}, []bool{false, false, false}, []int{0, 1, 2}},
+			1, false},
+		{"all null", args{
+			[]float64{1, 2, 3}, []bool{true, true, true}, []int{0, 1, 2}},
+			0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := min(tt.args.vals, tt.args.isNull, tt.args.index)
+			if got != tt.want {
+				t.Errorf("min() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("min() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func Test_max(t *testing.T) {
+	type args struct {
+		vals   []float64
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  float64
+		want1 bool
+	}{
+		{"at least one valid", args{
+			[]float64{1, 2, 3}, []bool{false, false, false}, []int{0, 1, 2}},
+			3, false},
+		{"all null", args{
+			[]float64{1, 2, 3}, []bool{true, true, true}, []int{0, 1, 2}},
+			0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := max(tt.args.vals, tt.args.isNull, tt.args.index)
+			if got != tt.want {
+				t.Errorf("max() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("max() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func Test_earliest(t *testing.T) {
+	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	type args struct {
+		vals   []time.Time
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  time.Time
+		want1 bool
+	}{
+		{"at least one valid", args{
+			[]time.Time{d, d.AddDate(0, 0, 1), d.AddDate(0, 0, 2)}, []bool{false, false, false}, []int{0, 1, 2}},
+			d, false},
+		{"all null", args{
+			[]time.Time{d, d.AddDate(0, 0, 1), d.AddDate(0, 0, 2)}, []bool{true, true, true}, []int{0, 1, 2}},
+			time.Time{}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := earliest(tt.args.vals, tt.args.isNull, tt.args.index)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("earliest() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("earliest() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func Test_latest(t *testing.T) {
+	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	type args struct {
+		vals   []time.Time
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  time.Time
+		want1 bool
+	}{
+		{"at least one valid", args{
+			[]time.Time{d, d.AddDate(0, 0, 1), d.AddDate(0, 0, 2)}, []bool{false, false, false}, []int{0, 1, 2}},
+			d.AddDate(0, 0, 2), false},
+		{"all null", args{
+			[]time.Time{d, d.AddDate(0, 0, 1), d.AddDate(0, 0, 2)}, []bool{true, true, true}, []int{0, 1, 2}},
+			time.Time{}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := latest(tt.args.vals, tt.args.isNull, tt.args.index)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("latest() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("latest() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}
