@@ -1183,14 +1183,19 @@ func (df *DataFrame) Merge(other *DataFrame) *DataFrame {
 
 // Merge stub
 func (df *DataFrameMutator) Merge(other *DataFrame) {
-	lookupDF := df.dataframe.Lookup(other, "left", nil, nil)
+	lookupDF := df.dataframe.Lookup(other)
 	for k := range lookupDF.values {
 		df.dataframe.values = append(df.dataframe.values, lookupDF.values[k])
 	}
 }
 
 // Lookup stub
-func (df *DataFrame) Lookup(other *DataFrame, how string, leftOn []string, rightOn []string) *DataFrame {
+func (df *DataFrame) Lookup(other *DataFrame) *DataFrame {
+	return df.LookupAdvanced(other, "left", nil, nil)
+}
+
+// LookupAdvanced stub
+func (df *DataFrame) LookupAdvanced(other *DataFrame, how string, leftOn []string, rightOn []string) *DataFrame {
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	otherMergedLabelsAndCols := append(other.labels, other.values...)
 	var leftKeys, rightKeys []int
@@ -1198,7 +1203,7 @@ func (df *DataFrame) Lookup(other *DataFrame, how string, leftOn []string, right
 	if len(leftOn) == 0 || len(rightOn) == 0 {
 		if !(len(leftOn) == 0 && len(rightOn) == 0) {
 			return dataFrameWithError(
-				fmt.Errorf("Lookup(): if either leftOn or rightOn is empty, both must be empty"))
+				fmt.Errorf("LookupAdvanced(): if either leftOn or rightOn is empty, both must be empty"))
 		}
 	}
 	if len(leftOn) == 0 {
@@ -1207,11 +1212,11 @@ func (df *DataFrame) Lookup(other *DataFrame, how string, leftOn []string, right
 	} else {
 		leftKeys, err = convertColNamesToIndexPositions(leftOn, mergedLabelsAndCols)
 		if err != nil {
-			return dataFrameWithError(fmt.Errorf("Lookup(): %v", err))
+			return dataFrameWithError(fmt.Errorf("LookupAdvanced(): %v", err))
 		}
 		rightKeys, err = convertColNamesToIndexPositions(rightOn, otherMergedLabelsAndCols)
 		if err != nil {
-			return dataFrameWithError(fmt.Errorf("Lookup(): %v", err))
+			return dataFrameWithError(fmt.Errorf("LookupAdvanced(): %v", err))
 		}
 	}
 	ret, err := lookupDataFrame(
@@ -1243,6 +1248,7 @@ func (df *DataFrameMutator) Sort(by ...Sorter) {
 			"Sort(): must supply at least one Sorter"))
 		return
 	}
+	// apply Sorters from right to left, preserving index and passing it into next sort
 	for i := len(by) - 1; i >= 0; i-- {
 		// Sorter with empty ColName -> error
 		if by[i].ColName == "" {

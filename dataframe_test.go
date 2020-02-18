@@ -1000,6 +1000,42 @@ func TestDataFrame_Filter(t *testing.T) {
 					return false
 				}, ColName: "bar"},
 			}}, []int{0}},
+		{"no filters - all rows", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, false, false}, name: "bar"}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			args{nil}, []int{0, 1, 2}},
+		{"filter with no colname - all columns", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			args{[]FilterFn{
+				{F64: func(v float64) bool {
+					if v >= 2 {
+						return true
+					}
+					return false
+				}}}}, []int{2}},
+		{"fail - empty filter", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			args{[]FilterFn{FilterFn{}}}, []int{-999}},
+		{"fail - bad column name", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			args{[]FilterFn{FilterFn{ColName: "corge", F64: func(float64) bool { return true }}}}, []int{-999}},
+		{"fail - no filter", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			args{[]FilterFn{FilterFn{ColName: "foo"}}}, []int{-999}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1039,14 +1075,50 @@ func TestDataFrame_Apply(t *testing.T) {
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			name:   "baz"},
 			args{ApplyFn{F64: func(v float64) float64 {
-				return v * 2
+				return v + 1
 			}}},
 			&DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 					{slice: []float64{2}, isNull: []bool{false}, name: "bar"}},
 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				name:   "baz"},
+		},
+		{"float64 on single column", fields{
+			values: []*valueContainer{
+				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:   "baz"},
+			args{ApplyFn{ColName: "foo", F64: func(v float64) float64 {
+				return v + 1
+			}}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+					{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				name:   "baz"},
+		},
+		{"fail - no function", fields{
+			values: []*valueContainer{
+				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:   "baz"},
+			args{ApplyFn{ColName: "foo"}},
+			&DataFrame{
+				err: fmt.Errorf("Apply(): no apply function provided")},
+		},
+		{"fail - no matching column", fields{
+			values: []*valueContainer{
+				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:   "baz"},
+			args{ApplyFn{ColName: "corge", F64: func(float64) float64 { return 0 }}},
+			&DataFrame{
+				err: fmt.Errorf("Apply(): name (corge) does not match any existing column")},
 		},
 	}
 	for _, tt := range tests {
@@ -1059,6 +1131,98 @@ func TestDataFrame_Apply(t *testing.T) {
 			}
 			if got := df.Apply(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.Apply() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_ApplyFormat(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		lambda ApplyFormatFn
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"float64 on all columns", fields{
+			values: []*valueContainer{
+				{slice: []float64{.51}, isNull: []bool{false}, name: "foo"},
+				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+			},
+			labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
+			name:          "baz",
+			colLevelNames: []string{"*0"}},
+			args{ApplyFormatFn{F64: func(v float64) string {
+				return strconv.FormatFloat(v, 'f', 1, 64)
+			}}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"0.5"}, isNull: []bool{false}, name: "foo"},
+					{slice: []string{"1.0"}, isNull: []bool{false}, name: "qux"},
+				},
+				labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
+				name:          "baz",
+				colLevelNames: []string{"*0"}},
+		},
+		{"float64 on single column", fields{
+			values: []*valueContainer{
+				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
+			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:          "baz",
+			colLevelNames: []string{"*0"}},
+			args{ApplyFormatFn{ColName: "foo", F64: func(v float64) string {
+				return fmt.Sprintf("%.2f", v)
+			}}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"0.00"}, isNull: []bool{false}, name: "foo"},
+					{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"},
+		},
+		{"fail - no function", fields{
+			values: []*valueContainer{
+				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:   "baz"},
+			args{ApplyFormatFn{ColName: "foo"}},
+			&DataFrame{
+				err: fmt.Errorf("ApplyFormat(): no apply function provided")},
+		},
+		{"fail - no matching column", fields{
+			values: []*valueContainer{
+				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:   "baz"},
+			args{ApplyFormatFn{ColName: "corge", F64: func(float64) string { return "" }}},
+			&DataFrame{
+				err: fmt.Errorf("ApplyFormat(): name (corge) does not match any existing column")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.ApplyFormat(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.ApplyFormat() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1091,6 +1255,33 @@ func TestDataFrame_Sort(t *testing.T) {
 					{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"}},
 				labels: []*valueContainer{{slice: []int{0, 2, 1}, isNull: []bool{false, false, false}, name: "*0"}},
 				name:   "baz"},
+		},
+		{"fail - no Sorters", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 2, 1}, isNull: []bool{false, false, false}, name: "foo"}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			name:   "baz"},
+			args{nil},
+			&DataFrame{
+				err: fmt.Errorf("Sort(): must supply at least one Sorter")},
+		},
+		{"fail - bad colName", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 2, 1}, isNull: []bool{false, false, false}, name: "foo"}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			name:   "baz"},
+			args{[]Sorter{{ColName: "corge"}}},
+			&DataFrame{
+				err: fmt.Errorf("Sort(): name (corge) does not match any existing column")},
+		},
+		{"fail - empty colName", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 2, 1}, isNull: []bool{false, false, false}, name: "foo"}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			name:   "baz"},
+			args{[]Sorter{{Descending: true, DType: Float}}},
+			&DataFrame{
+				err: fmt.Errorf("Sort(): Sorter (position 0) must have ColName")},
 		},
 	}
 	for _, tt := range tests {
@@ -1420,12 +1611,64 @@ func TestDataFrame_Max(t *testing.T) {
 	}
 }
 
-func TestDataFrame_Lookup(t *testing.T) {
+func TestDataFrame_Merge(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		other *DataFrame
+	}
+	tests := []struct {
 		name   string
-		err    error
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"pass",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{&DataFrame{
+				values:        []*valueContainer{{slice: []string{"c"}, isNull: []bool{false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "foo"}},
+				colLevelNames: []string{"anything"}}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
+					{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "bar"},
+				},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.Merge(tt.args.other); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Merge() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_LookupAdvanced(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		colLevelNames []string
+		err           error
 	}
 	type args struct {
 		other   *DataFrame
@@ -1439,30 +1682,44 @@ func TestDataFrame_Lookup(t *testing.T) {
 		args   args
 		want   *DataFrame
 	}{
-		{"single label level, named keys, left join", fields{
-			values: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
-			labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
-			name:   "qux"},
+		// {"single label level, named keys, left join", fields{
+		// 	values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
+		// 	labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+		// 	name:          "qux",
+		// 	colLevelNames: []string{"*0"}},
+		// 	args{
+		// 		other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
+		// 			labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
+		// 		how:    "left",
+		// 		leftOn: []string{"foo"}, rightOn: []string{"foo"}},
+		// 	&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
+		// 		labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+		// 		name:   "qux"},
+		// },
+		{"fail - leftOn but not rightOn", fields{
+			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
+			labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+			name:          "qux",
+			colLevelNames: []string{"*0"}},
 			args{
 				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "left",
-				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
-			&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
-				labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
-				name:   "qux"},
+				leftOn: []string{"foo"}, rightOn: nil},
+			&DataFrame{err: fmt.Errorf("LookupAdvanced(): if either leftOn or rightOn is empty, both must be empty")},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				colLevelNames: tt.fields.colLevelNames,
+				err:           tt.fields.err,
 			}
-			if got := df.Lookup(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.Lookup() = %v, want %v", got.labels[0], tt.want.labels[0])
+			if got := df.LookupAdvanced(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.LookupAdvanced() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 
 			}
@@ -1799,52 +2056,6 @@ func TestDataFrame_dropColLevel(t *testing.T) {
 				colLevelNames: tt.fields.colLevelNames,
 			}
 			df.dropColLevel(tt.args.level)
-		})
-	}
-}
-
-func TestDataFrame_ApplyFormat(t *testing.T) {
-	type fields struct {
-		labels        []*valueContainer
-		values        []*valueContainer
-		name          string
-		err           error
-		colLevelNames []string
-	}
-	type args struct {
-		lambda ApplyFormatFn
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *DataFrame
-	}{
-		{"float64 on all columns", fields{
-			values: []*valueContainer{{slice: []float64{.51}, isNull: []bool{false}, name: "foo"}},
-			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name:   "baz"},
-			args{ApplyFormatFn{ColName: "foo", F64: func(v float64) string {
-				return strconv.FormatFloat(v, 'f', 1, 64)
-			}}},
-			&DataFrame{
-				values: []*valueContainer{{slice: []string{"0.5"}, isNull: []bool{false}, name: "foo"}},
-				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				name:   "baz"},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			df := &DataFrame{
-				labels:        tt.fields.labels,
-				values:        tt.fields.values,
-				name:          tt.fields.name,
-				err:           tt.fields.err,
-				colLevelNames: tt.fields.colLevelNames,
-			}
-			if got := df.ApplyFormat(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.ApplyFormat() = %v, want %v", got, tt.want)
-			}
 		})
 	}
 }
