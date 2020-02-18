@@ -1575,7 +1575,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				leftOn: []string{"foo"}, rightOn: []string{"bar"}},
 			&Series{err: errors.New("LookupAdvanced(): name (bar) does not match any existing column")},
 		},
-		{"fail - no matching right key", fields{
+		{"fail - unsupported how", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
 			labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
 			args{
@@ -1583,7 +1583,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "other",
 				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
-			&Series{err: errors.New("LookupAdvanced(): unsupported how: must be `left`, `right`, or `inner`")},
+			&Series{err: errors.New("LookupAdvanced(): `how`: must be `left`, `right`, or `inner`")},
 		},
 	}
 	for _, tt := range tests {

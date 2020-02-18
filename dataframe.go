@@ -495,14 +495,17 @@ func (df *DataFrame) Tail(n int) *DataFrame {
 	return &DataFrame{values: retVals, labels: retLabels, name: df.name, colLevelNames: df.colLevelNames}
 }
 
-// Range returns the rows of the DataFrame starting at `first` and `ending` with last (inclusive).
+// Range returns the rows of the DataFrame starting at `first` and `ending` immediately prior to last (left-inclusive, right-exclusive).
 // If either `first` or `last` is greater than the length of the DataFrame, a DataFrame error is returned.
 // In all cases, returns a new DataFrame.
 func (df *DataFrame) Range(first, last int) *DataFrame {
+	if first > last {
+		return dataFrameWithError(fmt.Errorf("Range(): first is greater than last (%d > %d)", first, last))
+	}
 	if first >= df.Len() {
 		return dataFrameWithError(fmt.Errorf("Range(): first index out of range (%d > %d)", first, df.Len()-1))
-	} else if last >= df.Len() {
-		return dataFrameWithError(fmt.Errorf("Range(): last index out of range (%d > %d)", last, df.Len()-1))
+	} else if last > df.Len() {
+		return dataFrameWithError(fmt.Errorf("Range(): last index out of range (%d > %d)", last, df.Len()))
 	}
 	retVals := make([]*valueContainer, len(df.values))
 	for k := range df.values {
@@ -536,6 +539,7 @@ func (df *DataFrameMutator) DropNull(subset ...string) {
 			i, err := findColWithName(name, df.dataframe.values)
 			if err != nil {
 				df.dataframe.resetWithError(fmt.Errorf("DropNull(): %v", err))
+				return
 			}
 			index = append(index, i)
 		}
@@ -561,7 +565,7 @@ func (df *DataFrame) Null(subset ...string) *DataFrame {
 		for _, name := range subset {
 			i, err := findColWithName(name, df.values)
 			if err != nil {
-				return dataFrameWithError(fmt.Errorf("Valid(): %v", err))
+				return dataFrameWithError(fmt.Errorf("Null(): %v", err))
 			}
 			index = append(index, i)
 		}
@@ -655,11 +659,6 @@ func (df *DataFrameMutator) WithCol(name string, input interface{}) {
 		df.dataframe.resetWithError(fmt.Errorf("WithCol(): %v", err))
 	}
 	df.dataframe.values = cols
-}
-
-// WithRow stub
-func (df *DataFrame) WithRow(label string, values []interface{}) *DataFrame {
-	return nil
 }
 
 // DropCol drops the first column matching `name`
@@ -1212,18 +1211,19 @@ func (df *DataFrame) LookupAdvanced(other *DataFrame, how string, leftOn []strin
 	} else {
 		leftKeys, err = convertColNamesToIndexPositions(leftOn, mergedLabelsAndCols)
 		if err != nil {
-			return dataFrameWithError(fmt.Errorf("LookupAdvanced(): %v", err))
+			return dataFrameWithError(fmt.Errorf("LookupAdvanced(): `leftOn`: %v", err))
 		}
 		rightKeys, err = convertColNamesToIndexPositions(rightOn, otherMergedLabelsAndCols)
 		if err != nil {
-			return dataFrameWithError(fmt.Errorf("LookupAdvanced(): %v", err))
+			return dataFrameWithError(fmt.Errorf("LookupAdvanced(): `rightOn`: %v", err))
 		}
 	}
 	ret, err := lookupDataFrame(
-		how, df.name, df.values, df.labels, leftKeys,
+		how, df.name, df.colLevelNames,
+		df.values, df.labels, leftKeys,
 		other.values, other.labels, rightKeys, leftOn, rightOn)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("Lookup(): %v", err))
+		return dataFrameWithError(fmt.Errorf("LookupAdvanced(): %v", err))
 	}
 	return ret
 }

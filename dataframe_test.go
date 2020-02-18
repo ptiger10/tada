@@ -332,6 +332,18 @@ func TestDataFrame_SubsetLabels(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{10}, isNull: []bool{false}, name: "*10"}},
 				colLevelNames: []string{"*0"},
 				name:          "baz"}},
+		{"fail - bad index", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "0"},
+				{slice: []string{"foo"}, isNull: []bool{false}, name: "1"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
+				{slice: []int{10}, isNull: []bool{false}, name: "*10"},
+			},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
+			args{[]int{10}},
+			&DataFrame{err: fmt.Errorf("SubsetLabels(): index out of range (10 > 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -384,6 +396,18 @@ func TestDataFrame_SubsetCols(t *testing.T) {
 					{slice: []int{10}, isNull: []bool{false}, name: "*10"}},
 				colLevelNames: []string{"*0"},
 				name:          "baz"}},
+		{"fail - bad index", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "0"},
+				{slice: []string{"foo"}, isNull: []bool{false}, name: "1"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
+				{slice: []int{10}, isNull: []bool{false}, name: "*10"},
+			},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
+			args{[]int{10}},
+			&DataFrame{err: fmt.Errorf("SubsetCols(): index out of range (10 > 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -473,6 +497,18 @@ func TestDataFrame_Tail(t *testing.T) {
 				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "0"}},
 				labels: []*valueContainer{{slice: []int{1, 2}, isNull: []bool{false, false}, name: "*0"}},
 				name:   "baz"}},
+		{"overwrite n", fields{
+			values: []*valueContainer{
+				{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "0"}},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"},
+			},
+			name: "baz"},
+			args{20},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "0"}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+				name:   "baz"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -517,6 +553,33 @@ func TestDataFrame_Range(t *testing.T) {
 				{slice: []string{"bar"}, isNull: []bool{false}, name: "0"}},
 				labels: []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
 				name:   "baz"}},
+		{"fail - first > last", fields{
+			values: []*valueContainer{
+				{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "0"}},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"},
+			},
+			name: "baz"},
+			args{3, 2},
+			&DataFrame{err: fmt.Errorf("Range(): first is greater than last (3 > 2)")}},
+		{"fail - first out of range", fields{
+			values: []*valueContainer{
+				{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "0"}},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"},
+			},
+			name: "baz"},
+			args{3, 3},
+			&DataFrame{err: fmt.Errorf("Range(): first index out of range (3 > 2)")}},
+		{"fail - last out of range", fields{
+			values: []*valueContainer{
+				{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "0"}},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"},
+			},
+			name: "baz"},
+			args{2, 4},
+			&DataFrame{err: fmt.Errorf("Range(): last index out of range (4 > 3)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -527,7 +590,7 @@ func TestDataFrame_Range(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := df.Range(tt.args.first, tt.args.last); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.Range() = %v, want %v", got.labels[0], tt.want.labels[0])
+				t.Errorf("DataFrame.Range() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -655,6 +718,15 @@ func TestDataFrame_WithCol(t *testing.T) {
 					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				name: "bar"},
 		},
+		{"fail - bad input", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name: "bar"},
+			args{"baz", []complex64{10}},
+			&DataFrame{err: fmt.Errorf("WithCol(): unable to calculate null values ([]complex64 not supported)")},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -728,6 +800,15 @@ func TestDataFrame_WithLabels(t *testing.T) {
 					{slice: []float64{10}, isNull: []bool{false}, name: "baz"}},
 				name: "bar"},
 		},
+		{"fail - bad input", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name: "bar"},
+			args{"baz", []complex64{10}},
+			&DataFrame{err: fmt.Errorf("WithLabels(): unable to calculate null values ([]complex64 not supported)")},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -738,13 +819,13 @@ func TestDataFrame_WithLabels(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := df.WithLabels(tt.args.name, tt.args.input); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.WithLabels() = %v, want %v", got.values[0], tt.want.values[0])
+				t.Errorf("DataFrame.WithLabels() = %v, want %v", got.err, tt.want.err)
 			}
 		})
 	}
 }
 
-func TestDataFrame_Valid(t *testing.T) {
+func TestDataFrame_DropNull(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -790,6 +871,16 @@ func TestDataFrame_Valid(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{1, 2}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "baz"},
+		},
+		{"fail - bad column", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{true, false, false}, name: "0"},
+				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, true, false}, name: "1"}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
+			args{[]string{"corge"}},
+			&DataFrame{err: fmt.Errorf("DropNull(): name (corge) does not match any existing column")},
 		},
 	}
 	for _, tt := range tests {
@@ -854,6 +945,16 @@ func TestDataFrame_Null(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "baz"},
+		},
+		{"fail - bad column", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{true, false, false}, name: "0"},
+				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, true, false}, name: "1"}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
+			args{[]string{"corge"}},
+			&DataFrame{err: fmt.Errorf("Null(): name (corge) does not match any existing column")},
 		},
 	}
 	for _, tt := range tests {
@@ -1682,20 +1783,51 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 		args   args
 		want   *DataFrame
 	}{
-		// {"single label level, named keys, left join", fields{
-		// 	values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
-		// 	labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
-		// 	name:          "qux",
-		// 	colLevelNames: []string{"*0"}},
-		// 	args{
-		// 		other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
-		// 			labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-		// 		how:    "left",
-		// 		leftOn: []string{"foo"}, rightOn: []string{"foo"}},
-		// 	&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
-		// 		labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
-		// 		name:   "qux"},
-		// },
+		{"single label level, named keys, left join - longer labels", fields{
+			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
+			labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+			name:          "qux",
+			colLevelNames: []string{"*0"}},
+			args{
+				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
+					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
+				how:    "left",
+				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
+			&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
+				labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+				name:          "qux",
+				colLevelNames: []string{"*0"}},
+		},
+		{"single label level, named keys, left join - shorter labels", fields{
+			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
+			labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+			name:          "qux",
+			colLevelNames: []string{"*0"}},
+			args{
+				other: &DataFrame{values: []*valueContainer{{slice: []float64{30}, isNull: []bool{false, false, false}, name: "corge"}},
+					labels: []*valueContainer{{name: "foo", slice: []string{"bar"}, isNull: []bool{false, false, false}}}},
+				how:    "left",
+				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
+			&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
+				labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+				name:          "qux",
+				colLevelNames: []string{"*0"}},
+		},
+		{"auto key match", fields{
+			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
+			labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+			name:          "qux",
+			colLevelNames: []string{"*0"}},
+			args{
+				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
+					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
+				how:    "left",
+				leftOn: nil, rightOn: nil},
+			&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
+				labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+				name:          "qux",
+				colLevelNames: []string{"*0"}},
+		},
 		{"fail - leftOn but not rightOn", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
 			labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
@@ -1708,6 +1840,42 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 				leftOn: []string{"foo"}, rightOn: nil},
 			&DataFrame{err: fmt.Errorf("LookupAdvanced(): if either leftOn or rightOn is empty, both must be empty")},
 		},
+		{"fail - bad leftOn", fields{
+			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
+			labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+			name:          "qux",
+			colLevelNames: []string{"*0"}},
+			args{
+				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
+					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
+				how:    "left",
+				leftOn: []string{"quux"}, rightOn: []string{"foo"}},
+			&DataFrame{err: fmt.Errorf("LookupAdvanced(): `leftOn`: name (quux) does not match any existing column")},
+		},
+		{"fail - bad rightOn", fields{
+			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
+			labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+			name:          "qux",
+			colLevelNames: []string{"*0"}},
+			args{
+				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
+					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
+				how:    "left",
+				leftOn: []string{"foo"}, rightOn: []string{"quux"}},
+			&DataFrame{err: fmt.Errorf("LookupAdvanced(): `rightOn`: name (quux) does not match any existing column")},
+		},
+		{"fail - unsupported lookup", fields{
+			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
+			labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+			name:          "qux",
+			colLevelNames: []string{"*0"}},
+			args{
+				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
+					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
+				how:    "special",
+				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
+			&DataFrame{err: fmt.Errorf("LookupAdvanced(): `how`: must be `left`, `right`, or `inner`")},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1719,7 +1887,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 				err:           tt.fields.err,
 			}
 			if got := df.LookupAdvanced(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.LookupAdvanced() = %v, want %v", got, tt.want)
+				t.Errorf("DataFrame.LookupAdvanced() = %v, want %v", got.err, tt.want.err)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 
 			}

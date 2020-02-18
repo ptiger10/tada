@@ -1149,30 +1149,34 @@ func lookup(how string,
 		s = s.DropNull()
 		return s, nil
 	default:
-		return nil, fmt.Errorf("unsupported how: must be `left`, `right`, or `inner`")
+		return nil, fmt.Errorf("`how`: must be `left`, `right`, or `inner`")
 	}
 }
 
 func lookupDataFrame(how string,
-	name string, values1 []*valueContainer, labels1 []*valueContainer, leftOn []int,
+	name string, colLevelNames []string,
+	values1 []*valueContainer, labels1 []*valueContainer, leftOn []int,
 	values2 []*valueContainer, labels2 []*valueContainer, rightOn []int,
 	excludeLeft []string, excludeRight []string) (*DataFrame, error) {
 	mergedLabelsCols1 := append(labels1, values1...)
 	mergedLabelsCols2 := append(labels2, values2...)
 	switch how {
 	case "left":
-		return lookupDataFrameWithAnchor(name, mergedLabelsCols1, labels1, leftOn,
+		return lookupDataFrameWithAnchor(name, colLevelNames,
+			mergedLabelsCols1, labels1, leftOn,
 			values2, mergedLabelsCols2, rightOn, excludeRight), nil
 	case "right":
-		return lookupDataFrameWithAnchor(name, mergedLabelsCols2, labels2, rightOn,
+		return lookupDataFrameWithAnchor(name, colLevelNames,
+			mergedLabelsCols2, labels2, rightOn,
 			values1, mergedLabelsCols1, leftOn, excludeLeft), nil
 	case "inner":
-		df := lookupDataFrameWithAnchor(name, mergedLabelsCols1, labels1, leftOn,
+		df := lookupDataFrameWithAnchor(name, colLevelNames,
+			mergedLabelsCols1, labels1, leftOn,
 			values2, mergedLabelsCols2, rightOn, excludeRight)
 		df = df.DropNull()
 		return df, nil
 	default:
-		return nil, fmt.Errorf("unsupported how: must be `left`, `right`, or `inner`")
+		return nil, fmt.Errorf("`how`: must be `left`, `right`, or `inner`")
 	}
 }
 
@@ -1209,7 +1213,8 @@ func lookupWithAnchor(
 // looks up values in every column in values2 (excluding colNames matching `except`),
 // preserves the column names from values2, converts to dataframe with `name`
 func lookupDataFrameWithAnchor(
-	name string, mergedLabelsCols1 []*valueContainer, labels1 []*valueContainer, leftOn []int,
+	name string, colLevelNames []string,
+	mergedLabelsCols1 []*valueContainer, labels1 []*valueContainer, leftOn []int,
 	values2 []*valueContainer, mergedLabelsCols2 []*valueContainer, rightOn []int, exclude []string) *DataFrame {
 	toLookup := concatenateLabelsToStrings(mergedLabelsCols1, leftOn)
 	_, lookupSource, _, _ := labelsToMap(mergedLabelsCols2, rightOn)
@@ -1235,7 +1240,7 @@ func lookupDataFrameWithAnchor(
 			// positive match: copy value from values2
 			if matchedIndex != -1 {
 				vals.Index(i).Set(v.Index(matchedIndex))
-				isNull[i] = values2[k].isNull[i]
+				isNull[i] = values2[k].isNull[matchedIndex]
 				// no match
 			} else {
 				vals.Index(i).Set(reflect.Zero(reflect.TypeOf(values2[k].slice).Elem()))
@@ -1245,9 +1250,10 @@ func lookupDataFrameWithAnchor(
 		retVals = append(retVals, &valueContainer{slice: vals.Interface(), isNull: isNull, name: values2[k].name})
 	}
 	return &DataFrame{
-		values: retVals,
-		labels: labels1,
-		name:   name,
+		values:        retVals,
+		labels:        labels1,
+		name:          name,
+		colLevelNames: colLevelNames,
 	}
 }
 
