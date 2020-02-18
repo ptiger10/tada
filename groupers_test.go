@@ -1,11 +1,102 @@
 package tada
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 
 	"github.com/d4l3k/messagediff"
 )
+
+func TestGroupedSeries_Err(t *testing.T) {
+	type fields struct {
+		groups      map[string][]int
+		orderedKeys []string
+		series      *Series
+		levelNames  []string
+		aligned     bool
+		err         error
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		wantErr bool
+	}{
+		{"error", fields{err: errors.New("foo")}, true},
+		{"no error", fields{
+			groups:      map[string][]int{"foo": []int{0, 1}, "bar": []int{2, 3}},
+			orderedKeys: []string{"foo", "bar"},
+			levelNames:  []string{"*0"},
+			series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeries{
+				groups:      tt.fields.groups,
+				orderedKeys: tt.fields.orderedKeys,
+				series:      tt.fields.series,
+				levelNames:  tt.fields.levelNames,
+				aligned:     tt.fields.aligned,
+				err:         tt.fields.err,
+			}
+			if err := g.Err(); (err != nil) != tt.wantErr {
+				t.Errorf("GroupedSeries.Err() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestGroupedSeries_stringFunc(t *testing.T) {
+	type fields struct {
+		groups      map[string][]int
+		orderedKeys []string
+		series      *Series
+		levelNames  []string
+		aligned     bool
+		err         error
+	}
+	type args struct {
+		name string
+		fn   func(val []string, isNull []bool, index []int) (string, bool)
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{
+			name: "single level - not aligned",
+			fields: fields{
+				groups:      map[string][]int{"foo": []int{0, 1}, "bar": []int{2, 3}},
+				orderedKeys: []string{"foo", "bar"},
+				levelNames:  []string{"*0"},
+				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			args: args{"str", func([]string, []bool, []int) (string, bool) { return "", false }},
+			want: &Series{values: &valueContainer{slice: []string{"", ""}, isNull: []bool{false, false}, name: "str"},
+				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeries{
+				groups:      tt.fields.groups,
+				orderedKeys: tt.fields.orderedKeys,
+				series:      tt.fields.series,
+				levelNames:  tt.fields.levelNames,
+				aligned:     tt.fields.aligned,
+				err:         tt.fields.err,
+			}
+			if got := g.stringFunc(tt.args.name, tt.args.fn); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedSeries.stringFunc() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestGroupedSeries_Sum(t *testing.T) {
 	type fields struct {
