@@ -674,6 +674,11 @@ func (df *DataFrameMutator) DropCol(name string) {
 	toExclude, err := findColWithName(name, df.dataframe.values)
 	if err != nil {
 		df.dataframe.resetWithError(fmt.Errorf("DropCol(): %v", err))
+		return
+	}
+	if len(df.dataframe.values) == 1 {
+		df.dataframe.resetWithError(fmt.Errorf("DropCol(): cannot drop only column"))
+		return
 	}
 	index := excludeFromIndex(len(df.dataframe.values), toExclude)
 	df.SubsetCols(index)
@@ -751,11 +756,13 @@ func (df *DataFrameMutator) SetLabels(colNames ...string) {
 	if len(colNames) >= len(df.dataframe.values) {
 		df.dataframe.resetWithError(fmt.Errorf("SetLabels(): number of colNames must be less than number of columns (%d >= %d)",
 			len(colNames), len(df.dataframe.values)))
+		return
 	}
 	for i := 0; i < len(colNames); i++ {
 		index, err := findColWithName(colNames[i], df.dataframe.values)
 		if err != nil {
 			df.dataframe.resetWithError(fmt.Errorf("SetLabels(): %v", err))
+			return
 		}
 		df.dataframe.labels = append(df.dataframe.labels, df.dataframe.values[index])
 		df.DropCol(colNames[i])
@@ -775,23 +782,27 @@ func (df *DataFrame) ResetLabels(index ...int) *DataFrame {
 // ResetLabels appends the label level(s) at the supplied index levels as columns and drops the level.
 // If no index levels are supplied, all label levels are appended as columns and dropped as levels, and replaced by a default label column.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) ResetLabels(index ...int) {
-	if len(index) == 0 {
-		index = makeIntRange(0, df.dataframe.numLevels())
+func (df *DataFrameMutator) ResetLabels(labelLevels ...int) {
+	if len(labelLevels) == 0 {
+		labelLevels = makeIntRange(0, df.dataframe.numLevels())
 	}
-	for _, i := range index {
-		if i >= df.dataframe.numLevels() {
-			df.dataframe.resetWithError(fmt.Errorf("ResetLabels(): index out of range (%d > %d)", i, df.dataframe.numLevels()-1))
+	for incrementor, i := range labelLevels {
+		adjustedIndex := i - incrementor
+		if adjustedIndex >= df.dataframe.numLevels() {
+			df.dataframe.resetWithError(fmt.Errorf(
+				"ResetLabels(): index out of range (%d > %d)", i, df.dataframe.numLevels()+incrementor))
+			return
 		}
-		newVal := df.dataframe.labels[i]
+		newVal := df.dataframe.labels[adjustedIndex]
 		// If label level name has default indicator, remove default indicator
 		newVal.name = removeDefaultNameIndicator(newVal.name)
 		df.dataframe.values = append(df.dataframe.values, newVal)
-		df.dataframe.labels, _ = subsetCols(df.dataframe.labels, excludeFromIndex(df.dataframe.numLevels(), i))
+		exclude := excludeFromIndex(df.dataframe.numLevels(), adjustedIndex)
+		df.dataframe.labels, _ = subsetCols(df.dataframe.labels, exclude)
 	}
 	if df.dataframe.numLevels() == 0 {
 		defaultLabels := makeDefaultLabels(0, df.dataframe.Len())
-		df.dataframe.labels[0] = defaultLabels
+		df.dataframe.labels = append(df.dataframe.labels, defaultLabels)
 	}
 	return
 }
@@ -1310,11 +1321,15 @@ func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFr
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	labelIndex, err := findColWithName(labels, mergedLabelsAndCols)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("PivotTable(): invalid labels: %v", err))
+		return dataFrameWithError(fmt.Errorf("PivotTable(): `labels`: %v", err))
 	}
 	colIndex, err := findColWithName(columns, mergedLabelsAndCols)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("PivotTable(): invalid columns: %v", err))
+		return dataFrameWithError(fmt.Errorf("PivotTable(): `columns`: %v", err))
+	}
+	_, err = findColWithName(values, mergedLabelsAndCols)
+	if err != nil {
+		return dataFrameWithError(fmt.Errorf("PivotTable(): `values`: %v", err))
 	}
 	grouper := df.groupby([]int{labelIndex, colIndex})
 	var ret *DataFrame
@@ -1328,10 +1343,7 @@ func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFr
 	case "std":
 		ret = grouper.Std(values)
 	default:
-		return dataFrameWithError(fmt.Errorf("df.Pivot(): unsupported aggFunc (%v)", aggFunc))
-	}
-	if ret.err != nil {
-		return dataFrameWithError(fmt.Errorf("df.Pivot(): %v", err))
+		return dataFrameWithError(fmt.Errorf("PivotTable(): `aggFunc`: unsupported (%v)", aggFunc))
 	}
 	ret = ret.PromoteToColLevel(columns)
 	ret.dropColLevel(1)

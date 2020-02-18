@@ -135,7 +135,7 @@ func findNameInColumnsOrLabels(name string, cols []*valueContainer, labels []*va
 	} else if lvl, err := findColWithName(name, labels); err == nil {
 		return lvl, false, nil
 	} else {
-		return 0, false, fmt.Errorf("no matching name (%s) in either columns or label levels", name)
+		return 0, false, fmt.Errorf("name (%v) does not match any existing column", name)
 	}
 }
 
