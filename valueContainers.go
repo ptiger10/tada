@@ -2,7 +2,6 @@ package tada
 
 import (
 	"fmt"
-	"math"
 	"reflect"
 	"strconv"
 	"time"
@@ -77,7 +76,12 @@ func convertStringToFloat(val string, originalBool bool) (float64, bool) {
 	if err == nil {
 		return parsedVal, originalBool
 	}
-	return math.NaN(), true
+	return 0, true
+}
+
+// may change in the future
+func convertDateTimeToFloat(val time.Time, originalBool bool) (float64, bool) {
+	return 0, true
 }
 
 func convertBoolToFloat(val bool) float64 {
@@ -127,8 +131,7 @@ func (vc *valueContainer) float() floatValueContainer {
 		arr := vc.slice.([]time.Time)
 		for i := range arr {
 			// newVals[i] = float64(arr[i].UnixNano())
-			newVals[i] = math.NaN()
-			isNull[i] = true
+			newVals[i], isNull[i] = convertDateTimeToFloat(arr[i], isNull[i])
 		}
 
 	case []bool:
@@ -150,8 +153,7 @@ func (vc *valueContainer) float() floatValueContainer {
 			case uint, uint8, uint16, uint32, uint64:
 				newVals[i] = float64(reflect.ValueOf(arr[i]).Uint())
 			case time.Time:
-				newVals[i] = math.NaN()
-				isNull[i] = true
+				newVals[i], isNull[i] = convertDateTimeToFloat(arr[i].(time.Time), isNull[i])
 			case bool:
 				newVals[i] = convertBoolToFloat(arr[i].(bool))
 			}
@@ -193,10 +195,10 @@ func (vc *valueContainer) str() stringValueContainer {
 	return ret
 }
 
-func convertStringToDateTime(val string, originalBool bool) (time.Time, bool) {
+func convertStringToDateTime(val string) (time.Time, bool) {
 	parsedVal, err := dateparse.ParseAny(val)
 	if err == nil {
-		return parsedVal, originalBool
+		return parsedVal, false
 	}
 	return time.Time{}, true
 }
@@ -208,7 +210,7 @@ func (vc *valueContainer) dateTime() dateTimeValueContainer {
 	case []string:
 		arr := vc.slice.([]string)
 		for i := range arr {
-			newVals[i], isNull[i] = convertStringToDateTime(arr[i], isNull[i])
+			newVals[i], isNull[i] = convertStringToDateTime(arr[i])
 		}
 	case []time.Time:
 		newVals = vc.slice.([]time.Time)
@@ -217,7 +219,7 @@ func (vc *valueContainer) dateTime() dateTimeValueContainer {
 		for i := range arr {
 			switch arr[i].(type) {
 			case string:
-				newVals[i], isNull[i] = convertStringToDateTime(arr[i].(string), isNull[i])
+				newVals[i], isNull[i] = convertStringToDateTime(arr[i].(string))
 			case time.Time:
 				newVals[i] = arr[i].(time.Time)
 			default:
