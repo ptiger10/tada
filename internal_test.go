@@ -91,8 +91,6 @@ func Test_makeValueContainerFromInterface(t *testing.T) {
 	}{
 		{"pass", args{[]float64{1}, "0"},
 			&valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "0"}, false},
-		{"pass - elements", args{[]Element{{val: float64(1), isNull: false}}, "0"},
-			&valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "0"}, false},
 		{"fail - empty slice", args{[]float64{}, "0"},
 			nil, true},
 		{"fail - unsupported slice", args{[]complex64{1}, "0"},
@@ -1886,6 +1884,42 @@ func Test_readCSVByCols(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := readCSVByCols(tt.args.csv, tt.args.config); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("readCSVByCols() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_readStruct(t *testing.T) {
+	type args struct {
+		slice interface{}
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*valueContainer
+		wantErr bool
+	}{
+		{"pass", args{[]testStruct{{"foo", 1}, {"bar", 2}}},
+			[]*valueContainer{
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "Name"},
+				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "Age"}},
+			false},
+		{"fail - not slice", args{testStruct{"foo", 1}},
+			nil, true},
+		{"fail - not struct", args{[]string{"foo"}},
+			nil, true},
+		{"fail - empty", args{[]testStruct{}},
+			nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := readStruct(tt.args.slice)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readStruct() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("readStruct() = %v, want %v", got, tt.want)
 			}
 		})
 	}

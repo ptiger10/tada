@@ -69,8 +69,8 @@ type Sorter struct {
 
 // Element stub
 type Element struct {
-	val    interface{}
-	isNull bool
+	Val    interface{}
+	IsNull bool
 }
 
 // FilterFn stub

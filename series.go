@@ -13,47 +13,20 @@ import (
 // Supported underlying slice types: real numbers, string, time.Time, boolean, or interface.
 func NewSeries(slice interface{}, labels ...interface{}) *Series {
 	// handle values
-	if !isSlice(slice) {
-		return &Series{err: fmt.Errorf("NewSeries(): unsupported kind (%v); must be slice", reflect.TypeOf(slice))}
+	values, err := makeValueContainerFromInterface(slice, "0")
+	if err != nil {
+		return seriesWithError(fmt.Errorf("NewSeries(): `slice`: %v", err))
 	}
-	if reflect.ValueOf(slice).Len() == 0 {
-		return &Series{err: fmt.Errorf("NewSeries(): slice cannot be empty")}
-	}
-	isNull := setNullsFromInterface(slice)
-	if isNull == nil {
-		return &Series{err: fmt.Errorf(
-			"NewSeries(): unable to calculate null values ([]%v not supported)", reflect.TypeOf(slice).Elem())}
-	}
-	elements := handleElementsSlice(slice)
-	if elements != nil {
-		slice = elements
-	}
-	values := &valueContainer{slice: slice, isNull: isNull}
 
 	// handle labels
-	retLabels := make([]*valueContainer, len(labels))
+	retLabels, err := makeValueContainersFromInterfaces(labels, true)
+	if err != nil {
+		return seriesWithError(fmt.Errorf("NewSeries(): `labels`: %v", err))
+	}
 	if len(retLabels) == 0 {
 		// default labels
 		defaultLabels := makeDefaultLabels(0, reflect.ValueOf(slice).Len())
 		retLabels = append(retLabels, defaultLabels)
-	} else {
-		for i := range retLabels {
-			input := labels[i]
-			if !isSlice(input) {
-				return seriesWithError(fmt.Errorf("NewSeries(): unsupported label kind (%v) at level %d; must be slice", reflect.TypeOf(input), i))
-			}
-			isNull := setNullsFromInterface(input)
-			if isNull == nil {
-				return seriesWithError(fmt.Errorf(
-					"NewSeries(): unable to calculate null values at level %d ([]%v not supported)", i, reflect.TypeOf(input).Elem()))
-			}
-			// handle special case of []Element: convert to []interface{}
-			elements := handleElementsSlice(input)
-			if elements != nil {
-				input = elements
-			}
-			retLabels[i] = &valueContainer{slice: input, isNull: isNull, name: fmt.Sprintf("*%d", i)}
-		}
 	}
 
 	return &Series{values: values, labels: retLabels}
@@ -84,14 +57,18 @@ func (s *Series) ToDataFrame() *DataFrame {
 }
 
 // ToCSV converts a Series to a DataFrame and returns as [][]string.
-func (s *Series) ToCSV(ignoreLabels bool) [][]string {
+func (s *Series) ToCSV(ignoreLabels bool) ([][]string, error) {
+	if s.values == nil {
+		return nil, fmt.Errorf("ToCSV(): cannot export empty Series")
+	}
 	df := &DataFrame{
 		values:        []*valueContainer{s.values},
 		labels:        s.labels,
 		colLevelNames: []string{"*0"},
 		err:           s.err,
 	}
-	return df.ToCSV(ignoreLabels)
+	csv, _ := df.ToCSV(ignoreLabels)
+	return csv, nil
 }
 
 // -- GETTERS
@@ -123,8 +100,8 @@ func (s *Series) Elements(labelLevel ...int) []Element {
 		v := reflect.ValueOf(s.values.slice)
 		for i := 0; i < s.Len(); i++ {
 			ret[i] = Element{
-				val:    v.Index(i).Interface(),
-				isNull: s.values.isNull[i],
+				Val:    v.Index(i).Interface(),
+				IsNull: s.values.isNull[i],
 			}
 		}
 		// handle optional labelLevel
@@ -136,8 +113,8 @@ func (s *Series) Elements(labelLevel ...int) []Element {
 		v := reflect.ValueOf(s.labels[lvl].slice)
 		for i := range ret {
 			ret[i] = Element{
-				val:    v.Index(i).Interface(),
-				isNull: s.labels[lvl].isNull[i],
+				Val:    v.Index(i).Interface(),
+				IsNull: s.labels[lvl].isNull[i],
 			}
 		}
 	}

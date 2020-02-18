@@ -1,10 +1,5 @@
 package tada
 
-import (
-	"fmt"
-	"testing"
-)
-
 // func TestUsage(t *testing.T) {
 // 	df := NewDataFrame(
 // 		[]interface{}{[]float64{1, 2, 3}, []float64{4, 5, 6}}, []string{"foo", "foo", "baz"}).
@@ -21,7 +16,7 @@ import (
 // 	WriteMockCSV(c, &b, nil)
 // }
 
-func TestAlign(t *testing.T) {
-	df := NewDataFrame([]interface{}{[]float64{1, 2, 6}, []int{10, 20, 30}}, []string{"foo", "bar", "foo"}).SetCols([]string{"qux", "quux"})
-	fmt.Println(df.GroupBy().Align("qux").Min())
-}
+// func TestAlign(t *testing.T) {
+// 	df := NewDataFrame([]interface{}{[]float64{1, 2, 6}, []int{10, 20, 30}}, []string{"foo", "bar", "foo"}).SetCols([]string{"qux", "quux"})
+// 	fmt.Println(df.GroupBy().Align("qux").Min())
+// }

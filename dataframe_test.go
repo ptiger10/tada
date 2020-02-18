@@ -23,9 +23,19 @@ func TestNewDataFrame(t *testing.T) {
 		args args
 		want *DataFrame
 	}{
-		{"normal", args{
+		{"pass - supplied values and labels", args{
 			[]interface{}{[]float64{1, 2}, []string{"foo", "bar"}},
-			[]interface{}{[]int{0, 1}}},
+			[]interface{}{[]string{"a", "b"}}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"},
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "1"}},
+				labels:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+		},
+		{"pass - default labels", args{
+			[]interface{}{[]float64{1, 2}, []string{"foo", "bar"}},
+			nil},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"},
@@ -36,23 +46,18 @@ func TestNewDataFrame(t *testing.T) {
 		{"fail - unsupported kind", args{
 			[]interface{}{"foo"}, nil},
 			&DataFrame{
-				err: errors.New("NewDataFrame(): unsupported kind (string) in `slices` (position 0); must be slice")},
+				err: errors.New("NewDataFrame(): `slices`: error at position 0: unsupported kind (string); must be slice")},
 		},
-		{"fail - empty slice", args{
-			[]interface{}{[]float64{}}, nil},
+		{"fail - unsupported label kind", args{
+			[]interface{}{[]float64{1}}, []interface{}{"foo"}},
 			&DataFrame{
-				err: errors.New("NewDataFrame(): empty slice in slices (position 0): cannot be empty")},
-		},
-		{"fail - unsupported values type", args{
-			[]interface{}{[]complex64{1}}, nil},
-			&DataFrame{
-				err: errors.New("NewDataFrame(): unable to calculate null values ([]complex64 not supported)")},
+				err: errors.New("NewDataFrame(): `labels`: error at position 0: unsupported kind (string); must be slice")},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := NewDataFrame(tt.args.slices, tt.args.labels...); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewDataFrame() = %v, want %v", got, tt.want)
+				t.Errorf("NewDataFrame() = %v, want %v", got.err, tt.want.err)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
@@ -195,6 +200,26 @@ func TestDataFrame_Subset(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "baz"}},
+		{"fail - invalid filter", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"},
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "1"}},
+			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
+			args{[]int{-999}},
+			&DataFrame{err: fmt.Errorf(
+				"Subset(): invalid filter (every filter must have at least one filter function; if ColName is supplied, it must be valid)")}},
+		{"fail - no matching index", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"},
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "1"}},
+			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
+			args{[]int{10}},
+			&DataFrame{err: fmt.Errorf(
+				"Subset(): index out of range (10 > 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -206,7 +231,7 @@ func TestDataFrame_Subset(t *testing.T) {
 				err:           tt.fields.err,
 			}
 			if got := df.Subset(tt.args.index); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.Subset() = %v, want %v", got, tt.want)
+				t.Errorf("DataFrame.Subset() = %v, want %v", got.err, tt.want.err)
 			}
 		})
 	}
@@ -250,6 +275,14 @@ func TestReadCSV(t *testing.T) {
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}}, false},
+		{"fail - no rows",
+			args{csv: nil,
+				config: nil},
+			nil, true},
+		{"fail - no columns",
+			args{csv: [][]string{{}},
+				config: nil},
+			nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1883,6 +1916,10 @@ func TestReadStruct(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			false,
 		},
+		{"fail - bad input", args{"foo"},
+			nil,
+			true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1920,7 +1957,7 @@ func TestWriteMockCSV(t *testing.T) {
 			want1, false},
 		{"fail - no rows", args{src: nil, config: nil, outputRows: 3},
 			"", true},
-		{"fail - no cols", args{src: [][]string{}, config: nil, outputRows: 3},
+		{"fail - no cols", args{src: [][]string{{}}, config: nil, outputRows: 3},
 			"", true},
 		{"columns as major dim",
 			args{src: [][]string{{"corge", "1", "1"}, {"qux", "foo", "foo"}},
@@ -1928,7 +1965,7 @@ func TestWriteMockCSV(t *testing.T) {
 			want1, false},
 		{"fail - no rows", args{src: nil, config: &ReadConfig{MajorDimIsCols: true}, outputRows: 3},
 			"", true},
-		{"fail - no cols", args{src: [][]string{}, config: &ReadConfig{MajorDimIsCols: true}, outputRows: 3},
+		{"fail - no cols", args{src: [][]string{{}}, config: &ReadConfig{MajorDimIsCols: true}, outputRows: 3},
 			"", true},
 	}
 	for _, tt := range tests {
@@ -2108,6 +2145,541 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got1, tt.want1) {
 				t.Errorf("DataFrame.EqualsCSV() got1 = %#v, want %#v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func TestImportCSV(t *testing.T) {
+	type args struct {
+		path   string
+		config *ReadConfig
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *DataFrame
+		wantErr bool
+	}{
+		{"1 header, 0 labels - nil config",
+			args{"test_files/1_header_0_labels.csv", nil},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "Name"},
+					{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "Age"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				name:          "",
+				colLevelNames: []string{"*0"}}, false},
+		{"fail - no file",
+			args{"missing.csv", nil},
+			nil, true},
+		{"fail - bad delimiter",
+			args{"test_files/bad_delimiter.csv", nil},
+			nil, true},
+		{"fail - empty",
+			args{"test_files/empty.csv", nil},
+			nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ImportCSV(tt.args.path, tt.args.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ImportCSV() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ImportCSV() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReadInterface(t *testing.T) {
+	type args struct {
+		input  [][]interface{}
+		config *ReadConfig
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *DataFrame
+		wantErr bool
+	}{
+		{"1 header row, 2 columns, no index",
+			args{
+				input:  [][]interface{}{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
+				config: &ReadConfig{NumHeaderRows: 1}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}}, false},
+		{"1 header row, 2 columns, no index, nil config",
+			args{
+				input:  [][]interface{}{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
+				config: nil},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}}, false},
+		{"column as major dimension",
+			args{
+				input:  [][]interface{}{{"foo", "1", "2"}, {"bar", "5", "6"}},
+				config: &ReadConfig{MajorDimIsCols: true, NumHeaderRows: 1}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}}, false},
+		{"fail - no rows",
+			args{input: nil,
+				config: nil},
+			nil, true},
+		{"fail - no columns",
+			args{input: [][]interface{}{{}},
+				config: nil},
+			nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ReadInterface(tt.args.input, tt.args.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReadInterface() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ReadInterface() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_ToCSV(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		ignoreLabels bool
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    [][]string
+		wantErr bool
+	}{
+		{"pass",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{false},
+			[][]string{{"*0", "foo"}, {"0", "a"}, {"1", "b"}}, false},
+		{"fail",
+			fields{values: nil,
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{false},
+			nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			got, err := df.ToCSV(tt.args.ignoreLabels)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.ToCSV() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.ToCSV() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_ExportCSV(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		file         string
+		ignoreLabels bool
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{"pass", fields{values: []*valueContainer{
+			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+			args{"test_files/output.csv", false}, false},
+		{"fail - no df", fields{values: nil,
+			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+			args{"test_files/output.csv", false}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if err := df.ExportCSV(tt.args.file, tt.args.ignoreLabels); (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.ExportCSV() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestDataFrame_ToInterface(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		ignoreLabels bool
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    [][]interface{}
+		wantErr bool
+	}{
+		{"pass",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{false},
+			[][]interface{}{{"*0", "foo"}, {"0", "a"}, {"1", "b"}}, false},
+		{"fail",
+			fields{values: nil,
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{false},
+			nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			got, err := df.ToInterface(tt.args.ignoreLabels)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.ToInterface() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.ToInterface() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_Err(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		wantErr bool
+	}{
+		{"pass",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			false},
+		{"pass",
+			fields{err: fmt.Errorf("foo")},
+			true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if err := df.Err(); (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.Err() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestDataFrame_Col(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		name string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"pass",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{"foo"},
+			&Series{
+				values: &valueContainer{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			},
+		},
+		{"fail",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{"baz"},
+			&Series{
+				err: fmt.Errorf("Col(): name (baz) does not match any existing column")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.Col(tt.args.name); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Col() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_Cols(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		names []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"pass",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{[]string{"foo"}},
+			&DataFrame{
+				values: []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			},
+		},
+		{"fail",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{[]string{"foo", "baz"}},
+			&DataFrame{
+				err: fmt.Errorf("Cols(): name (baz) does not match any existing column")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.Cols(tt.args.names...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Cols() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_Drop(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		index int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"pass",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{0},
+			&DataFrame{
+				values:        []*valueContainer{{slice: []string{"b"}, isNull: []bool{false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+		},
+		{"fail",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{10},
+			&DataFrame{
+				err: fmt.Errorf("Drop(): index out of range (10 > 1)")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.Drop(tt.args.index); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Drop() = %v, want %v", got.err, tt.want.err)
+			}
+		})
+	}
+}
+
+func TestDataFrame_Append(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		other *DataFrame
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"pass",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{&DataFrame{
+				values:        []*valueContainer{{slice: []string{"c"}, isNull: []bool{false}, name: "anything"}},
+				labels:        []*valueContainer{{slice: []int{2}, isNull: []bool{false}, name: "anything"}},
+				colLevelNames: []string{"anything"}}},
+			&DataFrame{
+				values:        []*valueContainer{{slice: []string{"a", "b", "c"}, isNull: []bool{false, false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []string{"0", "1", "2"}, isNull: []bool{false, false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+		},
+		{"fail - wrong number of levels",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"c"}, isNull: []bool{false}, name: "anything"}},
+				labels: []*valueContainer{
+					{slice: []int{2}, isNull: []bool{false}, name: "anything"},
+					{slice: []int{2}, isNull: []bool{false}, name: "anything"},
+				},
+				colLevelNames: []string{"anything"}}},
+			&DataFrame{
+				err: fmt.Errorf("Append(): other DataFrame must have same number of label levels as original DataFrame (2 != 1)")},
+		},
+		{"fail - wrong num columns",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"c"}, isNull: []bool{false}, name: "anything"},
+					{slice: []int{2}, isNull: []bool{false}, name: "anything"}},
+				labels: []*valueContainer{
+					{slice: []int{2}, isNull: []bool{false}, name: "anything"}},
+				colLevelNames: []string{"anything"}}},
+			&DataFrame{
+				err: fmt.Errorf("Append(): other DataFrame must have same number of columns as original DataFrame (2 != 1)")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.Append(tt.args.other); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Append() = %v, want %v", got.err, tt.want.err)
 			}
 		})
 	}

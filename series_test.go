@@ -22,27 +22,15 @@ func TestNewSeries(t *testing.T) {
 		want *Series
 	}{
 		{"[]float64, default labels", args{slice: []float64{1}, labels: nil},
-			&Series{values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
+			&Series{values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "0"},
 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}}}},
 		{"[]float64, supplied labels", args{slice: []float64{1}, labels: []interface{}{[]string{"bar"}}},
-			&Series{values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
+			&Series{values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "0"},
 				labels: []*valueContainer{{slice: []string{"bar"}, isNull: []bool{false}, name: "*0"}}}},
-		{"[]Elements values", args{slice: []Element{{1, false}, {"foo", false}}, labels: nil},
-			&Series{values: &valueContainer{slice: []interface{}{1, "foo"}, isNull: []bool{false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}}},
-		{"[]Elements labels", args{slice: []float64{1, 2}, labels: []interface{}{[]Element{{1, false}, {"foo", false}}}},
-			&Series{values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
-				labels: []*valueContainer{{slice: []interface{}{1, "foo"}, isNull: []bool{false, false}, name: "*0"}}}},
 		{"unsupported input: empty slice", args{slice: []float64{}},
-			&Series{err: errors.New("NewSeries(): slice cannot be empty")}},
-		{"unsupported input: string scalar", args{slice: "foo"},
-			&Series{err: errors.New("NewSeries(): unsupported kind (string); must be slice")}},
-		{"unsupported input: complex slice", args{slice: []complex64{1}},
-			&Series{err: errors.New("NewSeries(): unable to calculate null values ([]complex64 not supported)")}},
+			&Series{err: errors.New("NewSeries(): `slice`: empty slice: cannot be empty")}},
 		{"unsupported label input: scalar", args{slice: []float64{1}, labels: []interface{}{"foo"}},
-			&Series{err: errors.New("NewSeries(): unsupported label kind (string) at level 0; must be slice")}},
-		{"unsupported label input: complex slice", args{slice: []float64{1}, labels: []interface{}{[]complex64{1}}},
-			&Series{err: errors.New("NewSeries(): unable to calculate null values at level 0 ([]complex64 not supported)")}},
+			&Series{err: errors.New("NewSeries(): `labels`: error at position 0: unsupported kind (string); must be slice")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -148,16 +136,22 @@ func TestSeries_ToCSV(t *testing.T) {
 		ignoreLabels bool
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   [][]string
+		name    string
+		fields  fields
+		args    args
+		want    [][]string
+		wantErr bool
 	}{
 		{"pass", fields{
 			values: &valueContainer{slice: []float64{1}, name: "foo", isNull: []bool{false}},
 			labels: []*valueContainer{{slice: []int{1}, name: "bar", isNull: []bool{false}}}},
 			args{false},
-			[][]string{{"bar", "foo"}, {"1", "1"}}},
+			[][]string{{"bar", "foo"}, {"1", "1"}}, false},
+		{"fail - empty", fields{
+			values: nil,
+			labels: nil},
+			args{false},
+			nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -166,7 +160,12 @@ func TestSeries_ToCSV(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.ToCSV(tt.args.ignoreLabels); !reflect.DeepEqual(got, tt.want) {
+			got, err := s.ToCSV(tt.args.ignoreLabels)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.ToCSV() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.ToCSV() = %v, want %v", got, tt.want)
 			}
 		})
@@ -757,12 +756,12 @@ func TestSeries_Elements(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}}}},
-			args{nil}, []Element{{val: float64(1), isNull: false}}},
+			args{nil}, []Element{{Val: float64(1), IsNull: false}}},
 		{"label level",
 			fields{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}}}},
-			args{[]int{0}}, []Element{{val: "foo", isNull: false}}},
+			args{[]int{0}}, []Element{{Val: "foo", IsNull: false}}},
 		{"fail: label level not in index",
 			fields{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},

@@ -54,11 +54,6 @@ func makeValueContainerFromInterface(slice interface{}, name string) (*valueCont
 	if isNull == nil {
 		return nil, fmt.Errorf("unable to calculate null values ([]%v not supported)", reflect.TypeOf(slice).Elem())
 	}
-	// handle special case of []Element: convert to []interface{}
-	elements := handleElementsSlice(slice)
-	if elements != nil {
-		slice = elements
-	}
 	return &valueContainer{
 		slice: slice, isNull: isNull, name: name,
 	}, nil
@@ -103,19 +98,6 @@ func makeIntRange(min, max int) []int {
 		ret[i] = min + i
 	}
 	return ret
-}
-
-// convert []Element to []interface of Element values only
-func handleElementsSlice(input interface{}) []interface{} {
-	elements, ok := input.([]Element)
-	if ok {
-		ret := make([]interface{}, len(elements))
-		for i := range ret {
-			ret[i] = elements[i].val
-		}
-		return ret
-	}
-	return nil
 }
 
 // search for a name only once. if it is found multiple times, return only the first
@@ -781,8 +763,8 @@ func (vc *valueContainer) append(other *valueContainer) *valueContainer {
 
 func (vc *valueContainer) iterRow(index int) Element {
 	return Element{
-		val:    reflect.ValueOf(vc.slice).Index(index).Interface(),
-		isNull: vc.isNull[index]}
+		Val:    reflect.ValueOf(vc.slice).Index(index).Interface(),
+		IsNull: vc.isNull[index]}
 }
 
 func (vc *valueContainer) gt(comparison float64) []int {
@@ -1369,7 +1351,7 @@ func setNullsFromInterface(input interface{}) []bool {
 		vals := input.([]Element)
 		ret = make([]bool, len(vals))
 		for i := range ret {
-			ret[i] = vals[i].isNull
+			ret[i] = vals[i].IsNull
 		}
 	default:
 		return nil

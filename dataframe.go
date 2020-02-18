@@ -21,23 +21,19 @@ func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 	// handle values
 	values, err := makeValueContainersFromInterfaces(slices, false)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("NewDataFrame(): slices: %v", err))
+		return dataFrameWithError(fmt.Errorf("NewDataFrame(): `slices`: %v", err))
 	}
 	// handle labels
-	retLabels := make([]*valueContainer, len(labels))
+	retLabels, err := makeValueContainersFromInterfaces(labels, true)
+	if err != nil {
+		return dataFrameWithError(fmt.Errorf("NewDataFrame(): `labels`: %v", err))
+	}
 	if len(retLabels) == 0 {
 		// handle default labels
 		numRows := reflect.ValueOf(slices[0]).Len()
 		defaultLabels := makeDefaultLabels(0, numRows)
 		retLabels = append(retLabels, defaultLabels)
-	} else {
-		// handle supplied labels
-		retLabels, err = makeValueContainersFromInterfaces(labels, true)
-		if err != nil {
-			return dataFrameWithError(fmt.Errorf("NewDataFrame(): labels: %v", err))
-		}
 	}
-
 	return &DataFrame{values: values, labels: retLabels, colLevelNames: []string{"*0"}}
 }
 
@@ -97,9 +93,6 @@ func ImportCSV(path string, config *ReadConfig) (*DataFrame, error) {
 
 	if len(csv) == 0 {
 		return nil, fmt.Errorf("ImportCSV(): csv must have at least one row")
-	}
-	if len(csv[0]) == 0 {
-		return nil, fmt.Errorf("ImportCSV(): csv must have at least one column")
 	}
 	return readCSVByRows(csv, config), nil
 
@@ -170,12 +163,12 @@ func (df *DataFrame) ToSeries() *Series {
 }
 
 // ToCSV converts a DataFrame to a [][]string with rows as the major dimension
-func (df *DataFrame) ToCSV(ignoreLabels bool) [][]string {
+func (df *DataFrame) ToCSV(ignoreLabels bool) ([][]string, error) {
 	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return transposedStringValues
+	return transposedStringValues, nil
 }
 
 // ExportCSV converts a DataFrame to a [][]string with rows as the major dimension, and writes the output to a csv file.
@@ -186,15 +179,9 @@ func (df *DataFrame) ExportCSV(file string, ignoreLabels bool) error {
 	}
 	var b bytes.Buffer
 	w := csv.NewWriter(&b)
-	err = w.WriteAll(transposedStringValues)
-	if err != nil {
-		return fmt.Errorf("ToCSV(): %v", err)
-	}
-	// ducks error because process is controlled
-	err = ioutil.WriteFile(file, b.Bytes(), 0666)
-	if err != nil {
-		return fmt.Errorf("ToCSV(): %v", err)
-	}
+	// duck error because csv is controlled
+	w.WriteAll(transposedStringValues)
+	ioutil.WriteFile(file, b.Bytes(), 0666)
 	return nil
 }
 
@@ -218,7 +205,7 @@ func (df *DataFrame) ToInterface(ignoreLabels bool) ([][]interface{}, error) {
 
 // EqualsCSV converts a dataframe to csv, compares it to another csv, and evaluates whether the two match and isolates their differences
 func (df *DataFrame) EqualsCSV(csv [][]string, ignoreLabels bool) (bool, *tablediff.Differences) {
-	compare := df.ToCSV(ignoreLabels)
+	compare, _ := df.ToCSV(ignoreLabels)
 	diffs, eq := tablediff.Diff(compare, csv)
 	return eq, diffs
 }
@@ -308,7 +295,7 @@ func removeDefaultNameIndicator(name string) string {
 
 func (df *DataFrame) String() string {
 	// do not try to print all rows
-	csv := df.Head(optionMaxRows).ToCSV(false)
+	csv, _ := df.Head(optionMaxRows).ToCSV(false)
 	for k := range csv[0] {
 		csv[0][k] = removeDefaultNameIndicator(csv[0][k])
 	}
@@ -731,13 +718,15 @@ func (df *DataFrame) Append(other *DataFrame) *DataFrame {
 func (df *DataFrameMutator) Append(other *DataFrame) {
 	if len(other.labels) != len(df.dataframe.labels) {
 		df.dataframe.resetWithError(
-			fmt.Errorf("other DataFrame must have same number of label levels as original DataFrame (%d != %d)",
+			fmt.Errorf("Append(): other DataFrame must have same number of label levels as original DataFrame (%d != %d)",
 				len(other.labels), len(df.dataframe.labels)))
+		return
 	}
 	if len(other.values) != len(df.dataframe.values) {
 		df.dataframe.resetWithError(
-			fmt.Errorf("other DataFrame must have same number of columns as original DataFrame (%d != %d)",
+			fmt.Errorf("Append(): other DataFrame must have same number of columns as original DataFrame (%d != %d)",
 				len(other.values), len(df.dataframe.values)))
+		return
 	}
 	for j := range df.dataframe.labels {
 		df.dataframe.labels[j] = df.dataframe.labels[j].append(other.labels[j])
