@@ -915,109 +915,109 @@ func (df *DataFrame) Transpose() *DataFrame {
 	}
 }
 
-// PromoteToColLevel pivots either a column or label level into a new column level.
+// PromoteToColLevel pivots an existing container (either column or label level) into a new column level.
 // If promoting would use either the last column or index level, it returns an error.
 // Adds new columns - each unique value in the stacked column is stacked above each existing column.
 // Can remove rows - returns only one row per unique label combination.
 func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
-	index, isCol, err := findNameInColumnsOrLabels(name, df.values, df.labels)
+
+	// -- isolate container to promote
+
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	index, err := findColWithName(name, mergedLabelsAndCols)
 	if err != nil {
 		return dataFrameWithError(fmt.Errorf("PromoteToColLevel(): %v", err))
 	}
-	var valsToPromote *valueContainer
-
-	// by default, include all label levels
+	// by default, include all original label levels in new labels
 	residualLabelIndex := makeIntRange(0, len(df.labels))
-	if isCol {
+	// check whether container refers to label or column
+	if index >= len(df.labels) {
 		if len(df.values) <= 1 {
 			return dataFrameWithError(fmt.Errorf("PromoteToColLevel(): cannot stack only column"))
 		}
-		valsToPromote = df.values[index]
 	} else {
 		if len(df.labels) <= 1 {
 			return dataFrameWithError(fmt.Errorf("PromoteToColLevel(): cannot stack only label level"))
 		}
-		valsToPromote = df.labels[index]
-		// if a label is selected, remove it from the residual labels
+		// if a label level is being promoted, exclude it from new labels
 		residualLabelIndex = excludeFromIndex(len(df.labels), index)
 	}
+	// adjust for label/value merging
+	colIndex := index - len(df.labels)
+	valsToPromote := mergedLabelsAndCols[index]
+
+	// -- set up helpers and new containers
+
+	// this step isolates the unique values in the promoted column and the rows in the original slice containing those values
+	_, rowIndices, _, uniqueValuesToPromote, _ := reduceContainers([]*valueContainer{valsToPromote}, []int{0})
+	// this step consolidates duplicate residual labels and maps each original row index to its new row index
+	labels, _, _, _, oldToNewRowMapping := reduceContainers(df.labels, residualLabelIndex)
+	// set new column level names
 	retColLevelNames := append([]string{valsToPromote.name}, df.colLevelNames...)
-	// lookupSource maps the unique values in the promoted column to the rows with that value
-	lookupSource, _, orderedKeys, _ := labelsToMap([]*valueContainer{valsToPromote}, []int{0})
-	// rowToUniqueLabels maps each original row index to its matching index in the return container
-	// this step consolidates duplicate residual labels
-	_, _, uniqueLabels, rowToUniqueLabels := labelsToMap(df.labels, residualLabelIndex)
-
-	// new labels will have as many columns as the residual label index and as many rows as the number of unique labels
-	newLevelNames := make([]string, len(residualLabelIndex))
-	newLabels := makeStringMatrix(len(residualLabelIndex), len(uniqueLabels))
-	for j, pos := range residualLabelIndex {
-		for i := range uniqueLabels {
-			splitLabelNames := splitLabelIntoLevels(uniqueLabels[i], true)
-			for _, labelName := range splitLabelNames {
-				newLabels[j][i] = labelName
-			}
-		}
-		newLevelNames[j] = df.labels[pos].name
-	}
-
 	// new values will have as many columns as unique values in the column-to-be-stacked * existing columns
 	// (minus the stacked column * existing columns, if a column is selected and not label level)
-	numNewCols := len(lookupSource) * df.numColumns()
+	numNewCols := len(uniqueValuesToPromote) * df.numColumns()
+	numNewRows := reflect.ValueOf(labels[0].slice).Len()
 	colNames := make([]string, numNewCols)
 	// each item in newVals should be a slice representing a new column
 	newVals := make([]interface{}, numNewCols)
-	newIsNull := makeBoolMatrix(numNewCols, len(uniqueLabels))
+	newIsNull := makeBoolMatrix(numNewCols, numNewRows)
 	for k := range newIsNull {
 		for i := range newIsNull[k] {
-			// by default, set all nulls to true
+			// by default, set all nulls to true; these must be explicitly overwritten in the next iterator
 			newIsNull[k][i] = true
 		}
 	}
 
+	// -- iterate over original data and write into new containers
+
 	// iterate over original columns -> unique values of stacked column -> row index of each unique value
 	// compare to original value at column and row position
-	// write to new row in container for each label value
+	// write to new row in container corresponding to unique label combo
 	for k := 0; k < df.numColumns(); k++ {
 		// skip column if it is derivative of the original - then drop those columns later
-		if k == index && isCol {
+		if k == colIndex {
 			continue
 		}
 		originalVals := reflect.ValueOf(df.values[k].slice)
-		for m, orderedKey := range orderedKeys {
-			newColumnIndex := k*len(lookupSource) + m
-			newHeader := joinLevelsIntoLabel([]string{orderedKey, df.values[k].name})
+		// m -> incrementor of unique values in the column to be promoted
+		for m, uniqueValue := range uniqueValuesToPromote {
+			newColumnIndex := k*len(uniqueValuesToPromote) + m
+			newHeader := joinLevelsIntoLabel([]string{uniqueValue, df.values[k].name})
 			colNames[newColumnIndex] = newHeader
 			// each item in newVals is a slice of the same type as originalVals at that column position
-			newVals[newColumnIndex] = reflect.MakeSlice(originalVals.Type(), len(uniqueLabels), len(uniqueLabels)).Interface()
+			newVals[newColumnIndex] = reflect.MakeSlice(originalVals.Type(), numNewRows, numNewRows).Interface()
 
 			// write to new column and new row index
-			for _, i := range lookupSource[orderedKey] {
-				newRowIndex := rowToUniqueLabels[i]
-				// if value is found in original data, it is not null in new data
-				newIsNull[newColumnIndex][newRowIndex] = false
-				reflect.ValueOf(newVals[newColumnIndex]).
-					Index(newRowIndex).
-					Set(originalVals.Index(i))
+			// length of rowIndices matches length of uniqueValues
+			for _, i := range rowIndices[m] {
+				// only original rows containing the current unique value will be written into new container
+				newRowIndex := oldToNewRowMapping[i]
+				// retain the original null value
+				newIsNull[newColumnIndex][newRowIndex] = df.values[k].isNull[i]
+				src := originalVals.Index(i)
+				dst := reflect.ValueOf(newVals[newColumnIndex]).Index(newRowIndex)
+				dst.Set(src)
 			}
 		}
 	}
-	// if a column was selected for promotion, drop all cols that are a derivative of the original
-	if isCol {
-		toDropStart := index * len(lookupSource)
-		toDropEnd := toDropStart + len(lookupSource)
+
+	// -- transfer values and to final form
+
+	// if a column was selected for promotion, drop all new columns that are a derivative of the original
+	if colIndex >= 0 {
+		toDropStart := colIndex * len(uniqueValuesToPromote)
+		toDropEnd := toDropStart + len(uniqueValuesToPromote)
 		newVals = append(newVals[:toDropStart], newVals[toDropEnd:]...)
 		colNames = append(colNames[:toDropStart], colNames[toDropEnd:]...)
 		newIsNull = append(newIsNull[:toDropStart], newIsNull[toDropEnd:]...)
 	}
 
-	// transfer values and labels to final form
 	retVals := copyInterfaceIntoValueContainers(newVals, newIsNull, colNames)
-	retLabels := copyStringsIntoValueContainers(newLabels, nil, newLevelNames)
 
 	return &DataFrame{
 		values:        retVals,
-		labels:        retLabels,
+		labels:        labels,
 		colLevelNames: retColLevelNames,
 		name:          df.name,
 	}
@@ -1304,16 +1304,17 @@ func (df *DataFrame) GroupBy(names ...string) *GroupedDataFrame {
 // expects index to refer to merged labels and columns
 func (df *DataFrame) groupby(index []int) *GroupedDataFrame {
 	mergedLabelsAndCols := append(df.labels, df.values...)
-	g, _, orderedKeys, _ := labelsToMap(mergedLabelsAndCols, index)
+	newLabels, rowIndices, groups, orderedKeys, _ := reduceContainers(mergedLabelsAndCols, index)
 	names := make([]string, len(index))
 	for i, pos := range index {
 		names[i] = mergedLabelsAndCols[pos].name
 	}
 	return &GroupedDataFrame{
-		groups:      g,
+		groups:      groups,
 		orderedKeys: orderedKeys,
+		rowIndices:  rowIndices,
+		labels:      newLabels,
 		df:          df,
-		levelNames:  names,
 	}
 }
 

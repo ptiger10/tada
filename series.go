@@ -675,18 +675,13 @@ func (s *Series) GroupBy(names ...string) *GroupedSeries {
 			return &GroupedSeries{err: fmt.Errorf("GroupBy(): %v", err)}
 		}
 	}
-	// g, _, orderedKeys, _ := labelsToMap(s.labels, index)
-	newLabels, rowIndices, groups, _ := reduceContainers(s.labels, index)
-	levelNames := make([]string, len(index))
-	for i, pos := range index {
-		levelNames[i] = s.labels[pos].name
-	}
+	newLabels, rowIndices, groups, orderedKeys, _ := reduceContainers(s.labels, index)
 	return &GroupedSeries{
-		rowIndices: rowIndices,
-		newGroups:  groups,
-		newLabels:  newLabels,
-		series:     s,
-		levelNames: levelNames,
+		groups:      groups,
+		orderedKeys: orderedKeys,
+		rowIndices:  rowIndices,
+		labels:      newLabels,
+		series:      s,
 	}
 }
 

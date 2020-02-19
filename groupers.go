@@ -13,16 +13,23 @@ func (g *GroupedSeries) Err() error {
 	return g.err
 }
 
-// control for inadvertent splitting just because the name has the level separator using `toSplit`
-func splitLabelIntoLevels(label string, toSplit bool) []string {
-	if toSplit {
-		return strings.Split(label, optionLevelSeparator)
+func (g *GroupedSeries) String() string {
+	groups := make([]string, len(g.groups))
+	var counter int
+	for k := range g.groups {
+		counter++
+		groups[counter] = k
 	}
-	return []string{label}
+	return "Groups: " + strings.Join(groups, ",")
 }
 
-func joinLevelsIntoLabel(levels []string) string {
-	return strings.Join(levels, optionLevelSeparator)
+// GetGroup stub
+func (g *GroupedSeries) GetGroup(group string) *Series {
+	i, ok := g.groups[group]
+	if !ok {
+		return seriesWithError(fmt.Errorf("GetGroup(): `group` (%v) not in groups", group))
+	}
+	return g.series.Subset(g.rowIndices[i])
 }
 
 func (g *GroupedSeries) stringFunc(name string, fn func(val []string, isNull []bool, index []int) (string, bool)) *Series {
@@ -41,7 +48,7 @@ func (g *GroupedSeries) stringFunc(name string, fn func(val []string, isNull []b
 	}
 	return &Series{
 		values: &valueContainer{slice: groupedVals, isNull: valueIsNull, name: name},
-		labels: g.newLabels,
+		labels: g.labels,
 	}
 }
 
@@ -65,7 +72,7 @@ func (g *GroupedSeries) applyAlignedFloat(name string, fn func([]float64) float6
 	vals := make([]float64, g.series.Len())
 	isNull := make([]bool, len(vals))
 	referenceVals := g.series.values.float().slice
-	for _, index := range g.groups {
+	for _, index := range g.rowIndices {
 		subsetVals := make([]float64, 0)
 		for _, i := range index {
 			if !isNull[i] {
@@ -88,7 +95,7 @@ func (g *GroupedSeries) alignedMath(name string, fn func([]float64, []bool, []in
 	vals := make([]float64, g.series.Len())
 	isNull := make([]bool, len(vals))
 	referenceVals := g.series.values.float().slice
-	for _, index := range g.groups {
+	for _, index := range g.rowIndices {
 		output, outputIsNull := fn(referenceVals, g.series.values.isNull, index)
 		for _, i := range index {
 			vals[i] = output
@@ -111,16 +118,16 @@ func (g *GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []bo
 
 	valueIsNull := make([]bool, len(g.groups))
 
-	for rowNumber, key := range g.orderedKeys {
+	for i, index := range g.rowIndices {
 		// evaluate func
-		output, isNull := fn(referenceVals, g.series.values.isNull, g.groups[key])
-		vals[rowNumber] = output
-		valueIsNull[rowNumber] = isNull
+		output, isNull := fn(referenceVals, g.series.values.isNull, index)
+		vals[i] = output
+		valueIsNull[i] = isNull
 	}
 
 	return &Series{
 		values: &valueContainer{slice: vals, isNull: valueIsNull, name: name},
-		labels: copyGroupedLabels(g.orderedKeys, g.levelNames),
+		labels: g.labels,
 	}
 }
 
@@ -197,138 +204,182 @@ func (g *GroupedDataFrame) Err() error {
 
 func (g *GroupedDataFrame) stringFunc(
 	name string, cols []string, fn func(val []string, isNull []bool, index []int) (string, bool)) *DataFrame {
-	numLevels := len(g.levelNames)
+	if len(g.rowIndices) == 0 {
+		return dataFrameWithError(errors.New("GroupBy(): no groups"))
+	}
+	groupedVals := makeStringMatrix(len(cols), len(g.rowIndices))
+	groupedNulls := makeBoolMatrix(len(cols), len(g.rowIndices))
 
-	// isolate columns to return
-	colIndex := make([]int, len(cols))
-	if len(cols) == 0 {
-		colIndex = makeIntRange(0, len(g.df.values))
-	} else {
-		for i, col := range cols {
-			idx, err := findColWithName(col, g.df.values)
-			if err != nil {
-				return dataFrameWithError(fmt.Errorf("GroupBy(): %v", err))
-			}
-			colIndex[i] = idx
+	for k := range cols {
+		referenceVals := g.df.values[k].str().slice
+		// iterate over rowsIndices
+		for i, rowIndex := range g.rowIndices {
+			output, isNull := fn(referenceVals, g.df.values[k].isNull, rowIndex)
+			groupedVals[k][i] = output
+			groupedNulls[k][i] = isNull
 		}
 	}
-	// prepare [][]string container to receive row-level values
-	vals := make([][]string, len(colIndex))
-	valuesIsNull := make([][]bool, len(colIndex))
-	names := make([]string, len(colIndex))
-	for col := range colIndex {
-		vals[col] = make([]string, len(g.groups))
-		valuesIsNull[col] = make([]bool, len(g.groups))
-		names[col] = g.df.values[col].name
-	}
+	retVals := copyStringsIntoValueContainers(groupedVals, groupedNulls, cols)
 
-	// prepare [][]string container to receive row-level labels
-	labelLevels := make([][]string, numLevels)
-	labelIsNull := make([][]bool, numLevels)
-	for lvl := 0; lvl < numLevels; lvl++ {
-		labelLevels[lvl] = make([]string, len(g.groups))
-		labelIsNull[lvl] = make([]bool, len(g.groups))
-	}
-	// iterate over rows
-	for rowNumber, key := range g.orderedKeys {
-		for i, col := range colIndex {
-			output, isNull := fn(
-				g.df.values[col].str().slice, g.df.values[col].isNull, g.groups[key])
-			vals[i][rowNumber] = output
-			valuesIsNull[i][rowNumber] = isNull
-		}
-		splitKey := splitLabelIntoLevels(key, true)
-		for j := range splitKey {
-			labelLevels[j][rowNumber] = splitKey[j]
-			labelIsNull[j][rowNumber] = false
-		}
-	}
-
-	// convert intermediate containers to valueContainers
-	retLabels := make([]*valueContainer, len(labelLevels))
-	retValues := make([]*valueContainer, len(colIndex))
-	for j := range retLabels {
-		retLabels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: g.levelNames[j]}
-	}
-	for k := range retValues {
-		retValues[k] = &valueContainer{slice: vals[k], isNull: valuesIsNull[k], name: names[k]}
-	}
 	return &DataFrame{
-		values:        retValues,
-		labels:        retLabels,
-		name:          name,
-		colLevelNames: g.df.colLevelNames,
+		values: retVals,
+		labels: g.labels,
 	}
+
+	// numLevels := len(g.labels)
+
+	// // isolate columns to return
+	// colIndex := make([]int, len(cols))
+	// if len(cols) == 0 {
+	// 	colIndex = makeIntRange(0, len(g.df.values))
+	// } else {
+	// 	for i, col := range cols {
+	// 		idx, err := findColWithName(col, g.df.values)
+	// 		if err != nil {
+	// 			return dataFrameWithError(fmt.Errorf("GroupBy(): %v", err))
+	// 		}
+	// 		colIndex[i] = idx
+	// 	}
+	// }
+	// // prepare [][]string container to receive row-level values
+	// vals := make([][]string, len(colIndex))
+	// valuesIsNull := make([][]bool, len(colIndex))
+	// names := make([]string, len(colIndex))
+	// for col := range colIndex {
+	// 	vals[col] = make([]string, len(g.groups))
+	// 	valuesIsNull[col] = make([]bool, len(g.groups))
+	// 	names[col] = g.df.values[col].name
+	// }
+
+	// // prepare [][]string container to receive row-level labels
+	// labelLevels := make([][]string, numLevels)
+	// labelIsNull := make([][]bool, numLevels)
+	// for lvl := 0; lvl < numLevels; lvl++ {
+	// 	labelLevels[lvl] = make([]string, len(g.groups))
+	// 	labelIsNull[lvl] = make([]bool, len(g.groups))
+	// }
+	// // iterate over rows
+	// for rowNumber, key := range g.orderedKeys {
+	// 	for i, col := range colIndex {
+	// 		output, isNull := fn(
+	// 			g.df.values[col].str().slice, g.df.values[col].isNull, g.groups[key])
+	// 		vals[i][rowNumber] = output
+	// 		valuesIsNull[i][rowNumber] = isNull
+	// 	}
+	// 	splitKey := splitLabelIntoLevels(key, true)
+	// 	for j := range splitKey {
+	// 		labelLevels[j][rowNumber] = splitKey[j]
+	// 		labelIsNull[j][rowNumber] = false
+	// 	}
+	// }
+
+	// // convert intermediate containers to valueContainers
+	// retLabels := make([]*valueContainer, len(labelLevels))
+	// retValues := make([]*valueContainer, len(colIndex))
+	// for j := range retLabels {
+	// 	retLabels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: g.levelNames[j]}
+	// }
+	// for k := range retValues {
+	// 	retValues[k] = &valueContainer{slice: vals[k], isNull: valuesIsNull[k], name: names[k]}
+	// }
+	// return &DataFrame{
+	// 	values:        retValues,
+	// 	labels:        retLabels,
+	// 	name:          name,
+	// 	colLevelNames: g.df.colLevelNames,
+	// }
 }
 
 func (g *GroupedDataFrame) mathFunc(
 	name string, cols []string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *DataFrame {
-	if len(g.groups) == 0 {
-		return dataFrameWithError(errors.New("no groups"))
+	if len(g.rowIndices) == 0 {
+		return dataFrameWithError(errors.New("GroupBy(): no groups"))
 	}
-	numLevels := len(g.levelNames)
+	groupedVals := makeFloatMatrix(len(cols), len(g.rowIndices))
+	groupedNulls := makeBoolMatrix(len(cols), len(g.rowIndices))
 
-	// isolate columns to return
-	colIndex := make([]int, len(cols))
-	if len(cols) == 0 {
-		colIndex = makeIntRange(0, len(g.df.values))
-	} else {
-		for i, col := range cols {
-			idx, err := findColWithName(col, g.df.values)
-			if err != nil {
-				return dataFrameWithError(fmt.Errorf("GroupBy(): %v", err))
-			}
-			colIndex[i] = idx
+	for k := range cols {
+		referenceVals := g.df.values[k].float().slice
+		// iterate over rowsIndices
+		for i, rowIndex := range g.rowIndices {
+			output, isNull := fn(referenceVals, g.df.values[k].isNull, rowIndex)
+			groupedVals[k][i] = output
+			groupedNulls[k][i] = isNull
 		}
 	}
+	retVals := copyFloatsIntoValueContainers(groupedVals, groupedNulls, cols)
 
-	// prepare [][]float64 container to receive row-level values
-	vals := make([][]float64, len(colIndex))
-	valuesIsNull := make([][]bool, len(colIndex))
-	names := make([]string, len(colIndex))
-	for col := range colIndex {
-		vals[col] = make([]float64, len(g.groups))
-		valuesIsNull[col] = make([]bool, len(g.groups))
-		names[col] = g.df.values[col].name
-	}
-
-	// prepare [][]string container to receive row-level labels
-	labelLevels := make([][]string, numLevels)
-	labelIsNull := make([][]bool, numLevels)
-	for lvl := 0; lvl < numLevels; lvl++ {
-		labelLevels[lvl] = make([]string, len(g.groups))
-		labelIsNull[lvl] = make([]bool, len(g.groups))
-	}
-	// iterate over rows
-	for rowNumber, key := range g.orderedKeys {
-		for i, col := range colIndex {
-			output, isNull := fn(
-				g.df.values[col].float().slice, g.df.values[col].isNull, g.groups[key])
-			vals[i][rowNumber] = output
-			valuesIsNull[i][rowNumber] = isNull
-		}
-		splitKey := splitLabelIntoLevels(key, true)
-		for j := range splitKey {
-			labelLevels[j][rowNumber] = splitKey[j]
-			labelIsNull[j][rowNumber] = false
-		}
-	}
-
-	// convert intermediate containers to valueContainers
-	retLabels := make([]*valueContainer, len(labelLevels))
-	retValues := make([]*valueContainer, len(colIndex))
-	for j := range retLabels {
-		retLabels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: g.levelNames[j]}
-	}
-	for k := range retValues {
-		retValues[k] = &valueContainer{slice: vals[k], isNull: valuesIsNull[k], name: names[k]}
-	}
 	return &DataFrame{
-		values:        retValues,
-		labels:        retLabels,
-		name:          name,
-		colLevelNames: g.df.colLevelNames,
+		values: retVals,
+		labels: g.labels,
 	}
+
+	// if len(g.groups) == 0 {
+	// 	return dataFrameWithError(errors.New("no groups"))
+	// }
+	// numLevels := len(g.levelNames)
+
+	// // isolate columns to return
+	// colIndex := make([]int, len(cols))
+	// if len(cols) == 0 {
+	// 	colIndex = makeIntRange(0, len(g.df.values))
+	// } else {
+	// 	for i, col := range cols {
+	// 		idx, err := findColWithName(col, g.df.values)
+	// 		if err != nil {
+	// 			return dataFrameWithError(fmt.Errorf("GroupBy(): %v", err))
+	// 		}
+	// 		colIndex[i] = idx
+	// 	}
+	// }
+
+	// // prepare [][]float64 container to receive row-level values
+	// vals := make([][]float64, len(colIndex))
+	// valuesIsNull := make([][]bool, len(colIndex))
+	// names := make([]string, len(colIndex))
+	// for col := range colIndex {
+	// 	vals[col] = make([]float64, len(g.groups))
+	// 	valuesIsNull[col] = make([]bool, len(g.groups))
+	// 	names[col] = g.df.values[col].name
+	// }
+
+	// // prepare [][]string container to receive row-level labels
+	// labelLevels := make([][]string, numLevels)
+	// labelIsNull := make([][]bool, numLevels)
+	// for lvl := 0; lvl < numLevels; lvl++ {
+	// 	labelLevels[lvl] = make([]string, len(g.groups))
+	// 	labelIsNull[lvl] = make([]bool, len(g.groups))
+	// }
+	// // iterate over rows
+	// for rowNumber, key := range g.orderedKeys {
+	// 	for i, col := range colIndex {
+	// 		output, isNull := fn(
+	// 			g.df.values[col].float().slice, g.df.values[col].isNull, g.groups[key])
+	// 		vals[i][rowNumber] = output
+	// 		valuesIsNull[i][rowNumber] = isNull
+	// 	}
+	// 	splitKey := splitLabelIntoLevels(key, true)
+	// 	for j := range splitKey {
+	// 		labelLevels[j][rowNumber] = splitKey[j]
+	// 		labelIsNull[j][rowNumber] = false
+	// 	}
+	// }
+
+	// // convert intermediate containers to valueContainers
+	// retLabels := make([]*valueContainer, len(labelLevels))
+	// retValues := make([]*valueContainer, len(colIndex))
+	// for j := range retLabels {
+	// 	retLabels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: g.levelNames[j]}
+	// }
+	// for k := range retValues {
+	// 	retValues[k] = &valueContainer{slice: vals[k], isNull: valuesIsNull[k], name: names[k]}
+	// }
+	// return &DataFrame{
+	// 	values:        retValues,
+	// 	labels:        retLabels,
+	// 	name:          name,
+	// 	colLevelNames: g.df.colLevelNames,
+	// }
 }
 
 // Sum stub
@@ -382,19 +433,18 @@ func (g *GroupedSeries) Align() *GroupedSeries {
 	return g
 }
 
-// Align isolates the column matching `colName` and aligns subsequent group aggregations with the original DataFrame labels.
-func (g *GroupedDataFrame) Align(colName string) *GroupedSeries {
-	_, err := findColWithName(colName, g.df.values)
-	if err != nil {
-		return &GroupedSeries{
-			err: err,
-		}
-	}
-	return &GroupedSeries{
-		groups:      g.groups,
-		orderedKeys: g.orderedKeys,
-		series:      g.df.Col(colName),
-		levelNames:  g.levelNames,
-		aligned:     true,
-	}
-}
+// // Align isolates the column matching `colName` and aligns subsequent group aggregations with the original DataFrame labels.
+// func (g *GroupedDataFrame) Align(colName string) *GroupedSeries {
+// 	_, err := findColWithName(colName, g.df.values)
+// 	if err != nil {
+// 		return &GroupedSeries{
+// 			err: err,
+// 		}
+// 	}
+// 	return &GroupedSeries{
+// 		groups:      g.groups,
+
+// 		series:      g.df.Col(colName),
+// 		aligned:     true,
+// 	}
+// }

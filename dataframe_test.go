@@ -1894,14 +1894,14 @@ func TestDataFrame_Merge(t *testing.T) {
 		args   args
 		want   *DataFrame
 	}{
-		{"pass",
+		{"matching keys",
 			fields{values: []*valueContainer{
 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
 			args{&DataFrame{
 				values:        []*valueContainer{{slice: []string{"c"}, isNull: []bool{false}, name: "bar"}},
-				labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
 				colLevelNames: []string{"anything"}}},
 			&DataFrame{
 				values: []*valueContainer{
@@ -2128,15 +2128,19 @@ func TestDataFrame_GroupBy(t *testing.T) {
 			}},
 			args{nil},
 			&GroupedDataFrame{
-				groups:      map[string][]int{"0|foo": []int{0, 1}, "1|foo": []int{2}, "2|bar": []int{3}},
+				groups:      map[string]int{"0|foo": 0, "1|foo": 2, "2|bar": 3},
 				orderedKeys: []string{"0|foo", "1|foo", "2|bar"},
+				rowIndices:  [][]int{{0, 1}, {2}, {3}},
+				labels: []*valueContainer{
+					{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "a"},
+					{slice: []string{"foo", "foo", "bar"}, isNull: []bool{false, false, false}, name: "b"},
+				},
 				df: &DataFrame{
 					values: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}}},
 					labels: []*valueContainer{
 						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a"},
 						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b"},
 					}},
-				levelNames: []string{"a", "b"},
 			},
 		},
 		{"fail - no matching column", fields{
@@ -2199,7 +2203,25 @@ func TestDataFrame_PromoteToColLevel(t *testing.T) {
 					{slice: []string{"a", "b", "", ""}, isNull: []bool{false, false, true, true}, name: "2018|foo"},
 					{slice: []string{"", "", "c", "d"}, isNull: []bool{true, true, false, false}, name: "2019|foo"}},
 				labels: []*valueContainer{
-					{slice: []string{"0", "1", "2", "3"}, isNull: []bool{false, false, false, false}, name: "*0"},
+					{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
+				},
+				colLevelNames: []string{"year", "*0"},
+			}},
+		{"stack column - nulls", fields{
+			values: []*valueContainer{
+				{slice: []int{2018, 2018, 2019, 2019}, isNull: []bool{false, false, false, false}, name: "year"},
+				{slice: []string{"a", "b", "c", "n/a"}, isNull: []bool{false, false, false, true}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
+			},
+			colLevelNames: []string{"*0"},
+		}, args{"year"},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"a", "b", "", ""}, isNull: []bool{false, false, true, true}, name: "2018|foo"},
+					{slice: []string{"", "", "c", "n/a"}, isNull: []bool{true, true, false, true}, name: "2019|foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
 				},
 				colLevelNames: []string{"year", "*0"},
 			}},

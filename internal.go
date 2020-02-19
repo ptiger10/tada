@@ -126,19 +126,6 @@ func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels
 	return leftKeys, rightKeys
 }
 
-// if name is found in neither columns nor labels, return error
-func findNameInColumnsOrLabels(name string, cols []*valueContainer, labels []*valueContainer) (index int, isCol bool, err error) {
-	// first check column names
-	if lvl, err := findColWithName(name, cols); err == nil {
-		return lvl, true, nil
-		// then check label level names
-	} else if lvl, err := findColWithName(name, labels); err == nil {
-		return lvl, false, nil
-	} else {
-		return 0, false, fmt.Errorf("name (%v) does not match any existing column", name)
-	}
-}
-
 // findColWithName returns the position of the first level within `cols` with a name matching `name`, or an error if no level matches
 func findColWithName(name string, cols []*valueContainer) (int, error) {
 	for j := range cols {
@@ -237,11 +224,29 @@ func copyStringsIntoValueContainers(slices [][]string, isNull [][]bool, names []
 	return copyInterfaceIntoValueContainers(slicesInterface, isNull, names)
 }
 
+// convert Floats to interface. if isNull is nil, sets null values from `slices`
+func copyFloatsIntoValueContainers(slices [][]float64, isNull [][]bool, names []string) []*valueContainer {
+	slicesInterface := make([]interface{}, len(slices))
+	for k := range slices {
+		slicesInterface[k] = slices[k]
+	}
+	return copyInterfaceIntoValueContainers(slicesInterface, isNull, names)
+}
+
 // columns as major dimension
 func makeStringMatrix(numCols, numRows int) [][]string {
 	ret := make([][]string, numCols)
 	for k := 0; k < numCols; k++ {
 		ret[k] = make([]string, numRows)
+	}
+	return ret
+}
+
+// columns as major dimension
+func makeFloatMatrix(numCols, numRows int) [][]float64 {
+	ret := make([][]float64, numCols)
+	for k := 0; k < numCols; k++ {
+		ret[k] = make([]float64, numRows)
 	}
 	return ret
 }
@@ -253,20 +258,6 @@ func makeBoolMatrix(numCols, numRows int) [][]bool {
 		ret[k] = make([]bool, numRows)
 	}
 	return ret
-}
-
-func copyGroupedLabels(labels []string, levelNames []string) []*valueContainer {
-	labelLevels := makeStringMatrix(len(levelNames), len(labels))
-	labelIsNull := makeBoolMatrix(len(levelNames), len(labels))
-
-	for i := range labels {
-		splitLabels := splitLabelIntoLevels(labels[i], true)
-		for j := range splitLabels {
-			labelLevels[j][i] = splitLabels[j]
-			labelIsNull[j][i] = false
-		}
-	}
-	return copyStringsIntoValueContainers(labelLevels, labelIsNull, levelNames)
 }
 
 func intersection(slices [][]int) []int {
@@ -1029,20 +1020,19 @@ func convertColNamesToIndexPositions(names []string, columns []*valueContainer) 
 
 // concatenateLabelsToStrings reduces all label levels referenced in the index to a single slice of concatenated strings
 func concatenateLabelsToStrings(labels []*valueContainer, index []int) []string {
-	sep := "|"
 	labelStrings := make([][]string, len(index))
 	// coerce every label level referenced in the index to a separate string slice
-	for j := range index {
-		labelStrings[j] = labels[j].str().slice
+	for incrementor, j := range index {
+		labelStrings[incrementor] = labels[j].str().slice
 	}
 	ret := make([]string, len(labelStrings[0]))
 	// for each row, combine labels into one concatenated string
 	for i := 0; i < len(labelStrings[0]); i++ {
 		labelComponents := make([]string, len(index))
-		for j := range index {
+		for j := range labelStrings {
 			labelComponents[j] = labelStrings[j][i]
 		}
-		concatenatedString := strings.Join(labelComponents, sep)
+		concatenatedString := strings.Join(labelComponents, optionLevelSeparator)
 		ret[i] = concatenatedString
 	}
 	// return a single slice of strings
@@ -1054,43 +1044,39 @@ func concatenateLabelsToStrings(labels []*valueContainer, index []int) []string 
 // 2) an []int that maps each new row
 // back to the rows in the original containers with the matching label combo
 // 3) a map[string]int that is the set of all unique label combinations and corresponding row in the []int map
-// and 4) a map[int]int that maps each original row index to its row index in the new containers
+// 4) a []string of the unique label combinations in order
+// and 5) a map[int]int that maps each original row index to its row index in the new containers
 func reduceContainers(containers []*valueContainer, index []int) (
-	newContainers []*valueContainer, originalRowIndexes [][]int,
-	uniqueLabels map[string]int, oldToNewRowMapping map[int]int) {
+	newContainers []*valueContainer,
+	originalRowIndices [][]int,
+	uniqueLabels map[string]int,
+	orderedKeys []string,
+	oldToNewRowMapping map[int]int) {
 	subset, _ := subsetContainers(containers, index)
-	// coerce label levels to string for use as map keys
-	stringifiedContainers := make([][]string, len(subset))
+	// coerce all label levels to string for use as map keys
+	stringifiedLabels := concatenateLabelsToStrings(containers, index)
 	// create receiver for unique labels of same type as original levels
 	newContainers = make([]*valueContainer, len(subset))
 	for j := range subset {
-		stringifiedContainers[j] = subset[j].str().slice
 		newContainers[j] = &valueContainer{
 			slice:  reflect.MakeSlice(reflect.TypeOf(subset[j].slice), 0, 0).Interface(),
 			name:   subset[j].name,
 			isNull: make([]bool, 0),
 		}
 	}
-	numRows := len(stringifiedContainers[0])
 	// create receiver for the original row indexes for each unique label combo
 	uniqueLabelRows := make(map[string][]int)
 	uniqueLabels = make(map[string]int)
 	// create receiver for the unique label combos in order
-	orderedKeys := make([]string, 0)
+	orderedKeys = make([]string, 0)
 	// key: original row index, value: new row index for the same unique label combo found at original row index
 	// there will be one key for each row in the original data
-	oldToNewRowMapping = make(map[int]int, numRows)
+	oldToNewRowMapping = make(map[int]int, len(stringifiedLabels))
 	// helper map for oldToNewRowMapping - key: unique label combo, value: new row index for that unique label combo
 	orderedKeyIndex := make(map[string]int)
 	// iterate over rows in original containers
-	for i := 0; i < numRows; i++ {
-		// make map key from stringified levels
-		labelComponents := make([]string, len(stringifiedContainers))
-		for j := range stringifiedContainers {
-			labelComponents[j] = stringifiedContainers[j][i]
-		}
-		key := joinLevelsIntoLabel(labelComponents)
-		// check if label combo already exists
+	for i, key := range stringifiedLabels {
+		// check if label combo already exists in set
 		if _, ok := uniqueLabelRows[key]; !ok {
 			// if label combo does not exist:
 			// add to set
@@ -1118,55 +1104,39 @@ func reduceContainers(containers []*valueContainer, index []int) (
 		oldToNewRowMapping[i] = orderedKeyIndex[key]
 	}
 	// transfer row indexes in order of new unique label combos
-	originalRowIndexes = make([][]int, len(orderedKeys))
+	originalRowIndices = make([][]int, len(orderedKeys))
 	for i, key := range orderedKeys {
-		originalRowIndexes[i] = uniqueLabelRows[key]
+		originalRowIndices[i] = uniqueLabelRows[key]
 	}
 	return
-
 }
 
-// labelsToMap reduces all label levels referenced in the index to two maps and a slice of strings:
-// 1) map[string][]int: the key is a single concatenated string of the labels
-// and the value is an integer slice of all the positions where the key appears in the labels, preserving the order in which they appear,
-// 2) map[string]int: same key as above, but the value is the integer of the first position where the key appears in the labels.
-// 3) []string: the map keys in the order in which they appear in the Series
-// 4) map[int]int: key is the original index position, value is the new index position for that unique label combination
-func labelsToMap(labels []*valueContainer, index []int) (
-	allIndex map[string][]int, firstIndex map[string]int,
-	orderedKeys []string, originalIndexToUniqueIndex map[int]int) {
-	// coerce all label levels referenced in the index to string
-	labelStrings := make([][]string, len(index))
-	for j := range index {
-		labelStrings[j] = labels[index[j]].str().slice
-	}
-	allIndex = make(map[string][]int)
-	firstIndex = make(map[string]int)
-	orderedKeys = make([]string, 0)
-	originalIndexToUniqueIndex = make(map[int]int, len(labelStrings[0]))
-	orderedKeyIndex := make(map[string]int)
-	// for each row, combine labels into a single string
-	l := len(labelStrings[0])
-	for i := 0; i < l; i++ {
-		labelComponents := make([]string, len(labelStrings))
-		for j := range labelStrings {
-			labelComponents[j] = labelStrings[j][i]
+// similar to reduceContainers, but only returns map of unique label combos
+func reduceContainersLimited(containers []*valueContainer, index []int) map[string]int {
+	ret := make(map[string]int)
+	stringifiedLabels := concatenateLabelsToStrings(containers, index)
+	for i, key := range stringifiedLabels {
+		if _, ok := ret[key]; !ok {
+			ret[key] = i
 		}
-		key := strings.Join(labelComponents, optionLevelSeparator)
-		if _, ok := allIndex[key]; !ok {
-			allIndex[key] = []int{i}
-			firstIndex[key] = i
-			orderedKeyIndex[key] = len(orderedKeys)
-			orderedKeys = append(orderedKeys, key)
-		} else {
-			allIndex[key] = append(allIndex[key], i)
-		}
-		originalIndexToUniqueIndex[i] = orderedKeyIndex[key]
 	}
-	return
+	return ret
+}
+
+// control for inadvertent splitting just because the name has the level separator using `toSplit`
+func splitLabelIntoLevels(label string, toSplit bool) []string {
+	if toSplit {
+		return strings.Split(label, optionLevelSeparator)
+	}
+	return []string{label}
+}
+
+func joinLevelsIntoLabel(levels []string) string {
+	return strings.Join(levels, optionLevelSeparator)
 }
 
 // if labels1[i] is in labels2, ret[i] = labels2[labels1[i]], else ret[i] = -1
+// records the index position of the first match only
 func matchLabelPositions(labels1 []string, labels2 map[string]int) []int {
 	ret := make([]int, len(labels1))
 	for i, key := range labels1 {
@@ -1258,12 +1228,12 @@ func lookupDataFrame(how string,
 }
 
 // cuts labels by leftOn and rightOn, anchors to labels in labels1, finds matches in labels2
-// looks up values in values2, converts to Series and preserves the name from values1
+// looks up values in values2, converts to Series and preserves the name supplied
 func lookupWithAnchor(
 	name string, labels1 []*valueContainer, leftOn []int,
 	values2 *valueContainer, labels2 []*valueContainer, rightOn []int) *Series {
 	toLookup := concatenateLabelsToStrings(labels1, leftOn)
-	_, lookupSource, _, _ := labelsToMap(labels2, rightOn)
+	lookupSource := reduceContainersLimited(labels2, rightOn)
 	matches := matchLabelPositions(toLookup, lookupSource)
 	v := reflect.ValueOf(values2.slice)
 	isNull := make([]bool, len(matches))
@@ -1271,12 +1241,15 @@ func lookupWithAnchor(
 	vals := reflect.MakeSlice(v.Type(), len(matches), len(matches))
 	for i, matchedIndex := range matches {
 		// positive match: copy value from values2
+		dst := vals.Index(i)
 		if matchedIndex != -1 {
-			vals.Index(i).Set(v.Index(matchedIndex))
+			src := v.Index(matchedIndex)
+			dst.Set(src)
 			isNull[i] = values2.isNull[i]
 			// no match: set to zero value
 		} else {
-			vals.Index(i).Set(reflect.Zero(reflect.TypeOf(values2.slice).Elem()))
+			src := reflect.TypeOf(values2.slice).Elem()
+			dst.Set(reflect.Zero(src))
 			isNull[i] = true
 		}
 	}
@@ -1294,7 +1267,7 @@ func lookupDataFrameWithAnchor(
 	mergedLabelsCols1 []*valueContainer, labels1 []*valueContainer, leftOn []int,
 	values2 []*valueContainer, mergedLabelsCols2 []*valueContainer, rightOn []int, exclude []string) *DataFrame {
 	toLookup := concatenateLabelsToStrings(mergedLabelsCols1, leftOn)
-	_, lookupSource, _, _ := labelsToMap(mergedLabelsCols2, rightOn)
+	lookupSource := reduceContainersLimited(mergedLabelsCols2, rightOn)
 	matches := matchLabelPositions(toLookup, lookupSource)
 	// slice of slices
 	var retVals []*valueContainer

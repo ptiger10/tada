@@ -105,23 +105,22 @@ type ApplyFormatFn struct {
 
 // GroupedSeries stub
 type GroupedSeries struct {
-	groups      map[string][]int
-	newGroups   map[string]int
-	rowIndices  [][]int
-	newLabels   []*valueContainer
+	groups      map[string]int
 	orderedKeys []string
+	rowIndices  [][]int
+	labels      []*valueContainer
 	series      *Series
-	levelNames  []string
 	aligned     bool
 	err         error
 }
 
 // GroupedDataFrame stub
 type GroupedDataFrame struct {
-	groups      map[string][]int
+	groups      map[string]int
 	orderedKeys []string
+	rowIndices  [][]int
+	labels      []*valueContainer
 	df          *DataFrame
-	levelNames  []string
 	err         error
 }
 

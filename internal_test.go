@@ -450,6 +450,19 @@ func Test_lookupDataFrame(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{name: "left - nulls", args: args{
+			how: "left", name: "baz", colLevelNames: []string{"*0"},
+			values1: []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}, leftOn: []int{0},
+			values2: []*valueContainer{{slice: []string{"c"}, isNull: []bool{false}, name: "bar"}},
+			labels2: []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "quux"}}, rightOn: []int{0}},
+			want: &DataFrame{
+				values: []*valueContainer{{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "bar"}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}},
+				name:   "baz", colLevelNames: []string{"*0"},
+			},
+			wantErr: false,
+		},
 		{name: "right", args: args{
 			how: "right", name: "baz", colLevelNames: []string{"*0"},
 			values1: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"}},
@@ -513,54 +526,6 @@ func Test_difference(t *testing.T) {
 	}
 }
 
-func Test_labelsToMap(t *testing.T) {
-	type args struct {
-		labels []*valueContainer
-		index  []int
-	}
-	tests := []struct {
-		name  string
-		args  args
-		want  map[string][]int
-		want1 map[string]int
-		want2 []string
-		want3 map[int]int
-	}{
-		{"normal", args{[]*valueContainer{{slice: []float64{1}}, {slice: []string{"foo"}}}, []int{0, 1}},
-			map[string][]int{"1|foo": []int{0}}, map[string]int{"1|foo": 0},
-			[]string{"1|foo"}, map[int]int{0: 0}},
-		{"reversed", args{[]*valueContainer{{slice: []float64{1}}, {slice: []string{"foo"}}}, []int{1, 0}},
-			map[string][]int{"foo|1": []int{0}}, map[string]int{"foo|1": 0},
-			[]string{"foo|1"}, map[int]int{0: 0}},
-		{"skip", args{[]*valueContainer{{slice: []float64{1}}, {slice: []string{"foo"}}, {slice: []bool{true}}}, []int{2, 0}},
-			map[string][]int{"true|1": []int{0}}, map[string]int{"true|1": 0},
-			[]string{"true|1"}, map[int]int{0: 0}},
-		{"multiple same", args{[]*valueContainer{{slice: []float64{1, 1}}, {slice: []string{"foo", "foo"}}}, []int{0, 1}},
-			map[string][]int{"1|foo": []int{0, 1}}, map[string]int{"1|foo": 0},
-			[]string{"1|foo"}, map[int]int{0: 0, 1: 0}},
-		{"multiple different", args{[]*valueContainer{{slice: []float64{2, 1}}, {slice: []string{"foo", "bar"}}}, []int{0, 1}},
-			map[string][]int{"2|foo": []int{0}, "1|bar": []int{1}}, map[string]int{"1|bar": 1, "2|foo": 0},
-			[]string{"2|foo", "1|bar"}, map[int]int{0: 0, 1: 1}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, got1, got2, got3 := labelsToMap(tt.args.labels, tt.args.index)
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("labelsToMap() got = %v, want %v", got, tt.want)
-			}
-			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("labelsToMap() got1 = %v, want %v", got1, tt.want1)
-			}
-			if !reflect.DeepEqual(got2, tt.want2) {
-				t.Errorf("labelsToMap() got2 = %v, want %v", got2, tt.want2)
-			}
-			if !reflect.DeepEqual(got3, tt.want3) {
-				t.Errorf("labelsToMap() got3 = %v, want %v", got3, tt.want3)
-			}
-		})
-	}
-}
-
 func Test_reduceContainers(t *testing.T) {
 	type args struct {
 		containers []*valueContainer
@@ -572,6 +537,7 @@ func Test_reduceContainers(t *testing.T) {
 		wantNewContainers      []*valueContainer
 		wantOriginalRowIndexes [][]int
 		wantUniqueLabels       map[string]int
+		wantOrderedKeys        []string
 		wantOldToNewRowMapping map[int]int
 	}{
 		{name: "single level",
@@ -585,6 +551,7 @@ func Test_reduceContainers(t *testing.T) {
 			},
 			wantOriginalRowIndexes: [][]int{{0, 2}, {1}},
 			wantUniqueLabels:       map[string]int{"bar": 0, "qux": 1},
+			wantOrderedKeys:        []string{"bar", "qux"},
 			wantOldToNewRowMapping: map[int]int{0: 0, 1: 1, 2: 0}},
 		{name: "multi level",
 			args: args{containers: []*valueContainer{
@@ -597,6 +564,7 @@ func Test_reduceContainers(t *testing.T) {
 				{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, name: "baz"},
 			},
 			wantOriginalRowIndexes: [][]int{{0, 2}, {1}},
+			wantOrderedKeys:        []string{"1|bar", "1|qux"},
 			wantUniqueLabels:       map[string]int{"1|bar": 0, "1|qux": 1},
 			wantOldToNewRowMapping: map[int]int{0: 0, 1: 1, 2: 0}},
 		{name: "single level - null",
@@ -609,12 +577,13 @@ func Test_reduceContainers(t *testing.T) {
 				{slice: []string{"bar", ""}, isNull: []bool{false, true}, name: "baz"},
 			},
 			wantOriginalRowIndexes: [][]int{{0, 2}, {1}},
+			wantOrderedKeys:        []string{"bar", ""},
 			wantUniqueLabels:       map[string]int{"bar": 0, "": 1},
 			wantOldToNewRowMapping: map[int]int{0: 0, 1: 1, 2: 0}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotNewContainers, gotOriginalRowIndexes, gotUniqueLabels, gotOldToNewRowMapping := reduceContainers(tt.args.containers, tt.args.index)
+			gotNewContainers, gotOriginalRowIndexes, gotUniqueLabels, gotOrderedKeys, gotOldToNewRowMapping := reduceContainers(tt.args.containers, tt.args.index)
 			if !reflect.DeepEqual(gotNewContainers, tt.wantNewContainers) {
 				t.Errorf("reduceContainers() gotNewContainers = %v, want %v", gotNewContainers[0], tt.wantNewContainers[0])
 			}
@@ -624,8 +593,38 @@ func Test_reduceContainers(t *testing.T) {
 			if !reflect.DeepEqual(gotUniqueLabels, tt.wantUniqueLabels) {
 				t.Errorf("reduceContainers() gotUniqueLabels = %v, want %v", gotUniqueLabels, tt.wantUniqueLabels)
 			}
+			if !reflect.DeepEqual(gotOrderedKeys, tt.wantOrderedKeys) {
+				t.Errorf("reduceContainers() gotUniqueLabels = %v, want %v", gotUniqueLabels, tt.wantUniqueLabels)
+			}
 			if !reflect.DeepEqual(gotOldToNewRowMapping, tt.wantOldToNewRowMapping) {
 				t.Errorf("reduceContainers() gotOldToNewRowMapping = %v, want %v", gotOldToNewRowMapping, tt.wantOldToNewRowMapping)
+			}
+		})
+	}
+}
+
+func Test_reduceContainersLimited(t *testing.T) {
+	type args struct {
+		containers []*valueContainer
+		index      []int
+	}
+	tests := []struct {
+		name string
+		args args
+		want map[string]int
+	}{
+		{name: "single level",
+			args: args{containers: []*valueContainer{
+				{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []string{"bar", "qux", "bar"}, isNull: []bool{false, false, false}, name: "baz"},
+			},
+				index: []int{1}},
+			want: map[string]int{"bar": 0, "qux": 1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := reduceContainersLimited(tt.args.containers, tt.args.index); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("reduceContainersLimited() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -657,31 +656,6 @@ func Test_copyInterfaceIntoValueContainers(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := copyInterfaceIntoValueContainers(tt.args.slices, tt.args.isNull, tt.args.names); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("copyInterfaceIntoValueContainers() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_copyGroupedLabels(t *testing.T) {
-	type args struct {
-		labels     []string
-		levelNames []string
-	}
-	tests := []struct {
-		name string
-		args args
-		want []*valueContainer
-	}{
-		{"pass", args{labels: []string{"foo|0", "bar|1"}, levelNames: []string{"corge", "waldo"}},
-			[]*valueContainer{
-				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "corge"},
-				{slice: []string{"0", "1"}, isNull: []bool{false, false}, name: "waldo"},
-			}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := copyGroupedLabels(tt.args.labels, tt.args.levelNames); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("copyGroupedLabels() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1104,6 +1078,11 @@ func Test_concatenateLabelsToStrings(t *testing.T) {
 			{slice: []int{0, 1}}},
 			index: []int{0}},
 			[]string{"foo", "bar"}},
+		{"two levels, one index", args{labels: []*valueContainer{
+			{slice: []string{"foo", "bar"}},
+			{slice: []int{0, 1}}},
+			index: []int{1}},
+			[]string{"0", "1"}},
 		{"two levels, two index", args{labels: []*valueContainer{
 			{slice: []string{"foo", "bar"}},
 			{slice: []int{0, 1}}},
