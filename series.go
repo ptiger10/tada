@@ -392,7 +392,7 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 	var vals *valueContainer
 	// default for handling no Sorters: values as float in ascending order
 	if len(by) == 0 {
-		// must copy the values to sort to avoid prematurely overwriting underlying data
+		// must copy the values to be sorted to avoid prematurely overwriting underlying data
 		vals = s.series.values.copy()
 		index = vals.sort(Float, false, index)
 		s.Subset(index)
@@ -414,6 +414,7 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 		// overwrite index with new index
 		index = vals.sort(by[i].DType, by[i].Descending, index)
 	}
+	// rearrange the data in place with the final index
 	s.Subset(index)
 	return
 }

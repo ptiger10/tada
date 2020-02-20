@@ -461,7 +461,7 @@ func (s *Series) RollingDuration(d time.Duration) *GroupedSeries {
 		nextRow := i + 1
 		for {
 			if nextRow < s.Len() {
-				if withinDuration(vals[i], vals[nextRow], d) {
+				if withinWindow(vals[i], vals[nextRow], d) {
 					eligibleRows = append(eligibleRows, nextRow)
 					nextRow++
 					continue

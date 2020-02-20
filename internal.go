@@ -569,22 +569,28 @@ func readStruct(slice interface{}) ([]*valueContainer, error) {
 	return ret, nil
 }
 
-func inferType(input string) DType {
+func inferType(input string) string {
 	if _, err := strconv.ParseInt(input, 10, 64); err == nil {
-		return Int
+		return "int"
 	}
 	if _, err := strconv.ParseFloat(input, 64); err == nil {
-		return Float
+		return "float"
 	}
-	if _, err := dateparse.ParseAny(input); err == nil {
-		return DateTime
+	if t, err := dateparse.ParseAny(input); err == nil {
+		if t.Hour() == 0 && t.Minute() == 0 && t.Second() == 0 && t.Nanosecond() == 0 {
+			return "date"
+		}
+		return "datetime"
 	}
-	return String
+	if _, err := strconv.ParseBool(input); err == nil {
+		return "bool"
+	}
+	return "string"
 }
 
-func getDominantDType(dtypes map[DType]int) DType {
+func getDominantDType(dtypes map[string]int) string {
 	var highestCount int
-	var dominantDType DType
+	var dominantDType string
 	for key, v := range dtypes {
 		// tie resolves randomly
 		if v > highestCount {
@@ -596,9 +602,9 @@ func getDominantDType(dtypes map[DType]int) DType {
 }
 
 // major dimension of output is rows
-func mockCSVFromDTypes(dtypes []map[DType]int, numMockRows int) [][]string {
+func mockCSVFromDTypes(dtypes []map[string]int, numMockRows int) [][]string {
 	rand.Seed(randSeed)
-	dominantDTypes := make([]DType, len(dtypes))
+	dominantDTypes := make([]string, len(dtypes))
 
 	// determine the dominant data type per column
 	for k := range dtypes {
@@ -614,18 +620,24 @@ func mockCSVFromDTypes(dtypes []map[DType]int, numMockRows int) [][]string {
 	return ret
 }
 
-func mockString(dtype DType) string {
+func mockString(dtype string) string {
 	var options []string
 	switch dtype {
 	// overwrite the options based on the dtype
-	case Float:
+	case "float":
 		options = []string{".1", ".25", ".5", ".75", ".9"}
-	case String:
-		options = []string{"foo", "bar", "baz", "qux", "quuz"}
-	case DateTime:
-		options = []string{"12/1/2019", "12/31/2019", "1/1/2020", "1/31/2020", "2/1/2020"}
-	case Int:
+	case "int":
 		options = []string{"1", "2", "3", "4", "5"}
+	case "string":
+		options = []string{"foo", "bar", "baz", "qux", "quuz"}
+	case "datetime":
+		options = []string{
+			"2020-01-01T00:00:00Z00:00", "2020-01-01T12:00:00Z00:00", "2020-01-01T12:30:00Z00:00",
+			"2020-01-02T00:00:00Z00:00", "2020-01-01T12:30:00Z00:00"}
+	case "date":
+		options = []string{"2019-12-31", "2020-01-01", "2020-01-02", "2020-02-01", "2020-02-02"}
+	case "bool":
+		options = []string{"true", "false"}
 	}
 	nullPct := .1
 	f := rand.Float64()
@@ -1007,7 +1019,7 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 		sortedIsNull = d.isNull
 		sortedIndex = d.index
 	}
-	// move all null values to the bottom
+	// iterate over each sorted row and check whether it is null or not
 	for i := range sortedIsNull {
 		if sortedIsNull[i] {
 			nulls = append(nulls, sortedIndex[i])
@@ -1015,6 +1027,7 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 			notNulls = append(notNulls, sortedIndex[i])
 		}
 	}
+	// move all null values to the bottom
 	return append(notNulls, nulls...)
 }
 
@@ -1945,11 +1958,14 @@ func (vc *valueContainer) pcut(bins []float64, labels []string) ([]string, error
 	return cut(pctile, vc.isNull, bins, leftInclusive, rightExclusive, false, false, labels)
 }
 
-func withinDuration(root time.Time, other time.Time, d time.Duration) bool {
-	if !(other.Equal(root) || other.After(root)) {
+func withinWindow(root time.Time, other time.Time, d time.Duration) bool {
+	// window = [root, root+d)
+	// if the other time is before root time, it is not within the window
+	if other.Before(root) {
 		return false
 	}
-	if !other.Before(root.Add(d)) {
+	// if the other time is on or after the root + duration, it is not within the window
+	if other.Equal(root.Add(d)) || other.After(root.Add(d)) {
 		return false
 	}
 	return true

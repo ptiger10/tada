@@ -1696,14 +1696,14 @@ func Test_valueContainer_sort(t *testing.T) {
 
 func Test_getDominantDType(t *testing.T) {
 	type args struct {
-		dtypes map[DType]int
+		dtypes map[string]int
 	}
 	tests := []struct {
 		name string
 		args args
-		want DType
+		want string
 	}{
-		{"pass", args{map[DType]int{Int: 0, Float: 1, String: 2, DateTime: 3}}, DateTime},
+		{"pass", args{map[string]int{"int": 0, "float": 1, "string": 2, "datetime": 3}}, "datetime"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1717,7 +1717,7 @@ func Test_getDominantDType(t *testing.T) {
 func Test_mockCSVFromDTypes(t *testing.T) {
 	randSeed = 3
 	type args struct {
-		dtypes      []map[DType]int
+		dtypes      []map[string]int
 		numMockRows int
 	}
 	tests := []struct {
@@ -1727,19 +1727,23 @@ func Test_mockCSVFromDTypes(t *testing.T) {
 	}{
 		{"2x rows",
 			args{
-				dtypes: []map[DType]int{
-					{Float: 3, String: 1, DateTime: 1, Int: 1},
-					{Float: 1, String: 3, DateTime: 1, Int: 1},
-					{Float: 1, String: 1, DateTime: 3, Int: 1},
-					{Float: 1, String: 1, DateTime: 1, Int: 3}},
+				dtypes: []map[string]int{
+					{"float": 3, "int": 1, "string": 1, "datetime": 1, "date": 1, "bool": 1},
+					{"float": 1, "int": 3, "string": 1, "datetime": 1, "date": 1, "bool": 1},
+					{"float": 1, "int": 1, "string": 3, "datetime": 1, "date": 1, "bool": 1},
+					{"float": 1, "int": 1, "string": 1, "datetime": 3, "date": 1, "bool": 1},
+					{"float": 1, "int": 1, "string": 1, "datetime": 1, "date": 3, "bool": 1},
+					{"float": 1, "int": 1, "string": 1, "datetime": 1, "date": 1, "bool": 3}},
 				numMockRows: 2},
-			[][]string{{".5", "foo", "2/1/2020", "3"}, {".5", "foo", "1/1/2020", "4"}},
+			[][]string{
+				{".5", "1", "quuz", "2020-01-01T12:30:00Z00:00", "2020-01-02", "true"},
+				{".5", "4", "qux", "2020-01-01T12:30:00Z00:00", "2020-02-01", "true"}},
 		},
 		{"3x rows",
 			args{
-				[]map[DType]int{
-					{Float: 1, String: 0, DateTime: 0},
-					{Float: 0, String: 1, DateTime: 0}},
+				[]map[string]int{
+					{"float": 1, "string": 0},
+					{"float": 0, "string": 1}},
 				3},
 			[][]string{{".5", "foo"}, {".9", "baz"}, {".5", "foo"}},
 		},
@@ -1760,12 +1764,14 @@ func Test_inferType(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want DType
+		want string
 	}{
-		{"float", args{"1.5"}, Float},
-		{"int", args{"1"}, Int},
-		{"string", args{"foo"}, String},
-		{"date", args{"1/1/20"}, DateTime},
+		{"float", args{"1.5"}, "float"},
+		{"int", args{"1"}, "int"},
+		{"string", args{"foo"}, "string"},
+		{"datetime", args{"1/1/20 3pm"}, "datetime"},
+		{"date", args{"1/1/20"}, "date"},
+		{"bool", args{"true"}, "bool"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2559,7 +2565,7 @@ func Test_latest(t *testing.T) {
 	}
 }
 
-func Test_withinDuration(t *testing.T) {
+func Test_withinWindow(t *testing.T) {
 	d1 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	d2 := time.Date(2020, 1, 1, 12, 0, 0, 0, time.UTC)
 	d3 := time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC)
@@ -2583,8 +2589,8 @@ func Test_withinDuration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := withinDuration(tt.args.root, tt.args.other, tt.args.d); got != tt.want {
-				t.Errorf("withinDuration() = %v, want %v", got, tt.want)
+			if got := withinWindow(tt.args.root, tt.args.other, tt.args.d); got != tt.want {
+				t.Errorf("withinWindow() = %v, want %v", got, tt.want)
 			}
 		})
 	}

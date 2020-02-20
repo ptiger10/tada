@@ -122,7 +122,7 @@ type GroupedDataFrame struct {
 	err         error
 }
 
-// DType stub
+// DType is a DataType that may be used in a Sorter
 type DType int
 
 const (
@@ -132,8 +132,6 @@ const (
 	String
 	// DateTime stub
 	DateTime
-	// Int stub
-	Int
 )
 
 // ReadConfig stub

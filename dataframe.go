@@ -215,7 +215,8 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 	// whether the major dimension of source is rows or columns, the major dimension of the output csv is rows
 	config = defaultConfigIfNil(config)
 	numPreviewRows := 10
-	inferredTypes := make([]map[DType]int, 0)
+	inferredTypes := make([]map[string]int, 0)
+	dtypes := []string{"float", "int", "string", "datetime", "time", "bool"}
 	var headers [][]string
 	// default: major dimension is rows
 	if !config.MajorDimIsCols {
@@ -235,7 +236,11 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 		}
 		// prepare one inferredTypes map per column
 		for range src[0] {
-			inferredTypes = append(inferredTypes, map[DType]int{Float: 0, String: 0, DateTime: 0, Int: 0})
+			emptyMap := map[string]int{}
+			for _, dtype := range dtypes {
+				emptyMap[dtype] = 0
+			}
+			inferredTypes = append(inferredTypes, emptyMap)
 		}
 
 		// offset preview by header rows
@@ -262,7 +267,11 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 
 		// prepare one inferredTypes map per column
 		for range src {
-			inferredTypes = append(inferredTypes, map[DType]int{Float: 0, String: 0, DateTime: 0, Int: 0})
+			emptyMap := map[string]int{}
+			for _, dtype := range dtypes {
+				emptyMap[dtype] = 0
+			}
+			inferredTypes = append(inferredTypes, emptyMap)
 		}
 
 		// copy headers
