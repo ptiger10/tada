@@ -1043,13 +1043,11 @@ func concatenateLabelsToStrings(labels []*valueContainer, index []int) []string 
 // to 1) a new []*valueContainer with slices with one unique combination of labels per row (same type as original labels),
 // 2) an []int that maps each new row
 // back to the rows in the original containers with the matching label combo
-// 3) a map[string]int that is the set of all unique label combinations and corresponding row in the []int map
-// 4) a []string of the unique label combinations in order
-// and 5) a map[int]int that maps each original row index to its row index in the new containers
+// 3) a []string of the unique label combinations in order
+// and 4) a map[int]int that maps each original row index to its row index in the new containers
 func reduceContainers(containers []*valueContainer, index []int) (
 	newContainers []*valueContainer,
 	originalRowIndices [][]int,
-	uniqueLabels map[string]int,
 	orderedKeys []string,
 	oldToNewRowMapping map[int]int) {
 	subset, _ := subsetContainers(containers, index)
@@ -1066,7 +1064,6 @@ func reduceContainers(containers []*valueContainer, index []int) (
 	}
 	// create receiver for the original row indexes for each unique label combo
 	uniqueLabelRows := make(map[string][]int)
-	uniqueLabels = make(map[string]int)
 	// create receiver for the unique label combos in order
 	orderedKeys = make([]string, 0)
 	// key: original row index, value: new row index for the same unique label combo found at original row index
@@ -1079,8 +1076,6 @@ func reduceContainers(containers []*valueContainer, index []int) (
 		// check if label combo already exists in set
 		if _, ok := uniqueLabelRows[key]; !ok {
 			// if label combo does not exist:
-			// add to set
-			uniqueLabels[key] = i
 			// add int position of the original row to the map
 			uniqueLabelRows[key] = []int{i}
 
@@ -1111,7 +1106,7 @@ func reduceContainers(containers []*valueContainer, index []int) (
 	return
 }
 
-// similar to reduceContainers, but only returns map of unique label combos
+// similar to reduceContainers, but only returns map of unique label combos and the row index where they first appear
 func reduceContainersLimited(containers []*valueContainer, index []int) map[string]int {
 	ret := make(map[string]int)
 	stringifiedLabels := concatenateLabelsToStrings(containers, index)

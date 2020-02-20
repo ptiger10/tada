@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 )
 
 // GroupedSeries
@@ -14,177 +15,282 @@ func (g *GroupedSeries) Err() error {
 }
 
 func (g *GroupedSeries) String() string {
-	groups := make([]string, len(g.groups))
-	var counter int
-	for k := range g.groups {
-		counter++
-		groups[counter] = k
+	groups := make([]string, len(g.orderedKeys))
+	for i, k := range g.orderedKeys {
+		groups[i] = k
 	}
 	return "Groups: " + strings.Join(groups, ",")
 }
 
 // GetGroup stub
 func (g *GroupedSeries) GetGroup(group string) *Series {
-	i, ok := g.groups[group]
-	if !ok {
-		return seriesWithError(fmt.Errorf("GetGroup(): `group` (%v) not in groups", group))
+	for m, key := range g.orderedKeys {
+		if key == group {
+			return g.series.Subset(g.rowIndices[m])
+		}
 	}
-	return g.series.Subset(g.rowIndices[i])
+	return seriesWithError(fmt.Errorf("GetGroup(): `group` (%v) not in groups", group))
+}
+
+func groupedFloatFunc(
+	vals []float64,
+	nulls []bool,
+	name string,
+	aligned bool,
+	rowIndices [][]int,
+	fn func(val []float64, isNull []bool, index []int) (float64, bool)) *valueContainer {
+	// default: return length is equal to the number of groups
+	retLength := len(rowIndices)
+	if aligned {
+		// if aligned: return length is overwritten to equal the length of original data
+		retLength = len(vals)
+	}
+	retVals := make([]float64, retLength)
+	retNulls := make([]bool, retLength)
+	for i, rowIndex := range rowIndices {
+		output, isNull := fn(vals, nulls, rowIndex)
+		if !aligned {
+			// default: write each output once and in sequential order into retVals
+			retVals[i] = output
+			retNulls[i] = isNull
+		} else {
+			// if aligned: write each output multiple times and out of order into retVals
+			for _, index := range rowIndex {
+				retVals[index] = output
+				retNulls[index] = isNull
+			}
+		}
+	}
+	return &valueContainer{
+		slice:  retVals,
+		isNull: retNulls,
+		name:   name,
+	}
+}
+
+func groupedStringFunc(
+	vals []string,
+	nulls []bool,
+	name string,
+	aligned bool,
+	rowIndices [][]int,
+	fn func(val []string, isNull []bool, index []int) (string, bool)) *valueContainer {
+	// default: return length is equal to the number of groups
+	retLength := len(rowIndices)
+	if aligned {
+		// if aligned: return length is overwritten to equal the length of original data
+		retLength = len(vals)
+	}
+	retVals := make([]string, retLength)
+	retNulls := make([]bool, retLength)
+	for i, rowIndex := range rowIndices {
+		output, isNull := fn(vals, nulls, rowIndex)
+		if !aligned {
+			// default: write each output once and in sequential order
+			retVals[i] = output
+			retNulls[i] = isNull
+		} else {
+			// if aligned: write each output multiple times and out of order
+			for _, index := range rowIndex {
+				retVals[index] = output
+				retNulls[index] = isNull
+			}
+		}
+	}
+	return &valueContainer{
+		slice:  retVals,
+		isNull: retNulls,
+		name:   name,
+	}
+}
+
+func groupedDateTimeFunc(
+	vals []time.Time,
+	nulls []bool,
+	name string,
+	aligned bool,
+	rowIndices [][]int,
+	fn func(val []time.Time, isNull []bool, index []int) (time.Time, bool)) *valueContainer {
+	// default: return length is equal to the number of groups
+	retLength := len(rowIndices)
+	if aligned {
+		// if aligned: return length is overwritten to equal the length of original data
+		retLength = len(vals)
+	}
+	retVals := make([]time.Time, retLength)
+	retNulls := make([]bool, retLength)
+	for i, rowIndex := range rowIndices {
+		output, isNull := fn(vals, nulls, rowIndex)
+		if !aligned {
+			// default: write each output once and in sequential order
+			retVals[i] = output
+			retNulls[i] = isNull
+		} else {
+			// if aligned: write each output multiple times and out of order
+			for _, index := range rowIndex {
+				retVals[index] = output
+				retNulls[index] = isNull
+			}
+		}
+	}
+	return &valueContainer{
+		slice:  retVals,
+		isNull: retNulls,
+		name:   name,
+	}
+}
+
+func (g *GroupedSeries) floatFunc(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
+	if len(g.rowIndices) == 0 {
+		return seriesWithError(errors.New("GroupBy(): no groups"))
+	}
+	if g.aligned {
+		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
+	}
+	retVals := groupedFloatFunc(
+		g.series.values.float().slice, g.series.values.isNull, name, g.aligned, g.rowIndices, fn)
+	// default: grouped labels
+	retLabels := g.labels
+	if g.aligned {
+		// if aligned: all labels
+		retLabels = g.series.labels
+	}
+	return &Series{
+		values: retVals,
+		labels: retLabels,
+	}
 }
 
 func (g *GroupedSeries) stringFunc(name string, fn func(val []string, isNull []bool, index []int) (string, bool)) *Series {
 	if len(g.rowIndices) == 0 {
 		return seriesWithError(errors.New("GroupBy(): no groups"))
 	}
-	groupedVals := make([]string, len(g.rowIndices))
-	valueIsNull := make([]bool, len(g.rowIndices))
-
-	referenceVals := g.series.values.str().slice
-	// iterate over rowsIndices
-	for i, rowIndex := range g.rowIndices {
-		output, isNull := fn(referenceVals, g.series.values.isNull, rowIndex)
-		groupedVals[i] = output
-		valueIsNull[i] = isNull
+	if g.aligned {
+		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
+	}
+	retVals := groupedStringFunc(
+		g.series.values.str().slice, g.series.values.isNull, name, g.aligned, g.rowIndices, fn)
+	// default: grouped labels
+	retLabels := g.labels
+	if g.aligned {
+		// if aligned: all labels
+		retLabels = g.series.labels
 	}
 	return &Series{
-		values: &valueContainer{slice: groupedVals, isNull: valueIsNull, name: name},
-		labels: g.labels,
+		values: retVals,
+		labels: retLabels,
+	}
+}
+
+func (g *GroupedSeries) dateTimeFunc(name string, fn func(val []time.Time, isNull []bool, index []int) (time.Time, bool)) *Series {
+	if len(g.rowIndices) == 0 {
+		return seriesWithError(errors.New("GroupBy(): no groups"))
+	}
+	if g.aligned {
+		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
+	}
+	retVals := groupedDateTimeFunc(
+		g.series.values.dateTime().slice, g.series.values.isNull, name, g.aligned, g.rowIndices, fn)
+	// default: grouped labels
+	retLabels := g.labels
+	if g.aligned {
+		// if aligned: all labels
+		retLabels = g.series.labels
+	}
+	return &Series{
+		values: retVals,
+		labels: retLabels,
 	}
 }
 
 // Apply stub
 func (g *GroupedSeries) Apply(name string, lambda GroupApplyFn) *Series {
+	// remove all nulls before running each set of values through custom user function
 	if lambda.F64 != nil {
-		fn := func(val []float64, isNull []bool, index []int) (float64, bool) {
-			return lambda.F64(val), false
-		}
-		if g.aligned {
-			return g.applyAlignedFloat(name, lambda.F64)
-		}
-		return g.mathFunc(name, fn)
-	} else if lambda.String != nil {
-
-	}
-	return nil
-}
-
-func (g *GroupedSeries) applyAlignedFloat(name string, fn func([]float64) float64) *Series {
-	vals := make([]float64, g.series.Len())
-	isNull := make([]bool, len(vals))
-	referenceVals := g.series.values.float().slice
-	for _, index := range g.rowIndices {
-		subsetVals := make([]float64, 0)
-		for _, i := range index {
-			if !isNull[i] {
-				subsetVals = append(subsetVals, referenceVals[i])
+		fn := func(vals []float64, isNull []bool, index []int) (float64, bool) {
+			var atLeastOneValid bool
+			inputVals := make([]float64, 0)
+			for _, i := range index {
+				if !isNull[i] {
+					inputVals = append(inputVals, vals[i])
+					atLeastOneValid = true
+				}
 			}
+			if !atLeastOneValid {
+				return 0, true
+			}
+			return lambda.F64(inputVals), false
 		}
-		output := fn(subsetVals)
-		for _, i := range index {
-			vals[i] = output
+		return g.floatFunc(name, fn)
+	} else if lambda.String != nil {
+		fn := func(vals []string, isNull []bool, index []int) (string, bool) {
+			var atLeastOneValid bool
+			inputVals := make([]string, 0)
+			for _, i := range index {
+				if !isNull[i] {
+					inputVals = append(inputVals, vals[i])
+					atLeastOneValid = true
+				}
+			}
+			if !atLeastOneValid {
+				return "", true
+			}
+			return lambda.String(inputVals), false
 		}
-	}
-	values := &valueContainer{slice: vals, isNull: isNull, name: name}
-	return &Series{
-		values: values,
-		labels: g.series.labels,
-	}
-}
-
-func (g *GroupedSeries) alignedMath(name string, fn func([]float64, []bool, []int) (float64, bool)) *Series {
-	vals := make([]float64, g.series.Len())
-	isNull := make([]bool, len(vals))
-	referenceVals := g.series.values.float().slice
-	for _, index := range g.rowIndices {
-		output, outputIsNull := fn(referenceVals, g.series.values.isNull, index)
-		for _, i := range index {
-			vals[i] = output
-			isNull[i] = outputIsNull
+		return g.stringFunc(name, fn)
+	} else if lambda.DateTime != nil {
+		fn := func(vals []time.Time, isNull []bool, index []int) (time.Time, bool) {
+			var atLeastOneValid bool
+			inputVals := make([]time.Time, 0)
+			for _, i := range index {
+				if !isNull[i] {
+					inputVals = append(inputVals, vals[i])
+					atLeastOneValid = true
+				}
+			}
+			if !atLeastOneValid {
+				return time.Time{}, true
+			}
+			return lambda.DateTime(inputVals), false
 		}
+		return g.dateTimeFunc(name, fn)
 	}
-	values := &valueContainer{slice: vals, isNull: isNull, name: name}
-	return &Series{
-		values: values,
-		labels: g.series.labels,
-	}
-}
-
-func (g *GroupedSeries) mathFunc(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
-	if len(g.groups) == 0 {
-		return seriesWithError(errors.New("GroupBy(): no groups"))
-	}
-	referenceVals := g.series.values.float().slice
-	vals := make([]float64, len(g.groups))
-
-	valueIsNull := make([]bool, len(g.groups))
-
-	for i, index := range g.rowIndices {
-		// evaluate func
-		output, isNull := fn(referenceVals, g.series.values.isNull, index)
-		vals[i] = output
-		valueIsNull[i] = isNull
-	}
-
-	return &Series{
-		values: &valueContainer{slice: vals, isNull: valueIsNull, name: name},
-		labels: g.labels,
-	}
+	return seriesWithError(fmt.Errorf("no lambda function provided"))
 }
 
 // Sum stub
 func (g *GroupedSeries) Sum() *Series {
-	if g.aligned {
-		return g.alignedMath(g.series.values.name+"_sum", sum)
-	}
-	return g.mathFunc("sum", sum)
+	return g.floatFunc("sum", sum)
 }
 
 // Mean stub
 func (g *GroupedSeries) Mean() *Series {
-	if g.aligned {
-		return g.alignedMath(g.series.values.name+"_mean", mean)
-	}
-	return g.mathFunc("mean", mean)
+	return g.floatFunc("mean", mean)
 }
 
 // Median stub
 func (g *GroupedSeries) Median() *Series {
-	if g.aligned {
-		return g.alignedMath(g.series.values.name+"_median", median)
-	}
-	return g.mathFunc("median", median)
+	return g.floatFunc("median", median)
 }
 
 // Std stub
 func (g *GroupedSeries) Std() *Series {
-	if g.aligned {
-		return g.alignedMath(g.series.values.name+"_std", std)
-	}
-	return g.mathFunc("std", std)
+	return g.floatFunc("std", std)
 }
 
 // Count stub
 func (g *GroupedSeries) Count() *Series {
-	if g.aligned {
-		return g.alignedMath(g.series.values.name+"_count", count)
-	}
-	return g.mathFunc("count", count)
+	return g.floatFunc("count", count)
 }
 
 // Min stub
 func (g *GroupedSeries) Min() *Series {
-	if g.aligned {
-		return g.alignedMath(g.series.values.name+"_min", min)
-	}
-	return g.mathFunc("min", min)
+	return g.floatFunc("min", min)
 }
 
 // Max stub
 func (g *GroupedSeries) Max() *Series {
-	if g.aligned {
-		return g.alignedMath(g.series.values.name+"_max", max)
-	}
-	return g.mathFunc("max", max)
+	return g.floatFunc("max", max)
 }
 
 // First stub
@@ -195,6 +301,16 @@ func (g *GroupedSeries) First() *Series {
 // Last stub
 func (g *GroupedSeries) Last() *Series {
 	return g.stringFunc("last", last)
+}
+
+// Earliest stub
+func (g *GroupedSeries) Earliest() *Series {
+	return g.dateTimeFunc("earliest", earliest)
+}
+
+// Latest stub
+func (g *GroupedSeries) Latest() *Series {
+	return g.dateTimeFunc("latest", latest)
 }
 
 // Err returns the underlying error, if any
@@ -212,7 +328,7 @@ func (g *GroupedDataFrame) stringFunc(
 
 	for k := range cols {
 		referenceVals := g.df.values[k].str().slice
-		// iterate over rowsIndices
+		// iterate over rowIndices
 		for i, rowIndex := range g.rowIndices {
 			output, isNull := fn(referenceVals, g.df.values[k].isNull, rowIndex)
 			groupedVals[k][i] = output
@@ -222,8 +338,10 @@ func (g *GroupedDataFrame) stringFunc(
 	retVals := copyStringsIntoValueContainers(groupedVals, groupedNulls, cols)
 
 	return &DataFrame{
-		values: retVals,
-		labels: g.labels,
+		values:        retVals,
+		labels:        g.labels,
+		colLevelNames: []string{"*0"},
+		name:          name,
 	}
 
 	// numLevels := len(g.labels)

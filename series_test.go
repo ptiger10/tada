@@ -2155,7 +2155,6 @@ func TestSeries_GroupBy(t *testing.T) {
 			args{nil},
 			&GroupedSeries{
 				rowIndices:  [][]int{{0, 1}, {2}, {3}},
-				groups:      map[string]int{"0|foo": 0, "1|foo": 2, "2|bar": 3},
 				orderedKeys: []string{"0|foo", "1|foo", "2|bar"},
 				labels: []*valueContainer{
 					{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "a"},
@@ -2176,7 +2175,6 @@ func TestSeries_GroupBy(t *testing.T) {
 			args{[]string{"b"}},
 			&GroupedSeries{
 				rowIndices:  [][]int{{0, 1, 2}, {3}},
-				groups:      map[string]int{"foo": 0, "bar": 3},
 				orderedKeys: []string{"foo", "bar"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "b"}},

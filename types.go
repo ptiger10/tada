@@ -91,9 +91,9 @@ type ApplyFn struct {
 
 // GroupApplyFn stub
 type GroupApplyFn struct {
-	F64      func(val []float64) float64
-	String   func(val []string) string
-	DateTime func(val []time.Time) time.Time
+	F64      func(vals []float64) float64
+	String   func(vals []string) string
+	DateTime func(vals []time.Time) time.Time
 }
 
 // ApplyFormatFn stub
@@ -105,7 +105,6 @@ type ApplyFormatFn struct {
 
 // GroupedSeries stub
 type GroupedSeries struct {
-	groups      map[string]int
 	orderedKeys []string
 	rowIndices  [][]int
 	labels      []*valueContainer
@@ -116,7 +115,6 @@ type GroupedSeries struct {
 
 // GroupedDataFrame stub
 type GroupedDataFrame struct {
-	groups      map[string]int
 	orderedKeys []string
 	rowIndices  [][]int
 	labels      []*valueContainer

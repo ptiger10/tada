@@ -536,7 +536,6 @@ func Test_reduceContainers(t *testing.T) {
 		args                   args
 		wantNewContainers      []*valueContainer
 		wantOriginalRowIndexes [][]int
-		wantUniqueLabels       map[string]int
 		wantOrderedKeys        []string
 		wantOldToNewRowMapping map[int]int
 	}{
@@ -550,7 +549,6 @@ func Test_reduceContainers(t *testing.T) {
 				{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, name: "baz"},
 			},
 			wantOriginalRowIndexes: [][]int{{0, 2}, {1}},
-			wantUniqueLabels:       map[string]int{"bar": 0, "qux": 1},
 			wantOrderedKeys:        []string{"bar", "qux"},
 			wantOldToNewRowMapping: map[int]int{0: 0, 1: 1, 2: 0}},
 		{name: "multi level",
@@ -565,7 +563,6 @@ func Test_reduceContainers(t *testing.T) {
 			},
 			wantOriginalRowIndexes: [][]int{{0, 2}, {1}},
 			wantOrderedKeys:        []string{"1|bar", "1|qux"},
-			wantUniqueLabels:       map[string]int{"1|bar": 0, "1|qux": 1},
 			wantOldToNewRowMapping: map[int]int{0: 0, 1: 1, 2: 0}},
 		{name: "single level - null",
 			args: args{containers: []*valueContainer{
@@ -578,23 +575,19 @@ func Test_reduceContainers(t *testing.T) {
 			},
 			wantOriginalRowIndexes: [][]int{{0, 2}, {1}},
 			wantOrderedKeys:        []string{"bar", ""},
-			wantUniqueLabels:       map[string]int{"bar": 0, "": 1},
 			wantOldToNewRowMapping: map[int]int{0: 0, 1: 1, 2: 0}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotNewContainers, gotOriginalRowIndexes, gotUniqueLabels, gotOrderedKeys, gotOldToNewRowMapping := reduceContainers(tt.args.containers, tt.args.index)
+			gotNewContainers, gotOriginalRowIndexes, gotOrderedKeys, gotOldToNewRowMapping := reduceContainers(tt.args.containers, tt.args.index)
 			if !reflect.DeepEqual(gotNewContainers, tt.wantNewContainers) {
 				t.Errorf("reduceContainers() gotNewContainers = %v, want %v", gotNewContainers[0], tt.wantNewContainers[0])
 			}
 			if !reflect.DeepEqual(gotOriginalRowIndexes, tt.wantOriginalRowIndexes) {
 				t.Errorf("reduceContainers() gotOriginalRowIndexes = %v, want %v", gotOriginalRowIndexes, tt.wantOriginalRowIndexes)
 			}
-			if !reflect.DeepEqual(gotUniqueLabels, tt.wantUniqueLabels) {
-				t.Errorf("reduceContainers() gotUniqueLabels = %v, want %v", gotUniqueLabels, tt.wantUniqueLabels)
-			}
 			if !reflect.DeepEqual(gotOrderedKeys, tt.wantOrderedKeys) {
-				t.Errorf("reduceContainers() gotUniqueLabels = %v, want %v", gotUniqueLabels, tt.wantUniqueLabels)
+				t.Errorf("reduceContainers() gotOrderedKeys = %v, want %v", gotOrderedKeys, tt.wantOrderedKeys)
 			}
 			if !reflect.DeepEqual(gotOldToNewRowMapping, tt.wantOldToNewRowMapping) {
 				t.Errorf("reduceContainers() gotOldToNewRowMapping = %v, want %v", gotOldToNewRowMapping, tt.wantOldToNewRowMapping)

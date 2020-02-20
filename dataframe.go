@@ -949,9 +949,9 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 	// -- set up helpers and new containers
 
 	// this step isolates the unique values in the promoted column and the rows in the original slice containing those values
-	_, rowIndices, _, uniqueValuesToPromote, _ := reduceContainers([]*valueContainer{valsToPromote}, []int{0})
+	_, rowIndices, uniqueValuesToPromote, _ := reduceContainers([]*valueContainer{valsToPromote}, []int{0})
 	// this step consolidates duplicate residual labels and maps each original row index to its new row index
-	labels, _, _, _, oldToNewRowMapping := reduceContainers(df.labels, residualLabelIndex)
+	labels, _, _, oldToNewRowMapping := reduceContainers(df.labels, residualLabelIndex)
 	// set new column level names
 	retColLevelNames := append([]string{valsToPromote.name}, df.colLevelNames...)
 	// new values will have as many columns as unique values in the column-to-be-stacked * existing columns
@@ -1304,13 +1304,12 @@ func (df *DataFrame) GroupBy(names ...string) *GroupedDataFrame {
 // expects index to refer to merged labels and columns
 func (df *DataFrame) groupby(index []int) *GroupedDataFrame {
 	mergedLabelsAndCols := append(df.labels, df.values...)
-	newLabels, rowIndices, groups, orderedKeys, _ := reduceContainers(mergedLabelsAndCols, index)
+	newLabels, rowIndices, orderedKeys, _ := reduceContainers(mergedLabelsAndCols, index)
 	names := make([]string, len(index))
 	for i, pos := range index {
 		names[i] = mergedLabelsAndCols[pos].name
 	}
 	return &GroupedDataFrame{
-		groups:      groups,
 		orderedKeys: orderedKeys,
 		rowIndices:  rowIndices,
 		labels:      newLabels,

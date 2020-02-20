@@ -675,9 +675,8 @@ func (s *Series) GroupBy(names ...string) *GroupedSeries {
 			return &GroupedSeries{err: fmt.Errorf("GroupBy(): %v", err)}
 		}
 	}
-	newLabels, rowIndices, groups, orderedKeys, _ := reduceContainers(s.labels, index)
+	newLabels, rowIndices, orderedKeys, _ := reduceContainers(s.labels, index)
 	return &GroupedSeries{
-		groups:      groups,
 		orderedKeys: orderedKeys,
 		rowIndices:  rowIndices,
 		labels:      newLabels,

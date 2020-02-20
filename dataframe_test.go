@@ -2128,7 +2128,6 @@ func TestDataFrame_GroupBy(t *testing.T) {
 			}},
 			args{nil},
 			&GroupedDataFrame{
-				groups:      map[string]int{"0|foo": 0, "1|foo": 2, "2|bar": 3},
 				orderedKeys: []string{"0|foo", "1|foo", "2|bar"},
 				rowIndices:  [][]int{{0, 1}, {2}, {3}},
 				labels: []*valueContainer{
