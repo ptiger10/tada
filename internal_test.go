@@ -2455,7 +2455,7 @@ func Test_max(t *testing.T) {
 			[]float64{1, 2, 3}, []bool{false, false, false}, []int{0, 1, 2}},
 			3, false},
 		{"all null", args{
-			[]float64{1, 2, 3}, []bool{true, true, true}, []int{0, 1, 2}},
+			[]float64{1, 2, 3}, []bool{false, true, true}, []int{1, 2}},
 			0, true},
 	}
 	for _, tt := range tests {
@@ -2532,6 +2532,35 @@ func Test_latest(t *testing.T) {
 			}
 			if got1 != tt.want1 {
 				t.Errorf("latest() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func Test_withinDuration(t *testing.T) {
+	d1 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	d2 := time.Date(2020, 1, 1, 12, 0, 0, 0, time.UTC)
+	d3 := time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC)
+	d4 := time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC)
+	type args struct {
+		root  time.Time
+		other time.Time
+		d     time.Duration
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"true - itself", args{d1, d1, 24 * time.Hour}, true},
+		{"true", args{d1, d2, 24 * time.Hour}, true},
+		{"false - exclusive", args{d1, d3, 24 * time.Hour}, false},
+		{"false", args{d1, d4, 24 * time.Hour}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := withinDuration(tt.args.root, tt.args.other, tt.args.d); got != tt.want {
+				t.Errorf("withinDuration() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -448,3 +448,56 @@ func (g *GroupedDataFrame) Align(colName string) *GroupedSeries {
 		aligned:     true,
 	}
 }
+
+// RollingN stub
+func (s *Series) RollingN(n int) *GroupedSeries {
+	if n < 1 {
+		return &GroupedSeries{err: fmt.Errorf("RollingN(): `n` must be greater than zero (not %v)", n)}
+	}
+	rowIndices := make([][]int, s.Len())
+	for i := 0; i < s.Len(); i++ {
+		rowIndex := make([]int, 0)
+		if i+n <= s.Len() {
+			rowIndex = makeIntRange(i, i+n)
+		} else {
+			rowIndex = make([]int, 0)
+		}
+		rowIndices[i] = rowIndex
+	}
+	return &GroupedSeries{
+		rowIndices: rowIndices,
+		series:     s,
+		aligned:    true,
+	}
+}
+
+// RollingDuration stub
+func (s *Series) RollingDuration(d time.Duration) *GroupedSeries {
+	// assumes positive duration
+	if d < 0 {
+		return &GroupedSeries{err: fmt.Errorf("RollingDuration(): `d` must be greater than zero (not %v)", d)}
+	}
+	vals := s.values.dateTime().slice
+	rowIndices := make([][]int, s.Len())
+	for i := 0; i < s.Len(); i++ {
+		eligibleRows := []int{i}
+		nextRow := i + 1
+		for {
+			if nextRow < s.Len() {
+				if withinDuration(vals[i], vals[nextRow], d) {
+					eligibleRows = append(eligibleRows, nextRow)
+					nextRow++
+					continue
+				}
+			}
+			// keep appending nextRow until it is not within duration or the end of series
+			break
+		}
+		rowIndices[i] = eligibleRows
+	}
+	return &GroupedSeries{
+		rowIndices: rowIndices,
+		series:     s,
+		aligned:    true,
+	}
+}

@@ -1876,3 +1876,13 @@ func (vc *valueContainer) pcut(bins []float64, labels []string) ([]string, error
 	rightExclusive := true
 	return cut(pctile, vc.isNull, bins, leftInclusive, rightExclusive, false, false, labels)
 }
+
+func withinDuration(root time.Time, other time.Time, d time.Duration) bool {
+	if !(other.Equal(root) || other.After(root)) {
+		return false
+	}
+	if !other.Before(root.Add(d)) {
+		return false
+	}
+	return true
+}

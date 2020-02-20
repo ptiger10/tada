@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/d4l3k/messagediff"
 )
 
 func TestGroupedSeries_Err(t *testing.T) {
@@ -1253,42 +1255,6 @@ func TestGroupedSeries_Apply(t *testing.T) {
 	}
 }
 
-// func TestGroupedSeries_First(t *testing.T) {
-// 	type fields struct {
-// 		groups map[string]int
-// 		series *Series
-// 		err    error
-// 	}
-// 	tests := []struct {
-// 		name   string
-// 		fields fields
-// 		want   *Series
-// 	}{
-// 		{name: "single level",
-// 			fields: fields{
-// 				groups:      map[string][]int{"foo": []int{0, 1}, "bar": []int{2, 3}},
-// 				orderedKeys: []string{"foo", "bar"},
-// 				levelNames:  []string{"*0"},
-// 				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
-// 					labels: []*valueContainer{
-// 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-// 			want: &Series{values: &valueContainer{slice: []string{"1", "3"}, isNull: []bool{false, false}, name: "first"},
-// 				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}}}},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			g := GroupedSeries{
-// 				groups: tt.fields.groups,
-// 				series: tt.fields.series,
-// 				err:    tt.fields.err,
-// 			}
-// 			if got := g.First(); !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("GroupedSeries.First() = %v, want %v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
-
 func TestGroupedSeries_Align(t *testing.T) {
 	type fields struct {
 		series  *Series
@@ -2258,6 +2224,111 @@ func TestGroupedDataFrame_Err(t *testing.T) {
 			}
 			if err := g.Err(); (err != nil) != tt.wantErr {
 				t.Errorf("GroupedDataFrame.Err() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestSeries_RollingN(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		n int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *GroupedSeries
+	}{
+		{"pass", fields{values: &valueContainer{
+			slice: []float64{1, 0, 0, 4}, isNull: []bool{false, true, true, false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
+			}}, args{2},
+			&GroupedSeries{
+				rowIndices: [][]int{{0, 1}, {1, 2}, {2, 3}, {}},
+				aligned:    true,
+				series: &Series{
+					values: &valueContainer{slice: []float64{1, 0, 0, 4}, isNull: []bool{false, true, true, false}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}}},
+			}},
+		{"fail", fields{values: &valueContainer{
+			slice: []float64{1, 0, 0, 4}, isNull: []bool{false, true, true, false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
+			}}, args{0},
+			&GroupedSeries{
+				err: fmt.Errorf("RollingN(): `n` must be greater than zero (not 0)"),
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.RollingN(tt.args.n); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.RollingN() = %v, want %v", got, tt.want)
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+			}
+		})
+	}
+}
+
+func TestSeries_RollingDuration(t *testing.T) {
+	d1 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	d2 := d1.AddDate(0, 0, 3)
+	d3 := d1.AddDate(0, 0, 4)
+	d4 := d1.AddDate(0, 0, 9)
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		d time.Duration
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *GroupedSeries
+	}{
+		{"pass", fields{values: &valueContainer{slice: []time.Time{d1, d2, d3, d4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
+			}}, args{5 * 24 * time.Hour},
+			&GroupedSeries{
+				rowIndices: [][]int{{0, 1, 2}, {1, 2}, {2}, {3}},
+				aligned:    true,
+				series: &Series{
+					values: &valueContainer{slice: []time.Time{d1, d2, d3, d4}, isNull: []bool{false, false, false, false}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}}},
+			}},
+		{"fail", fields{values: &valueContainer{slice: []time.Time{d1, d2, d3, d4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
+			}}, args{-1},
+			&GroupedSeries{
+				err: fmt.Errorf("RollingDuration(): `d` must be greater than zero (not -1ns)"),
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.RollingDuration(tt.args.d); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.RollingDuration() = %v, want %v", got, tt.want)
 			}
 		})
 	}
