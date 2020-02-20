@@ -2643,11 +2643,11 @@ func TestReadStruct(t *testing.T) {
 
 func TestWriteMockCSV(t *testing.T) {
 	want1 := `corge,qux
-,foo
-,baz
-1,foo
+.5,foo
+.9,baz
+.5,foo
 `
-	randSeed = 2
+	randSeed = 3
 	type args struct {
 		src        [][]string
 		config     *ReadConfig
@@ -2659,14 +2659,14 @@ func TestWriteMockCSV(t *testing.T) {
 		wantW   string
 		wantErr bool
 	}{
-		{"pass", args{src: [][]string{{"corge", "qux"}, {"1", "foo"}, {"1", "foo"}}, config: nil, outputRows: 3},
+		{"pass", args{src: [][]string{{"corge", "qux"}, {"1.5", "foo"}, {"2.5", "foo"}}, config: nil, outputRows: 3},
 			want1, false},
 		{"fail - no rows", args{src: nil, config: nil, outputRows: 3},
 			"", true},
 		{"fail - no cols", args{src: [][]string{{}}, config: nil, outputRows: 3},
 			"", true},
 		{"columns as major dim",
-			args{src: [][]string{{"corge", "1", "1"}, {"qux", "foo", "foo"}},
+			args{src: [][]string{{"corge", "1.5", "2.5"}, {"qux", "foo", "foo"}},
 				config: &ReadConfig{MajorDimIsCols: true, NumHeaderRows: 1}, outputRows: 3},
 			want1, false},
 		{"fail - no rows", args{src: nil, config: &ReadConfig{MajorDimIsCols: true}, outputRows: 3},

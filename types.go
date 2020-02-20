@@ -132,6 +132,8 @@ const (
 	String
 	// DateTime stub
 	DateTime
+	// Int stub
+	Int
 )
 
 // ReadConfig stub

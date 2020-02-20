@@ -1694,6 +1694,26 @@ func Test_valueContainer_sort(t *testing.T) {
 	}
 }
 
+func Test_getDominantDType(t *testing.T) {
+	type args struct {
+		dtypes map[DType]int
+	}
+	tests := []struct {
+		name string
+		args args
+		want DType
+	}{
+		{"pass", args{map[DType]int{Int: 0, Float: 1, String: 2, DateTime: 3}}, DateTime},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := getDominantDType(tt.args.dtypes); got != tt.want {
+				t.Errorf("getDominantDType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func Test_mockCSVFromDTypes(t *testing.T) {
 	randSeed = 3
 	type args struct {
@@ -1707,12 +1727,13 @@ func Test_mockCSVFromDTypes(t *testing.T) {
 	}{
 		{"2x rows",
 			args{
-				[]map[DType]int{
-					{Float: 3, String: 0, DateTime: 0},
-					{Float: 0, String: 3, DateTime: 0},
-					{Float: 0, String: 1, DateTime: 2}},
-				2},
-			[][]string{{"3", "foo", "12/1/2019"}, {"1", "foo", "12/1/2019"}},
+				dtypes: []map[DType]int{
+					{Float: 3, String: 1, DateTime: 1, Int: 1},
+					{Float: 1, String: 3, DateTime: 1, Int: 1},
+					{Float: 1, String: 1, DateTime: 3, Int: 1},
+					{Float: 1, String: 1, DateTime: 1, Int: 3}},
+				numMockRows: 2},
+			[][]string{{".5", "foo", "2/1/2020", "3"}, {".5", "foo", "1/1/2020", "4"}},
 		},
 		{"3x rows",
 			args{
@@ -1720,7 +1741,7 @@ func Test_mockCSVFromDTypes(t *testing.T) {
 					{Float: 1, String: 0, DateTime: 0},
 					{Float: 0, String: 1, DateTime: 0}},
 				3},
-			[][]string{{"3", "foo"}, {"1", "foo"}, {"1", "foo"}},
+			[][]string{{".5", "foo"}, {".9", "baz"}, {".5", "foo"}},
 		},
 	}
 	for _, tt := range tests {
@@ -1741,9 +1762,10 @@ func Test_inferType(t *testing.T) {
 		args args
 		want DType
 	}{
-		{"date", args{"1/1/20"}, DateTime},
-		{"float", args{"1"}, Float},
+		{"float", args{"1.5"}, Float},
+		{"int", args{"1"}, Int},
 		{"string", args{"foo"}, String},
+		{"date", args{"1/1/20"}, DateTime},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2542,6 +2564,7 @@ func Test_withinDuration(t *testing.T) {
 	d2 := time.Date(2020, 1, 1, 12, 0, 0, 0, time.UTC)
 	d3 := time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC)
 	d4 := time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC)
+	d5 := time.Date(2019, 12, 31, 0, 0, 0, 0, time.UTC)
 	type args struct {
 		root  time.Time
 		other time.Time
@@ -2556,6 +2579,7 @@ func Test_withinDuration(t *testing.T) {
 		{"true", args{d1, d2, 24 * time.Hour}, true},
 		{"false - exclusive", args{d1, d3, 24 * time.Hour}, false},
 		{"false", args{d1, d4, 24 * time.Hour}, false},
+		{"false - before", args{d1, d5, 24 * time.Hour}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

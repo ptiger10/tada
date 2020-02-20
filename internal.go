@@ -570,28 +570,39 @@ func readStruct(slice interface{}) ([]*valueContainer, error) {
 }
 
 func inferType(input string) DType {
-	if _, err := dateparse.ParseAny(input); err == nil {
-		return DateTime
+	if _, err := strconv.ParseInt(input, 10, 64); err == nil {
+		return Int
 	}
 	if _, err := strconv.ParseFloat(input, 64); err == nil {
 		return Float
 	}
+	if _, err := dateparse.ParseAny(input); err == nil {
+		return DateTime
+	}
 	return String
 }
 
+func getDominantDType(dtypes map[DType]int) DType {
+	var highestCount int
+	var dominantDType DType
+	for key, v := range dtypes {
+		// tie resolves randomly
+		if v > highestCount {
+			dominantDType = key
+			highestCount = v
+		}
+	}
+	return dominantDType
+}
+
+// major dimension of output is rows
 func mockCSVFromDTypes(dtypes []map[DType]int, numMockRows int) [][]string {
 	rand.Seed(randSeed)
 	dominantDTypes := make([]DType, len(dtypes))
-	var highestCount int
-	var dominantDType DType
+
 	// determine the dominant data type per column
 	for k := range dtypes {
-		for key, v := range dtypes[k] {
-			if v > highestCount {
-				dominantDType = key
-			}
-		}
-		dominantDTypes[k] = dominantDType
+		dominantDTypes[k] = getDominantDType(dtypes[k])
 	}
 	ret := make([][]string, numMockRows)
 	for i := range ret {
@@ -606,14 +617,17 @@ func mockCSVFromDTypes(dtypes []map[DType]int, numMockRows int) [][]string {
 func mockString(dtype DType) string {
 	var options []string
 	switch dtype {
+	// overwrite the options based on the dtype
 	case Float:
-		options = []string{"1", "2", "3"}
-	case DateTime:
-		options = []string{"12/1/2019", "1/1/2020", "2/1/2020"}
+		options = []string{".1", ".25", ".5", ".75", ".9"}
 	case String:
-		options = []string{"foo", "bar", "baz"}
+		options = []string{"foo", "bar", "baz", "qux", "quuz"}
+	case DateTime:
+		options = []string{"12/1/2019", "12/31/2019", "1/1/2020", "1/31/2020", "2/1/2020"}
+	case Int:
+		options = []string{"1", "2", "3", "4", "5"}
 	}
-	nullPct := .2
+	nullPct := .1
 	f := rand.Float64()
 	if f < nullPct {
 		return ""

@@ -212,6 +212,7 @@ func (df *DataFrame) EqualsCSV(csv [][]string, ignoreLabels bool) (bool, *tabled
 
 // WriteMockCSV writes a mock csv to `w` modeled after `src`.
 func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows int) error {
+	// whether the major dimension of source is rows or columns, the major dimension of the output csv is rows
 	config = defaultConfigIfNil(config)
 	numPreviewRows := 10
 	inferredTypes := make([]map[DType]int, 0)
@@ -232,19 +233,21 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 		for i := 0; i < config.NumHeaderRows; i++ {
 			headers = append(headers, src[i])
 		}
+		// prepare one inferredTypes map per column
 		for range src[0] {
-			inferredTypes = append(inferredTypes, map[DType]int{Float: 0, DateTime: 0, String: 0})
+			inferredTypes = append(inferredTypes, map[DType]int{Float: 0, String: 0, DateTime: 0, Int: 0})
 		}
 
 		// offset preview by header rows
 		preview := src[config.NumHeaderRows : numPreviewRows+config.NumHeaderRows]
 		for i := range preview {
 			for k := range preview[i] {
-				dtype := inferType(src[i+config.NumHeaderRows][k])
+				datum := preview[i][k]
+				dtype := inferType(datum)
 				inferredTypes[k][dtype]++
 			}
 		}
-		// major dimension is rows
+		// major dimension is columns
 	} else {
 		if len(src) == 0 {
 			return fmt.Errorf("WriteMockCSV(): csv must have at least one column")
@@ -257,9 +260,9 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 			numPreviewRows = maxRows
 		}
 
-		// prepare inferredTypes map
+		// prepare one inferredTypes map per column
 		for range src {
-			inferredTypes = append(inferredTypes, map[DType]int{Float: 0, DateTime: 0, String: 0})
+			inferredTypes = append(inferredTypes, map[DType]int{Float: 0, String: 0, DateTime: 0, Int: 0})
 		}
 
 		// copy headers
@@ -267,6 +270,7 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 		for l := 0; l < config.NumHeaderRows; l++ {
 			headers = append(headers, make([]string, len(src)))
 			for k := range src {
+				// major dimension of output is rows
 				headers[l][k] = src[k][l]
 			}
 		}
@@ -281,6 +285,7 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 			}
 		}
 	}
+	// major dimension of output is rows, for compatability with csv.NewWriter
 	mockCSV := mockCSVFromDTypes(inferredTypes, outputRows)
 	mockCSV = append(headers, mockCSV...)
 	writer := csv.NewWriter(w)
