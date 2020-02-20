@@ -1266,6 +1266,122 @@ func TestGroupedSeries_Apply(t *testing.T) {
 	}
 }
 
+func TestGroupedDataFrame_Apply(t *testing.T) {
+	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		df          *DataFrame
+		err         error
+	}
+	type args struct {
+		name   string
+		cols   []string
+		lambda GroupApplyFn
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		// -- float64
+		{"no nulls - not aligned - float", fields{
+			orderedKeys: []string{"foo", "bar"},
+			rowIndices:  [][]int{{0, 1}, {2, 3}},
+			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			df: &DataFrame{
+				values: []*valueContainer{{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "foo"}},
+			args{"custom", []string{"qux"}, GroupApplyFn{F64: func(vals []float64) float64 {
+				var sum float64
+				for i := range vals {
+					sum += vals[i]
+				}
+				return sum
+			}}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{3, 7}, isNull: []bool{false, false}, name: "qux"}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "custom"},
+		},
+
+		// -- string
+		{"no nulls - not aligned - string", fields{
+			orderedKeys: []string{"foo", "bar"},
+			rowIndices:  [][]int{{0, 1}, {2, 3}},
+			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			df: &DataFrame{
+				values: []*valueContainer{{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "qux"}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "foo"}},
+			args{"custom", []string{"qux"}, GroupApplyFn{String: func(vals []string) string {
+				return strings.ToUpper(vals[0])
+			}}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"A", "C"}, isNull: []bool{false, false}, name: "qux"}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "custom"}},
+
+		// -- datetime
+		{"no nulls - not aligned - datetime", fields{
+			orderedKeys: []string{"foo", "bar"},
+			rowIndices:  [][]int{{0, 1}, {2, 3}},
+			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			df: &DataFrame{
+				values: []*valueContainer{{slice: []time.Time{d, d.AddDate(0, 0, 1), d.AddDate(0, 0, 2), d.AddDate(0, 0, 3)}, isNull: []bool{false, false, false, false}, name: "qux"}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "foo"}},
+			args{"custom", []string{"qux"}, GroupApplyFn{DateTime: func(vals []time.Time) time.Time {
+				return vals[0]
+			}}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []time.Time{d, d.AddDate(0, 0, 2)}, isNull: []bool{false, false}, name: "qux"}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "custom"}},
+
+		{"fail", fields{
+			orderedKeys: []string{"foo", "bar"},
+			rowIndices:  [][]int{{0, 1}, {2, 3}},
+			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			df: &DataFrame{
+				values: []*valueContainer{{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "qux"}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "foo"}},
+			args{"custom", []string{"qux"}, GroupApplyFn{}},
+			&DataFrame{err: fmt.Errorf("Apply(): no lambda function provided")}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedDataFrame{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				df:          tt.fields.df,
+				err:         tt.fields.err,
+			}
+			if got := g.Apply(tt.args.name, tt.args.cols, tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedDataFrame.Apply() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 func TestGroupedSeries_Align(t *testing.T) {
 	type fields struct {
 		series  *Series

@@ -197,52 +197,13 @@ func (g *GroupedSeries) dateTimeFunc(name string, fn func(val []time.Time, isNul
 func (g *GroupedSeries) Apply(name string, lambda GroupApplyFn) *Series {
 	// remove all nulls before running each set of values through custom user function
 	if lambda.F64 != nil {
-		fn := func(vals []float64, isNull []bool, index []int) (float64, bool) {
-			var atLeastOneValid bool
-			inputVals := make([]float64, 0)
-			for _, i := range index {
-				if !isNull[i] {
-					inputVals = append(inputVals, vals[i])
-					atLeastOneValid = true
-				}
-			}
-			if !atLeastOneValid {
-				return 0, true
-			}
-			return lambda.F64(inputVals), false
-		}
+		fn := convertUserFloatFunc(lambda.F64)
 		return g.floatFunc(name, fn)
 	} else if lambda.String != nil {
-		fn := func(vals []string, isNull []bool, index []int) (string, bool) {
-			var atLeastOneValid bool
-			inputVals := make([]string, 0)
-			for _, i := range index {
-				if !isNull[i] {
-					inputVals = append(inputVals, vals[i])
-					atLeastOneValid = true
-				}
-			}
-			if !atLeastOneValid {
-				return "", true
-			}
-			return lambda.String(inputVals), false
-		}
+		fn := convertUserStringFunc(lambda.String)
 		return g.stringFunc(name, fn)
 	} else if lambda.DateTime != nil {
-		fn := func(vals []time.Time, isNull []bool, index []int) (time.Time, bool) {
-			var atLeastOneValid bool
-			inputVals := make([]time.Time, 0)
-			for _, i := range index {
-				if !isNull[i] {
-					inputVals = append(inputVals, vals[i])
-					atLeastOneValid = true
-				}
-			}
-			if !atLeastOneValid {
-				return time.Time{}, true
-			}
-			return lambda.DateTime(inputVals), false
-		}
+		fn := convertUserDateTimeFunc(lambda.DateTime)
 		return g.dateTimeFunc(name, fn)
 	}
 	return seriesWithError(fmt.Errorf("Apply(): no lambda function provided"))
@@ -447,6 +408,22 @@ func (g *GroupedDataFrame) Align(colName string) *GroupedSeries {
 		series:      g.df.Col(colName),
 		aligned:     true,
 	}
+}
+
+// Apply stub
+func (g *GroupedDataFrame) Apply(name string, cols []string, lambda GroupApplyFn) *DataFrame {
+	// remove all nulls before running each set of values through custom user function
+	if lambda.F64 != nil {
+		fn := convertUserFloatFunc(lambda.F64)
+		return g.floatFunc(name, cols, fn)
+	} else if lambda.String != nil {
+		fn := convertUserStringFunc(lambda.String)
+		return g.stringFunc(name, cols, fn)
+	} else if lambda.DateTime != nil {
+		fn := convertUserDateTimeFunc(lambda.DateTime)
+		return g.dateTimeFunc(name, cols, fn)
+	}
+	return dataFrameWithError(fmt.Errorf("Apply(): no lambda function provided"))
 }
 
 // RollingN stub
