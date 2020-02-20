@@ -67,7 +67,7 @@ func (s *Series) ToCSV(ignoreLabels bool) ([][]string, error) {
 		colLevelNames: []string{"*0"},
 		err:           s.err,
 	}
-	csv, _ := df.ToCSV(ignoreLabels)
+	csv := df.ToCSV(ignoreLabels)
 	return csv, nil
 }
 

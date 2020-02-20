@@ -163,12 +163,12 @@ func (df *DataFrame) ToSeries() *Series {
 }
 
 // ToCSV converts a DataFrame to a [][]string with rows as the major dimension
-func (df *DataFrame) ToCSV(ignoreLabels bool) ([][]string, error) {
+func (df *DataFrame) ToCSV(ignoreLabels bool) [][]string {
 	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
 	if err != nil {
-		return nil, err
+		return nil
 	}
-	return transposedStringValues, nil
+	return transposedStringValues
 }
 
 // ExportCSV converts a DataFrame to a [][]string with rows as the major dimension, and writes the output to a csv file.
@@ -186,10 +186,10 @@ func (df *DataFrame) ExportCSV(file string, ignoreLabels bool) error {
 }
 
 // ToInterface exports a DataFrame to a [][]interface with rows as the major dimension.
-func (df *DataFrame) ToInterface(ignoreLabels bool) ([][]interface{}, error) {
+func (df *DataFrame) ToInterface(ignoreLabels bool) [][]interface{} {
 	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
 	if err != nil {
-		return nil, fmt.Errorf("ToInterface(): %v", err)
+		return nil
 	}
 	ret := make([][]interface{}, len(transposedStringValues))
 	for k := range ret {
@@ -200,12 +200,12 @@ func (df *DataFrame) ToInterface(ignoreLabels bool) ([][]interface{}, error) {
 			ret[i][k] = transposedStringValues[i][k]
 		}
 	}
-	return ret, nil
+	return ret
 }
 
 // EqualsCSV converts a dataframe to csv, compares it to another csv, and evaluates whether the two match and isolates their differences
 func (df *DataFrame) EqualsCSV(csv [][]string, ignoreLabels bool) (bool, *tablediff.Differences) {
-	compare, _ := df.ToCSV(ignoreLabels)
+	compare := df.ToCSV(ignoreLabels)
 	diffs, eq := tablediff.Diff(compare, csv)
 	return eq, diffs
 }
@@ -295,7 +295,7 @@ func removeDefaultNameIndicator(name string) string {
 
 func (df *DataFrame) String() string {
 	// do not try to print all rows
-	csv, _ := df.Head(optionMaxRows).ToCSV(false)
+	csv := df.Head(optionMaxRows).ToCSV(false)
 	for k := range csv[0] {
 		csv[0][k] = removeDefaultNameIndicator(csv[0][k])
 	}

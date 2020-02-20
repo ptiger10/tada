@@ -3002,11 +3002,7 @@ func TestDataFrame_ToCSV(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			got, err := df.ToCSV(tt.args.ignoreLabels)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("DataFrame.ToCSV() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got := df.ToCSV(tt.args.ignoreLabels)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.ToCSV() = %v, want %v", got, tt.want)
 			}
@@ -3099,11 +3095,8 @@ func TestDataFrame_ToInterface(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			got, err := df.ToInterface(tt.args.ignoreLabels)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("DataFrame.ToInterface() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got := df.ToInterface(tt.args.ignoreLabels)
+
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.ToInterface() = %v, want %v", got, tt.want)
 			}
