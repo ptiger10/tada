@@ -1237,6 +1237,17 @@ func TestGroupedSeries_Apply(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
+		{"fail", fields{
+			orderedKeys: []string{"foo", "bar"},
+			rowIndices:  [][]int{{0, 1}, {2, 3}},
+			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			aligned:     false,
+			series: &Series{
+				values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			args{"custom", GroupApplyFn{}},
+			&Series{err: fmt.Errorf("Apply(): no lambda function provided")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -2275,8 +2275,8 @@ func TestSeries_Where(t *testing.T) {
 	}
 	type args struct {
 		filters []FilterFn
-		ifTrue  string
-		ifFalse string
+		ifTrue  interface{}
+		ifFalse interface{}
 	}
 	tests := []struct {
 		name   string
@@ -2284,7 +2284,7 @@ func TestSeries_Where(t *testing.T) {
 		args   args
 		want   *Series
 	}{
-		{"multiple filters",
+		{"pass",
 			fields{
 				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
@@ -2301,9 +2301,9 @@ func TestSeries_Where(t *testing.T) {
 					}
 					return false
 				}},
-			}, "yes", "no"},
+			}, "yes", 0},
 			&Series{
-				values: &valueContainer{slice: []string{"no", "no", "yes"}, isNull: []bool{false, false, false}},
+				values: &valueContainer{slice: []interface{}{0, 0, "yes"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
 	}
 	for _, tt := range tests {

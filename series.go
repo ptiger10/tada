@@ -451,8 +451,8 @@ func (s *Series) Filter(filters ...FilterFn) []int {
 }
 
 // Where stub
-func (s *Series) Where(filters []FilterFn, ifTrue, ifFalse string) *Series {
-	ret := make([]string, s.Len())
+func (s *Series) Where(filters []FilterFn, ifTrue, ifFalse interface{}) *Series {
+	ret := make([]interface{}, s.Len())
 	index := s.Filter(filters...)
 	for _, i := range index {
 		ret[i] = ifTrue

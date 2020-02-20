@@ -245,7 +245,7 @@ func (g *GroupedSeries) Apply(name string, lambda GroupApplyFn) *Series {
 		}
 		return g.dateTimeFunc(name, fn)
 	}
-	return seriesWithError(fmt.Errorf("no lambda function provided"))
+	return seriesWithError(fmt.Errorf("Apply(): no lambda function provided"))
 }
 
 // Sum stub
