@@ -26,3 +26,16 @@ func ExampleSeries() {
 	// |     | 2 |
 	// +-----+---+
 }
+
+func ExampleGroupedSeries() {
+	g := NewSeries([]float64{1, 2, 3, 4}, []string{"foo", "foo", "bar", "bar"}).GroupBy("*0")
+	fmt.Println(g)
+	// Output:
+	// Groups: foo,bar
+}
+func ExampleGroupedSeries_multiple() {
+	g := NewSeries([]float64{1, 2}, []string{"foo", "foo"}, []string{"bar", "bar"}).GroupBy("*0", "*1")
+	fmt.Println(g)
+	// Output:
+	// Groups: foo|bar
+}

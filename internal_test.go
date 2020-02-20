@@ -224,6 +224,7 @@ func Test_setNullsFromInterface(t *testing.T) {
 			math.NaN(), "", time.Time{}}},
 			[]bool{false, false, false, false, false, false,
 				true, true, true}},
+		{"nil - not slice", args{"foo"}, nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -463,6 +464,35 @@ func Test_lookupDataFrame(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{name: "left - repeated label appears only once", args: args{
+			how: "left", name: "baz", colLevelNames: []string{"*0"},
+			values1: []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}, leftOn: []int{0},
+			values2: []*valueContainer{{slice: []string{"c", "d"}, isNull: []bool{false, false}, name: "bar"}},
+			labels2: []*valueContainer{{slice: []int{1, 1}, isNull: []bool{false, false}, name: "quux"}}, rightOn: []int{0}},
+			want: &DataFrame{
+				values: []*valueContainer{{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "bar"}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}},
+				name:   "baz", colLevelNames: []string{"*0"},
+			},
+			wantErr: false,
+		},
+		{name: "left - exclude named column", args: args{
+			how: "left", name: "baz", colLevelNames: []string{"*0"},
+			values1: []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}, leftOn: []int{0},
+			values2: []*valueContainer{
+				{slice: []int{1}, isNull: []bool{false}, name: "baz"},
+				{slice: []string{"c"}, isNull: []bool{false}, name: "bar"}},
+			labels2: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "quux"}}, rightOn: []int{1},
+			excludeRight: []string{"baz"}},
+			want: &DataFrame{
+				values: []*valueContainer{{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "bar"}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}},
+				name:   "baz", colLevelNames: []string{"*0"},
+			},
+			wantErr: false,
+		},
 		{name: "right", args: args{
 			how: "right", name: "baz", colLevelNames: []string{"*0"},
 			values1: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"}},
@@ -644,11 +674,51 @@ func Test_copyInterfaceIntoValueContainers(t *testing.T) {
 				{slice: []float64{1}, isNull: []bool{false}, name: "waldo"},
 			},
 		},
+		{"create nulls from interface", args{
+			slices: []interface{}{[]string{"foo", ""}, []float64{1, 2}},
+			isNull: nil,
+			names:  []string{"corge", "waldo"},
+		},
+			[]*valueContainer{
+				{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "corge"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := copyInterfaceIntoValueContainers(tt.args.slices, tt.args.isNull, tt.args.names); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("copyInterfaceIntoValueContainers() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_copyFloatsIntoValueContainers(t *testing.T) {
+	type args struct {
+		slices [][]float64
+		isNull [][]bool
+		names  []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []*valueContainer
+	}{
+		{"pass", args{
+			slices: [][]float64{{0, 1}, {1, 2}},
+			isNull: [][]bool{{true, false}, {false, false}},
+			names:  []string{"corge", "waldo"},
+		},
+			[]*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "corge"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := copyFloatsIntoValueContainers(tt.args.slices, tt.args.isNull, tt.args.names); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("copyFloatsIntoValueContainers() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -671,6 +741,28 @@ func Test_makeBoolMatrix(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := makeBoolMatrix(tt.args.numCols, tt.args.numRows); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("makeBoolMatrix() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_makeFloatMatrix(t *testing.T) {
+	type args struct {
+		numCols int
+		numRows int
+	}
+	tests := []struct {
+		name string
+		args args
+		want [][]float64
+	}{
+		{"2 col, 1 row", args{2, 1}, [][]float64{{0}, {0}}},
+		{"1 col, 2 row", args{1, 2}, [][]float64{{0, 0}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := makeFloatMatrix(tt.args.numCols, tt.args.numRows); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("makeFloatMatrix() = %v, want %v", got, tt.want)
 			}
 		})
 	}

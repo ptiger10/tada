@@ -423,7 +423,7 @@ func (g *GroupedDataFrame) Earliest(colNames ...string) *DataFrame {
 
 // Latest stub
 func (g *GroupedDataFrame) Latest(colNames ...string) *DataFrame {
-	return g.dateTimeFunc("last", colNames, latest)
+	return g.dateTimeFunc("latest", colNames, latest)
 }
 
 // Align stub
@@ -437,7 +437,7 @@ func (g *GroupedDataFrame) Align(colName string) *GroupedSeries {
 	_, err := findColWithName(colName, g.df.values)
 	if err != nil {
 		return &GroupedSeries{
-			err: err,
+			err: fmt.Errorf("Align(): %v", err),
 		}
 	}
 	return &GroupedSeries{

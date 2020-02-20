@@ -1283,12 +1283,15 @@ func lookupDataFrameWithAnchor(
 		vals := reflect.MakeSlice(v.Type(), len(matches), len(matches))
 		for i, matchedIndex := range matches {
 			// positive match: copy value from values2
+			dst := vals.Index(i)
 			if matchedIndex != -1 {
-				vals.Index(i).Set(v.Index(matchedIndex))
+				src := v.Index(matchedIndex)
+				dst.Set(src)
 				isNull[i] = values2[k].isNull[matchedIndex]
 				// no match
 			} else {
-				vals.Index(i).Set(reflect.Zero(reflect.TypeOf(values2[k].slice).Elem()))
+				src := reflect.TypeOf(values2[k].slice).Elem()
+				dst.Set(reflect.Zero(src))
 				isNull[i] = true
 			}
 		}
