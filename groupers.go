@@ -1,7 +1,6 @@
 package tada
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -141,9 +140,6 @@ func groupedDateTimeFunc(
 }
 
 func (g *GroupedSeries) floatFunc(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
-	if len(g.rowIndices) == 0 {
-		return seriesWithError(errors.New("GroupBy(): no groups"))
-	}
 	if g.aligned {
 		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
 	}
@@ -162,9 +158,6 @@ func (g *GroupedSeries) floatFunc(name string, fn func(val []float64, isNull []b
 }
 
 func (g *GroupedSeries) stringFunc(name string, fn func(val []string, isNull []bool, index []int) (string, bool)) *Series {
-	if len(g.rowIndices) == 0 {
-		return seriesWithError(errors.New("GroupBy(): no groups"))
-	}
 	if g.aligned {
 		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
 	}
@@ -183,9 +176,6 @@ func (g *GroupedSeries) stringFunc(name string, fn func(val []string, isNull []b
 }
 
 func (g *GroupedSeries) dateTimeFunc(name string, fn func(val []time.Time, isNull []bool, index []int) (time.Time, bool)) *Series {
-	if len(g.rowIndices) == 0 {
-		return seriesWithError(errors.New("GroupBy(): no groups"))
-	}
 	if g.aligned {
 		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
 	}
@@ -318,221 +308,102 @@ func (g *GroupedDataFrame) Err() error {
 	return g.err
 }
 
-func (g *GroupedDataFrame) stringFunc(
-	name string, cols []string, fn func(val []string, isNull []bool, index []int) (string, bool)) *DataFrame {
-	if len(g.rowIndices) == 0 {
-		return dataFrameWithError(errors.New("GroupBy(): no groups"))
-	}
-	groupedVals := makeStringMatrix(len(cols), len(g.rowIndices))
-	groupedNulls := makeBoolMatrix(len(cols), len(g.rowIndices))
-
-	for k := range cols {
-		referenceVals := g.df.values[k].str().slice
-		// iterate over rowIndices
-		for i, rowIndex := range g.rowIndices {
-			output, isNull := fn(referenceVals, g.df.values[k].isNull, rowIndex)
-			groupedVals[k][i] = output
-			groupedNulls[k][i] = isNull
+func (g *GroupedDataFrame) floatFunc(
+	name string, cols []string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *DataFrame {
+	if len(cols) == 0 {
+		cols = make([]string, len(g.df.values))
+		for k := range cols {
+			cols[k] = g.df.values[k].name
 		}
 	}
-	retVals := copyStringsIntoValueContainers(groupedVals, groupedNulls, cols)
-
+	retVals := make([]*valueContainer, len(cols))
+	for k := range retVals {
+		retVals[k] = groupedFloatFunc(
+			g.df.values[k].float().slice, g.df.values[k].isNull, cols[k], false, g.rowIndices, fn)
+	}
 	return &DataFrame{
 		values:        retVals,
 		labels:        g.labels,
 		colLevelNames: []string{"*0"},
 		name:          name,
 	}
-
-	// numLevels := len(g.labels)
-
-	// // isolate columns to return
-	// colIndex := make([]int, len(cols))
-	// if len(cols) == 0 {
-	// 	colIndex = makeIntRange(0, len(g.df.values))
-	// } else {
-	// 	for i, col := range cols {
-	// 		idx, err := findColWithName(col, g.df.values)
-	// 		if err != nil {
-	// 			return dataFrameWithError(fmt.Errorf("GroupBy(): %v", err))
-	// 		}
-	// 		colIndex[i] = idx
-	// 	}
-	// }
-	// // prepare [][]string container to receive row-level values
-	// vals := make([][]string, len(colIndex))
-	// valuesIsNull := make([][]bool, len(colIndex))
-	// names := make([]string, len(colIndex))
-	// for col := range colIndex {
-	// 	vals[col] = make([]string, len(g.groups))
-	// 	valuesIsNull[col] = make([]bool, len(g.groups))
-	// 	names[col] = g.df.values[col].name
-	// }
-
-	// // prepare [][]string container to receive row-level labels
-	// labelLevels := make([][]string, numLevels)
-	// labelIsNull := make([][]bool, numLevels)
-	// for lvl := 0; lvl < numLevels; lvl++ {
-	// 	labelLevels[lvl] = make([]string, len(g.groups))
-	// 	labelIsNull[lvl] = make([]bool, len(g.groups))
-	// }
-	// // iterate over rows
-	// for rowNumber, key := range g.orderedKeys {
-	// 	for i, col := range colIndex {
-	// 		output, isNull := fn(
-	// 			g.df.values[col].str().slice, g.df.values[col].isNull, g.groups[key])
-	// 		vals[i][rowNumber] = output
-	// 		valuesIsNull[i][rowNumber] = isNull
-	// 	}
-	// 	splitKey := splitLabelIntoLevels(key, true)
-	// 	for j := range splitKey {
-	// 		labelLevels[j][rowNumber] = splitKey[j]
-	// 		labelIsNull[j][rowNumber] = false
-	// 	}
-	// }
-
-	// // convert intermediate containers to valueContainers
-	// retLabels := make([]*valueContainer, len(labelLevels))
-	// retValues := make([]*valueContainer, len(colIndex))
-	// for j := range retLabels {
-	// 	retLabels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: g.levelNames[j]}
-	// }
-	// for k := range retValues {
-	// 	retValues[k] = &valueContainer{slice: vals[k], isNull: valuesIsNull[k], name: names[k]}
-	// }
-	// return &DataFrame{
-	// 	values:        retValues,
-	// 	labels:        retLabels,
-	// 	name:          name,
-	// 	colLevelNames: g.df.colLevelNames,
-	// }
 }
 
-func (g *GroupedDataFrame) mathFunc(
-	name string, cols []string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *DataFrame {
-	if len(g.rowIndices) == 0 {
-		return dataFrameWithError(errors.New("GroupBy(): no groups"))
-	}
-	groupedVals := makeFloatMatrix(len(cols), len(g.rowIndices))
-	groupedNulls := makeBoolMatrix(len(cols), len(g.rowIndices))
-
-	for k := range cols {
-		referenceVals := g.df.values[k].float().slice
-		// iterate over rowsIndices
-		for i, rowIndex := range g.rowIndices {
-			output, isNull := fn(referenceVals, g.df.values[k].isNull, rowIndex)
-			groupedVals[k][i] = output
-			groupedNulls[k][i] = isNull
+func (g *GroupedDataFrame) stringFunc(
+	name string, cols []string, fn func(val []string, isNull []bool, index []int) (string, bool)) *DataFrame {
+	if len(cols) == 0 {
+		cols = make([]string, len(g.df.values))
+		for k := range cols {
+			cols[k] = g.df.values[k].name
 		}
 	}
-	retVals := copyFloatsIntoValueContainers(groupedVals, groupedNulls, cols)
-
-	return &DataFrame{
-		values: retVals,
-		labels: g.labels,
+	retVals := make([]*valueContainer, len(cols))
+	for k := range retVals {
+		retVals[k] = groupedStringFunc(
+			g.df.values[k].str().slice, g.df.values[k].isNull, cols[k], false, g.rowIndices, fn)
 	}
+	return &DataFrame{
+		values:        retVals,
+		labels:        g.labels,
+		colLevelNames: []string{"*0"},
+		name:          name,
+	}
+}
 
-	// if len(g.groups) == 0 {
-	// 	return dataFrameWithError(errors.New("no groups"))
-	// }
-	// numLevels := len(g.levelNames)
-
-	// // isolate columns to return
-	// colIndex := make([]int, len(cols))
-	// if len(cols) == 0 {
-	// 	colIndex = makeIntRange(0, len(g.df.values))
-	// } else {
-	// 	for i, col := range cols {
-	// 		idx, err := findColWithName(col, g.df.values)
-	// 		if err != nil {
-	// 			return dataFrameWithError(fmt.Errorf("GroupBy(): %v", err))
-	// 		}
-	// 		colIndex[i] = idx
-	// 	}
-	// }
-
-	// // prepare [][]float64 container to receive row-level values
-	// vals := make([][]float64, len(colIndex))
-	// valuesIsNull := make([][]bool, len(colIndex))
-	// names := make([]string, len(colIndex))
-	// for col := range colIndex {
-	// 	vals[col] = make([]float64, len(g.groups))
-	// 	valuesIsNull[col] = make([]bool, len(g.groups))
-	// 	names[col] = g.df.values[col].name
-	// }
-
-	// // prepare [][]string container to receive row-level labels
-	// labelLevels := make([][]string, numLevels)
-	// labelIsNull := make([][]bool, numLevels)
-	// for lvl := 0; lvl < numLevels; lvl++ {
-	// 	labelLevels[lvl] = make([]string, len(g.groups))
-	// 	labelIsNull[lvl] = make([]bool, len(g.groups))
-	// }
-	// // iterate over rows
-	// for rowNumber, key := range g.orderedKeys {
-	// 	for i, col := range colIndex {
-	// 		output, isNull := fn(
-	// 			g.df.values[col].float().slice, g.df.values[col].isNull, g.groups[key])
-	// 		vals[i][rowNumber] = output
-	// 		valuesIsNull[i][rowNumber] = isNull
-	// 	}
-	// 	splitKey := splitLabelIntoLevels(key, true)
-	// 	for j := range splitKey {
-	// 		labelLevels[j][rowNumber] = splitKey[j]
-	// 		labelIsNull[j][rowNumber] = false
-	// 	}
-	// }
-
-	// // convert intermediate containers to valueContainers
-	// retLabels := make([]*valueContainer, len(labelLevels))
-	// retValues := make([]*valueContainer, len(colIndex))
-	// for j := range retLabels {
-	// 	retLabels[j] = &valueContainer{slice: labelLevels[j], isNull: labelIsNull[j], name: g.levelNames[j]}
-	// }
-	// for k := range retValues {
-	// 	retValues[k] = &valueContainer{slice: vals[k], isNull: valuesIsNull[k], name: names[k]}
-	// }
-	// return &DataFrame{
-	// 	values:        retValues,
-	// 	labels:        retLabels,
-	// 	name:          name,
-	// 	colLevelNames: g.df.colLevelNames,
-	// }
+func (g *GroupedDataFrame) dateTimeFunc(
+	name string, cols []string, fn func(val []time.Time, isNull []bool, index []int) (time.Time, bool)) *DataFrame {
+	if len(cols) == 0 {
+		cols = make([]string, len(g.df.values))
+		for k := range cols {
+			cols[k] = g.df.values[k].name
+		}
+	}
+	retVals := make([]*valueContainer, len(cols))
+	for k := range retVals {
+		retVals[k] = groupedDateTimeFunc(
+			g.df.values[k].dateTime().slice, g.df.values[k].isNull, cols[k], false, g.rowIndices, fn)
+	}
+	return &DataFrame{
+		values:        retVals,
+		labels:        g.labels,
+		colLevelNames: []string{"*0"},
+		name:          name,
+	}
 }
 
 // Sum stub
 func (g *GroupedDataFrame) Sum(colNames ...string) *DataFrame {
-	return g.mathFunc("sum", colNames, sum)
+	return g.floatFunc("sum", colNames, sum)
 }
 
 // Mean stub
 func (g *GroupedDataFrame) Mean(colNames ...string) *DataFrame {
-	return g.mathFunc("mean", colNames, mean)
+	return g.floatFunc("mean", colNames, mean)
 }
 
 // Median stub
 func (g *GroupedDataFrame) Median(colNames ...string) *DataFrame {
-	return g.mathFunc("median", colNames, median)
+	return g.floatFunc("median", colNames, median)
 }
 
 // Std stub
 func (g *GroupedDataFrame) Std(colNames ...string) *DataFrame {
-	return g.mathFunc("std", colNames, std)
+	return g.floatFunc("std", colNames, std)
 }
 
 // Count stub
 func (g *GroupedDataFrame) Count(colNames ...string) *DataFrame {
-	return g.mathFunc("count", colNames, count)
+	return g.floatFunc("count", colNames, count)
 }
 
 // Min stub
 func (g *GroupedDataFrame) Min(colNames ...string) *DataFrame {
-	return g.mathFunc("min", colNames, min)
+	return g.floatFunc("min", colNames, min)
 }
 
 // Max stub
 func (g *GroupedDataFrame) Max(colNames ...string) *DataFrame {
-	return g.mathFunc("max", colNames, max)
+	return g.floatFunc("max", colNames, max)
 }
 
 // First stub
@@ -545,24 +416,35 @@ func (g *GroupedDataFrame) Last(colNames ...string) *DataFrame {
 	return g.stringFunc("last", colNames, last)
 }
 
+// Earliest stub
+func (g *GroupedDataFrame) Earliest(colNames ...string) *DataFrame {
+	return g.dateTimeFunc("earliest", colNames, earliest)
+}
+
+// Latest stub
+func (g *GroupedDataFrame) Latest(colNames ...string) *DataFrame {
+	return g.dateTimeFunc("last", colNames, latest)
+}
+
 // Align stub
 func (g *GroupedSeries) Align() *GroupedSeries {
 	g.aligned = true
 	return g
 }
 
-// // Align isolates the column matching `colName` and aligns subsequent group aggregations with the original DataFrame labels.
-// func (g *GroupedDataFrame) Align(colName string) *GroupedSeries {
-// 	_, err := findColWithName(colName, g.df.values)
-// 	if err != nil {
-// 		return &GroupedSeries{
-// 			err: err,
-// 		}
-// 	}
-// 	return &GroupedSeries{
-// 		groups:      g.groups,
-
-// 		series:      g.df.Col(colName),
-// 		aligned:     true,
-// 	}
-// }
+// Align isolates the column matching `colName` and aligns subsequent group aggregations with the original DataFrame labels.
+func (g *GroupedDataFrame) Align(colName string) *GroupedSeries {
+	_, err := findColWithName(colName, g.df.values)
+	if err != nil {
+		return &GroupedSeries{
+			err: err,
+		}
+	}
+	return &GroupedSeries{
+		orderedKeys: g.orderedKeys,
+		rowIndices:  g.rowIndices,
+		labels:      g.labels,
+		series:      g.df.Col(colName),
+		aligned:     true,
+	}
+}
