@@ -60,6 +60,19 @@ func (df *DataFrame) Copy() *DataFrame {
 	}
 }
 
+// Cast casts the underlying DataFrame column slice values to either []float64, []string, or []time.Time.
+// Use cast to improve performance when calling multiple operations on values.
+func (df *DataFrame) Cast(colAsType map[string]DType) error {
+	for name, dtype := range colAsType {
+		index, err := findContainerWithName(name, df.values)
+		if err != nil {
+			return fmt.Errorf("Cast(): %v", err)
+		}
+		df.values[index].cast(dtype)
+	}
+	return nil
+}
+
 // ReadCSV stub
 func ReadCSV(csv [][]string, config *ReadConfig) *DataFrame {
 	if len(csv) == 0 {

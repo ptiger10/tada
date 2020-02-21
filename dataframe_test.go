@@ -64,6 +64,78 @@ func TestNewDataFrame(t *testing.T) {
 	}
 }
 
+func TestDataFrame_Cast(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		colAsType map[string]DType
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *DataFrame
+		wantErr bool
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []int{1}, isNull: []bool{false}, name: "foo"},
+				{slice: []int{1}, isNull: []bool{false}, name: "bar"}},
+			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "qux"},
+			args{map[string]DType{"foo": Float, "bar": String}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+					{slice: []string{"1"}, isNull: []bool{false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "qux"},
+			false,
+		},
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []int{1}, isNull: []bool{false}, name: "foo"},
+				{slice: []int{1}, isNull: []bool{false}, name: "bar"}},
+			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "qux"},
+			args{map[string]DType{"corge": Float}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []int{1}, isNull: []bool{false}, name: "foo"},
+					{slice: []int{1}, isNull: []bool{false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "qux"},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if err := df.Cast(tt.args.colAsType); (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.Cast() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(df, tt.want) {
+				t.Errorf("DataFrame.Cast() -> %v, want %v", df, tt.want)
+			}
+		})
+	}
+}
+
 func TestDataFrame_ToSeries(t *testing.T) {
 	type fields struct {
 		labels []*valueContainer

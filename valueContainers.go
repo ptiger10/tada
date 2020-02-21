@@ -91,28 +91,26 @@ func convertBoolToFloat(val bool) float64 {
 	return 0
 }
 
-// TO DO
-// func (vc *valueContainer) cast(dtype DType) interface{} {
-// 	switch dtype {
-// 	case Float:
-// 		_, ok := vc.slice.([]float64)
-// 		if ok {
-// 			return vc.slice
-// 		} else {
-
-// 		}
-// 	case String:
-// 		_, ok := vc.slice.([]string)
-// 		if ok {
-// 			return vc.slice
-// 		}
-// 	case DateTime:
-// 		_, ok := vc.slice.([]time.Time)
-// 		if ok {
-// 			return vc.slice
-// 		}
-// 	}
-// }
+func (vc *valueContainer) cast(dtype DType) {
+	switch dtype {
+	case Float:
+		_, ok := vc.slice.([]float64)
+		if !ok {
+			vc.slice = vc.float().slice
+		}
+	case String:
+		_, ok := vc.slice.([]string)
+		if !ok {
+			vc.slice = vc.str().slice
+		}
+	case DateTime:
+		_, ok := vc.slice.([]time.Time)
+		if !ok {
+			vc.slice = vc.dateTime().slice
+		}
+	}
+	return
+}
 
 func (vc *valueContainer) float() floatValueContainer {
 	newVals := make([]float64, reflect.ValueOf(vc.slice).Len())

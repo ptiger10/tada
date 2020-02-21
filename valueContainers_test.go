@@ -505,3 +505,47 @@ func Test_valueContainer_dateTime(t *testing.T) {
 		})
 	}
 }
+
+func Test_valueContainer_cast(t *testing.T) {
+	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	type args struct {
+		dtype DType
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *valueContainer
+	}{
+		{"float64 to float64", fields{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			args{Float}, &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+		{"int to float64", fields{slice: []int{1}, isNull: []bool{false}, name: "foo"},
+			args{Float}, &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+		{"string to string", fields{slice: []string{"foo"}, isNull: []bool{false}, name: "foo"},
+			args{String}, &valueContainer{slice: []string{"foo"}, isNull: []bool{false}, name: "foo"}},
+		{"int to string", fields{slice: []int{1}, isNull: []bool{false}, name: "foo"},
+			args{String}, &valueContainer{slice: []string{"1"}, isNull: []bool{false}, name: "foo"}},
+		{"datetime to datetime", fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},
+			args{DateTime}, &valueContainer{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"}},
+		{"int to datetime", fields{slice: []int{1}, isNull: []bool{false}, name: "foo"},
+			args{DateTime}, &valueContainer{slice: []time.Time{time.Time{}}, isNull: []bool{true}, name: "foo"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			vc.cast(tt.args.dtype)
+			if !reflect.DeepEqual(vc, tt.want) {
+				t.Errorf("vc.cast() -> %v, want %v", vc, tt.want)
+			}
+		})
+	}
+}

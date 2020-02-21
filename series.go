@@ -92,33 +92,11 @@ func (s *Series) numLevels() int {
 	return len(s.labels)
 }
 
-// Elements returns the underlying value and isNull for each row.
-// If any `labelLevel` is provided, returns the Elements of the columns of labels at that level.
-func (s *Series) Elements(labelLevel ...int) []Element {
-	ret := make([]Element, s.Len())
-	if len(labelLevel) == 0 {
-		v := reflect.ValueOf(s.values.slice)
-		for i := 0; i < s.Len(); i++ {
-			ret[i] = Element{
-				Val:    v.Index(i).Interface(),
-				IsNull: s.values.isNull[i],
-			}
-		}
-		// handle optional labelLevel
-	} else if len(labelLevel) > 0 {
-		lvl := labelLevel[0]
-		if lvl >= len(s.labels) {
-			return []Element{}
-		}
-		v := reflect.ValueOf(s.labels[lvl].slice)
-		for i := range ret {
-			ret[i] = Element{
-				Val:    v.Index(i).Interface(),
-				IsNull: s.labels[lvl].isNull[i],
-			}
-		}
-	}
-	return ret
+// Cast casts the underlying Series slice values to either []float64, []string, or []time.Time.
+// Use cast to improve performance when calling multiple operations on values.
+func (s *Series) Cast(dtype DType) {
+	s.values.cast(dtype)
+	return
 }
 
 // Subset returns only the rows specified at the index positions, in the order specified. Returns a new Series.

@@ -2,10 +2,9 @@ package tada
 
 // func TestUsage(t *testing.T) {
 // 	df := NewDataFrame(
-// 		[]interface{}{[]float64{1, 2, 3}, []float64{4, 5, 6}}, []string{"foo", "foo", "baz"}).
-// 		SetCols([]string{"qux", "quux"})
-// 	g := df.GroupBy().Sum()
-// 	fmt.Print(g.values[1])
+// 		[]interface{}{[]float64{1, 2, 3}, []string{"foo", "foo", "baz"}}).
+// 		SetColNames([]string{"qux", "quux"})
+// 	fmt.Println(df.Sum())
 // }
 
 // func TestMockCSV(t *testing.T) {

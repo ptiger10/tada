@@ -85,6 +85,44 @@ func TestSeries_Copy(t *testing.T) {
 	}
 }
 
+func TestSeries_Cast(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		dtype DType
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"pass", fields{
+			values: &valueContainer{slice: []int{1}, name: "foo", isNull: []bool{false}},
+			labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}},
+			args{Float},
+			&Series{
+				values: &valueContainer{slice: []float64{1}, name: "foo", isNull: []bool{false}},
+				labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			s.Cast(tt.args.dtype)
+			if !reflect.DeepEqual(s, tt.want) {
+				t.Errorf("Series.Cast() -> %v, want %v", s, tt.want)
+			}
+		})
+	}
+}
+
 func TestSeries_ToDataFrame(t *testing.T) {
 	type fields struct {
 		values *valueContainer
@@ -786,51 +824,6 @@ func TestSeries_Append(t *testing.T) {
 			}
 			if got := s.Append(tt.args.other); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.Append() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestSeries_Elements(t *testing.T) {
-	type fields struct {
-		values *valueContainer
-		labels []*valueContainer
-		err    error
-	}
-	type args struct {
-		level []int
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   []Element
-	}{
-		{"values",
-			fields{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
-				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}}}},
-			args{nil}, []Element{{Val: float64(1), IsNull: false}}},
-		{"label level",
-			fields{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
-				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}}}},
-			args{[]int{0}}, []Element{{Val: "foo", IsNull: false}}},
-		{"fail: label level not in index",
-			fields{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
-				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}}}},
-			args{[]int{1}}, []Element{}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values: tt.fields.values,
-				labels: tt.fields.labels,
-				err:    tt.fields.err,
-			}
-			if got := s.Elements(tt.args.level...); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.Elements() = %v, want %v", got, tt.want)
 			}
 		})
 	}
