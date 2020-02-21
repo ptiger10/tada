@@ -243,10 +243,9 @@ func TestReadCSV(t *testing.T) {
 		config *ReadConfig
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    *DataFrame
-		wantErr bool
+		name string
+		args args
+		want *DataFrame
 	}{
 		{"1 header row, 2 columns, no index",
 			args{
@@ -256,7 +255,7 @@ func TestReadCSV(t *testing.T) {
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}}, false},
+				colLevelNames: []string{"*0"}}},
 		{"1 header row, 2 columns, no index, nil config",
 			args{
 				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
@@ -265,7 +264,7 @@ func TestReadCSV(t *testing.T) {
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}}, false},
+				colLevelNames: []string{"*0"}}},
 		{"column as major dimension",
 			args{
 				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
@@ -274,23 +273,19 @@ func TestReadCSV(t *testing.T) {
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}}, false},
+				colLevelNames: []string{"*0"}}},
 		{"fail - no rows",
 			args{csv: nil,
 				config: nil},
-			nil, true},
+			&DataFrame{err: fmt.Errorf("ReadCSV(): csv must have at least one row")}},
 		{"fail - no columns",
 			args{csv: [][]string{{}},
 				config: nil},
-			nil, true},
+			&DataFrame{err: fmt.Errorf("ReadCSV(): csv must have at least one column")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ReadCSV(tt.args.csv, tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ReadCSV() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got := ReadCSV(tt.args.csv, tt.args.config)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ReadCSV() = %v, want %v", got, tt.want)
 			}
@@ -2906,10 +2901,9 @@ func TestReadInterface(t *testing.T) {
 		config *ReadConfig
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    *DataFrame
-		wantErr bool
+		name string
+		args args
+		want *DataFrame
 	}{
 		{"1 header row, 2 columns, no index",
 			args{
@@ -2919,7 +2913,7 @@ func TestReadInterface(t *testing.T) {
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}}, false},
+				colLevelNames: []string{"*0"}}},
 		{"1 header row, 2 columns, no index, nil config",
 			args{
 				input:  [][]interface{}{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
@@ -2928,7 +2922,7 @@ func TestReadInterface(t *testing.T) {
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}}, false},
+				colLevelNames: []string{"*0"}}},
 		{"column as major dimension",
 			args{
 				input:  [][]interface{}{{"foo", "1", "2"}, {"bar", "5", "6"}},
@@ -2937,23 +2931,19 @@ func TestReadInterface(t *testing.T) {
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}}, false},
+				colLevelNames: []string{"*0"}}},
 		{"fail - no rows",
 			args{input: nil,
 				config: nil},
-			nil, true},
+			&DataFrame{err: fmt.Errorf("ReadInterface(): `input` must have at least one row")}},
 		{"fail - no columns",
 			args{input: [][]interface{}{{}},
 				config: nil},
-			nil, true},
+			&DataFrame{err: fmt.Errorf("ReadInterface(): `input` must have at least one column")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ReadInterface(tt.args.input, tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ReadInterface() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got := ReadInterface(tt.args.input, tt.args.config)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ReadInterface() = %v, want %v", got, tt.want)
 			}

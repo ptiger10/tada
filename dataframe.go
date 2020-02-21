@@ -61,19 +61,19 @@ func (df *DataFrame) Copy() *DataFrame {
 }
 
 // ReadCSV stub
-func ReadCSV(csv [][]string, config *ReadConfig) (*DataFrame, error) {
+func ReadCSV(csv [][]string, config *ReadConfig) *DataFrame {
 	if len(csv) == 0 {
-		return nil, fmt.Errorf("ReadCSV(): csv must have at least one row")
+		return dataFrameWithError(fmt.Errorf("ReadCSV(): csv must have at least one row"))
 	}
 	if len(csv[0]) == 0 {
-		return nil, fmt.Errorf("ReadCSV(): csv must have at least one column")
+		return dataFrameWithError(fmt.Errorf("ReadCSV(): csv must have at least one column"))
 	}
 	config = defaultConfigIfNil(config)
 
 	if config.MajorDimIsCols {
-		return readCSVByCols(csv, config), nil
+		return readCSVByCols(csv, config)
 	}
-	return readCSVByRows(csv, config), nil
+	return readCSVByRows(csv, config)
 }
 
 // ImportCSV stub
@@ -99,14 +99,14 @@ func ImportCSV(path string, config *ReadConfig) (*DataFrame, error) {
 }
 
 // ReadInterface stub
-func ReadInterface(input [][]interface{}, config *ReadConfig) (*DataFrame, error) {
+func ReadInterface(input [][]interface{}, config *ReadConfig) *DataFrame {
 	config = defaultConfigIfNil(config)
 
 	if len(input) == 0 {
-		return nil, fmt.Errorf("ReadInterface(): `input` must have at least one row")
+		return dataFrameWithError(fmt.Errorf("ReadInterface(): `input` must have at least one row"))
 	}
 	if len(input[0]) == 0 {
-		return nil, fmt.Errorf("ReadInterface(): `input` must at least one column")
+		return dataFrameWithError(fmt.Errorf("ReadInterface(): `input` must have at least one column"))
 	}
 	// convert [][]interface to [][]string
 	str := make([][]string, len(input))
@@ -119,9 +119,9 @@ func ReadInterface(input [][]interface{}, config *ReadConfig) (*DataFrame, error
 		}
 	}
 	if config.MajorDimIsCols {
-		return readCSVByCols(str, config), nil
+		return readCSVByCols(str, config)
 	}
-	return readCSVByRows(str, config), nil
+	return readCSVByRows(str, config)
 }
 
 // ReadMatrix stub
