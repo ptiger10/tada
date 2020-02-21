@@ -1603,13 +1603,13 @@ func Test_findColWithName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := findColWithName(tt.args.name, tt.args.cols)
+			got, err := findContainerWithName(tt.args.name, tt.args.cols)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("findColWithName() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("findContainerWithName() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("findColWithName() = %v, want %v", got, tt.want)
+				t.Errorf("findContainerWithName() = %v, want %v", got, tt.want)
 			}
 		})
 	}

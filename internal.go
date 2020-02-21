@@ -126,21 +126,21 @@ func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels
 	return leftKeys, rightKeys
 }
 
-// findColWithName returns the position of the first level within `cols` with a name matching `name`, or an error if no level matches
-func findColWithName(name string, cols []*valueContainer) (int, error) {
+// findContainerWithName returns the position of the first level within `cols` with a name matching `name`, or an error if no level matches
+func findContainerWithName(name string, cols []*valueContainer) (int, error) {
 	for j := range cols {
 		if strings.ToLower(cols[j].name) == strings.ToLower(name) {
 			return j, nil
 		}
 	}
-	return 0, fmt.Errorf("name (%v) does not match any existing column", name)
+	return 0, fmt.Errorf("`name` (%v) not found", name)
 }
 
 func withColumn(cols []*valueContainer, name string, input interface{}, requiredLen int) ([]*valueContainer, error) {
 	switch reflect.TypeOf(input).Kind() {
 	// `input` is string: rename label level
 	case reflect.String:
-		lvl, err := findColWithName(name, cols)
+		lvl, err := findContainerWithName(name, cols)
 		if err != nil {
 			return nil, fmt.Errorf("cannot rename column: %v", err)
 		}
@@ -156,7 +156,7 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 				name, l, requiredLen)
 		}
 		// `input` is supported slice
-		lvl, err := findColWithName(name, cols)
+		lvl, err := findContainerWithName(name, cols)
 		if err != nil {
 			// `name` does not already exist: append new label level
 			cols = append(cols, &valueContainer{slice: input, name: name, isNull: isNull})
@@ -177,7 +177,7 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 				name, v.Len(), requiredLen)
 		}
 		// `name` does not already exist: append new level
-		lvl, err := findColWithName(name, cols)
+		lvl, err := findContainerWithName(name, cols)
 		if err != nil {
 			cols = append(cols, v.values)
 			cols[len(cols)-1].name = name
@@ -1061,7 +1061,7 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 func convertColNamesToIndexPositions(names []string, columns []*valueContainer) ([]int, error) {
 	ret := make([]int, len(names))
 	for i, name := range names {
-		lvl, err := findColWithName(name, columns)
+		lvl, err := findContainerWithName(name, columns)
 		if err != nil {
 			return nil, err
 		}

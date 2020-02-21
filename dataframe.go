@@ -381,7 +381,7 @@ func (df *DataFrame) ListLevels() []string {
 // HasCols returns an error if the DataFrame does not contain all of the `colNames` supplied.
 func (df *DataFrame) HasCols(colNames ...string) error {
 	for _, name := range colNames {
-		_, err := findColWithName(name, df.values)
+		_, err := findContainerWithName(name, df.values)
 		if err != nil {
 			return fmt.Errorf("HasCols(): %v", err)
 		}
@@ -464,7 +464,7 @@ func (df *DataFrameMutator) SubsetCols(index []int) {
 
 // Col finds the first column with matching `name` and returns as a Series.
 func (df *DataFrame) Col(name string) *Series {
-	index, err := findColWithName(name, df.values)
+	index, err := findContainerWithName(name, df.values)
 	if err != nil {
 		return seriesWithError(fmt.Errorf("Col(): %v", err))
 	}
@@ -478,7 +478,7 @@ func (df *DataFrame) Col(name string) *Series {
 func (df *DataFrame) Cols(names ...string) *DataFrame {
 	vals := make([]*valueContainer, len(names))
 	for i, name := range names {
-		index, err := findColWithName(name, df.values)
+		index, err := findContainerWithName(name, df.values)
 		if err != nil {
 			return dataFrameWithError(fmt.Errorf("Cols(): %v", err))
 		}
@@ -566,7 +566,7 @@ func (df *DataFrameMutator) DropNull(subset ...string) {
 		index = makeIntRange(0, len(df.dataframe.values))
 	} else {
 		for _, name := range subset {
-			i, err := findColWithName(name, df.dataframe.values)
+			i, err := findContainerWithName(name, df.dataframe.values)
 			if err != nil {
 				df.dataframe.resetWithError(fmt.Errorf("DropNull(): %v", err))
 				return
@@ -593,7 +593,7 @@ func (df *DataFrame) Null(subset ...string) *DataFrame {
 		index = makeIntRange(0, len(df.values))
 	} else {
 		for _, name := range subset {
-			i, err := findColWithName(name, df.values)
+			i, err := findContainerWithName(name, df.values)
 			if err != nil {
 				return dataFrameWithError(fmt.Errorf("Null(): %v", err))
 			}
@@ -701,7 +701,7 @@ func (df *DataFrame) DropCol(name string) *DataFrame {
 
 // DropCol drops the first column matching `name`
 func (df *DataFrameMutator) DropCol(name string) {
-	toExclude, err := findColWithName(name, df.dataframe.values)
+	toExclude, err := findContainerWithName(name, df.dataframe.values)
 	if err != nil {
 		df.dataframe.resetWithError(fmt.Errorf("DropCol(): %v", err))
 		return
@@ -790,7 +790,7 @@ func (df *DataFrameMutator) SetLabels(colNames ...string) {
 		return
 	}
 	for i := 0; i < len(colNames); i++ {
-		index, err := findColWithName(colNames[i], df.dataframe.values)
+		index, err := findContainerWithName(colNames[i], df.dataframe.values)
 		if err != nil {
 			df.dataframe.resetWithError(fmt.Errorf("SetLabels(): %v", err))
 			return
@@ -967,7 +967,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 	// -- isolate container to promote
 
 	mergedLabelsAndCols := append(df.labels, df.values...)
-	index, err := findColWithName(name, mergedLabelsAndCols)
+	index, err := findContainerWithName(name, mergedLabelsAndCols)
 	if err != nil {
 		return dataFrameWithError(fmt.Errorf("PromoteToColLevel(): %v", err))
 	}
@@ -1125,7 +1125,7 @@ func (df *DataFrame) Filter(filters ...FilterFn) []int {
 		// if ContainerName is not empty, find name in either columns or labels
 		var data *valueContainer
 		mergedLabelsAndCols := append(df.labels, df.values...)
-		index, err := findColWithName(filter.ContainerName, mergedLabelsAndCols)
+		index, err := findContainerWithName(filter.ContainerName, mergedLabelsAndCols)
 		if err != nil {
 			return []int{-999}
 		}
@@ -1177,7 +1177,7 @@ func (df *DataFrameMutator) Apply(lambda ApplyFn) {
 	} else {
 		// if ColName is not empty, find name in either columns or labels
 		mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
-		index, err := findColWithName(lambda.ContainerName, mergedLabelsAndCols)
+		index, err := findContainerWithName(lambda.ContainerName, mergedLabelsAndCols)
 		if err != nil {
 			df.dataframe.resetWithError((fmt.Errorf("Apply(): %v", err)))
 		}
@@ -1215,7 +1215,7 @@ func (df *DataFrameMutator) ApplyFormat(lambda ApplyFormatFn) {
 	} else {
 		// if ColName is not empty, find name in either columns or labels
 		mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
-		index, err := findColWithName(lambda.ContainerName, mergedLabelsAndCols)
+		index, err := findContainerWithName(lambda.ContainerName, mergedLabelsAndCols)
 		if err != nil {
 			df.dataframe.resetWithError((fmt.Errorf("ApplyFormat(): %v", err)))
 		}
@@ -1314,7 +1314,7 @@ func (df *DataFrameMutator) Sort(by ...Sorter) {
 		}
 
 		mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
-		colPosition, err := findColWithName(by[i].ContainerName, mergedLabelsAndCols)
+		colPosition, err := findContainerWithName(by[i].ContainerName, mergedLabelsAndCols)
 		if err != nil {
 			df.dataframe.resetWithError((fmt.Errorf("Sort(): %v", err)))
 		}
@@ -1364,15 +1364,15 @@ func (df *DataFrame) groupby(index []int) *GroupedDataFrame {
 func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFrame {
 
 	mergedLabelsAndCols := append(df.labels, df.values...)
-	labelIndex, err := findColWithName(labels, mergedLabelsAndCols)
+	labelIndex, err := findContainerWithName(labels, mergedLabelsAndCols)
 	if err != nil {
 		return dataFrameWithError(fmt.Errorf("PivotTable(): `labels`: %v", err))
 	}
-	colIndex, err := findColWithName(columns, mergedLabelsAndCols)
+	colIndex, err := findContainerWithName(columns, mergedLabelsAndCols)
 	if err != nil {
 		return dataFrameWithError(fmt.Errorf("PivotTable(): `columns`: %v", err))
 	}
-	_, err = findColWithName(values, mergedLabelsAndCols)
+	_, err = findContainerWithName(values, mergedLabelsAndCols)
 	if err != nil {
 		return dataFrameWithError(fmt.Errorf("PivotTable(): `values`: %v", err))
 	}

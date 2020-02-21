@@ -875,7 +875,7 @@ func TestDataFrame_DropNull(t *testing.T) {
 			colLevelNames: []string{"*0"},
 			name:          "baz"},
 			args{[]string{"corge"}},
-			&DataFrame{err: fmt.Errorf("DropNull(): name (corge) does not match any existing column")},
+			&DataFrame{err: fmt.Errorf("DropNull(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -950,7 +950,7 @@ func TestDataFrame_Null(t *testing.T) {
 			name:          "baz"},
 			args{[]string{"corge"}},
 			&DataFrame{
-				err: fmt.Errorf("Null(): name (corge) does not match any existing column")},
+				err: fmt.Errorf("Null(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -963,7 +963,7 @@ func TestDataFrame_Null(t *testing.T) {
 				err:           tt.fields.err,
 			}
 			if got := df.Null(tt.args.subset...); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.Null() = %v, want %v", got.values[0], tt.want.values[0])
+				t.Errorf("DataFrame.Null() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1016,7 +1016,7 @@ func TestDataFrame_SetLabels(t *testing.T) {
 			name:   "baz"},
 			args{[]string{"corge"}},
 			&DataFrame{
-				err: fmt.Errorf("SetLabels(): name (corge) does not match any existing column")},
+				err: fmt.Errorf("SetLabels(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -1452,7 +1452,7 @@ func TestDataFrame_Apply(t *testing.T) {
 			name:   "baz"},
 			args{ApplyFn{ContainerName: "corge", F64: func(float64) float64 { return 0 }}},
 			&DataFrame{
-				err: fmt.Errorf("Apply(): name (corge) does not match any existing column")},
+				err: fmt.Errorf("Apply(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -1543,7 +1543,7 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 			name:   "baz"},
 			args{ApplyFormatFn{ContainerName: "corge", F64: func(float64) string { return "" }}},
 			&DataFrame{
-				err: fmt.Errorf("ApplyFormat(): name (corge) does not match any existing column")},
+				err: fmt.Errorf("ApplyFormat(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -1606,7 +1606,7 @@ func TestDataFrame_Sort(t *testing.T) {
 			name:   "baz"},
 			args{[]Sorter{{ContainerName: "corge"}}},
 			&DataFrame{
-				err: fmt.Errorf("Sort(): name (corge) does not match any existing column")},
+				err: fmt.Errorf("Sort(): `name` (corge) not found")},
 		},
 		{"fail - empty colName", fields{
 			values: []*valueContainer{
@@ -2082,8 +2082,8 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "left",
-				leftOn: []string{"quux"}, rightOn: []string{"foo"}},
-			&DataFrame{err: fmt.Errorf("LookupAdvanced(): `leftOn`: name (quux) does not match any existing column")},
+				leftOn: []string{"corge"}, rightOn: []string{"foo"}},
+			&DataFrame{err: fmt.Errorf("LookupAdvanced(): `leftOn`: `name` (corge) not found")},
 		},
 		{"fail - bad rightOn", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
@@ -2091,11 +2091,11 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 			name:          "qux",
 			colLevelNames: []string{"*0"}},
 			args{
-				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
+				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "baz"}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "left",
-				leftOn: []string{"foo"}, rightOn: []string{"quux"}},
-			&DataFrame{err: fmt.Errorf("LookupAdvanced(): `rightOn`: name (quux) does not match any existing column")},
+				leftOn: []string{"foo"}, rightOn: []string{"corge"}},
+			&DataFrame{err: fmt.Errorf("LookupAdvanced(): `rightOn`: `name` (corge) not found")},
 		},
 		{"fail - unsupported lookup", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
@@ -2218,7 +2218,7 @@ func TestDataFrame_GroupBy(t *testing.T) {
 			}},
 			args{[]string{"corge"}},
 			&GroupedDataFrame{
-				err: fmt.Errorf("GroupBy(): name (corge) does not match any existing column"),
+				err: fmt.Errorf("GroupBy(): `name` (corge) not found"),
 			},
 		},
 	}
@@ -2320,7 +2320,7 @@ func TestDataFrame_PromoteToColLevel(t *testing.T) {
 			colLevelNames: []string{"*0"},
 		}, args{"corge"},
 			&DataFrame{
-				err: fmt.Errorf("PromoteToColLevel(): name (corge) does not match any existing column")},
+				err: fmt.Errorf("PromoteToColLevel(): `name` (corge) not found")},
 		},
 		{"fail - only column", fields{
 			values: []*valueContainer{
@@ -2531,7 +2531,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{labels: "corge", columns: "year", values: "amount", aggFn: "std"},
 			&DataFrame{
-				err: fmt.Errorf("PivotTable(): `labels`: name (corge) does not match any existing column")}},
+				err: fmt.Errorf("PivotTable(): `labels`: `name` (corge) not found")}},
 		{"fail - no matching columns", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -2542,7 +2542,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{labels: "type", columns: "corge", values: "amount", aggFn: "std"},
 			&DataFrame{
-				err: fmt.Errorf("PivotTable(): `columns`: name (corge) does not match any existing column")}},
+				err: fmt.Errorf("PivotTable(): `columns`: `name` (corge) not found")}},
 		{"fail - no matching values", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -2553,7 +2553,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{labels: "type", columns: "year", values: "corge", aggFn: "std"},
 			&DataFrame{
-				err: fmt.Errorf("PivotTable(): `values`: name (corge) does not match any existing column")}},
+				err: fmt.Errorf("PivotTable(): `values`: `name` (corge) not found")}},
 		{"fail - unsupported aggfunc", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -3239,9 +3239,9 @@ func TestDataFrame_Col(t *testing.T) {
 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
-			args{"baz"},
+			args{"corge"},
 			&Series{
-				err: fmt.Errorf("Col(): name (baz) does not match any existing column")},
+				err: fmt.Errorf("Col(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -3293,9 +3293,9 @@ func TestDataFrame_Cols(t *testing.T) {
 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
-			args{[]string{"foo", "baz"}},
+			args{[]string{"foo", "corge"}},
 			&DataFrame{
-				err: fmt.Errorf("Cols(): name (baz) does not match any existing column")},
+				err: fmt.Errorf("Cols(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -3495,7 +3495,7 @@ func TestDataFrame_DropCol(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{"corge"},
 			&DataFrame{
-				err: fmt.Errorf("DropCol(): name (corge) does not match any existing column")},
+				err: fmt.Errorf("DropCol(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {

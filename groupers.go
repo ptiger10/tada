@@ -395,7 +395,7 @@ func (g *GroupedSeries) Align() *GroupedSeries {
 
 // Align isolates the column matching `colName` and aligns subsequent group aggregations with the original DataFrame labels.
 func (g *GroupedDataFrame) Align(colName string) *GroupedSeries {
-	_, err := findColWithName(colName, g.df.values)
+	_, err := findContainerWithName(colName, g.df.values)
 	if err != nil {
 		return &GroupedSeries{
 			err: fmt.Errorf("Align(): %v", err),

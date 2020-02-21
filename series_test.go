@@ -590,7 +590,7 @@ func TestSeries_WithLabels(t *testing.T) {
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
 			args{"qux", "baz"},
-			&Series{err: errors.New("WithLabels(): cannot rename column: name (qux) does not match any existing column")},
+			&Series{err: errors.New("WithLabels(): cannot rename column: `name` (qux) not found")},
 		},
 		{"fail: unsupported slice type",
 			fields{
@@ -782,13 +782,62 @@ func TestSeries_Elements(t *testing.T) {
 	}
 }
 
+func TestSeries_Relabel(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		levelNames []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"pass", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "*0"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "*1"}}},
+			args{[]string{"*0", "*1"}},
+			&Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"},
+					{slice: []int{0}, isNull: []bool{false}, name: "*1"}}},
+		},
+		{"fail", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "*0"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "*1"}}},
+			args{[]string{"*0", "corge"}},
+			&Series{
+				err: errors.New("Relabel(): `name` (corge) not found")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Relabel(tt.args.levelNames); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Relabel() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSeries_SetLevelNames(t *testing.T) {
 	type fields struct {
-		labels        []*valueContainer
-		values        *valueContainer
-		name          string
-		err           error
-		colLevelNames []string
+		labels []*valueContainer
+		values *valueContainer
+		err    error
 	}
 	type args struct {
 		colNames []string
@@ -802,9 +851,7 @@ func TestSeries_SetLevelNames(t *testing.T) {
 		{"pass", fields{
 			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 			labels: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name:          "baz",
-			colLevelNames: []string{"*0"}},
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}}},
 			args{[]string{"bar"}},
 			&Series{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
@@ -1002,7 +1049,7 @@ func TestSeries_Sort(t *testing.T) {
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
 			args{[]Sorter{{ContainerName: "foo", Descending: true}}},
 			&Series{
-				err: errors.New("Sort(): cannot use label level: name (foo) does not match any existing column")}},
+				err: errors.New("Sort(): cannot use label level: `name` (foo) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1699,8 +1746,8 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "left",
-				leftOn: []string{"bar"}, rightOn: []string{"foo"}},
-			&Series{err: errors.New("LookupAdvanced(): name (bar) does not match any existing column")},
+				leftOn: []string{"corge"}, rightOn: []string{"foo"}},
+			&Series{err: errors.New("LookupAdvanced(): `name` (corge) not found")},
 		},
 		{"fail - no matching right key", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1709,8 +1756,8 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "left",
-				leftOn: []string{"foo"}, rightOn: []string{"bar"}},
-			&Series{err: errors.New("LookupAdvanced(): name (bar) does not match any existing column")},
+				leftOn: []string{"foo"}, rightOn: []string{"corge"}},
+			&Series{err: errors.New("LookupAdvanced(): `name` (corge) not found")},
 		},
 		{"fail - unsupported how", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1789,7 +1836,7 @@ func TestSeries_Apply(t *testing.T) {
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
 			args{ApplyFn{ContainerName: "corge", F64: func(float64) float64 { return 1 }}},
 			&Series{
-				err: errors.New("Apply(): name (corge) does not match any existing column")}},
+				err: errors.New("Apply(): `name` (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1850,7 +1897,7 @@ func TestSeries_ApplyFormat(t *testing.T) {
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
 			args{ApplyFormatFn{ContainerName: "corge", F64: func(float64) string { return "foo" }}},
 			&Series{
-				err: errors.New("ApplyFormat(): name (corge) does not match any existing column")}},
+				err: errors.New("ApplyFormat(): `name` (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2330,7 +2377,7 @@ func TestSeries_GroupBy(t *testing.T) {
 			}},
 			args{[]string{"corge"}},
 			&GroupedSeries{
-				err: errors.New("GroupBy(): name (corge) does not match any existing column"),
+				err: errors.New("GroupBy(): `name` (corge) not found"),
 			}},
 	}
 	for _, tt := range tests {

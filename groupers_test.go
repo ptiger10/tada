@@ -2297,16 +2297,16 @@ func TestGroupedDataFrame_Align(t *testing.T) {
 				labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "baz"}},
 				df: &DataFrame{
 					values: []*valueContainer{
-						{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "corge"},
+						{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "quux"},
 						{slice: []float64{5, 6, 7, 8}, isNull: []bool{false, false, false, false}, name: "waldo"},
 					},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "baz"}},
 					colLevelNames: []string{"*0"},
 					name:          "qux"}},
-			args: args{"quux"},
+			args: args{"corge"},
 			want: &GroupedSeries{
-				err: fmt.Errorf("Align(): name (quux) does not match any existing column")}},
+				err: fmt.Errorf("Align(): `name` (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
