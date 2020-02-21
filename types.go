@@ -62,9 +62,9 @@ type dateTimeValueContainer struct {
 
 // Sorter stub
 type Sorter struct {
-	ColName    string
-	Descending bool
-	DType      DType
+	ContainerName string
+	Descending    bool
+	DType         DType
 }
 
 // Element stub
@@ -75,18 +75,18 @@ type Element struct {
 
 // FilterFn stub
 type FilterFn struct {
-	F64      func(val float64) bool
-	String   func(val string) bool
-	DateTime func(val time.Time) bool
-	ColName  string
+	F64           func(val float64) bool
+	String        func(val string) bool
+	DateTime      func(val time.Time) bool
+	ContainerName string
 }
 
 // ApplyFn stub
 type ApplyFn struct {
-	F64      func(val float64) float64
-	String   func(val string) string
-	DateTime func(val time.Time) time.Time
-	ColName  string
+	F64           func(val float64) float64
+	String        func(val string) string
+	DateTime      func(val time.Time) time.Time
+	ContainerName string
 }
 
 // GroupApplyFn stub
@@ -98,9 +98,9 @@ type GroupApplyFn struct {
 
 // ApplyFormatFn stub
 type ApplyFormatFn struct {
-	F64      func(val float64) string
-	DateTime func(val time.Time) string
-	ColName  string
+	F64           func(val float64) string
+	DateTime      func(val time.Time) string
+	ContainerName string
 }
 
 // GroupedSeries stub

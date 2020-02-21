@@ -884,9 +884,34 @@ func (vc *valueContainer) before(comparison time.Time) []int {
 	return index
 }
 
+func (vc *valueContainer) beforeOrEqual(comparison time.Time) []int {
+	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
+		if v.Before(comparison) || v.Equal(comparison) {
+			return true
+		}
+		return false
+	}})
+	return index
+}
+
+func (vc *valueContainer) relabel() {
+	vc.slice = makeIntRange(0, len(vc.isNull))
+	return
+}
+
 func (vc *valueContainer) after(comparison time.Time) []int {
 	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
 		if v.After(comparison) {
+			return true
+		}
+		return false
+	}})
+	return index
+}
+
+func (vc *valueContainer) afterOrEqual(comparison time.Time) []int {
+	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
+		if v.After(comparison) || v.Equal(comparison) {
 			return true
 		}
 		return false

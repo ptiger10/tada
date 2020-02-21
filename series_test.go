@@ -782,6 +782,67 @@ func TestSeries_Elements(t *testing.T) {
 	}
 }
 
+func TestSeries_SetLevelNames(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        *valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		colNames []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"pass", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:          "baz",
+			colLevelNames: []string{"*0"}},
+			args{[]string{"bar"}},
+			&Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"}}},
+		},
+		{"fail - too many", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}}},
+			args{[]string{"bar", "qux"}},
+			&Series{
+				err: errors.New("SetLevelNames(): number of `levelNames` must match number of levels in Series (2 != 1)")},
+		},
+		{"fail - too few", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "*1"}}},
+			args{[]string{"qux"}},
+			&Series{
+				err: errors.New("SetLevelNames(): number of `levelNames` must match number of levels in Series (1 != 2)")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &Series{
+				labels: tt.fields.labels,
+				values: tt.fields.values,
+				err:    tt.fields.err,
+			}
+			if got := df.SetLevelNames(tt.args.colNames); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.SetLevelNames() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSeries_SetName(t *testing.T) {
 	type fields struct {
 		values *valueContainer
@@ -931,7 +992,7 @@ func TestSeries_Sort(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []string{"baz", "foo", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{[]Sorter{Sorter{DType: String}, Sorter{ColName: "*0", Descending: true}}},
+			args{[]Sorter{Sorter{DType: String}, Sorter{ContainerName: "*0", Descending: true}}},
 			&Series{
 				values: &valueContainer{slice: []string{"baz", "baz", "foo"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{2, 0, 1}, isNull: []bool{false, false, false}}}}},
@@ -939,7 +1000,7 @@ func TestSeries_Sort(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []string{"baz", "foo", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{[]Sorter{{ColName: "foo", Descending: true}}},
+			args{[]Sorter{{ContainerName: "foo", Descending: true}}},
 			&Series{
 				err: errors.New("Sort(): cannot use label level: name (foo) does not match any existing column")}},
 	}
@@ -993,7 +1054,7 @@ func TestSeries_Filter(t *testing.T) {
 					}
 					return false
 				}},
-				{ColName: "*0", String: func(val string) bool {
+				{ContainerName: "*0", String: func(val string) bool {
 					if strings.Contains(val, "a") {
 						return true
 					}
@@ -1009,17 +1070,17 @@ func TestSeries_Filter(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{[]FilterFn{{ColName: "*0"}}}, []int{-999}},
+			args{[]FilterFn{{ContainerName: "*0"}}}, []int{-999}},
 		{"fail: no matching col",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{[]FilterFn{{ColName: "corge"}}}, []int{-999}},
+			args{[]FilterFn{{ContainerName: "corge"}}}, []int{-999}},
 		{"fail: failure in multi filter",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{[]FilterFn{{ColName: "*0"}, {ColName: "corge"}}}, []int{-999}},
+			args{[]FilterFn{{ContainerName: "*0"}, {ContainerName: "corge"}}}, []int{-999}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1406,6 +1467,44 @@ func TestSeries_Before(t *testing.T) {
 	}
 }
 
+func TestSeries_BeforeOrEqual(t *testing.T) {
+	sample := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		comparison time.Time
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"beforeOrEqual",
+			fields{
+				values: &valueContainer{slice: []time.Time{sample, sample.AddDate(0, 0, 1), sample.AddDate(0, 0, 2)}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{sample.AddDate(0, 0, 1)},
+			[]int{0, 1},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.BeforeOrEqual(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.BeforeOrEqual() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSeries_After(t *testing.T) {
 	sample := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	type fields struct {
@@ -1439,6 +1538,44 @@ func TestSeries_After(t *testing.T) {
 			}
 			if got := s.After(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.After() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_AfterOrEqual(t *testing.T) {
+	sample := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		comparison time.Time
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"after",
+			fields{
+				values: &valueContainer{slice: []time.Time{sample, sample.AddDate(0, 0, 1), sample.AddDate(0, 0, 2)}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+			args{sample.AddDate(0, 0, 1)},
+			[]int{1, 2},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.AfterOrEqual(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.AfterOrEqual() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1627,7 +1764,7 @@ func TestSeries_Apply(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFn{F64: func(v float64) float64 { return v * 2 }, ColName: "*0"}},
+			args{ApplyFn{F64: func(v float64) float64 { return v * 2 }, ContainerName: "*0"}},
 			&Series{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []float64{0, 2}, isNull: []bool{false, false}}}}},
@@ -1635,7 +1772,7 @@ func TestSeries_Apply(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{true, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFn{F64: func(v float64) float64 { return v * 2 }, ColName: ""}},
+			args{ApplyFn{F64: func(v float64) float64 { return v * 2 }, ContainerName: ""}},
 			&Series{
 				values: &valueContainer{slice: []float64{0, 2}, isNull: []bool{true, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}}},
@@ -1643,14 +1780,14 @@ func TestSeries_Apply(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFn{ColName: "*0"}},
+			args{ApplyFn{ContainerName: "*0"}},
 			&Series{
 				err: errors.New("Apply(): no apply function provided")}},
 		{"fail: no matching col",
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFn{ColName: "corge", F64: func(float64) float64 { return 1 }}},
+			args{ApplyFn{ContainerName: "corge", F64: func(float64) float64 { return 1 }}},
 			&Series{
 				err: errors.New("Apply(): name (corge) does not match any existing column")}},
 	}
@@ -1695,7 +1832,7 @@ func TestSeries_ApplyFormat(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, .25}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"}}},
-			args{ApplyFormatFn{ColName: "foo",
+			args{ApplyFormatFn{ContainerName: "foo",
 				F64: func(v float64) string { return strconv.FormatFloat(v, 'f', 1, 64) }}},
 			&Series{
 				values: &valueContainer{slice: []float64{0, 0.25}, isNull: []bool{false, false}},
@@ -1704,14 +1841,14 @@ func TestSeries_ApplyFormat(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFormatFn{ColName: "*0"}},
+			args{ApplyFormatFn{ContainerName: "*0"}},
 			&Series{
 				err: errors.New("ApplyFormat(): no apply function provided")}},
 		{"fail: no matching col",
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFormatFn{ColName: "corge", F64: func(float64) string { return "foo" }}},
+			args{ApplyFormatFn{ContainerName: "corge", F64: func(float64) string { return "foo" }}},
 			&Series{
 				err: errors.New("ApplyFormat(): name (corge) does not match any existing column")}},
 	}
@@ -2289,7 +2426,7 @@ func TestSeries_Where(t *testing.T) {
 				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{[]FilterFn{
-				{ColName: "qux", F64: func(v float64) bool {
+				{ContainerName: "qux", F64: func(v float64) bool {
 					if v > 1 {
 						return true
 					}

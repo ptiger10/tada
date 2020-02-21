@@ -1111,6 +1111,39 @@ func Test_valueContainer_before(t *testing.T) {
 	}
 }
 
+func Test_valueContainer_beforeOrEqual(t *testing.T) {
+	date := time.Date(2019, 1, 1, 1, 0, 0, 0, time.UTC)
+	type fields struct {
+		slice  interface{}
+		name   string
+		isNull []bool
+	}
+	type args struct {
+		comparison time.Time
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"pass", fields{slice: []time.Time{date, date.AddDate(0, 0, 1), date.AddDate(0, 0, 2)}, isNull: []bool{false, false, false}},
+			args{date.AddDate(0, 0, 1)}, []int{0, 1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				name:   tt.fields.name,
+				isNull: tt.fields.isNull,
+			}
+			if got := vc.beforeOrEqual(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.beforeOrEqual() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func Test_valueContainer_after(t *testing.T) {
 	date := time.Date(2019, 1, 1, 1, 0, 0, 0, time.UTC)
 	type fields struct {
@@ -1139,6 +1172,39 @@ func Test_valueContainer_after(t *testing.T) {
 			}
 			if got := vc.after(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("valueContainer.after() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_afterOrEqual(t *testing.T) {
+	date := time.Date(2019, 1, 1, 1, 0, 0, 0, time.UTC)
+	type fields struct {
+		slice  interface{}
+		name   string
+		isNull []bool
+	}
+	type args struct {
+		comparison time.Time
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"pass", fields{slice: []time.Time{date, date.AddDate(0, 0, 1), date.AddDate(0, 0, 2)}, isNull: []bool{false, false, false}},
+			args{date.AddDate(0, 0, 1)}, []int{1, 2}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				name:   tt.fields.name,
+				isNull: tt.fields.isNull,
+			}
+			if got := vc.afterOrEqual(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.afterOrEqual() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -2591,6 +2657,42 @@ func Test_withinWindow(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := withinWindow(tt.args.root, tt.args.other, tt.args.d); got != tt.want {
 				t.Errorf("withinWindow() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_relabel(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *valueContainer
+	}{
+		{"pass", fields{
+			slice:  []float64{2, 3, 0},
+			isNull: []bool{false, false, true},
+			name:   "foo",
+		}, &valueContainer{
+			slice:  []int{0, 1, 2},
+			isNull: []bool{false, false, true},
+			name:   "foo",
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			vc.relabel()
+			if !reflect.DeepEqual(vc, tt.want) {
+				t.Errorf("relabel() -> %v, want %v", vc, tt.want)
 			}
 		})
 	}

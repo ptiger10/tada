@@ -367,6 +367,38 @@ func (s *Series) SetName(name string) *Series {
 	return s
 }
 
+// Relabel stub
+func (s *Series) Relabel(levelNames []string) *Series {
+	s = s.Copy()
+	s.InPlace().Relabel(levelNames)
+	return s
+}
+
+// Relabel stub
+func (s *SeriesMutator) Relabel(levelNames []string) {
+	for _, name := range levelNames {
+		lvl, err := findColWithName(name, s.series.labels)
+		if err != nil {
+			s.series.resetWithError(fmt.Errorf("Relabel(): %v", err))
+			return
+		}
+		s.series.labels[lvl].relabel()
+	}
+	return
+}
+
+// SetLevelNames sets the names of all the label levels in the Series and returns the entire Series.
+func (s *Series) SetLevelNames(levelNames []string) *Series {
+	if len(levelNames) != len(s.labels) {
+		return seriesWithError(
+			fmt.Errorf("SetLevelNames(): number of `levelNames` must match number of levels in Series (%d != %d)", len(levelNames), len(s.labels)))
+	}
+	for j := range levelNames {
+		s.labels[j].name = levelNames[j]
+	}
+	return s
+}
+
 // Name returns the name of the Series
 func (s *Series) Name() string {
 	return s.values.name
@@ -400,10 +432,10 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 	}
 	for i := len(by) - 1; i >= 0; i-- {
 		// Sorter with empty ColName -> use Series values
-		if by[i].ColName == "" || by[i].ColName == s.series.values.name {
+		if by[i].ContainerName == "" || by[i].ContainerName == s.series.values.name {
 			vals = s.series.values.copy()
 		} else {
-			lvl, err := findColWithName(by[i].ColName, s.series.labels)
+			lvl, err := findColWithName(by[i].ContainerName, s.series.labels)
 			if err != nil {
 				s.series.resetWithError(fmt.Errorf(
 					"Sort(): cannot use label level: %v", err))
@@ -433,9 +465,9 @@ func (s *Series) Filter(filters ...FilterFn) []int {
 	for _, filter := range filters {
 		var data *valueContainer
 		// if no column name is specified in a filter, use the series values
-		if filter.ColName == "" || filter.ColName == s.values.name {
+		if filter.ContainerName == "" || filter.ContainerName == s.values.name {
 			data = s.values
-		} else if lvl, err := findColWithName(filter.ColName, s.labels); err != nil {
+		} else if lvl, err := findColWithName(filter.ContainerName, s.labels); err != nil {
 			return []int{-999}
 		} else {
 			data = s.labels[lvl]
@@ -522,9 +554,21 @@ func (s *Series) Before(comparison time.Time) []int {
 	return s.values.before(comparison)
 }
 
+// BeforeOrEqual coerces Series values to time.Time and returns
+// each row position with a non-null value before or equal to `comparison`.
+func (s *Series) BeforeOrEqual(comparison time.Time) []int {
+	return s.values.beforeOrEqual(comparison)
+}
+
 // After coerces Series values to time.Time and returns each row position with a non-null value after `comparison`.
 func (s *Series) After(comparison time.Time) []int {
 	return s.values.after(comparison)
+}
+
+// AfterOrEqual coerces Series values to time.Time and returns
+// each row position with a non-null value after or equal to `comparison`.
+func (s *Series) AfterOrEqual(comparison time.Time) []int {
+	return s.values.afterOrEqual(comparison)
 }
 
 // -- APPLY
@@ -547,9 +591,9 @@ func (s *SeriesMutator) Apply(lambda ApplyFn) {
 	}
 	var data *valueContainer
 	// if colName is not specified, use the main values
-	if lambda.ColName == "" || lambda.ColName == s.series.values.name {
+	if lambda.ContainerName == "" || lambda.ContainerName == s.series.values.name {
 		data = s.series.values
-	} else if lvl, err := findColWithName(lambda.ColName, s.series.labels); err == nil {
+	} else if lvl, err := findColWithName(lambda.ContainerName, s.series.labels); err == nil {
 		data = s.series.labels[lvl]
 	} else {
 		s.series.resetWithError(fmt.Errorf("Apply(): %v", err))
@@ -577,9 +621,9 @@ func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
 	}
 	var data *valueContainer
 	// if colName is not specified, use the main values
-	if lambda.ColName == "" || lambda.ColName == s.series.values.name {
+	if lambda.ContainerName == "" || lambda.ContainerName == s.series.values.name {
 		data = s.series.values
-	} else if lvl, err := findColWithName(lambda.ColName, s.series.labels); err == nil {
+	} else if lvl, err := findColWithName(lambda.ContainerName, s.series.labels); err == nil {
 		data = s.series.labels[lvl]
 	} else {
 		s.series.resetWithError(fmt.Errorf("ApplyFormat(): %v", err))

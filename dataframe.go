@@ -771,7 +771,8 @@ func (df *DataFrameMutator) Append(other *DataFrame) {
 	return
 }
 
-// SetLabels removes the row at the specified index.
+// SetLabels appends the column(s) supplied as `colNames` as label levels and drops the column(s).
+// The number of `colNames` supplied must be less than the number of columns in the Series.
 // Returns a new DataFrame.
 func (df *DataFrame) SetLabels(colNames ...string) *DataFrame {
 	df.Copy()
@@ -848,11 +849,23 @@ func (df *DataFrame) Name() string {
 	return df.name
 }
 
-// SetCols sets the names of all the columns in the DataFrame and returns the entire DataFrame.
-func (df *DataFrame) SetCols(colNames []string) *DataFrame {
+// SetLevelNames sets the names of all the label levels in the DataFrame and returns the entire DataFrame.
+func (df *DataFrame) SetLevelNames(levelNames []string) *DataFrame {
+	if len(levelNames) != len(df.labels) {
+		return dataFrameWithError(
+			fmt.Errorf("SetLevelNames(): number of `levelNames` must match number of levels in DataFrame (%d != %d)", len(levelNames), len(df.labels)))
+	}
+	for j := range levelNames {
+		df.labels[j].name = levelNames[j]
+	}
+	return df
+}
+
+// SetColNames sets the names of all the columns in the DataFrame and returns the entire DataFrame.
+func (df *DataFrame) SetColNames(colNames []string) *DataFrame {
 	if len(colNames) != len(df.values) {
 		return dataFrameWithError(
-			fmt.Errorf("SetCols(): number of colNames must match number of columns in DataFrame (%d != %d)", len(colNames), len(df.values)))
+			fmt.Errorf("SetColNames(): number of `colNames` must match number of columns in DataFrame (%d != %d)", len(colNames), len(df.values)))
 	}
 	for k := range colNames {
 		df.values[k].name = colNames[k]
@@ -1096,8 +1109,8 @@ func (df *DataFrame) Filter(filters ...FilterFn) []int {
 	// subIndexes contains the index positions computed across all the filters
 	var subIndexes [][]int
 	for _, filter := range filters {
-		// if ColName is empty, apply filter to all columns
-		if filter.ColName == "" {
+		// if ContainerName is empty, apply filter to all *columns* (excluding labels)
+		if filter.ContainerName == "" {
 			var dfWideSubIndexes [][]int
 			for k := range df.values {
 				subIndex, err := df.values[k].filter(filter)
@@ -1109,10 +1122,10 @@ func (df *DataFrame) Filter(filters ...FilterFn) []int {
 			subIndexes = append(subIndexes, intersection(dfWideSubIndexes))
 			continue
 		}
-		// if ColName is not empty, find name in either columns or labels
+		// if ContainerName is not empty, find name in either columns or labels
 		var data *valueContainer
 		mergedLabelsAndCols := append(df.labels, df.values...)
-		index, err := findColWithName(filter.ColName, mergedLabelsAndCols)
+		index, err := findColWithName(filter.ContainerName, mergedLabelsAndCols)
 		if err != nil {
 			return []int{-999}
 		}
@@ -1154,7 +1167,7 @@ func (df *DataFrameMutator) Apply(lambda ApplyFn) {
 		return
 	}
 	// if ColName is empty, apply lambda to all columns
-	if lambda.ColName == "" {
+	if lambda.ContainerName == "" {
 		for k := range df.dataframe.values {
 			df.dataframe.values[k].slice = df.dataframe.values[k].apply(lambda)
 			df.dataframe.values[k].isNull = isEitherNull(
@@ -1164,7 +1177,7 @@ func (df *DataFrameMutator) Apply(lambda ApplyFn) {
 	} else {
 		// if ColName is not empty, find name in either columns or labels
 		mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
-		index, err := findColWithName(lambda.ColName, mergedLabelsAndCols)
+		index, err := findColWithName(lambda.ContainerName, mergedLabelsAndCols)
 		if err != nil {
 			df.dataframe.resetWithError((fmt.Errorf("Apply(): %v", err)))
 		}
@@ -1192,7 +1205,7 @@ func (df *DataFrameMutator) ApplyFormat(lambda ApplyFormatFn) {
 		return
 	}
 	// if ColName is empty, apply lambda to all columns
-	if lambda.ColName == "" {
+	if lambda.ContainerName == "" {
 		for k := range df.dataframe.values {
 			df.dataframe.values[k].slice = df.dataframe.values[k].applyFormat(lambda)
 			df.dataframe.values[k].isNull = isEitherNull(
@@ -1202,7 +1215,7 @@ func (df *DataFrameMutator) ApplyFormat(lambda ApplyFormatFn) {
 	} else {
 		// if ColName is not empty, find name in either columns or labels
 		mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
-		index, err := findColWithName(lambda.ColName, mergedLabelsAndCols)
+		index, err := findColWithName(lambda.ContainerName, mergedLabelsAndCols)
 		if err != nil {
 			df.dataframe.resetWithError((fmt.Errorf("ApplyFormat(): %v", err)))
 		}
@@ -1294,14 +1307,14 @@ func (df *DataFrameMutator) Sort(by ...Sorter) {
 	// apply Sorters from right to left, preserving index and passing it into next sort
 	for i := len(by) - 1; i >= 0; i-- {
 		// Sorter with empty ColName -> error
-		if by[i].ColName == "" {
+		if by[i].ContainerName == "" {
 			df.dataframe.resetWithError(fmt.Errorf(
 				"Sort(): Sorter (position %d) must have ColName", i))
 			return
 		}
 
 		mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
-		colPosition, err := findColWithName(by[i].ColName, mergedLabelsAndCols)
+		colPosition, err := findColWithName(by[i].ContainerName, mergedLabelsAndCols)
 		if err != nil {
 			df.dataframe.resetWithError((fmt.Errorf("Sort(): %v", err)))
 		}
