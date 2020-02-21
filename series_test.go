@@ -458,7 +458,61 @@ func TestSeries_Range(t *testing.T) {
 	}
 }
 
-func TestSeries_Valid(t *testing.T) {
+func TestSeries_FillNull(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		how        NullFiller
+		levelNames []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"values",
+			fields{
+				values: &valueContainer{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "qux"},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{true, false}, name: "*0"}}},
+			args{NullFiller{FillForward: true}, nil},
+			&Series{
+				values: &valueContainer{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "qux"},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{true, false}, name: "*0"}}}},
+		{"labels",
+			fields{
+				values: &valueContainer{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "qux"},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{true, false}, name: "*0"}}},
+			args{NullFiller{FillForward: true}, []string{"*0"}},
+			&Series{
+				values: &valueContainer{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "qux"},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}}},
+		{"fail - bad level name",
+			fields{
+				values: &valueContainer{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "qux"},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{true, false}, name: "*0"}}},
+			args{NullFiller{FillForward: true}, []string{"corge"}},
+			&Series{
+				err: errors.New("FillNull(): `name` (corge) not found")}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.FillNull(tt.args.how, tt.args.levelNames...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.FillNull() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_DropNull(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -589,8 +643,8 @@ func TestSeries_WithLabels(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
-			args{"qux", "baz"},
-			&Series{err: errors.New("WithLabels(): cannot rename column: `name` (qux) not found")},
+			args{"corge", "baz"},
+			&Series{err: errors.New("WithLabels(): cannot rename column: `name` (corge) not found")},
 		},
 		{"fail: unsupported slice type",
 			fields{

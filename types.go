@@ -73,6 +73,19 @@ type Element struct {
 	IsNull bool
 }
 
+// NullFiller fills every row with a null value and changes the row status to not-null.
+// If multiple fields are provided, resolves in the following order:
+// 1) FillForward - fills with the last valid value,
+// 2) FillBackward - fills with the next valid value,
+// 3) FillZero - fills with the zero type of the slice,
+// 4) FillFloat - coerces to float64 and fills with the value provided.
+type NullFiller struct {
+	FillForward  bool
+	FillBackward bool
+	FillZero     bool
+	FillFloat    float64
+}
+
 // FilterFn stub
 type FilterFn struct {
 	F64           func(val float64) bool

@@ -648,6 +648,54 @@ func mockString(dtype string) string {
 	return options[randomIndex]
 }
 
+func (vc *valueContainer) fillnull(lambda NullFiller) {
+	v := reflect.ValueOf(vc.slice)
+	zeroVal := reflect.Zero(v.Type().Elem())
+	if lambda.FillForward {
+		lastValid := zeroVal
+		for i := 0; i < len(vc.isNull); i++ {
+			if !vc.isNull[i] {
+				lastValid = v.Index(i)
+			} else {
+				v.Index(i).Set(lastValid)
+				vc.isNull[i] = false
+			}
+		}
+		return
+	}
+	if lambda.FillBackward {
+		lastValid := zeroVal
+		for i := len(vc.isNull) - 1; i >= 0; i-- {
+			if !vc.isNull[i] {
+				lastValid = v.Index(i)
+			} else {
+				v.Index(i).Set(lastValid)
+				vc.isNull[i] = false
+			}
+		}
+		return
+	}
+	if lambda.FillZero {
+		for i := 0; i < len(vc.isNull); i++ {
+			if vc.isNull[i] {
+				v.Index(i).Set(zeroVal)
+				vc.isNull[i] = false
+			}
+		}
+		return
+	}
+	// // default: coerce to float and fill with 0
+	vals := vc.float().slice
+	for i := 0; i < len(vc.isNull); i++ {
+		if vc.isNull[i] {
+			vals[i] = lambda.FillFloat
+			vc.isNull[i] = false
+		}
+	}
+	vc.slice = vals
+	return
+}
+
 func (vc *valueContainer) valid() []int {
 	index := make([]int, 0)
 	for i, isNull := range vc.isNull {

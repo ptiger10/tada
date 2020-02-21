@@ -2697,3 +2697,50 @@ func Test_valueContainer_relabel(t *testing.T) {
 		})
 	}
 }
+
+func Test_valueContainer_fillnull(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	type args struct {
+		lambda NullFiller
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *valueContainer
+	}{
+		{"fill forward", fields{slice: []int{10, 1, 0, 2, 0}, isNull: []bool{true, false, true, false, true}},
+			args{NullFiller{FillForward: true}},
+			&valueContainer{slice: []int{0, 1, 1, 2, 2}, isNull: []bool{false, false, false, false, false}},
+		},
+		{"fill backward", fields{slice: []int{10, 1, 0, 2, 0}, isNull: []bool{true, false, true, false, true}},
+			args{NullFiller{FillBackward: true}},
+			&valueContainer{slice: []int{1, 1, 2, 2, 0}, isNull: []bool{false, false, false, false, false}},
+		},
+		{"fill backward", fields{slice: []int{10, 1, 0, 2, 0}, isNull: []bool{true, false, true, false, true}},
+			args{NullFiller{FillZero: true}},
+			&valueContainer{slice: []int{0, 1, 0, 2, 0}, isNull: []bool{false, false, false, false, false}},
+		},
+		{"fill float", fields{slice: []int{10, 1, 0, 2, 0}, isNull: []bool{true, false, true, false, true}},
+			args{NullFiller{FillFloat: 0}},
+			&valueContainer{slice: []float64{0, 1, 0, 2, 0}, isNull: []bool{false, false, false, false, false}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			vc.fillnull(tt.args.lambda)
+			if !reflect.DeepEqual(vc, tt.want) {
+				t.Errorf("vc.fillnull() -> %v, want %v", vc, tt.want)
+			}
+		})
+	}
+}
