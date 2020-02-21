@@ -1153,6 +1153,63 @@ func TestDataFrame_Name(t *testing.T) {
 	}
 }
 
+func TestDataFrame_Relabel(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		levelNames []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"pass", fields{
+			values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "*0"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "*1"}},
+			colLevelNames: []string{"*0"}},
+			args{[]string{"*0", "*1"}},
+			&DataFrame{
+				values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"},
+					{slice: []int{0}, isNull: []bool{false}, name: "*1"}},
+				colLevelNames: []string{"*0"}},
+		},
+		{"fail", fields{
+			values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "*0"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "*1"}}},
+			args{[]string{"*0", "corge"}},
+			&DataFrame{
+				err: errors.New("Relabel(): `name` (corge) not found")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.Relabel(tt.args.levelNames); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Relabel() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestDataFrame_SetLevelNames(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer

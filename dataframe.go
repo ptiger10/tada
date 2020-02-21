@@ -771,6 +771,26 @@ func (df *DataFrameMutator) Append(other *DataFrame) {
 	return
 }
 
+// Relabel stub
+func (df *DataFrame) Relabel(levelNames []string) *DataFrame {
+	df = df.Copy()
+	df.InPlace().Relabel(levelNames)
+	return df
+}
+
+// Relabel stub
+func (df *DataFrameMutator) Relabel(levelNames []string) {
+	for _, name := range levelNames {
+		lvl, err := findContainerWithName(name, df.dataframe.labels)
+		if err != nil {
+			df.dataframe.resetWithError(fmt.Errorf("Relabel(): %v", err))
+			return
+		}
+		df.dataframe.labels[lvl].relabel()
+	}
+	return
+}
+
 // SetLabels appends the column(s) supplied as `colNames` as label levels and drops the column(s).
 // The number of `colNames` supplied must be less than the number of columns in the Series.
 // Returns a new DataFrame.
