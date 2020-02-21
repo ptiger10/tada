@@ -830,6 +830,27 @@ func (s *Series) alignedMath(alignedFunction func([]float64, []bool, []int) []fl
 	return retVals
 }
 
+// Resample stub
+func (s *Series) Resample(by Resampler) *Series {
+	s = s.Copy()
+	s.InPlace().Resample(by)
+	return s
+}
+
+// Resample stub
+func (s *SeriesMutator) Resample(by Resampler) {
+	if by.ContainerName == "" || by.ContainerName == s.series.values.name {
+		s.series.values.resample(by)
+		return
+	}
+	lvl, err := findContainerWithName(by.ContainerName, s.series.labels)
+	if err != nil {
+		s.series.resetWithError(fmt.Errorf("Resample(): %v", err))
+		return
+	}
+	s.series.labels[lvl].resample(by)
+}
+
 // CumSum returns the cumulative sum at each row position
 func (s *Series) CumSum() *Series {
 	isNull := make([]bool, s.Len())

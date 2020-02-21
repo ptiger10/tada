@@ -2744,3 +2744,67 @@ func Test_valueContainer_fillnull(t *testing.T) {
 		})
 	}
 }
+
+func Test_valueContainer_resample(t *testing.T) {
+	d := time.Date(2020, 2, 2, 12, 30, 45, 100, time.UTC)
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	type args struct {
+		by Resampler
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *valueContainer
+	}{
+		{"year", fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},
+			args{Resampler{Year: true}},
+			&valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
+				isNull: []bool{false}, name: "foo"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			vc.resample(tt.args.by)
+			if !reflect.DeepEqual(vc, tt.want) {
+				t.Errorf("vc.resample() -> %v, want %v", vc, tt.want)
+			}
+		})
+	}
+}
+
+func Test_resample(t *testing.T) {
+	d := time.Date(2020, 2, 2, 12, 30, 45, 100, time.UTC)
+	type args struct {
+		t  time.Time
+		by Resampler
+	}
+	tests := []struct {
+		name string
+		args args
+		want time.Time
+	}{
+		{"year", args{d, Resampler{Year: true, Location: time.UTC}}, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
+		{"month", args{d, Resampler{Month: true, Location: time.UTC}}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC)},
+		{"day", args{d, Resampler{Day: true, Location: time.UTC}}, time.Date(2020, 2, 2, 0, 0, 0, 0, time.UTC)},
+		{"hour", args{d, Resampler{Duration: time.Hour, Location: time.UTC}}, time.Date(2020, 2, 2, 12, 0, 0, 0, time.UTC)},
+		{"minute", args{d, Resampler{Duration: time.Minute, Location: time.UTC}}, time.Date(2020, 2, 2, 12, 30, 0, 0, time.UTC)},
+		{"second", args{d, Resampler{Duration: time.Second, Location: time.UTC}}, time.Date(2020, 2, 2, 12, 30, 45, 0, time.UTC)},
+		{"default", args{d, Resampler{Location: time.UTC}}, time.Date(2020, 2, 2, 12, 30, 45, 100, time.UTC)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := resample(tt.args.t, tt.args.by); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("resample() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

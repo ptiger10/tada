@@ -1099,39 +1099,6 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 	}
 }
 
-// ResetColLevel pivots a column level to be a new label level.
-// If unstacking would use the last column level, it fails.
-// Removes columns by consolidating all lower level columns with the same name, and adds one label level.
-// Unstacking does not change the number of rows.
-// func (df *DataFrame) ResetColLevel(level int) *DataFrame {
-// 	if len(df.colLevelNames) <= 1 {
-// 		return dataFrameWithError(fmt.Errorf("ResetColLevel(): cannot unstack only column level"))
-// 	}
-// 	if level >= len(df.colLevelNames) {
-// 		return dataFrameWithError(
-// 			fmt.Errorf("ResetColLevel(): level out of range (%d > %d", level, len(df.colLevelNames)-1))
-
-// 	}
-// 	valPositions := make(map[string][]int)
-// 	for k := range df.values {
-// 		name := splitLabelIntoLevels(df.values[k].name)[level]
-// 		// the first time the column header is found, isolate all the rows where it is valid
-// 		if _, ok := valPositions[name]; !ok {
-// 			valPositions[name] = make([]int, 0)
-// 			for i := 0; i < df.Len(); i++ {
-// 				if !df.values[k].isNull[i] {
-// 					valPositions[name] = append(valPositions[name], i)
-// 				}
-// 			}
-// 		}
-// 	}
-
-// 	newVals := make([][]string, )
-// 	newLabels := make([]string, df.Len())
-
-// 	return nil
-// }
-
 // -- FILTERS
 
 // Filter stub
@@ -1358,6 +1325,29 @@ func (df *DataFrameMutator) Sort(by ...Sorter) {
 }
 
 // -- GROUPERS
+
+// Resample stub
+func (df *DataFrame) Resample(by Resampler) *DataFrame {
+	df = df.Copy()
+	df.InPlace().Resample(by)
+	return df
+}
+
+// Resample stub
+func (df *DataFrameMutator) Resample(by Resampler) {
+	// if ContainerName is empty, return error
+	if by.ContainerName == "" {
+		df.dataframe.resetWithError(fmt.Errorf("Resample(): must supply ContainerName"))
+		return
+	}
+	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
+	index, err := findContainerWithName(by.ContainerName, mergedLabelsAndCols)
+	if err != nil {
+		df.dataframe.resetWithError(fmt.Errorf("Resample(): %v", err))
+		return
+	}
+	mergedLabelsAndCols[index].resample(by)
+}
 
 // GroupBy stub
 // includes label levels and columns

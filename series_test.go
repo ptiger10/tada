@@ -2957,3 +2957,54 @@ func TestSeries_SliceTime(t *testing.T) {
 		})
 	}
 }
+
+func TestSeries_Resample(t *testing.T) {
+	d := time.Date(2020, 2, 2, 12, 30, 45, 100, time.UTC)
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		by Resampler
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"default - values", fields{
+			values: &valueContainer{slice: []time.Time{d}, name: "foo", isNull: []bool{false}},
+			labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}},
+			args{Resampler{Year: true}},
+			&Series{
+				values: &valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, name: "foo", isNull: []bool{false}},
+				labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}}},
+		{"default - labels", fields{
+			values: &valueContainer{slice: []float64{1}, name: "bar", isNull: []bool{false}},
+			labels: []*valueContainer{{slice: []time.Time{d}, name: "foo", isNull: []bool{false}}}},
+			args{Resampler{Year: true, ContainerName: "foo"}},
+			&Series{
+				values: &valueContainer{slice: []float64{1}, name: "bar", isNull: []bool{false}},
+				labels: []*valueContainer{{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, name: "foo", isNull: []bool{false}}}}},
+		{"fail - bad name", fields{
+			values: &valueContainer{slice: []float64{1}, name: "bar", isNull: []bool{false}},
+			labels: []*valueContainer{{slice: []time.Time{d}, name: "foo", isNull: []bool{false}}}},
+			args{Resampler{Year: true, ContainerName: "corge"}},
+			&Series{
+				err: errors.New("Resample(): `name` (corge) not found")}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.Resample(tt.args.by); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Resample() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

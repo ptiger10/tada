@@ -2043,3 +2043,27 @@ func withinWindow(root time.Time, other time.Time, d time.Duration) bool {
 	}
 	return true
 }
+
+func resample(t time.Time, by Resampler) time.Time {
+	if by.Year {
+		return time.Date(t.Year(), 1, 1, 0, 0, 0, 0, by.Location)
+	} else if by.Month {
+		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, by.Location)
+	} else if by.Day {
+		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, by.Location)
+	} else {
+		return t.Truncate(by.Duration)
+	}
+}
+
+// default timezone: UTC
+func (vc *valueContainer) resample(by Resampler) {
+	vals := vc.dateTime().slice
+	if by.Location == nil {
+		by.Location = time.UTC
+	}
+	for i := range vals {
+		vals[i] = resample(vals[i], by)
+	}
+	return
+}

@@ -153,3 +153,13 @@ type ReadConfig struct {
 	NumLabelCols   int
 	MajorDimIsCols bool
 }
+
+// Resampler stub
+type Resampler struct {
+	ContainerName string
+	Year          bool
+	Month         bool
+	Day           bool
+	Duration      time.Duration
+	Location      *time.Location
+}

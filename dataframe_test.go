@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/d4l3k/messagediff"
 	"github.com/ptiger10/tablediff"
@@ -3638,6 +3639,64 @@ func TestDataFrame_DropCol(t *testing.T) {
 			}
 			if got := df.DropCol(tt.args.name); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.DropCol() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_Resample(t *testing.T) {
+	d := time.Date(2020, 2, 2, 12, 30, 45, 100, time.UTC)
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		by Resampler
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"default - values", fields{
+			values:        []*valueContainer{{slice: []time.Time{d}, name: "foo", isNull: []bool{false}}},
+			labels:        []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}},
+			colLevelNames: []string{"0"},
+			name:          "qux"},
+			args{Resampler{Year: true, ContainerName: "foo"}},
+			&DataFrame{
+				values:        []*valueContainer{{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, name: "foo", isNull: []bool{false}}},
+				labels:        []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}},
+				colLevelNames: []string{"0"},
+				name:          "qux"}},
+		{"fail - bad name", fields{
+			values: []*valueContainer{{slice: []time.Time{d}, name: "foo", isNull: []bool{false}}},
+			labels: []*valueContainer{{slice: []time.Time{d}, name: "foo", isNull: []bool{false}}}},
+			args{Resampler{Year: true, ContainerName: "corge"}},
+			&DataFrame{
+				err: errors.New("Resample(): `name` (corge) not found")}},
+		{"fail - empty container name", fields{
+			values: []*valueContainer{{slice: []time.Time{d}, name: "foo", isNull: []bool{false}}},
+			labels: []*valueContainer{{slice: []time.Time{d}, name: "foo", isNull: []bool{false}}}},
+			args{Resampler{Year: true, ContainerName: ""}},
+			&DataFrame{
+				err: errors.New("Resample(): must supply ContainerName")}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.Resample(tt.args.by); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.Resample() = %v, want %v", got, tt.want)
 			}
 		})
 	}
