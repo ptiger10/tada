@@ -307,11 +307,27 @@ func removeDefaultNameIndicator(name string) string {
 	return regexp.MustCompile(`^\*`).ReplaceAllString(name, "")
 }
 
+func suppressDefaultName(name string) string {
+	if regexp.MustCompile(`^\*`).MatchString(name) {
+		return ""
+	}
+	return name
+}
+
 func (df *DataFrame) String() string {
 	// do not try to print all rows
 	csv := df.Head(optionMaxRows).ToCSV(false)
 	for k := range csv[0] {
-		csv[0][k] = removeDefaultNameIndicator(csv[0][k])
+		csv[0][k] = suppressDefaultName(csv[0][k])
+	}
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	// check for nulls, skippiung headers
+	for i := range csv[df.numColLevels():] {
+		for k := range csv[i] {
+			if mergedLabelsAndCols[k].isNull[i] {
+				csv[i+df.numColLevels()][k] = "n/a"
+			}
+		}
 	}
 	var caption string
 	if df.name != "" {

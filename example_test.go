@@ -7,7 +7,7 @@ func ExampleDataFrame() {
 	fmt.Println(df)
 	// Output:
 	// +---+---+-----+
-	// | 0 | A |  B  |
+	// |   | A |  B  |
 	// +---+---+-----+
 	// | 0 | 1 | foo |
 	// | 1 | 2 | bar |
@@ -15,12 +15,24 @@ func ExampleDataFrame() {
 	// name: qux
 }
 
+func ExampleSeries_null() {
+	s := NewSeries([]string{"foo", ""})
+	fmt.Println(s)
+	// Output:
+	// +---+-----+
+	// |   |  0  |
+	// +---+-----+
+	// | 0 | foo |
+	// | 1 | n/a |
+	// +---+-----+
+}
+
 func ExampleSeries() {
 	s := NewSeries([]float64{1, 2}, []string{"foo", "foo"}).SetName("A")
 	fmt.Println(s)
 	// Output:
 	// +-----+---+
-	// |  0  | A |
+	// |     | A |
 	// +-----+---+
 	// | foo | 1 |
 	// |     | 2 |
