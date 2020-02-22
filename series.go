@@ -941,57 +941,22 @@ func (s *Series) PercentileCut(bins []float64, labels []string) *Series {
 // -- Slicers
 
 // SliceFloat64 coerces the Series values into []float64.
-// If `labelLevel` is provided, the column of labels at that level is coerced instead.
-// If multiple levels are provides, only the first is used. If the level is out of range, a nil value is returned.
-func (s *Series) SliceFloat64(labelLevel ...int) []float64 {
-	if len(labelLevel) == 0 {
-		return s.values.float().slice
-	}
-	lvl := labelLevel[0]
-	if lvl >= s.numLevels() {
-		return nil
-	}
-	return s.labels[lvl].float().slice
+func (s *Series) SliceFloat64() []float64 {
+	return s.values.float().slice
 }
 
 // SliceString coerces the Series values into []string.
-// If `labelLevel` is provided, the column of labels at that level is coerced instead.
-// If multiple levels are provides, only the first is used. If the level is out of range, a nil value is returned.
-func (s *Series) SliceString(labelLevel ...int) []string {
-	if len(labelLevel) == 0 {
-		return s.values.str().slice
-	}
-	lvl := labelLevel[0]
-	if lvl >= s.numLevels() {
-		return nil
-	}
-	return s.labels[lvl].str().slice
+func (s *Series) SliceString() []string {
+	return s.values.str().slice
+
 }
 
 // SliceTime coerces the Series values into []time.Time.
-// If `labelLevel` is provided, the column of labels at that level is coerced instead.
-// If multiple levels are provides, only the first is used. If the level is out of range, a nil value is returned.
-func (s *Series) SliceTime(labelLevel ...int) []time.Time {
-	if len(labelLevel) == 0 {
-		return s.values.dateTime().slice
-	}
-	lvl := labelLevel[0]
-	if lvl >= s.numLevels() {
-		return nil
-	}
-	return s.labels[lvl].dateTime().slice
+func (s *Series) SliceTime() []time.Time {
+	return s.values.dateTime().slice
 }
 
 // SliceNulls returns whether each value is null or not.
-// If `labelLevel` is provided, the column of labels at that level is coerced instead.
-// If multiple levels are provides, only the first is used. If the level is out of range, a nil value is returned.
-func (s *Series) SliceNulls(labelLevel ...int) []bool {
-	if len(labelLevel) == 0 {
-		return s.values.isNull
-	}
-	lvl := labelLevel[0]
-	if lvl >= s.numLevels() {
-		return nil
-	}
-	return s.labels[lvl].isNull
+func (s *Series) SliceNulls() []bool {
+	return s.values.isNull
 }

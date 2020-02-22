@@ -910,7 +910,8 @@ func (df *DataFrame) SetLevelNames(levelNames []string) *DataFrame {
 func (df *DataFrame) SetColNames(colNames []string) *DataFrame {
 	if len(colNames) != len(df.values) {
 		return dataFrameWithError(
-			fmt.Errorf("SetColNames(): number of `colNames` must match number of columns in DataFrame (%d != %d)", len(colNames), len(df.values)))
+			fmt.Errorf("SetColNames(): number of `colNames` must match number of columns in DataFrame (%d != %d)",
+				len(colNames), len(df.values)))
 	}
 	for k := range colNames {
 		df.values[k].name = colNames[k]
