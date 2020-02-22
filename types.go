@@ -12,9 +12,10 @@ type valueContainer struct {
 
 // Series stub
 type Series struct {
-	values *valueContainer
-	labels []*valueContainer
-	err    error
+	values     *valueContainer
+	labels     []*valueContainer
+	sharedData bool
+	err        error
 }
 
 // SeriesMutator stub

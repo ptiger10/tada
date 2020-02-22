@@ -3,6 +3,7 @@ package tada
 import (
 	"errors"
 	"fmt"
+	"log"
 	"reflect"
 	"strconv"
 	"time"
@@ -42,9 +43,10 @@ func (s *Series) Copy() *Series {
 		labels[i] = s.labels[i].copy()
 	}
 	return &Series{
-		values: s.values.copy(),
-		labels: labels,
-		err:    s.err,
+		values:     s.values.copy(),
+		labels:     labels,
+		err:        s.err,
+		sharedData: false,
 	}
 }
 
@@ -289,6 +291,12 @@ func (s *SeriesMutator) Shift(n int) {
 // InPlace returns a SeriesMutator, which contains most of the same methods as Series but never returns a new Series.
 // If you want to save memory and improve performance and do not need to preserve the original Series, consider using InPlace().
 func (s *Series) InPlace() *SeriesMutator {
+	if optionSharedDataWarning {
+		log.Print(
+			"WARNING: this Series shares its labels and values with the DataFrame " +
+				"from which it was selected, so InPlace changes will also modify " +
+				"the original DataFrame. To avoid this, make a new Series with Series.Copy()")
+	}
 	return &SeriesMutator{series: s}
 }
 

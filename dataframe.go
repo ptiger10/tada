@@ -494,8 +494,9 @@ func (df *DataFrame) Col(name string) *Series {
 		return seriesWithError(fmt.Errorf("Col(): %v", err))
 	}
 	return &Series{
-		values: df.values[index],
-		labels: df.labels,
+		values:     df.values[index],
+		labels:     df.labels,
+		sharedData: true,
 	}
 }
 
