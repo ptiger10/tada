@@ -1114,44 +1114,17 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 // -- FILTERS
 
 // Filter stub
-func (df *DataFrame) Filter(filters ...FilterFn) []int {
+func (df *DataFrame) Filter(filters map[string]FilterFn) []int {
 	if len(filters) == 0 {
 		return makeIntRange(0, df.Len())
 	}
-	// subIndexes contains the index positions computed across all the filters
-	var subIndexes [][]int
-	for _, filter := range filters {
-		// if ContainerName is empty, apply filter to all *columns* (excluding labels)
-		if filter.ContainerName == "" {
-			var dfWideSubIndexes [][]int
-			for k := range df.values {
-				subIndex, err := df.values[k].filter(filter)
-				if err != nil {
-					return []int{-999}
-				}
-				dfWideSubIndexes = append(dfWideSubIndexes, subIndex)
-			}
-			subIndexes = append(subIndexes, intersection(dfWideSubIndexes))
-			continue
-		}
-		// if ContainerName is not empty, find name in either columns or labels
-		var data *valueContainer
-		mergedLabelsAndCols := append(df.labels, df.values...)
-		index, err := findContainerWithName(filter.ContainerName, mergedLabelsAndCols)
-		if err != nil {
-			return []int{-999}
-		}
-		data = mergedLabelsAndCols[index]
 
-		subIndex, err := data.filter(filter)
-		if err != nil {
-			return []int{-999}
-		}
-		subIndexes = append(subIndexes, subIndex)
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	ret, err := filter(mergedLabelsAndCols, filters)
+	if err != nil {
+		return []int{-999}
 	}
-	// reduce the subindexes to a single index that shares all the values
-	index := intersection(subIndexes)
-	return index
+	return ret
 }
 
 // -- APPLY

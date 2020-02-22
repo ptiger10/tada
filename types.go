@@ -88,10 +88,9 @@ type NullFiller struct {
 
 // FilterFn stub
 type FilterFn struct {
-	F64           func(val float64) bool
-	String        func(val string) bool
-	DateTime      func(val time.Time) bool
-	ContainerName string
+	F64      func(val float64) bool
+	String   func(val string) bool
+	DateTime func(val time.Time) bool
 }
 
 // ApplyFn stub

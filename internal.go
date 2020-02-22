@@ -1807,6 +1807,17 @@ func cumsum(vals []float64, isNull []bool, index []int) []float64 {
 	return ret
 }
 
+func (filter FilterFn) validate() error {
+	if filter.F64 == nil {
+		if filter.String == nil {
+			if filter.DateTime == nil {
+				return fmt.Errorf("no filter function provided")
+			}
+		}
+	}
+	return nil
+}
+
 func (lambda ApplyFn) validate() error {
 	if lambda.F64 == nil {
 		if lambda.String == nil {

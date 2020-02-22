@@ -1163,7 +1163,7 @@ func TestSeries_Filter(t *testing.T) {
 		err    error
 	}
 	type args struct {
-		filters []FilterFn
+		filters map[string]FilterFn
 	}
 	tests := []struct {
 		name   string
@@ -1175,7 +1175,7 @@ func TestSeries_Filter(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{[]FilterFn{{F64: func(val float64) bool {
+			args{map[string]FilterFn{"": {F64: func(val float64) bool {
 				if val > 1 {
 					return true
 				}
@@ -1185,14 +1185,13 @@ func TestSeries_Filter(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []string{"bar", "foo", "baz"}, isNull: []bool{false, false, false}}}},
-			args{[]FilterFn{
-				{F64: func(val float64) bool {
-					if val > 1 {
-						return true
-					}
-					return false
-				}},
-				{ContainerName: "*0", String: func(val string) bool {
+			args{map[string]FilterFn{"": {F64: func(val float64) bool {
+				if val > 1 {
+					return true
+				}
+				return false
+			}},
+				"*0": {String: func(val string) bool {
 					if strings.Contains(val, "a") {
 						return true
 					}
@@ -1208,17 +1207,12 @@ func TestSeries_Filter(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{[]FilterFn{{ContainerName: "*0"}}}, []int{-999}},
+			args{map[string]FilterFn{"*0": {}}}, []int{-999}},
 		{"fail: no matching col",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{[]FilterFn{{ContainerName: "corge"}}}, []int{-999}},
-		{"fail: failure in multi filter",
-			fields{
-				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{[]FilterFn{{ContainerName: "*0"}, {ContainerName: "corge"}}}, []int{-999}},
+			args{map[string]FilterFn{"corge": {F64: func(float64) bool { return true }}}}, []int{-999}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1227,7 +1221,7 @@ func TestSeries_Filter(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Filter(tt.args.filters...); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Filter(tt.args.filters); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.Filter() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2518,7 +2512,7 @@ func TestSeries_Where(t *testing.T) {
 		err    error
 	}
 	type args struct {
-		filters []FilterFn
+		filters map[string]FilterFn
 		ifTrue  interface{}
 		ifFalse interface{}
 	}
@@ -2532,14 +2526,13 @@ func TestSeries_Where(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
-			args{[]FilterFn{
-				{ContainerName: "qux", F64: func(v float64) bool {
-					if v > 1 {
-						return true
-					}
-					return false
-				}},
-				{String: func(v string) bool {
+			args{map[string]FilterFn{"qux": {F64: func(v float64) bool {
+				if v > 1 {
+					return true
+				}
+				return false
+			}},
+				"": {String: func(v string) bool {
 					if strings.Contains(v, "ba") {
 						return true
 					}

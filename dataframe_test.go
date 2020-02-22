@@ -1436,7 +1436,7 @@ func TestDataFrame_Filter(t *testing.T) {
 		err    error
 	}
 	type args struct {
-		filters []FilterFn
+		filters map[string]FilterFn
 	}
 	tests := []struct {
 		name   string
@@ -1444,61 +1444,42 @@ func TestDataFrame_Filter(t *testing.T) {
 		args   args
 		want   []int
 	}{
-		{"multiple", fields{
+		{"float and string intersection", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, false, false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{[]FilterFn{
-				{F64: func(v float64) bool {
-					if v < 2 {
+			args{map[string]FilterFn{"foo": {F64: func(val float64) bool {
+				if val > 1 {
+					return true
+				}
+				return false
+			}},
+				"bar": {String: func(val string) bool {
+					if strings.Contains(val, "a") {
 						return true
 					}
 					return false
-				}, ContainerName: "foo"},
-				{String: func(v string) bool {
-					if strings.Contains(v, "oo") {
-						return true
-					}
-					return false
-				}, ContainerName: "bar"},
-			}}, []int{0}},
+				}},
+			}}, []int{2}},
 		{"no filters - all rows", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, false, false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
 			args{nil}, []int{0, 1, 2}},
-		{"filter with no colname - all columns", fields{
-			values: []*valueContainer{
-				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
-				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{[]FilterFn{
-				{F64: func(v float64) bool {
-					if v >= 2 {
-						return true
-					}
-					return false
-				}}}}, []int{2}},
 		{"fail - empty filter", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{[]FilterFn{{}}}, []int{-999}},
+			args{map[string]FilterFn{"*0": {}}}, []int{-999}},
 		{"fail - bad column name", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{[]FilterFn{{ContainerName: "corge", F64: func(float64) bool { return true }}}}, []int{-999}},
-		{"fail - no filter", fields{
-			values: []*valueContainer{
-				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
-				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{[]FilterFn{{ContainerName: "foo"}}}, []int{-999}},
+			args{map[string]FilterFn{"corge": {F64: func(float64) bool { return true }}}}, []int{-999}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1508,7 +1489,7 @@ func TestDataFrame_Filter(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.Filter(tt.args.filters...); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Filter(tt.args.filters); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.Filter() = %v, want %v", got, tt.want)
 			}
 		})

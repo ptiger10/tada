@@ -480,42 +480,54 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 	return
 }
 
-// -- FILTERS
-
-// Filter applies one or more filters to a Series and returns the intersection of the row positions that satisfy all filters.
-// If no filter is provided, returns a list of all index positions in the Series.
-// In event of error, returns []int
-func (s *Series) Filter(filters ...FilterFn) []int {
-	if len(filters) == 0 {
-		return makeIntRange(0, s.Len())
-	}
+func filter(containers []*valueContainer, filters map[string]FilterFn) ([]int, error) {
 	// subIndexes contains the index positions computed across all the filters
 	var subIndexes [][]int
-	for _, filter := range filters {
-		var data *valueContainer
-		// if no column name is specified in a filter, use the series values
-		if filter.ContainerName == "" || filter.ContainerName == s.values.name {
-			data = s.values
-		} else if lvl, err := findContainerWithName(filter.ContainerName, s.labels); err != nil {
-			return []int{-999}
-		} else {
-			data = s.labels[lvl]
-		}
-		subIndex, err := data.filter(filter)
+	for containerName, filter := range filters {
+		err := filter.validate()
 		if err != nil {
-			return []int{-999}
+			return nil, fmt.Errorf("filter: %v", err)
+		}
+		index, err := findContainerWithName(containerName, containers)
+		if err != nil {
+			return nil, fmt.Errorf("filter: %v", err)
+		}
+		subIndex, err := containers[index].filter(filter)
+		if err != nil {
+			return nil, fmt.Errorf("filter: %v", err)
 		}
 		subIndexes = append(subIndexes, subIndex)
 	}
 	// reduce the subindexes to a single index that shares all the values
-	index := intersection(subIndexes)
-	return index
+	return intersection(subIndexes), nil
+}
+
+// -- FILTERS
+
+// Filter applies one or more filters to the containers in the Series
+// and returns the intersection of the row positions that satisfy all filters.
+// Filter may be applied to any label level by supplying the label name as a key in the `filter` map.
+// Filter may be applied to the Series values by supplying as key either the Series name or an empty string ("").
+// If no filter is provided, returns a list of all index positions in the Series.
+// In event of error, returns []int{-999}
+func (s *Series) Filter(filters map[string]FilterFn) []int {
+	if len(filters) == 0 {
+		return makeIntRange(0, s.Len())
+	}
+
+	mergedLabelsAndValues := append(s.labels, s.values)
+	ret, err := filter(mergedLabelsAndValues, filters)
+	if err != nil {
+		return []int{-999}
+	}
+	return ret
 }
 
 // Where stub
-func (s *Series) Where(filters []FilterFn, ifTrue, ifFalse interface{}) *Series {
+// To do: check for bad filter
+func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{}) *Series {
 	ret := make([]interface{}, s.Len())
-	index := s.Filter(filters...)
+	index := s.Filter(filters)
 	for _, i := range index {
 		ret[i] = ifTrue
 	}
