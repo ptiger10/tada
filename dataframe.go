@@ -475,7 +475,19 @@ func (df *DataFrameMutator) SubsetCols(index []int) {
 	return
 }
 
-// Col finds the first column with matching `name` and returns as a Series.
+// SelectLabels finds the first level with matching `name` and returns as a Series with all existing label levels (including itself).
+func (df *DataFrame) SelectLabels(name string) *Series {
+	index, err := findContainerWithName(name, df.labels)
+	if err != nil {
+		return seriesWithError(fmt.Errorf("SelectLabels(): %v", err))
+	}
+	return &Series{
+		values: df.labels[index],
+		labels: df.labels,
+	}
+}
+
+// Col finds the first column with matching `name` and returns as a Series. Similar to SelectLabels, but to select a column instead.
 func (df *DataFrame) Col(name string) *Series {
 	index, err := findContainerWithName(name, df.values)
 	if err != nil {

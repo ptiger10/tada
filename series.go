@@ -108,6 +108,18 @@ func (s *Series) Cast(dtype DType) {
 	return
 }
 
+// SelectLabels finds the first level with matching `name` and returns as a Series with all existing label levels (including itself).
+func (s *Series) SelectLabels(name string) *Series {
+	index, err := findContainerWithName(name, s.labels)
+	if err != nil {
+		return seriesWithError(fmt.Errorf("SelectLabels(): %v", err))
+	}
+	return &Series{
+		values: s.labels[index],
+		labels: s.labels,
+	}
+}
+
 // Subset returns only the rows specified at the index positions, in the order specified. Returns a new Series.
 func (s *Series) Subset(index []int) *Series {
 	s = s.Copy()
