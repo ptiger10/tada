@@ -1685,16 +1685,7 @@ func TestDataFrame_Sort(t *testing.T) {
 			name:   "baz"},
 			args{[]Sorter{{ContainerName: "corge"}}},
 			&DataFrame{
-				err: fmt.Errorf("Sort(): `name` (corge) not found")},
-		},
-		{"fail - empty colName", fields{
-			values: []*valueContainer{
-				{slice: []float64{0, 2, 1}, isNull: []bool{false, false, false}, name: "foo"}},
-			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
-			name:   "baz"},
-			args{[]Sorter{{Ascending: false, DType: Float}}},
-			&DataFrame{
-				err: fmt.Errorf("Sort(): Sorter (position 0) must have ColName")},
+				err: fmt.Errorf("Sort(): position 0: `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {

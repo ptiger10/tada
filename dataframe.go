@@ -1260,32 +1260,20 @@ func (df *DataFrame) Sort(by ...Sorter) *DataFrame {
 
 // Sort stub
 func (df *DataFrameMutator) Sort(by ...Sorter) {
-	// original index
-	index := makeIntRange(0, df.dataframe.Len())
-	var vals *valueContainer
-	// no Sorters supplied -> error
 	if len(by) == 0 {
 		df.dataframe.resetWithError(fmt.Errorf(
 			"Sort(): must supply at least one Sorter"))
 		return
 	}
-	// apply Sorters from right to left, preserving index and passing it into next sort
-	for i := len(by) - 1; i >= 0; i-- {
-		// Sorter with empty ColName -> error
-		if by[i].ContainerName == "" {
-			df.dataframe.resetWithError(fmt.Errorf(
-				"Sort(): Sorter (position %d) must have ColName", i))
-			return
-		}
 
-		mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
-		colPosition, err := findContainerWithName(by[i].ContainerName, mergedLabelsAndCols)
-		if err != nil {
-			df.dataframe.resetWithError((fmt.Errorf("Sort(): %v", err)))
-		}
-		vals = mergedLabelsAndCols[colPosition].copy()
-		index = vals.sort(by[i].DType, by[i].Ascending, index)
+	// original index
+	mergedLabelsAndValues := append(df.dataframe.labels, df.dataframe.values...)
+	index, err := sortContainers(mergedLabelsAndValues, by, df.dataframe.Len())
+	if err != nil {
+		df.dataframe.resetWithError(fmt.Errorf("Sort(): %v", err))
+		return
 	}
+	// rearrange the data in place with the final index
 	df.Subset(index)
 }
 
