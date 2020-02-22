@@ -1640,10 +1640,11 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 
 func TestDataFrame_Sort(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		colLevelNames []string
+		name          string
+		err           error
 	}
 	type args struct {
 		by []Sorter
@@ -1657,14 +1658,16 @@ func TestDataFrame_Sort(t *testing.T) {
 		{"float64 on one column", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 2, 1}, isNull: []bool{false, false, false}, name: "foo"}},
-			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
-			name:   "baz"},
-			args{[]Sorter{{ContainerName: "foo"}}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
+			args{[]Sorter{{ContainerName: "foo", Ascending: true}}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"}},
-				labels: []*valueContainer{{slice: []int{0, 2, 1}, isNull: []bool{false, false, false}, name: "*0"}},
-				name:   "baz"},
+				labels:        []*valueContainer{{slice: []int{0, 2, 1}, isNull: []bool{false, false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"},
 		},
 		{"fail - no Sorters", fields{
 			values: []*valueContainer{
@@ -1689,7 +1692,7 @@ func TestDataFrame_Sort(t *testing.T) {
 				{slice: []float64{0, 2, 1}, isNull: []bool{false, false, false}, name: "foo"}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
 			name:   "baz"},
-			args{[]Sorter{{Descending: true, DType: Float}}},
+			args{[]Sorter{{Ascending: false, DType: Float}}},
 			&DataFrame{
 				err: fmt.Errorf("Sort(): Sorter (position 0) must have ColName")},
 		},
@@ -1697,13 +1700,14 @@ func TestDataFrame_Sort(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				colLevelNames: tt.fields.colLevelNames,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
 			}
 			if got := df.Sort(tt.args.by...); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.Sort() = %v, want %v", got, tt.want)
+				t.Errorf("DataFrame.Sort() = %v, want %v", got.err, tt.want.err)
 			}
 		})
 	}

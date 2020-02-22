@@ -446,34 +446,38 @@ func (s *Series) Sort(by ...Sorter) *Series {
 	return s
 }
 
+func sortContainers(containers []*valueContainer, sorters []Sorter, length int) ([]int, error) {
+	// original index
+	originalIndex := makeIntRange(0, length)
+	for i := len(sorters) - 1; i >= 0; i-- {
+		index, err := findContainerWithName(sorters[i].ContainerName, containers)
+		if err != nil {
+			return nil, fmt.Errorf("position %v: %v", len(sorters)-1-i, err)
+		}
+		// must copy the values to be sorted to avoid prematurely overwriting underlying data
+		vals := containers[index].copy()
+		originalIndex = vals.sort(sorters[i].DType, sorters[i].Ascending, originalIndex)
+	}
+	return originalIndex, nil
+}
+
 // Sort stub
 func (s *SeriesMutator) Sort(by ...Sorter) {
-	// original index
-	index := makeIntRange(0, s.series.Len())
-	var vals *valueContainer
 	// default for handling no Sorters: values as float in ascending order
 	if len(by) == 0 {
-		// must copy the values to be sorted to avoid prematurely overwriting underlying data
-		vals = s.series.values.copy()
-		index = vals.sort(Float, false, index)
-		s.Subset(index)
-		return
+		by = []Sorter{{ContainerName: s.series.values.name, DType: Float, Ascending: true}}
 	}
-	for i := len(by) - 1; i >= 0; i-- {
-		// Sorter with empty ColName -> use Series values
-		if by[i].ContainerName == "" || by[i].ContainerName == s.series.values.name {
-			vals = s.series.values.copy()
-		} else {
-			lvl, err := findContainerWithName(by[i].ContainerName, s.series.labels)
-			if err != nil {
-				s.series.resetWithError(fmt.Errorf(
-					"Sort(): cannot use label level: %v", err))
-				return
-			}
-			vals = s.series.labels[lvl].copy()
+	// replace "" with values
+	for i := range by {
+		if by[i].ContainerName == "" {
+			by[i].ContainerName = s.series.values.name
 		}
-		// overwrite index with new index
-		index = vals.sort(by[i].DType, by[i].Descending, index)
+	}
+	mergedLabelsAndValues := append(s.series.labels, s.series.values)
+	index, err := sortContainers(mergedLabelsAndValues, by, s.series.Len())
+	if err != nil {
+		s.series.resetWithError(fmt.Errorf("Sort(): %v", err))
+		return
 	}
 	// rearrange the data in place with the final index
 	s.Subset(index)
@@ -513,6 +517,13 @@ func filter(containers []*valueContainer, filters map[string]FilterFn) ([]int, e
 func (s *Series) Filter(filters map[string]FilterFn) []int {
 	if len(filters) == 0 {
 		return makeIntRange(0, s.Len())
+	}
+	// replace "" with values
+	for k, v := range filters {
+		if k == "" {
+			filters[s.values.name] = v
+			delete(filters, k)
+		}
 	}
 
 	mergedLabelsAndValues := append(s.labels, s.values)

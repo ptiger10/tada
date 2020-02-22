@@ -1112,25 +1112,25 @@ func TestSeries_Sort(t *testing.T) {
 	}{
 		{"sort values as float by default",
 			fields{
-				values: &valueContainer{slice: []float64{3, 1, 2}, isNull: []bool{false, false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+				values: &valueContainer{slice: []float64{3, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
 			args{nil},
 			&Series{
-				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
-				labels: []*valueContainer{{slice: []int{1, 2, 0}, isNull: []bool{false, false, false}}}}},
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{1, 2, 0}, isNull: []bool{false, false, false}, name: "*0"}}}},
 		{"sort string descending",
 			fields{
 				values: &valueContainer{slice: []string{"bar", "foo"}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{[]Sorter{{DType: String, Descending: true}}},
+			args{[]Sorter{{DType: String, Ascending: false}}},
 			&Series{
 				values: &valueContainer{slice: []string{"foo", "bar"}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{1, 0}, isNull: []bool{false, false}}}}},
-		{"sort labels as string then as float",
+		{"sort first labels (descending), then values (ascending)",
 			fields{
 				values: &valueContainer{slice: []string{"baz", "foo", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{[]Sorter{{DType: String}, {ContainerName: "*0", Descending: true}}},
+			args{[]Sorter{{DType: String, Ascending: true}, {ContainerName: "*0", Ascending: false}}},
 			&Series{
 				values: &valueContainer{slice: []string{"baz", "baz", "foo"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{2, 0, 1}, isNull: []bool{false, false, false}}}}},
@@ -1138,9 +1138,9 @@ func TestSeries_Sort(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []string{"baz", "foo", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{[]Sorter{{ContainerName: "foo", Descending: true}}},
+			args{[]Sorter{{ContainerName: "corge", Ascending: false}}},
 			&Series{
-				err: errors.New("Sort(): cannot use label level: `name` (foo) not found")}},
+				err: errors.New("Sort(): position 0: `name` (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1171,10 +1171,10 @@ func TestSeries_Filter(t *testing.T) {
 		args   args
 		want   []int
 	}{
-		{"float filter",
+		{"float filter - default",
 			fields{
-				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
 			args{map[string]FilterFn{"": {F64: func(val float64) bool {
 				if val > 1 {
 					return true
@@ -1183,9 +1183,9 @@ func TestSeries_Filter(t *testing.T) {
 			}}}}, []int{2}},
 		{"float and string intersection",
 			fields{
-				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
 				labels: []*valueContainer{{name: "*0", slice: []string{"bar", "foo", "baz"}, isNull: []bool{false, false, false}}}},
-			args{map[string]FilterFn{"": {F64: func(val float64) bool {
+			args{map[string]FilterFn{"foo": {F64: func(val float64) bool {
 				if val > 1 {
 					return true
 				}

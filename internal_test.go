@@ -1708,9 +1708,9 @@ func Test_valueContainer_sort(t *testing.T) {
 		name   string
 	}
 	type args struct {
-		dtype      DType
-		descending bool
-		index      []int
+		dtype     DType
+		ascending bool
+		index     []int
 	}
 	tests := []struct {
 		name   string
@@ -1720,31 +1720,31 @@ func Test_valueContainer_sort(t *testing.T) {
 	}{
 		{"float - no nulls",
 			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, false, false}, name: "foo"},
-			args{dtype: Float, descending: false, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
+			args{dtype: Float, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
 		{"float - no nulls - descending",
 			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, false, false}, name: "foo"},
-			args{dtype: Float, descending: true, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
+			args{dtype: Float, ascending: false, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
 		{"float - nulls",
 			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, true, false}, name: "foo"},
-			args{dtype: Float, descending: false, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
+			args{dtype: Float, ascending: true, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
 		{"strings - no nulls",
 			fields{slice: []string{"foo", "bar", "a", "baz"}, isNull: []bool{false, false, false, false}, name: "foo"},
-			args{dtype: String, descending: false, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
+			args{dtype: String, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
 		{"strings - no nulls - descending",
 			fields{slice: []string{"foo", "bar", "a", "baz"}, isNull: []bool{false, false, false, false}, name: "foo"},
-			args{dtype: String, descending: true, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
+			args{dtype: String, ascending: false, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
 		{"strings - nulls",
 			fields{slice: []string{"foo", "bar", "a", "baz"}, isNull: []bool{false, false, true, false}, name: "foo"},
-			args{dtype: String, descending: false, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
+			args{dtype: String, ascending: true, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
 		{"datetime - no nulls",
 			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false, false}, name: "foo"},
-			args{dtype: DateTime, descending: false, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
+			args{dtype: DateTime, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
 		{"datetime - no nulls - descending",
 			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false, false}, name: "foo"},
-			args{dtype: DateTime, descending: true, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
+			args{dtype: DateTime, ascending: false, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
 		{"datetime - nulls",
 			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, true, false}, name: "foo"},
-			args{dtype: DateTime, descending: false, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
+			args{dtype: DateTime, ascending: true, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1753,7 +1753,7 @@ func Test_valueContainer_sort(t *testing.T) {
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
 			}
-			if got := vc.sort(tt.args.dtype, tt.args.descending, tt.args.index); !reflect.DeepEqual(got, tt.want) {
+			if got := vc.sort(tt.args.dtype, tt.args.ascending, tt.args.index); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("valueContainer.sort() = %v, want %v", got, tt.want)
 			}
 		})

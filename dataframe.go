@@ -1284,7 +1284,7 @@ func (df *DataFrameMutator) Sort(by ...Sorter) {
 			df.dataframe.resetWithError((fmt.Errorf("Sort(): %v", err)))
 		}
 		vals = mergedLabelsAndCols[colPosition].copy()
-		index = vals.sort(by[i].DType, by[i].Descending, index)
+		index = vals.sort(by[i].DType, by[i].Ascending, index)
 	}
 	df.Subset(index)
 }

@@ -1052,7 +1052,7 @@ func isEitherNull(isNull1, isNull2 []bool) []bool {
 	return ret
 }
 
-func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int {
+func (vc *valueContainer) sort(dtype DType, ascending bool, index []int) []int {
 	var srt sort.Interface
 	nulls := make([]int, 0)
 	notNulls := make([]int, 0)
@@ -1063,7 +1063,7 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 		d := vc.float()
 		d.index = index
 		srt = d
-		if descending {
+		if !ascending {
 			srt = sort.Reverse(srt)
 		}
 		sort.Stable(srt)
@@ -1074,7 +1074,7 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 		d := vc.str()
 		d.index = index
 		srt = d
-		if descending {
+		if !ascending {
 			srt = sort.Reverse(srt)
 		}
 		sort.Stable(srt)
@@ -1085,7 +1085,7 @@ func (vc *valueContainer) sort(dtype DType, descending bool, index []int) []int 
 		d := vc.dateTime()
 		d.index = index
 		srt = d
-		if descending {
+		if !ascending {
 			srt = sort.Reverse(srt)
 		}
 		sort.Stable(srt)
