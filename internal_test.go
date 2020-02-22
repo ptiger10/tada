@@ -2843,3 +2843,31 @@ func Test_valueContainer_valueCounts(t *testing.T) {
 		})
 	}
 }
+
+func Test_nunique(t *testing.T) {
+	type args struct {
+		vals   []string
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name  string
+		args  args
+		want  string
+		want1 bool
+	}{
+		{"pass", args{[]string{"foo", "foo", "bar", ""}, []bool{false, false, false, true}, []int{0, 1, 2, 3}}, "2", false},
+		{"fail", args{[]string{"", "", "", ""}, []bool{true, true, true, true}, []int{0, 1, 2, 3}}, "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1 := nunique(tt.args.vals, tt.args.isNull, tt.args.index)
+			if got != tt.want {
+				t.Errorf("nunique() got = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.want1 {
+				t.Errorf("nunique() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}

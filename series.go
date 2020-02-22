@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/ptiger10/tablediff"
@@ -785,38 +786,45 @@ func (s *Series) IterRows() []map[string]Element {
 
 // Sum stub
 func (s *Series) Sum() float64 {
-	return s.math(sum)
+	return s.floatFunc(sum)
 }
 
 // Mean stub
 func (s *Series) Mean() float64 {
-	return s.math(mean)
+	return s.floatFunc(mean)
 }
 
 // Median stub
 func (s *Series) Median() float64 {
-	return s.math(median)
+	return s.floatFunc(median)
 }
 
 // Std stub
 func (s *Series) Std() float64 {
-	return s.math(std)
+	return s.floatFunc(std)
 }
 
 // Count stub
 func (s *Series) Count() int {
-	count := s.math(count)
+	count := s.floatFunc(count)
 	return int(count)
+}
+
+// NUnique stub
+func (s *Series) NUnique() int {
+	unique := s.stringFunc(nunique)
+	i, _ := strconv.Atoi(unique)
+	return i
 }
 
 // Min stub
 func (s *Series) Min() float64 {
-	return s.math(min)
+	return s.floatFunc(min)
 }
 
 // Max stub
 func (s *Series) Max() float64 {
-	return s.math(max)
+	return s.floatFunc(max)
 }
 
 // Earliest stub
@@ -829,9 +837,17 @@ func (s *Series) Latest() time.Time {
 	return s.timeFunc(latest)
 }
 
-func (s *Series) math(mathFunction func([]float64, []bool, []int) (float64, bool)) float64 {
-	output, _ := mathFunction(
+func (s *Series) floatFunc(floatFunction func([]float64, []bool, []int) (float64, bool)) float64 {
+	output, _ := floatFunction(
 		s.values.float().slice,
+		s.values.isNull,
+		makeIntRange(0, s.Len()))
+	return output
+}
+
+func (s *Series) stringFunc(stringFunction func([]string, []bool, []int) (string, bool)) string {
+	output, _ := stringFunction(
+		s.values.str().slice,
 		s.values.isNull,
 		makeIntRange(0, s.Len()))
 	return output

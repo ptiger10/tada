@@ -244,6 +244,11 @@ func (g *GroupedSeries) Max() *Series {
 	return g.floatFunc("max", max)
 }
 
+// NUnique stub
+func (g *GroupedSeries) NUnique() *Series {
+	return g.stringFunc("nunique", nunique)
+}
+
 // First stub
 func (g *GroupedSeries) First() *Series {
 	return g.stringFunc("first", first)
@@ -365,6 +370,11 @@ func (g *GroupedDataFrame) Min(colNames ...string) *DataFrame {
 // Max stub
 func (g *GroupedDataFrame) Max(colNames ...string) *DataFrame {
 	return g.floatFunc("max", colNames, max)
+}
+
+// NUnique stub
+func (g *GroupedDataFrame) NUnique(colNames ...string) *DataFrame {
+	return g.stringFunc("nunique", colNames, nunique)
 }
 
 // First stub

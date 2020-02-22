@@ -1698,6 +1698,23 @@ func count(vals []float64, isNull []bool, index []int) (float64, bool) {
 	return float64(counter), false
 }
 
+func nunique(vals []string, isNull []bool, index []int) (string, bool) {
+	m := make(map[string]bool)
+	var atLeastOneValid bool
+	for _, i := range index {
+		if !isNull[i] {
+			if _, ok := m[vals[i]]; !ok {
+				m[vals[i]] = true
+			}
+			atLeastOneValid = true
+		}
+	}
+	if !atLeastOneValid {
+		return "", true
+	}
+	return strconv.Itoa(len(m)), false
+}
+
 // min returns the min of the non-null values at the `index` positions in `vals`.
 // Compatible with Grouped calculations as well as Series
 func min(vals []float64, isNull []bool, index []int) (float64, bool) {
