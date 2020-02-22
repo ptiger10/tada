@@ -960,3 +960,8 @@ func (s *Series) SliceTime() []time.Time {
 func (s *Series) SliceNulls() []bool {
 	return s.values.isNull
 }
+
+// ValueCounts stub
+func (s *Series) ValueCounts() map[string]int {
+	return s.values.valueCounts()
+}

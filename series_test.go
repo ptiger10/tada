@@ -2985,3 +2985,33 @@ func TestSeries_SelectLabels(t *testing.T) {
 		})
 	}
 }
+
+func TestSeries_ValueCounts(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   map[string]int
+	}{
+		{"default values", fields{
+			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			map[string]int{"1": 1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if got := s.ValueCounts(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.ValueCounts() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -2812,3 +2812,34 @@ func Test_resample(t *testing.T) {
 		})
 	}
 }
+
+func Test_valueContainer_valueCounts(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   map[string]int
+	}{
+		{"pass", fields{
+			slice:  []float64{1, 1, 2, 0},
+			isNull: []bool{false, false, false, true},
+			name:   "foo",
+		}, map[string]int{"1": 2, "2": 1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			if got := vc.valueCounts(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.valueCounts() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

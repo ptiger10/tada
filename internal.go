@@ -2086,3 +2086,20 @@ func (vc *valueContainer) resample(by Resampler) {
 	}
 	return
 }
+
+func (vc *valueContainer) valueCounts() map[string]int {
+	v := vc.str().slice
+	m := make(map[string]int)
+	for i := range v {
+		// skip nulls
+		if vc.isNull[i] {
+			continue
+		}
+		if _, ok := m[v[i]]; !ok {
+			m[v[i]] = 1
+		} else {
+			m[v[i]]++
+		}
+	}
+	return m
+}
