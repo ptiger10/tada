@@ -1338,29 +1338,6 @@ func (df *DataFrameMutator) Sort(by ...Sorter) {
 
 // -- GROUPERS
 
-// Resample stub
-func (df *DataFrame) Resample(by Resampler) *DataFrame {
-	df = df.Copy()
-	df.InPlace().Resample(by)
-	return df
-}
-
-// Resample stub
-func (df *DataFrameMutator) Resample(by Resampler) {
-	// if ContainerName is empty, return error
-	if by.ContainerName == "" {
-		df.dataframe.resetWithError(fmt.Errorf("Resample(): must supply ContainerName"))
-		return
-	}
-	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
-	index, err := findContainerWithName(by.ContainerName, mergedLabelsAndCols)
-	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("Resample(): %v", err))
-		return
-	}
-	mergedLabelsAndCols[index].resample(by)
-}
-
 // GroupBy stub
 // includes label levels and columns
 func (df *DataFrame) GroupBy(names ...string) *GroupedDataFrame {

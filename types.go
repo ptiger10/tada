@@ -156,12 +156,11 @@ type ReadConfig struct {
 
 // Resampler stub
 type Resampler struct {
-	ContainerName string
-	ByYear        bool
-	ByMonth       bool
-	ByDay         bool
-	ByWeek        bool
-	StartOfWeek   time.Weekday
-	ByDuration    time.Duration
-	Location      *time.Location
+	ByYear      bool
+	ByMonth     bool
+	ByDay       bool
+	ByWeek      bool
+	StartOfWeek time.Weekday
+	ByDuration  time.Duration
+	Location    *time.Location
 }

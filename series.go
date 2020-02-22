@@ -860,16 +860,8 @@ func (s *Series) Resample(by Resampler) *Series {
 
 // Resample stub
 func (s *SeriesMutator) Resample(by Resampler) {
-	if by.ContainerName == "" || by.ContainerName == s.series.values.name {
-		s.series.values.resample(by)
-		return
-	}
-	lvl, err := findContainerWithName(by.ContainerName, s.series.labels)
-	if err != nil {
-		s.series.resetWithError(fmt.Errorf("Resample(): %v", err))
-		return
-	}
-	s.series.labels[lvl].resample(by)
+	s.series.values.resample(by)
+	return
 }
 
 // CumSum returns the cumulative sum at each row position

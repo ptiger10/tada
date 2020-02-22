@@ -3025,19 +3025,6 @@ func TestSeries_Resample(t *testing.T) {
 			&Series{
 				values: &valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, name: "foo", isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}}},
-		{"default - labels", fields{
-			values: &valueContainer{slice: []float64{1}, name: "bar", isNull: []bool{false}},
-			labels: []*valueContainer{{slice: []time.Time{d}, name: "foo", isNull: []bool{false}}}},
-			args{Resampler{ByYear: true, ContainerName: "foo"}},
-			&Series{
-				values: &valueContainer{slice: []float64{1}, name: "bar", isNull: []bool{false}},
-				labels: []*valueContainer{{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, name: "foo", isNull: []bool{false}}}}},
-		{"fail - bad name", fields{
-			values: &valueContainer{slice: []float64{1}, name: "bar", isNull: []bool{false}},
-			labels: []*valueContainer{{slice: []time.Time{d}, name: "foo", isNull: []bool{false}}}},
-			args{Resampler{ByYear: true, ContainerName: "corge"}},
-			&Series{
-				err: errors.New("Resample(): `name` (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
