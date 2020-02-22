@@ -403,20 +403,26 @@ func (g *GroupedSeries) Align() *GroupedSeries {
 	return g
 }
 
-// Align isolates the column matching `colName` and aligns subsequent group aggregations with the original DataFrame labels.
-func (g *GroupedDataFrame) Align(colName string) *GroupedSeries {
-	_, err := findContainerWithName(colName, g.df.values)
+// Col isolates the Series at `containerName`, which may be either a label level or column in the underlying DataFrame.
+// Returns a GroupedSeries with the same groups and labels as in the GroupedDataFrame.
+func (g *GroupedDataFrame) Col(containerName string) *GroupedSeries {
+	mergedLabelsAndCols := append(g.df.labels, g.df.values...)
+	index, err := findContainerWithName(containerName, mergedLabelsAndCols)
 	if err != nil {
 		return &GroupedSeries{
-			err: fmt.Errorf("Align(): %v", err),
+			err: fmt.Errorf("Col(): %v", err),
 		}
+	}
+	series := &Series{
+		values:     mergedLabelsAndCols[index],
+		labels:     g.df.labels,
+		sharedData: true,
 	}
 	return &GroupedSeries{
 		orderedKeys: g.orderedKeys,
 		rowIndices:  g.rowIndices,
 		labels:      g.labels,
-		series:      g.df.Col(colName),
-		aligned:     true,
+		series:      series,
 	}
 }
 

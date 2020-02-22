@@ -2246,7 +2246,7 @@ func TestGroupedDataFrame_Latest(t *testing.T) {
 	}
 }
 
-func TestGroupedDataFrame_Align(t *testing.T) {
+func TestGroupedDataFrame_Col(t *testing.T) {
 	type fields struct {
 		orderedKeys []string
 		rowIndices  [][]int
@@ -2289,7 +2289,6 @@ func TestGroupedDataFrame_Align(t *testing.T) {
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "baz"}},
 					sharedData: true,
 				},
-				aligned: true,
 			}},
 		{name: "fail - bad column",
 			fields: fields{
@@ -2307,7 +2306,7 @@ func TestGroupedDataFrame_Align(t *testing.T) {
 					name:          "qux"}},
 			args: args{"corge"},
 			want: &GroupedSeries{
-				err: fmt.Errorf("Align(): `name` (corge) not found")}},
+				err: fmt.Errorf("Col(): `name` (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2318,8 +2317,8 @@ func TestGroupedDataFrame_Align(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.Align(tt.args.colName); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GroupedDataFrame.Align() = %v, want %v", got, tt.want)
+			if got := g.Col(tt.args.colName); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedDataFrame.Col() = %v, want %v", got, tt.want)
 			}
 		})
 	}
