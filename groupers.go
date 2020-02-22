@@ -433,7 +433,7 @@ func (s *Series) RollingN(n int) *GroupedSeries {
 	}
 	rowIndices := make([][]int, s.Len())
 	for i := 0; i < s.Len(); i++ {
-		rowIndex := make([]int, 0)
+		var rowIndex []int
 		if i+n <= s.Len() {
 			rowIndex = makeIntRange(i, i+n)
 		} else {

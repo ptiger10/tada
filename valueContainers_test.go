@@ -379,7 +379,7 @@ func Test_valueContainer_float(t *testing.T) {
 			floatValueContainer{slice: []float64{1}, isNull: []bool{false}, index: []int{0}}},
 		{"[]string", fields{slice: []string{"", "foo", "3.5"}, isNull: []bool{true, false, false}},
 			floatValueContainer{slice: []float64{0, 0, 3.5}, isNull: []bool{true, true, false}, index: []int{0, 1, 2}}},
-		{"[]time.Time", fields{slice: []time.Time{time.Time{}, d}, isNull: []bool{true, false}},
+		{"[]time.Time", fields{slice: []time.Time{{}, d}, isNull: []bool{true, false}},
 			floatValueContainer{slice: []float64{0, 0}, isNull: []bool{true, true}, index: []int{0, 1}}},
 		{"[]bool", fields{slice: []bool{false, true, false}, isNull: []bool{false, false, true}},
 			floatValueContainer{slice: []float64{0, 1, 0}, isNull: []bool{false, false, true}, index: []int{0, 1, 2}}},
@@ -418,7 +418,7 @@ func Test_valueContainer_str(t *testing.T) {
 			stringValueContainer{slice: []string{"1"}, isNull: []bool{false}, index: []int{0}}},
 		{"[]string", fields{slice: []string{"", "foo", "3.5"}, isNull: []bool{true, false, false}},
 			stringValueContainer{slice: []string{"", "foo", "3.5"}, isNull: []bool{true, false, false}, index: []int{0, 1, 2}}},
-		{"[]time.Time", fields{slice: []time.Time{time.Time{}, d}, isNull: []bool{true, false}},
+		{"[]time.Time", fields{slice: []time.Time{{}, d}, isNull: []bool{true, false}},
 			stringValueContainer{slice: []string{"0001-01-01 00:00:00 +0000 UTC", "2020-01-01 00:00:00 +0000 UTC"}, isNull: []bool{true, false}, index: []int{0, 1}}},
 		{"[]bool", fields{slice: []bool{false, true, false}, isNull: []bool{false, false, true}},
 			stringValueContainer{slice: []string{"false", "true", "false"}, isNull: []bool{false, false, true}, index: []int{0, 1, 2}}},
@@ -480,17 +480,17 @@ func Test_valueContainer_dateTime(t *testing.T) {
 		want   dateTimeValueContainer
 	}{
 		{"[]float64", fields{slice: []float64{1}, isNull: []bool{false}},
-			dateTimeValueContainer{slice: []time.Time{time.Time{}}, isNull: []bool{true}, index: []int{0}}},
+			dateTimeValueContainer{slice: []time.Time{{}}, isNull: []bool{true}, index: []int{0}}},
 		{"[]string", fields{slice: []string{"", "1/1/20", "foo"}, isNull: []bool{true, false, true}},
-			dateTimeValueContainer{slice: []time.Time{time.Time{}, d, time.Time{}}, isNull: []bool{true, false, true}, index: []int{0, 1, 2}}},
-		{"[]time.Time", fields{slice: []time.Time{time.Time{}, d}, isNull: []bool{true, false}},
-			dateTimeValueContainer{slice: []time.Time{time.Time{}, d}, isNull: []bool{true, false}, index: []int{0, 1}}},
+			dateTimeValueContainer{slice: []time.Time{{}, d, {}}, isNull: []bool{true, false, true}, index: []int{0, 1, 2}}},
+		{"[]time.Time", fields{slice: []time.Time{{}, d}, isNull: []bool{true, false}},
+			dateTimeValueContainer{slice: []time.Time{{}, d}, isNull: []bool{true, false}, index: []int{0, 1}}},
 		{"[]bool", fields{slice: []bool{false, true, false}, isNull: []bool{false, false, true}},
-			dateTimeValueContainer{slice: []time.Time{time.Time{}, time.Time{}, time.Time{}}, isNull: []bool{true, true, true}, index: []int{0, 1, 2}}},
+			dateTimeValueContainer{slice: []time.Time{{}, {}, {}}, isNull: []bool{true, true, true}, index: []int{0, 1, 2}}},
 		{"[]interface", fields{slice: []interface{}{"foo", float64(1), int(1), uint(1), d, false}, isNull: []bool{false, false, false, false, false, false}},
-			dateTimeValueContainer{slice: []time.Time{time.Time{}, time.Time{}, time.Time{}, time.Time{}, d, time.Time{}}, isNull: []bool{true, true, true, true, false, true}, index: []int{0, 1, 2, 3, 4, 5}}},
+			dateTimeValueContainer{slice: []time.Time{{}, {}, {}, {}, d, {}}, isNull: []bool{true, true, true, true, false, true}, index: []int{0, 1, 2, 3, 4, 5}}},
 		{"[]int", fields{slice: []int{1}, isNull: []bool{false}},
-			dateTimeValueContainer{slice: []time.Time{time.Time{}}, isNull: []bool{true}, index: []int{0}}},
+			dateTimeValueContainer{slice: []time.Time{{}}, isNull: []bool{true}, index: []int{0}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -533,7 +533,7 @@ func Test_valueContainer_cast(t *testing.T) {
 		{"datetime to datetime", fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},
 			args{DateTime}, &valueContainer{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"}},
 		{"int to datetime", fields{slice: []int{1}, isNull: []bool{false}, name: "foo"},
-			args{DateTime}, &valueContainer{slice: []time.Time{time.Time{}}, isNull: []bool{true}, name: "foo"}},
+			args{DateTime}, &valueContainer{slice: []time.Time{{}}, isNull: []bool{true}, name: "foo"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -307,7 +307,7 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 			}
 		}
 	}
-	// major dimension of output is rows, for compatability with csv.NewWriter
+	// major dimension of output is rows, for compatibility with csv.NewWriter
 	mockCSV := mockCSVFromDTypes(inferredTypes, outputRows)
 	mockCSV = append(headers, mockCSV...)
 	writer := csv.NewWriter(w)

@@ -1078,7 +1078,7 @@ func TestSeries_Sort(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []string{"bar", "foo"}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{[]Sorter{Sorter{DType: String, Descending: true}}},
+			args{[]Sorter{{DType: String, Descending: true}}},
 			&Series{
 				values: &valueContainer{slice: []string{"foo", "bar"}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{1, 0}, isNull: []bool{false, false}}}}},
@@ -1086,7 +1086,7 @@ func TestSeries_Sort(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []string{"baz", "foo", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{[]Sorter{Sorter{DType: String}, Sorter{ContainerName: "*0", Descending: true}}},
+			args{[]Sorter{{DType: String}, {ContainerName: "*0", Descending: true}}},
 			&Series{
 				values: &valueContainer{slice: []string{"baz", "baz", "foo"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{2, 0, 1}, isNull: []bool{false, false, false}}}}},
@@ -2977,21 +2977,21 @@ func TestSeries_Resample(t *testing.T) {
 		{"default - values", fields{
 			values: &valueContainer{slice: []time.Time{d}, name: "foo", isNull: []bool{false}},
 			labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}},
-			args{Resampler{Year: true}},
+			args{Resampler{ByYear: true}},
 			&Series{
 				values: &valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, name: "foo", isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}}},
 		{"default - labels", fields{
 			values: &valueContainer{slice: []float64{1}, name: "bar", isNull: []bool{false}},
 			labels: []*valueContainer{{slice: []time.Time{d}, name: "foo", isNull: []bool{false}}}},
-			args{Resampler{Year: true, ContainerName: "foo"}},
+			args{Resampler{ByYear: true, ContainerName: "foo"}},
 			&Series{
 				values: &valueContainer{slice: []float64{1}, name: "bar", isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, name: "foo", isNull: []bool{false}}}}},
 		{"fail - bad name", fields{
 			values: &valueContainer{slice: []float64{1}, name: "bar", isNull: []bool{false}},
 			labels: []*valueContainer{{slice: []time.Time{d}, name: "foo", isNull: []bool{false}}}},
-			args{Resampler{Year: true, ContainerName: "corge"}},
+			args{Resampler{ByYear: true, ContainerName: "corge"}},
 			&Series{
 				err: errors.New("Resample(): `name` (corge) not found")}},
 	}

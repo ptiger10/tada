@@ -1199,7 +1199,7 @@ func TestGroupedSeries_Apply(t *testing.T) {
 				return vals[0]
 			}}},
 			&Series{values: &valueContainer{
-				slice: []time.Time{d, time.Time{}}, isNull: []bool{false, true}, name: "custom"},
+				slice: []time.Time{d, {}}, isNull: []bool{false, true}, name: "custom"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
 				}}},
@@ -1233,7 +1233,7 @@ func TestGroupedSeries_Apply(t *testing.T) {
 				return vals[0]
 			}}},
 			&Series{values: &valueContainer{
-				slice: []time.Time{d, d, time.Time{}, time.Time{}}, isNull: []bool{false, false, true, true}, name: "qux_custom"},
+				slice: []time.Time{d, d, {}, {}}, isNull: []bool{false, false, true, true}, name: "qux_custom"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},

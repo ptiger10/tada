@@ -217,7 +217,7 @@ func Test_setNullsFromInterface(t *testing.T) {
 		{"float", args{[]float64{1, math.NaN()}}, []bool{false, true}},
 		{"int", args{[]int{0}}, []bool{false}},
 		{"string", args{[]string{"foo", ""}}, []bool{false, true}},
-		{"dateTime", args{[]time.Time{time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC), time.Time{}}}, []bool{false, true, true}},
+		{"dateTime", args{[]time.Time{time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC), {}}}, []bool{false, true, true}},
 		{"element", args{[]Element{{0, true}, {1, false}}}, []bool{true, false}},
 		{"interface", args{[]interface{}{
 			int(1), uint(1), float32(1), float64(1), time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), "foo",
@@ -2762,7 +2762,7 @@ func Test_valueContainer_resample(t *testing.T) {
 		want   *valueContainer
 	}{
 		{"year", fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},
-			args{Resampler{Year: true}},
+			args{Resampler{ByYear: true}},
 			&valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
 				isNull: []bool{false}, name: "foo"}},
 	}
@@ -2792,16 +2792,16 @@ func Test_resample(t *testing.T) {
 		args args
 		want time.Time
 	}{
-		{"year", args{d, Resampler{Year: true, Location: time.UTC}}, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
-		{"month", args{d, Resampler{Month: true, Location: time.UTC}}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC)},
-		{"day", args{d, Resampler{Day: true, Location: time.UTC}}, time.Date(2020, 2, 2, 0, 0, 0, 0, time.UTC)},
-		{"week (Sunday)", args{d, Resampler{Week: true, Location: time.UTC}},
+		{"year", args{d, Resampler{ByYear: true, Location: time.UTC}}, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
+		{"month", args{d, Resampler{ByMonth: true, Location: time.UTC}}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC)},
+		{"day", args{d, Resampler{ByDay: true, Location: time.UTC}}, time.Date(2020, 2, 2, 0, 0, 0, 0, time.UTC)},
+		{"week (Sunday)", args{d, Resampler{ByWeek: true, Location: time.UTC}},
 			time.Date(2020, 2, 2, 0, 0, 0, 0, time.UTC)},
-		{"week (Monday)", args{d, Resampler{Week: true, StartOfWeek: time.Monday, Location: time.UTC}},
+		{"week (Monday)", args{d, Resampler{ByWeek: true, StartOfWeek: time.Monday, Location: time.UTC}},
 			time.Date(2020, 1, 27, 0, 0, 0, 0, time.UTC)},
-		{"hour", args{d, Resampler{Duration: time.Hour, Location: time.UTC}}, time.Date(2020, 2, 2, 12, 0, 0, 0, time.UTC)},
-		{"minute", args{d, Resampler{Duration: time.Minute, Location: time.UTC}}, time.Date(2020, 2, 2, 12, 30, 0, 0, time.UTC)},
-		{"second", args{d, Resampler{Duration: time.Second, Location: time.UTC}}, time.Date(2020, 2, 2, 12, 30, 45, 0, time.UTC)},
+		{"hour", args{d, Resampler{ByDuration: time.Hour, Location: time.UTC}}, time.Date(2020, 2, 2, 12, 0, 0, 0, time.UTC)},
+		{"minute", args{d, Resampler{ByDuration: time.Minute, Location: time.UTC}}, time.Date(2020, 2, 2, 12, 30, 0, 0, time.UTC)},
+		{"second", args{d, Resampler{ByDuration: time.Second, Location: time.UTC}}, time.Date(2020, 2, 2, 12, 30, 45, 0, time.UTC)},
 		{"default", args{d, Resampler{Location: time.UTC}}, time.Date(2020, 2, 2, 12, 30, 45, 100, time.UTC)},
 	}
 	for _, tt := range tests {

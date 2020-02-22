@@ -1487,19 +1487,19 @@ func TestDataFrame_Filter(t *testing.T) {
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{[]FilterFn{FilterFn{}}}, []int{-999}},
+			args{[]FilterFn{{}}}, []int{-999}},
 		{"fail - bad column name", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{[]FilterFn{FilterFn{ContainerName: "corge", F64: func(float64) bool { return true }}}}, []int{-999}},
+			args{[]FilterFn{{ContainerName: "corge", F64: func(float64) bool { return true }}}}, []int{-999}},
 		{"fail - no filter", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{[]FilterFn{FilterFn{ContainerName: "foo"}}}, []int{-999}},
+			args{[]FilterFn{{ContainerName: "foo"}}}, []int{-999}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3667,7 +3667,7 @@ func TestDataFrame_Resample(t *testing.T) {
 			labels:        []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}},
 			colLevelNames: []string{"0"},
 			name:          "qux"},
-			args{Resampler{Year: true, ContainerName: "foo"}},
+			args{Resampler{ByYear: true, ContainerName: "foo"}},
 			&DataFrame{
 				values:        []*valueContainer{{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, name: "foo", isNull: []bool{false}}},
 				labels:        []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}},
@@ -3676,13 +3676,13 @@ func TestDataFrame_Resample(t *testing.T) {
 		{"fail - bad name", fields{
 			values: []*valueContainer{{slice: []time.Time{d}, name: "foo", isNull: []bool{false}}},
 			labels: []*valueContainer{{slice: []time.Time{d}, name: "foo", isNull: []bool{false}}}},
-			args{Resampler{Year: true, ContainerName: "corge"}},
+			args{Resampler{ByYear: true, ContainerName: "corge"}},
 			&DataFrame{
 				err: errors.New("Resample(): `name` (corge) not found")}},
 		{"fail - empty container name", fields{
 			values: []*valueContainer{{slice: []time.Time{d}, name: "foo", isNull: []bool{false}}},
 			labels: []*valueContainer{{slice: []time.Time{d}, name: "foo", isNull: []bool{false}}}},
-			args{Resampler{Year: true, ContainerName: ""}},
+			args{Resampler{ByYear: true, ContainerName: ""}},
 			&DataFrame{
 				err: errors.New("Resample(): must supply ContainerName")}},
 	}

@@ -1268,7 +1268,6 @@ func (s *Series) combineMath(other *Series, ignoreMissing bool, fn func(v1 float
 		combinedFloat := fn(originalFloat[i], lookupFloat[i])
 		// handle division by 0
 		if math.IsNaN(combinedFloat) || math.IsInf(combinedFloat, 0) {
-			combinedFloat = 0
 			retIsNull[i] = true
 			continue
 		}
@@ -2045,13 +2044,13 @@ func withinWindow(root time.Time, other time.Time, d time.Duration) bool {
 }
 
 func resample(t time.Time, by Resampler) time.Time {
-	if by.Year {
+	if by.ByYear {
 		return time.Date(t.Year(), 1, 1, 0, 0, 0, 0, by.Location)
-	} else if by.Month {
+	} else if by.ByMonth {
 		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, by.Location)
-	} else if by.Day {
+	} else if by.ByDay {
 		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, by.Location)
-	} else if by.Week {
+	} else if by.ByWeek {
 		day := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, by.Location)
 		daysSinceStartOfWeek := day.Weekday() - by.StartOfWeek
 		if daysSinceStartOfWeek >= 0 {
@@ -2061,7 +2060,7 @@ func resample(t time.Time, by Resampler) time.Time {
 		// add days to get to start of new week, then subtract a full week
 		return day.AddDate(0, 0, (int(daysSinceStartOfWeek)*-1)-7)
 	} else {
-		return t.Truncate(by.Duration)
+		return t.Truncate(by.ByDuration)
 	}
 }
 
