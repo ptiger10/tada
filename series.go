@@ -648,19 +648,9 @@ func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
 		s.series.resetWithError((fmt.Errorf("ApplyFormat(): %v", err)))
 		return
 	}
-	var data *valueContainer
-	// if colName is not specified, use the main values
-	if lambda.ContainerName == "" || lambda.ContainerName == s.series.values.name {
-		data = s.series.values
-	} else if lvl, err := findContainerWithName(lambda.ContainerName, s.series.labels); err == nil {
-		data = s.series.labels[lvl]
-	} else {
-		s.series.resetWithError(fmt.Errorf("ApplyFormat(): %v", err))
-		return
-	}
-	data.slice = data.applyFormat(lambda)
+	s.series.values.slice = s.series.values.applyFormat(lambda)
 	// set to null if null either prior to or after transformation
-	data.isNull = isEitherNull(s.series.values.isNull, setNullsFromInterface(data.slice))
+	s.series.values.isNull = isEitherNull(s.series.values.isNull, setNullsFromInterface(s.series.values.slice))
 	return
 }
 

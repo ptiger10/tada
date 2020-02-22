@@ -1608,7 +1608,7 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 		colLevelNames []string
 	}
 	type args struct {
-		lambda ApplyFormatFn
+		lambdas map[string]ApplyFormatFn
 	}
 	tests := []struct {
 		name   string
@@ -1616,7 +1616,7 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 		args   args
 		want   *DataFrame
 	}{
-		{"float64 on all columns", fields{
+		{"float64", fields{
 			values: []*valueContainer{
 				{slice: []float64{.51}, isNull: []bool{false}, name: "foo"},
 				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
@@ -1624,35 +1624,17 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 			labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
 			name:          "baz",
 			colLevelNames: []string{"*0"}},
-			args{ApplyFormatFn{F64: func(v float64) string {
+			args{map[string]ApplyFormatFn{"foo": ApplyFormatFn{F64: func(v float64) string {
 				return strconv.FormatFloat(v, 'f', 1, 64)
-			}}},
+			}}}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []string{"0.5"}, isNull: []bool{false}, name: "foo"},
-					{slice: []string{"1.0"}, isNull: []bool{false}, name: "qux"},
+					{slice: []int{1}, isNull: []bool{false}, name: "qux"},
 				},
 				labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
 				name:          "baz",
 				colLevelNames: []string{"*0"}},
-		},
-		{"float64 on single column", fields{
-			values: []*valueContainer{
-				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
-				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
-			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name:          "baz",
-			colLevelNames: []string{"*0"}},
-			args{ApplyFormatFn{ContainerName: "foo", F64: func(v float64) string {
-				return fmt.Sprintf("%.2f", v)
-			}}},
-			&DataFrame{
-				values: []*valueContainer{
-					{slice: []string{"0.00"}, isNull: []bool{false}, name: "foo"},
-					{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
-				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				colLevelNames: []string{"*0"},
-				name:          "baz"},
 		},
 		{"fail - no function", fields{
 			values: []*valueContainer{
@@ -1660,7 +1642,7 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			name:   "baz"},
-			args{ApplyFormatFn{ContainerName: "foo"}},
+			args{map[string]ApplyFormatFn{"foo": ApplyFormatFn{}}},
 			&DataFrame{
 				err: fmt.Errorf("ApplyFormat(): no apply function provided")},
 		},
@@ -1670,7 +1652,7 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			name:   "baz"},
-			args{ApplyFormatFn{ContainerName: "corge", F64: func(float64) string { return "" }}},
+			args{map[string]ApplyFormatFn{"corge": ApplyFormatFn{F64: func(float64) string { return "" }}}},
 			&DataFrame{
 				err: fmt.Errorf("ApplyFormat(): `name` (corge) not found")},
 		},
@@ -1684,7 +1666,7 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.ApplyFormat(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+			if got := df.ApplyFormat(tt.args.lambdas); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.ApplyFormat() = %v, want %v", got, tt.want)
 			}
 		})

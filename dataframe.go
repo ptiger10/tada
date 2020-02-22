@@ -1202,32 +1202,23 @@ func (df *DataFrameMutator) Apply(lambda ApplyFn) {
 }
 
 // ApplyFormat stub
-func (df *DataFrame) ApplyFormat(lambda ApplyFormatFn) *DataFrame {
+func (df *DataFrame) ApplyFormat(lambdas map[string]ApplyFormatFn) *DataFrame {
 	df.Copy()
-	df.InPlace().ApplyFormat(lambda)
+	df.InPlace().ApplyFormat(lambdas)
 	return df
 }
 
 // ApplyFormat stub
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) ApplyFormat(lambda ApplyFormatFn) {
-	err := lambda.validate()
-	if err != nil {
-		df.dataframe.resetWithError((fmt.Errorf("ApplyFormat(): %v", err)))
-		return
-	}
-	// if ColName is empty, apply lambda to all columns
-	if lambda.ContainerName == "" {
-		for k := range df.dataframe.values {
-			df.dataframe.values[k].slice = df.dataframe.values[k].applyFormat(lambda)
-			df.dataframe.values[k].isNull = isEitherNull(
-				df.dataframe.values[k].isNull,
-				setNullsFromInterface(df.dataframe.values[k].slice))
+func (df *DataFrameMutator) ApplyFormat(lambdas map[string]ApplyFormatFn) {
+	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
+	for containerName, lambda := range lambdas {
+		err := lambda.validate()
+		if err != nil {
+			df.dataframe.resetWithError((fmt.Errorf("ApplyFormat(): %v", err)))
+			return
 		}
-	} else {
-		// if ColName is not empty, find name in either columns or labels
-		mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
-		index, err := findContainerWithName(lambda.ContainerName, mergedLabelsAndCols)
+		index, err := findContainerWithName(containerName, mergedLabelsAndCols)
 		if err != nil {
 			df.dataframe.resetWithError((fmt.Errorf("ApplyFormat(): %v", err)))
 		}

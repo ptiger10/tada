@@ -1966,29 +1966,13 @@ func TestSeries_ApplyFormat(t *testing.T) {
 			&Series{
 				values: &valueContainer{slice: []string{"0.0", "0.2"}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
-		{"apply to level",
-			fields{
-				values: &valueContainer{slice: []float64{0, .25}, isNull: []bool{false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"}}},
-			args{ApplyFormatFn{ContainerName: "foo",
-				F64: func(v float64) string { return strconv.FormatFloat(v, 'f', 1, 64) }}},
-			&Series{
-				values: &valueContainer{slice: []float64{0, 0.25}, isNull: []bool{false, false}},
-				labels: []*valueContainer{{slice: []string{"0.0", "1.0"}, isNull: []bool{false, false}, name: "foo"}}}},
 		{"fail: no function supplied",
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFormatFn{ContainerName: "*0"}},
+			args{ApplyFormatFn{}},
 			&Series{
 				err: errors.New("ApplyFormat(): no apply function provided")}},
-		{"fail: no matching col",
-			fields{
-				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
-				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFormatFn{ContainerName: "corge", F64: func(float64) string { return "foo" }}},
-			&Series{
-				err: errors.New("ApplyFormat(): `name` (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

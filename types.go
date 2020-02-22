@@ -111,9 +111,8 @@ type GroupApplyFn struct {
 
 // ApplyFormatFn stub
 type ApplyFormatFn struct {
-	F64           func(val float64) string
-	DateTime      func(val time.Time) string
-	ContainerName string
+	F64      func(val float64) string
+	DateTime func(val time.Time) string
 }
 
 // GroupedSeries stub
