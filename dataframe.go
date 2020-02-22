@@ -1157,39 +1157,28 @@ func (df *DataFrame) Filter(filters ...FilterFn) []int {
 // -- APPLY
 
 // Apply applies a user-defined `lambda` function to every row in a particular column and coerces all values to match the lambda type.
-// Apply may be applied to any label level or column by specifying a ColName in `lambda`.
-// If no ColName is specified in `lambda`, the function is applied to every column.
+// Apply may be applied to any label level or column by specifying the container name as a key in the `lambdas` map.
 // If a value is considered null either prior to or after the lambda function is applied, it is considered null after.
 // Returns a new DataFrame.
-func (df *DataFrame) Apply(lambda ApplyFn) *DataFrame {
+func (df *DataFrame) Apply(lambdas map[string]ApplyFn) *DataFrame {
 	df.Copy()
-	df.InPlace().Apply(lambda)
+	df.InPlace().Apply(lambdas)
 	return df
 }
 
 // Apply applies a user-defined `lambda` function to every row in a particular column and coerces all values to match the lambda type.
-// Apply may be applied to any label level or column by specifying a ColName in `lambda`.
-// If no ColName is specified in `lambda`, the function is applied to every column.
+// Apply may be applied to any label level or column by specifying the container name as a key in the `lambdas` map.
 // If a value is considered null either prior to or after the lambda function is applied, it is considered null after.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) Apply(lambda ApplyFn) {
-	err := lambda.validate()
-	if err != nil {
-		df.dataframe.resetWithError((fmt.Errorf("Apply(): %v", err)))
-		return
-	}
-	// if ColName is empty, apply lambda to all columns
-	if lambda.ContainerName == "" {
-		for k := range df.dataframe.values {
-			df.dataframe.values[k].slice = df.dataframe.values[k].apply(lambda)
-			df.dataframe.values[k].isNull = isEitherNull(
-				df.dataframe.values[k].isNull,
-				setNullsFromInterface(df.dataframe.values[k].slice))
+func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
+	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
+	for containerName, lambda := range lambdas {
+		err := lambda.validate()
+		if err != nil {
+			df.dataframe.resetWithError((fmt.Errorf("Apply(): %v", err)))
+			return
 		}
-	} else {
-		// if ColName is not empty, find name in either columns or labels
-		mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
-		index, err := findContainerWithName(lambda.ContainerName, mergedLabelsAndCols)
+		index, err := findContainerWithName(containerName, mergedLabelsAndCols)
 		if err != nil {
 			df.dataframe.resetWithError((fmt.Errorf("Apply(): %v", err)))
 		}

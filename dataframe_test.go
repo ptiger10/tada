@@ -1523,7 +1523,7 @@ func TestDataFrame_Apply(t *testing.T) {
 		err    error
 	}
 	type args struct {
-		lambda ApplyFn
+		lambdas map[string]ApplyFn
 	}
 	tests := []struct {
 		name   string
@@ -1531,35 +1531,19 @@ func TestDataFrame_Apply(t *testing.T) {
 		args   args
 		want   *DataFrame
 	}{
-		{"float64 on all columns", fields{
+		{"float64", fields{
 			values: []*valueContainer{
 				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
-				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
+				{slice: []int{1}, isNull: []bool{false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			name:   "baz"},
-			args{ApplyFn{F64: func(v float64) float64 {
+			args{map[string]ApplyFn{"foo": ApplyFn{F64: func(v float64) float64 {
 				return v + 1
-			}}},
+			}}}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
-					{slice: []float64{2}, isNull: []bool{false}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				name:   "baz"},
-		},
-		{"float64 on single column", fields{
-			values: []*valueContainer{
-				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
-				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name:   "baz"},
-			args{ApplyFn{ContainerName: "foo", F64: func(v float64) float64 {
-				return v + 1
-			}}},
-			&DataFrame{
-				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
-					{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
+					{slice: []int{1}, isNull: []bool{false}, name: "bar"}},
 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				name:   "baz"},
 		},
@@ -1569,7 +1553,7 @@ func TestDataFrame_Apply(t *testing.T) {
 				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			name:   "baz"},
-			args{ApplyFn{ContainerName: "foo"}},
+			args{map[string]ApplyFn{"foo": {}}},
 			&DataFrame{
 				err: fmt.Errorf("Apply(): no apply function provided")},
 		},
@@ -1579,7 +1563,7 @@ func TestDataFrame_Apply(t *testing.T) {
 				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			name:   "baz"},
-			args{ApplyFn{ContainerName: "corge", F64: func(float64) float64 { return 0 }}},
+			args{map[string]ApplyFn{"corge": ApplyFn{F64: func(float64) float64 { return 0 }}}},
 			&DataFrame{
 				err: fmt.Errorf("Apply(): `name` (corge) not found")},
 		},
@@ -1592,7 +1576,7 @@ func TestDataFrame_Apply(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.Apply(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Apply(tt.args.lambdas); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.Apply() = %v, want %v", got, tt.want)
 			}
 		})

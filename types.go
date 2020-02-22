@@ -96,10 +96,9 @@ type FilterFn struct {
 
 // ApplyFn stub
 type ApplyFn struct {
-	F64           func(val float64) float64
-	String        func(val string) string
-	DateTime      func(val time.Time) time.Time
-	ContainerName string
+	F64      func(val float64) float64
+	String   func(val string) string
+	DateTime func(val time.Time) time.Time
 }
 
 // GroupApplyFn stub

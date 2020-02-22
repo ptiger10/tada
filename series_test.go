@@ -1890,7 +1890,7 @@ func TestSeries_Apply(t *testing.T) {
 		args   args
 		want   *Series
 	}{
-		{"apply to series values by default",
+		{"apply to series values",
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
@@ -1898,19 +1898,11 @@ func TestSeries_Apply(t *testing.T) {
 			&Series{
 				values: &valueContainer{slice: []float64{0, 2}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
-		{"apply to label level and coerce to float",
-			fields{
-				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
-				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFn{F64: func(v float64) float64 { return v * 2 }, ContainerName: "*0"}},
-			&Series{
-				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
-				labels: []*valueContainer{{name: "*0", slice: []float64{0, 2}, isNull: []bool{false, false}}}}},
-		{"apply with prior null",
+		{"apply with null",
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{true, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFn{F64: func(v float64) float64 { return v * 2 }, ContainerName: ""}},
+			args{ApplyFn{F64: func(v float64) float64 { return v * 2 }}},
 			&Series{
 				values: &valueContainer{slice: []float64{0, 2}, isNull: []bool{true, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}}},
@@ -1918,16 +1910,9 @@ func TestSeries_Apply(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFn{ContainerName: "*0"}},
+			args{ApplyFn{}},
 			&Series{
 				err: errors.New("Apply(): no apply function provided")}},
-		{"fail: no matching col",
-			fields{
-				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
-				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFn{ContainerName: "corge", F64: func(float64) float64 { return 1 }}},
-			&Series{
-				err: errors.New("Apply(): `name` (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
