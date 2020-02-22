@@ -2051,6 +2051,15 @@ func resample(t time.Time, by Resampler) time.Time {
 		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, by.Location)
 	} else if by.Day {
 		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, by.Location)
+	} else if by.Week {
+		day := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, by.Location)
+		daysSinceStartOfWeek := day.Weekday() - by.StartOfWeek
+		if daysSinceStartOfWeek >= 0 {
+			// subtract days back to beginning of week
+			return day.AddDate(0, 0, int(daysSinceStartOfWeek)*-1)
+		}
+		// add days to get to start of new week, then subtract a full week
+		return day.AddDate(0, 0, (int(daysSinceStartOfWeek)*-1)-7)
 	} else {
 		return t.Truncate(by.Duration)
 	}

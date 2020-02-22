@@ -334,7 +334,7 @@ func (df *DataFrame) String() string {
 		csv[0][k] = suppressDefaultName(csv[0][k])
 	}
 	mergedLabelsAndCols := append(df.labels, df.values...)
-	// check for nulls, skippiung headers
+	// check for nulls, skipping headers
 	for i := range csv[df.numColLevels():] {
 		for k := range csv[i] {
 			if mergedLabelsAndCols[k].isNull[i] {

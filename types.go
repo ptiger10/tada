@@ -160,6 +160,8 @@ type Resampler struct {
 	Year          bool
 	Month         bool
 	Day           bool
+	Week          bool
+	StartOfWeek   time.Weekday
 	Duration      time.Duration
 	Location      *time.Location
 }

@@ -19,12 +19,15 @@ github.com/ptiger10/tablediff v0.0.0-20200213194603-d7bb408a510d h1:+aUb/cKEbIqj
 github.com/ptiger10/tablediff v0.0.0-20200213194603-d7bb408a510d/go.mod h1:Z8aoZApU6W2rGtrwNjcwL429qhIPsE4WlTrpqxWtgQk=
 github.com/ptiger10/tablediff v0.0.0-20200217220451-aaeb10694984 h1:LCNoSaiOFtN1BhOdxPzGQ6ZjHk9/xfMkEM0KpxTX4VM=
 github.com/ptiger10/tablediff v0.0.0-20200217220451-aaeb10694984/go.mod h1:Z8aoZApU6W2rGtrwNjcwL429qhIPsE4WlTrpqxWtgQk=
+github.com/ptiger10/tablediff v0.0.0-20200222000733-e003218fd611 h1:SeL0EqyJywhz0a6oa2Qz5SEQQjlK9Or/PM47f/YATck=
+github.com/ptiger10/tablediff v0.0.0-20200222000733-e003218fd611/go.mod h1:3uUtSdk/ye6xhBdYsJC70kg88qbfJ0e7pzvXDBUKNow=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
 github.com/stretchr/objx v0.2.0/go.mod h1:qt09Ya8vawLte6SNmTgCsAVtYtaKzEcn8ATUoHMkEqE=
 github.com/stretchr/testify v1.3.0 h1:TivCn/peBQ7UY8ooIcPgZFpTNSz0Q2U6UrFlUfqbe0Q=
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.4.0 h1:2E4SXV/wtOkTonXsotYi4li6zVWxYlZuYNCXe9XRJyk=
 github.com/stretchr/testify v1.4.0/go.mod h1:j7eGeouHqKxXV5pUuKE4zz7dFj8WfuZ+81PSLYec5m4=
+github.com/stretchr/testify v1.5.1/go.mod h1:5W2xD1RspED5o8YsWQXVCued0rvSQ+mT+I5cxcmMvtA=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/yaml.v2 v2.2.2/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
