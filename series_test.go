@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/d4l3k/messagediff"
+	"github.com/ptiger10/tablediff"
 )
 
 func TestNewSeries(t *testing.T) {
@@ -159,6 +160,49 @@ func TestSeries_ToDataFrame(t *testing.T) {
 			got.labels[0] = &valueContainer{slice: []float64{10}, name: "baz", isNull: []bool{false}}
 			if reflect.DeepEqual(got.labels, s.labels) {
 				t.Errorf("Series.ToDataFrame() retained reference to original labels")
+			}
+		})
+	}
+}
+
+func TestSeries_EqualsCSV(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		csv          [][]string
+		ignoreLabels bool
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   bool
+		want1  *tablediff.Differences
+	}{
+		{name: "pass",
+			fields: fields{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}}},
+			args:  args{[][]string{{"*0", "foo"}, {"0", "1"}}, false},
+			want:  true,
+			want1: nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			got, got1 := s.EqualsCSV(tt.args.csv, tt.args.ignoreLabels)
+			if got != tt.want {
+				t.Errorf("Series.EqualsCSV() got = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got1, tt.want1) {
+				t.Errorf("Series.EqualsCSV() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}

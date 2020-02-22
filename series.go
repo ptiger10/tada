@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 	"time"
+
+	"github.com/ptiger10/tablediff"
 )
 
 // -- CONSTRUCTORS
@@ -54,6 +56,13 @@ func (s *Series) ToDataFrame() *DataFrame {
 		colLevelNames: []string{"*0"},
 		err:           s.err,
 	}
+}
+
+// EqualsCSV converts a Series to csv, compares it to another csv, and evaluates whether the two match and isolates their differences
+func (s *Series) EqualsCSV(csv [][]string, ignoreLabels bool) (bool, *tablediff.Differences) {
+	compare, _ := s.ToCSV(ignoreLabels)
+	diffs, eq := tablediff.Diff(compare, csv)
+	return eq, diffs
 }
 
 // ToCSV converts a Series to a DataFrame and returns as [][]string.
