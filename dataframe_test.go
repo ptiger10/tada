@@ -3301,8 +3301,9 @@ func TestDataFrame_SelectLabels(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{"*0"},
 			&Series{
-				values: &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				values:     &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"},
+				labels:     []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				sharedData: true,
 			},
 		},
 		{"fail",
@@ -3355,8 +3356,9 @@ func TestDataFrame_Col(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{"foo"},
 			&Series{
-				values: &valueContainer{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				values:     &valueContainer{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
+				labels:     []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				sharedData: true,
 			},
 		},
 		{"fail",

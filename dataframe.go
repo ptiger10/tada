@@ -482,8 +482,9 @@ func (df *DataFrame) SelectLabels(name string) *Series {
 		return seriesWithError(fmt.Errorf("SelectLabels(): %v", err))
 	}
 	return &Series{
-		values: df.labels[index],
-		labels: df.labels,
+		values:     df.labels[index],
+		labels:     df.labels,
+		sharedData: true,
 	}
 }
 

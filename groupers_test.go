@@ -2287,6 +2287,7 @@ func TestGroupedDataFrame_Align(t *testing.T) {
 					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "corge"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "baz"}},
+					sharedData: true,
 				},
 				aligned: true,
 			}},
