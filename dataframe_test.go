@@ -3640,3 +3640,47 @@ func TestDataFrame_DropCol(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_DeduplicateContainerNames(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *DataFrame
+	}{
+		{"normal", fields{values: []*valueContainer{
+			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
+			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
+		},
+			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+			colLevelNames: []string{"*0"}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo_1"},
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
+				},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+				colLevelNames: []string{"*0"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.DeduplicateContainerNames(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.DeduplicateContainerNames() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

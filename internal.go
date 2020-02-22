@@ -2120,3 +2120,16 @@ func (vc *valueContainer) valueCounts() map[string]int {
 	}
 	return m
 }
+
+func deduplicateContainerNames(containers []*valueContainer) {
+	m := make(map[string]int)
+	for k := range containers {
+		name := containers[k].name
+		if n, ok := m[name]; !ok {
+			m[name] = 1
+		} else {
+			containers[k].name = fmt.Sprintf("%v_%v", containers[k].name, n)
+			m[name]++
+		}
+	}
+}

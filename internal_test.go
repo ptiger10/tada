@@ -2871,3 +2871,35 @@ func Test_nunique(t *testing.T) {
 		})
 	}
 }
+
+func Test_deduplicateContainerNames(t *testing.T) {
+	type args struct {
+		containers []*valueContainer
+	}
+	tests := []struct {
+		name string
+		args args
+		want []*valueContainer
+	}{
+		{"pass", args{[]*valueContainer{
+			{name: "foo"},
+			{name: "foo"},
+			{name: "bar"},
+			{name: "foo"},
+		}},
+			[]*valueContainer{
+				{name: "foo"},
+				{name: "foo_1"},
+				{name: "bar"},
+				{name: "foo_2"},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			deduplicateContainerNames(tt.args.containers)
+			if !reflect.DeepEqual(tt.args.containers, tt.want) {
+				t.Errorf("deduplicateContainerNames() -> %v, want %v", tt.args.containers, tt.want)
+			}
+		})
+	}
+}

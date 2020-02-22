@@ -475,6 +475,19 @@ func (df *DataFrameMutator) SubsetCols(index []int) {
 	return
 }
 
+// DeduplicateContainerNames stub
+func (df *DataFrame) DeduplicateContainerNames() *DataFrame {
+	df = df.Copy()
+	df.InPlace().DeduplicateContainerNames()
+	return df
+}
+
+// DeduplicateContainerNames stub
+func (df *DataFrameMutator) DeduplicateContainerNames() {
+	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
+	deduplicateContainerNames(mergedLabelsAndCols)
+}
+
 // SelectLabels finds the first level with matching `name` and returns as a Series with all existing label levels (including itself).
 func (df *DataFrame) SelectLabels(name string) *Series {
 	index, err := findContainerWithName(name, df.labels)
