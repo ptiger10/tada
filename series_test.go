@@ -2960,7 +2960,7 @@ func TestSeries_SelectLabels(t *testing.T) {
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}},
 			args{"*0"},
 			&Series{
-				values:     &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"},
+				values:     &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "0"},
 				labels:     []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				sharedData: true,
 			},

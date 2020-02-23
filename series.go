@@ -108,13 +108,20 @@ func (s *Series) Cast(dtype DType) {
 }
 
 // SelectLabels finds the first level with matching `name` and returns as a Series with all existing label levels (including itself).
+// If label level name is default (prefixed with *), removes the prefix.
 func (s *Series) SelectLabels(name string) *Series {
 	index, err := findContainerWithName(name, s.labels)
 	if err != nil {
 		return seriesWithError(fmt.Errorf("SelectLabels(): %v", err))
 	}
+	values := s.labels[index]
+	retValues := &valueContainer{
+		slice:  values.slice,
+		isNull: values.isNull,
+		name:   removeDefaultNameIndicator(values.name),
+	}
 	return &Series{
-		values:     s.labels[index],
+		values:     retValues,
 		labels:     s.labels,
 		sharedData: true,
 	}

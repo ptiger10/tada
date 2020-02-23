@@ -438,16 +438,15 @@ func (g *GroupedSeries) HavingCount(lambda func(int) bool) *GroupedSeries {
 
 // Col isolates the Series at `containerName`, which may be either a label level or column in the underlying DataFrame.
 // Returns a GroupedSeries with the same groups and labels as in the GroupedDataFrame.
-func (g *GroupedDataFrame) Col(containerName string) *GroupedSeries {
-	mergedLabelsAndCols := append(g.df.labels, g.df.values...)
-	index, err := findContainerWithName(containerName, mergedLabelsAndCols)
+func (g *GroupedDataFrame) Col(colName string) *GroupedSeries {
+	index, err := findContainerWithName(colName, g.df.values)
 	if err != nil {
 		return &GroupedSeries{
 			err: fmt.Errorf("Col(): %v", err),
 		}
 	}
 	series := &Series{
-		values:     mergedLabelsAndCols[index],
+		values:     g.df.values[index],
 		labels:     g.df.labels,
 		sharedData: true,
 	}

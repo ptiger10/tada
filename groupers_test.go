@@ -2308,20 +2308,20 @@ func TestGroupedDataFrame_Col(t *testing.T) {
 				labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "baz"}},
 				df: &DataFrame{
 					values: []*valueContainer{
-						{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "corge"},
+						{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
 						{slice: []float64{5, 6, 7, 8}, isNull: []bool{false, false, false, false}, name: "waldo"},
 					},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "baz"}},
 					colLevelNames: []string{"*0"},
 					name:          "qux"}},
-			args: args{"corge"},
+			args: args{"qux"},
 			want: &GroupedSeries{
 				orderedKeys: []string{"foo", "bar"},
 				rowIndices:  [][]int{{0, 1}, {2, 3}},
 				labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "baz"}},
 				series: &Series{
-					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "corge"},
+					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "baz"}},
 					sharedData: true,

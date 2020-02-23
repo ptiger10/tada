@@ -480,13 +480,20 @@ func (df *DataFrameMutator) DeduplicateNames() {
 }
 
 // SelectLabels finds the first level with matching `name` and returns as a Series with all existing label levels (including itself).
+// If label level name is default (prefixed with *), removes the prefix.
 func (df *DataFrame) SelectLabels(name string) *Series {
 	index, err := findContainerWithName(name, df.labels)
 	if err != nil {
 		return seriesWithError(fmt.Errorf("SelectLabels(): %v", err))
 	}
+	values := df.labels[index]
+	retValues := &valueContainer{
+		slice:  values.slice,
+		isNull: values.isNull,
+		name:   removeDefaultNameIndicator(values.name),
+	}
 	return &Series{
-		values:     df.labels[index],
+		values:     retValues,
 		labels:     df.labels,
 		sharedData: true,
 	}
