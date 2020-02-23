@@ -312,8 +312,10 @@ func TestGroupedSeries_Sum(t *testing.T) {
 					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			want: &Series{values: &valueContainer{
-				slice: []float64{3, 3, 7, 7}, isNull: []bool{false, false, false, false}, name: "qux_sum"},
+			want: &Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []float64{3, 3, 7, 7}, isNull: []bool{false, false, false, false}, name: "qux_sum"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -330,7 +332,8 @@ func TestGroupedSeries_Sum(t *testing.T) {
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 						{slice: []int{0, 0, 0, 0}, isNull: []bool{false, false, false, false}, name: "*1"}}}},
-			want: &Series{values: &valueContainer{slice: []float64{3, 7}, isNull: []bool{false, false}, name: "sum"},
+			want: &Series{
+				values: &valueContainer{slice: []float64{3, 7}, isNull: []bool{false, false}, name: "sum"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
 					{slice: []int{0, 0}, isNull: []bool{false, false}, name: "*1"}}}},
@@ -388,8 +391,10 @@ func TestGroupedSeries_Mean(t *testing.T) {
 					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			want: &Series{values: &valueContainer{
-				slice: []float64{1.5, 1.5, 3.5, 3.5}, isNull: []bool{false, false, false, false}, name: "qux_mean"},
+			want: &Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []float64{1.5, 1.5, 3.5, 3.5}, isNull: []bool{false, false, false, false}, name: "qux_mean"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -406,7 +411,8 @@ func TestGroupedSeries_Mean(t *testing.T) {
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 						{slice: []int{0, 0, 0, 0}, isNull: []bool{false, false, false, false}, name: "*1"}}}},
-			want: &Series{values: &valueContainer{slice: []float64{1.5, 3.5}, isNull: []bool{false, false}, name: "mean"},
+			want: &Series{
+				values: &valueContainer{slice: []float64{1.5, 3.5}, isNull: []bool{false, false}, name: "mean"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
 					{slice: []int{0, 0}, isNull: []bool{false, false}, name: "*1"}}}},
@@ -464,8 +470,10 @@ func TestGroupedSeries_Median(t *testing.T) {
 					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			want: &Series{values: &valueContainer{
-				slice: []float64{1.5, 1.5, 3.5, 3.5}, isNull: []bool{false, false, false, false}, name: "qux_median"},
+			want: &Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []float64{1.5, 1.5, 3.5, 3.5}, isNull: []bool{false, false, false, false}, name: "qux_median"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -482,7 +490,8 @@ func TestGroupedSeries_Median(t *testing.T) {
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 						{slice: []int{0, 0, 0, 0}, isNull: []bool{false, false, false, false}, name: "*1"}}}},
-			want: &Series{values: &valueContainer{slice: []float64{1.5, 3.5}, isNull: []bool{false, false}, name: "median"},
+			want: &Series{
+				values: &valueContainer{slice: []float64{1.5, 3.5}, isNull: []bool{false, false}, name: "median"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
 					{slice: []int{0, 0}, isNull: []bool{false, false}, name: "*1"}}}},
@@ -540,8 +549,10 @@ func TestGroupedSeries_Std(t *testing.T) {
 					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			want: &Series{values: &valueContainer{
-				slice: []float64{0.5, 0.5, 0.5, 0.5}, isNull: []bool{false, false, false, false}, name: "qux_std"},
+			want: &Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []float64{0.5, 0.5, 0.5, 0.5}, isNull: []bool{false, false, false, false}, name: "qux_std"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -616,8 +627,10 @@ func TestGroupedSeries_Min(t *testing.T) {
 					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			want: &Series{values: &valueContainer{
-				slice: []float64{1, 1, 3, 3}, isNull: []bool{false, false, false, false}, name: "qux_min"},
+			want: &Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []float64{1, 1, 3, 3}, isNull: []bool{false, false, false, false}, name: "qux_min"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -675,8 +688,10 @@ func TestGroupedSeries_Max(t *testing.T) {
 					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			want: &Series{values: &valueContainer{
-				slice: []float64{2, 2, 4, 4}, isNull: []bool{false, false, false, false}, name: "qux_max"},
+			want: &Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []float64{2, 2, 4, 4}, isNull: []bool{false, false, false, false}, name: "qux_max"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -734,8 +749,10 @@ func TestGroupedSeries_Count(t *testing.T) {
 					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			want: &Series{values: &valueContainer{
-				slice: []float64{2, 2, 2, 2}, isNull: []bool{false, false, false, false}, name: "qux_count"},
+			want: &Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []float64{2, 2, 2, 2}, isNull: []bool{false, false, false, false}, name: "qux_count"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -793,8 +810,10 @@ func TestGroupedSeries_First(t *testing.T) {
 					values: &valueContainer{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "qux"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			want: &Series{values: &valueContainer{
-				slice: []string{"a", "a", "c", "c"}, isNull: []bool{false, false, false, false}, name: "qux_first"},
+			want: &Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []string{"a", "a", "c", "c"}, isNull: []bool{false, false, false, false}, name: "qux_first"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -852,8 +871,10 @@ func TestGroupedSeries_Last(t *testing.T) {
 					values: &valueContainer{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "qux"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			want: &Series{values: &valueContainer{
-				slice: []string{"b", "b", "d", "d"}, isNull: []bool{false, false, false, false}, name: "qux_last"},
+			want: &Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []string{"b", "b", "d", "d"}, isNull: []bool{false, false, false, false}, name: "qux_last"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -912,8 +933,10 @@ func TestGroupedSeries_Earliest(t *testing.T) {
 					values: &valueContainer{slice: []time.Time{d, d.AddDate(0, 0, 1), d.AddDate(0, 0, 2), d.AddDate(0, 0, 3)}, isNull: []bool{false, false, false, false}, name: "qux"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			want: &Series{values: &valueContainer{
-				slice: []time.Time{d, d, d.AddDate(0, 0, 2), d.AddDate(0, 0, 2)}, isNull: []bool{false, false, false, false}, name: "qux_earliest"},
+			want: &Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []time.Time{d, d, d.AddDate(0, 0, 2), d.AddDate(0, 0, 2)}, isNull: []bool{false, false, false, false}, name: "qux_earliest"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -972,8 +995,10 @@ func TestGroupedSeries_Latest(t *testing.T) {
 					values: &valueContainer{slice: []time.Time{d, d.AddDate(0, 0, 1), d.AddDate(0, 0, 2), d.AddDate(0, 0, 3)}, isNull: []bool{false, false, false, false}, name: "qux"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			want: &Series{values: &valueContainer{
-				slice: []time.Time{d.AddDate(0, 0, 1), d.AddDate(0, 0, 1), d.AddDate(0, 0, 3), d.AddDate(0, 0, 3)}, isNull: []bool{false, false, false, false}, name: "qux_latest"},
+			want: &Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []time.Time{d.AddDate(0, 0, 1), d.AddDate(0, 0, 1), d.AddDate(0, 0, 3), d.AddDate(0, 0, 3)}, isNull: []bool{false, false, false, false}, name: "qux_latest"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -1073,8 +1098,10 @@ func TestGroupedSeries_Apply(t *testing.T) {
 				}
 				return sum
 			}}},
-			&Series{values: &valueContainer{
-				slice: []float64{3, 3, 7, 7}, isNull: []bool{false, false, false, false}, name: "qux_custom"},
+			&Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []float64{3, 3, 7, 7}, isNull: []bool{false, false, false, false}, name: "qux_custom"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -1094,8 +1121,10 @@ func TestGroupedSeries_Apply(t *testing.T) {
 				}
 				return sum
 			}}},
-			&Series{values: &valueContainer{
-				slice: []float64{3, 3, 0, 0}, isNull: []bool{false, false, true, true}, name: "qux_custom"},
+			&Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []float64{3, 3, 0, 0}, isNull: []bool{false, false, true, true}, name: "qux_custom"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -1146,8 +1175,10 @@ func TestGroupedSeries_Apply(t *testing.T) {
 			args{"custom", GroupApplyFn{String: func(vals []string) string {
 				return strings.ToUpper(vals[0])
 			}}},
-			&Series{values: &valueContainer{
-				slice: []string{"A", "A", "C", "C"}, isNull: []bool{false, false, false, false}, name: "qux_custom"},
+			&Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []string{"A", "A", "C", "C"}, isNull: []bool{false, false, false, false}, name: "qux_custom"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -1163,8 +1194,10 @@ func TestGroupedSeries_Apply(t *testing.T) {
 			args{"custom", GroupApplyFn{String: func(vals []string) string {
 				return strings.ToUpper(vals[0])
 			}}},
-			&Series{values: &valueContainer{
-				slice: []string{"A", "A", "", ""}, isNull: []bool{false, false, true, true}, name: "qux_custom"},
+			&Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []string{"A", "A", "", ""}, isNull: []bool{false, false, true, true}, name: "qux_custom"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -1215,8 +1248,10 @@ func TestGroupedSeries_Apply(t *testing.T) {
 			args{"custom", GroupApplyFn{DateTime: func(vals []time.Time) time.Time {
 				return vals[0]
 			}}},
-			&Series{values: &valueContainer{
-				slice: []time.Time{d, d, d.AddDate(0, 0, 2), d.AddDate(0, 0, 2)}, isNull: []bool{false, false, false, false}, name: "qux_custom"},
+			&Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []time.Time{d, d, d.AddDate(0, 0, 2), d.AddDate(0, 0, 2)}, isNull: []bool{false, false, false, false}, name: "qux_custom"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -1232,8 +1267,10 @@ func TestGroupedSeries_Apply(t *testing.T) {
 			args{"custom", GroupApplyFn{DateTime: func(vals []time.Time) time.Time {
 				return vals[0]
 			}}},
-			&Series{values: &valueContainer{
-				slice: []time.Time{d, d, {}, {}}, isNull: []bool{false, false, true, true}, name: "qux_custom"},
+			&Series{
+				sharedData: true,
+				values: &valueContainer{
+					slice: []time.Time{d, d, {}, {}}, isNull: []bool{false, false, true, true}, name: "qux_custom"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},

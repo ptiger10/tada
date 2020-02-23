@@ -140,6 +140,7 @@ func groupedDateTimeFunc(
 }
 
 func (g *GroupedSeries) floatFunc(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
+	var sharedData bool
 	if g.aligned {
 		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
 	}
@@ -150,14 +151,17 @@ func (g *GroupedSeries) floatFunc(name string, fn func(val []float64, isNull []b
 	if g.aligned {
 		// if aligned: all labels
 		retLabels = g.series.labels
+		sharedData = true
 	}
 	return &Series{
-		values: retVals,
-		labels: retLabels,
+		values:     retVals,
+		labels:     retLabels,
+		sharedData: sharedData,
 	}
 }
 
 func (g *GroupedSeries) stringFunc(name string, fn func(val []string, isNull []bool, index []int) (string, bool)) *Series {
+	var sharedData bool
 	if g.aligned {
 		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
 	}
@@ -168,14 +172,17 @@ func (g *GroupedSeries) stringFunc(name string, fn func(val []string, isNull []b
 	if g.aligned {
 		// if aligned: all labels
 		retLabels = g.series.labels
+		sharedData = true
 	}
 	return &Series{
-		values: retVals,
-		labels: retLabels,
+		values:     retVals,
+		labels:     retLabels,
+		sharedData: sharedData,
 	}
 }
 
 func (g *GroupedSeries) dateTimeFunc(name string, fn func(val []time.Time, isNull []bool, index []int) (time.Time, bool)) *Series {
+	var sharedData bool
 	if g.aligned {
 		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
 	}
@@ -186,10 +193,12 @@ func (g *GroupedSeries) dateTimeFunc(name string, fn func(val []time.Time, isNul
 	if g.aligned {
 		// if aligned: all labels
 		retLabels = g.series.labels
+		sharedData = true
 	}
 	return &Series{
-		values: retVals,
-		labels: retLabels,
+		values:     retVals,
+		labels:     retLabels,
+		sharedData: sharedData,
 	}
 }
 
