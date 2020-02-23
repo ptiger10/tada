@@ -39,21 +39,12 @@ func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 
 // Copy stub
 func (df *DataFrame) Copy() *DataFrame {
-	values := make([]*valueContainer, len(df.values))
-	for j := range df.values {
-		values[j] = df.values[j].copy()
-	}
-
-	labels := make([]*valueContainer, len(df.labels))
-	for j := range df.labels {
-		labels[j] = df.labels[j].copy()
-	}
 	colLevelNames := make([]string, len(df.colLevelNames))
 	copy(colLevelNames, df.colLevelNames)
 
 	return &DataFrame{
-		values:        values,
-		labels:        labels,
+		values:        copyContainers(df.values),
+		labels:        copyContainers(df.labels),
 		err:           df.err,
 		colLevelNames: colLevelNames,
 		name:          df.name,
@@ -475,15 +466,15 @@ func (df *DataFrameMutator) SubsetCols(index []int) {
 	return
 }
 
-// DeduplicateContainerNames stub
-func (df *DataFrame) DeduplicateContainerNames() *DataFrame {
+// DeduplicateNames stub
+func (df *DataFrame) DeduplicateNames() *DataFrame {
 	df = df.Copy()
-	df.InPlace().DeduplicateContainerNames()
+	df.InPlace().DeduplicateNames()
 	return df
 }
 
-// DeduplicateContainerNames stub
-func (df *DataFrameMutator) DeduplicateContainerNames() {
+// DeduplicateNames stub
+func (df *DataFrameMutator) DeduplicateNames() {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
 	deduplicateContainerNames(mergedLabelsAndCols)
 }
@@ -1217,12 +1208,14 @@ func (df *DataFrame) Merge(other *DataFrame) *DataFrame {
 	return df
 }
 
-// Merge stub
+// Merge adds the columns of the `other` DataFrame where there is label alignment on containers with matching names.
+// Merged containers are deduplicated so that they are unique.
 func (df *DataFrameMutator) Merge(other *DataFrame) {
 	lookupDF := df.dataframe.Lookup(other)
 	for k := range lookupDF.values {
 		df.dataframe.values = append(df.dataframe.values, lookupDF.values[k])
 	}
+	df.DeduplicateNames()
 }
 
 // Lookup stub

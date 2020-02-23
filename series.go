@@ -38,13 +38,9 @@ func NewSeries(slice interface{}, labels ...interface{}) *Series {
 
 // Copy returns a deep copy of a Series with no shared references to the original.
 func (s *Series) Copy() *Series {
-	labels := make([]*valueContainer, len(s.labels))
-	for i := 0; i < len(s.labels); i++ {
-		labels[i] = s.labels[i].copy()
-	}
 	return &Series{
 		values:     s.values.copy(),
-		labels:     labels,
+		labels:     copyContainers(s.labels),
 		err:        s.err,
 		sharedData: false,
 	}

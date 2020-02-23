@@ -716,6 +716,16 @@ func (vc *valueContainer) null() []int {
 	return index
 }
 
+func subsetContainerRows(containers []*valueContainer, index []int) error {
+	for k := range containers {
+		err := containers[k].subsetRows(index)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // subsetRows modifies vc in place to contain ony the rows specified by index.
 // If any position is out of range, returns an error
 func (vc *valueContainer) subsetRows(index []int) error {
@@ -1425,6 +1435,14 @@ func excludeFromIndex(indexLength int, item int) []int {
 		if i != item {
 			ret = append(ret, i)
 		}
+	}
+	return ret
+}
+
+func copyContainers(containers []*valueContainer) []*valueContainer {
+	ret := make([]*valueContainer, len(containers))
+	for k := range containers {
+		ret[k] = containers[k].copy()
 	}
 	return ret
 }

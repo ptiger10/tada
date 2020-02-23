@@ -403,6 +403,30 @@ func (g *GroupedSeries) Align() *GroupedSeries {
 	return g
 }
 
+// HavingCount stub
+func (g *GroupedSeries) HavingCount(lambda func(int) bool) *GroupedSeries {
+	indexToKeep := make([]int, 0)
+	retRowIndices := make([][]int, 0)
+	retOrderedKeys := make([]string, 0)
+	for i, index := range g.rowIndices {
+		if lambda(len(index)) {
+			indexToKeep = append(indexToKeep, i)
+			retRowIndices = append(retRowIndices, index)
+			retOrderedKeys = append(retOrderedKeys, g.orderedKeys[i])
+		}
+	}
+	labels := copyContainers(g.labels)
+	subsetContainerRows(labels, indexToKeep)
+
+	return &GroupedSeries{
+		orderedKeys: retOrderedKeys,
+		rowIndices:  retRowIndices,
+		labels:      labels,
+		series:      g.series,
+		aligned:     g.aligned,
+	}
+}
+
 // Col isolates the Series at `containerName`, which may be either a label level or column in the underlying DataFrame.
 // Returns a GroupedSeries with the same groups and labels as in the GroupedDataFrame.
 func (g *GroupedDataFrame) Col(containerName string) *GroupedSeries {
@@ -492,5 +516,28 @@ func (s *Series) RollingDuration(d time.Duration) *GroupedSeries {
 		rowIndices: rowIndices,
 		series:     s,
 		aligned:    true,
+	}
+}
+
+// HavingCount stub
+func (g *GroupedDataFrame) HavingCount(lambda func(int) bool) *GroupedDataFrame {
+	indexToKeep := make([]int, 0)
+	retRowIndices := make([][]int, 0)
+	retOrderedKeys := make([]string, 0)
+	for i, index := range g.rowIndices {
+		if lambda(len(index)) {
+			indexToKeep = append(indexToKeep, i)
+			retRowIndices = append(retRowIndices, index)
+			retOrderedKeys = append(retOrderedKeys, g.orderedKeys[i])
+		}
+	}
+	labels := copyContainers(g.labels)
+	subsetContainerRows(labels, indexToKeep)
+
+	return &GroupedDataFrame{
+		orderedKeys: retOrderedKeys,
+		rowIndices:  retRowIndices,
+		labels:      labels,
+		df:          g.df,
 	}
 }

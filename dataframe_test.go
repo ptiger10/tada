@@ -3641,7 +3641,7 @@ func TestDataFrame_DropCol(t *testing.T) {
 	}
 }
 
-func TestDataFrame_DeduplicateContainerNames(t *testing.T) {
+func TestDataFrame_DeduplicateNames(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -3678,8 +3678,8 @@ func TestDataFrame_DeduplicateContainerNames(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.DeduplicateContainerNames(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.DeduplicateContainerNames() = %v, want %v", got, tt.want)
+			if got := df.DeduplicateNames(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.DeduplicateNames() = %v, want %v", got, tt.want)
 			}
 		})
 	}
