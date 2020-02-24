@@ -547,8 +547,7 @@ func TestSeries_FillNull(t *testing.T) {
 		err    error
 	}
 	type args struct {
-		how        NullFiller
-		levelNames []string
+		how NullFiller
 	}
 	tests := []struct {
 		name   string
@@ -556,29 +555,14 @@ func TestSeries_FillNull(t *testing.T) {
 		args   args
 		want   *Series
 	}{
-		{"values",
+		{"fill forward",
 			fields{
 				values: &valueContainer{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "qux"},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{true, false}, name: "*0"}}},
-			args{NullFiller{FillForward: true}, nil},
+			args{NullFiller{FillForward: true}},
 			&Series{
 				values: &valueContainer{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "qux"},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{true, false}, name: "*0"}}}},
-		{"labels",
-			fields{
-				values: &valueContainer{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "qux"},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{true, false}, name: "*0"}}},
-			args{NullFiller{FillForward: true}, []string{"*0"}},
-			&Series{
-				values: &valueContainer{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "qux"},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}}},
-		{"fail - bad level name",
-			fields{
-				values: &valueContainer{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "qux"},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{true, false}, name: "*0"}}},
-			args{NullFiller{FillForward: true}, []string{"corge"}},
-			&Series{
-				err: errors.New("FillNull(): `name` (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -587,7 +571,7 @@ func TestSeries_FillNull(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.FillNull(tt.args.how, tt.args.levelNames...); !reflect.DeepEqual(got, tt.want) {
+			if got := s.FillNull(tt.args.how); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.FillNull() = %v, want %v", got, tt.want)
 			}
 		})

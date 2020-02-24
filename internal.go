@@ -648,6 +648,7 @@ func mockString(dtype string) string {
 	return options[randomIndex]
 }
 
+// modifies vc in place
 func (vc *valueContainer) fillnull(lambda NullFiller) {
 	v := reflect.ValueOf(vc.slice)
 	zeroVal := reflect.Zero(v.Type().Elem())

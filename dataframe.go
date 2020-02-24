@@ -616,6 +616,31 @@ func (df *DataFrame) Range(first, last int) *DataFrame {
 	return &DataFrame{values: retVals, labels: retLabels, name: df.name, colLevelNames: df.colLevelNames}
 }
 
+// FillNull fills all the null values in the specified container name (column or label level) and makes them not-null.
+// By default, applies NullFiller to Series values.
+// Returns a new Series.
+func (df *DataFrame) FillNull(how map[string]NullFiller) *DataFrame {
+	df = df.Copy()
+	df.InPlace().FillNull(how)
+	return df
+}
+
+// FillNull fills all the null values and makes them not-null.
+// By default, applies NullFiller to Series values.
+// Modifies the underlying Series.
+func (df *DataFrameMutator) FillNull(how map[string]NullFiller) {
+	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
+	for name, filler := range how {
+		index, err := findContainerWithName(name, mergedLabelsAndCols)
+		if err != nil {
+			df.dataframe.resetWithError(fmt.Errorf("FillNull(): %v", err))
+			return
+		}
+		mergedLabelsAndCols[index].fillnull(filler)
+	}
+	return
+}
+
 // DropNull removes rows with null values.
 // If `subset` is supplied, removes any rows with null values in any of the specified columns.
 // Returns a new DataFrame.

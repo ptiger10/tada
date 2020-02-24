@@ -222,32 +222,17 @@ func (s *Series) Range(first, last int) *Series {
 }
 
 // FillNull fills all the null values and makes them not-null.
-// By default, applies NullFiller to Series values.
-// If `levelNames` are supplied, applies the NullFiller only to those label levels.
 // Returns a new Series.
-func (s *Series) FillNull(how NullFiller, levelNames ...string) *Series {
+func (s *Series) FillNull(how NullFiller) *Series {
 	s = s.Copy()
-	s.InPlace().FillNull(how, levelNames...)
+	s.InPlace().FillNull(how)
 	return s
 }
 
 // FillNull fills all the null values and makes them not-null.
-// By default, applies NullFiller to Series values.
-// If `levelNames` are supplied, applies the NullFiller only to those label levels.
 // Modifies the underlying Series.
-func (s *SeriesMutator) FillNull(how NullFiller, levelNames ...string) {
-	if len(levelNames) == 0 {
-		s.series.values.fillnull(how)
-		return
-	}
-	for _, name := range levelNames {
-		lvl, err := findContainerWithName(name, s.series.labels)
-		if err != nil {
-			s.series.resetWithError(fmt.Errorf("FillNull(): %v", err))
-			return
-		}
-		s.series.labels[lvl].fillnull(how)
-	}
+func (s *SeriesMutator) FillNull(how NullFiller) {
+	s.series.values.fillnull(how)
 	return
 }
 

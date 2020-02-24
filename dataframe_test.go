@@ -3684,3 +3684,68 @@ func TestDataFrame_DeduplicateNames(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_FillNull(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		how map[string]NullFiller
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []int{10, 1}, isNull: []bool{true, false}, name: "foo"},
+				{slice: []int{0, 1}, isNull: []bool{true, false}, name: "qux"},
+			},
+			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			name:          "baz",
+			colLevelNames: []string{"*0"}},
+			args{map[string]NullFiller{"foo": {FillZero: true}}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"},
+					{slice: []int{0, 1}, isNull: []bool{true, false}, name: "qux"},
+				},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				name:          "baz",
+				colLevelNames: []string{"*0"}},
+		},
+		{"fail - no matching column", fields{
+			values: []*valueContainer{
+				{slice: []int{10, 1}, isNull: []bool{true, false}, name: "foo"},
+				{slice: []int{0, 1}, isNull: []bool{true, false}, name: "qux"},
+			},
+			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			name:          "baz",
+			colLevelNames: []string{"*0"}},
+			args{map[string]NullFiller{"corge": {FillZero: true}}},
+			&DataFrame{
+				err: fmt.Errorf("FillNull(): `name` (corge) not found")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.FillNull(tt.args.how); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.FillNull() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

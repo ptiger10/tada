@@ -2730,7 +2730,7 @@ func Test_valueContainer_fillnull(t *testing.T) {
 			args{NullFiller{FillBackward: true}},
 			&valueContainer{slice: []int{1, 1, 2, 2, 0}, isNull: []bool{false, false, false, false, false}},
 		},
-		{"fill backward", fields{slice: []int{10, 1, 0, 2, 0}, isNull: []bool{true, false, true, false, true}},
+		{"fill zero", fields{slice: []int{10, 1, 0, 2, 0}, isNull: []bool{true, false, true, false, true}},
 			args{NullFiller{FillZero: true}},
 			&valueContainer{slice: []int{0, 1, 0, 2, 0}, isNull: []bool{false, false, false, false, false}},
 		},
