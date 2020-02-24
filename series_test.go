@@ -1130,7 +1130,7 @@ func TestSeries_Sort(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []string{"baz", "foo", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{[]Sorter{{DType: String, Descending: false}, {ContainerName: "*0", Descending: true}}},
+			args{[]Sorter{{DType: String, Descending: false}, {Name: "*0", Descending: true}}},
 			&Series{
 				values: &valueContainer{slice: []string{"baz", "baz", "foo"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{2, 0, 1}, isNull: []bool{false, false, false}}}}},
@@ -1138,7 +1138,7 @@ func TestSeries_Sort(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []string{"baz", "foo", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{[]Sorter{{ContainerName: "corge", Descending: true}}},
+			args{[]Sorter{{Name: "corge", Descending: true}}},
 			&Series{
 				err: errors.New("Sort(): position 0: `name` (corge) not found")}},
 	}

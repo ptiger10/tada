@@ -63,9 +63,9 @@ type dateTimeValueContainer struct {
 
 // Sorter stub
 type Sorter struct {
-	ContainerName string
-	Descending    bool
-	DType         DType
+	Name       string
+	Descending bool
+	DType      DType
 }
 
 // Element stub

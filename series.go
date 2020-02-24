@@ -463,7 +463,7 @@ func sortContainers(containers []*valueContainer, sorters []Sorter, length int) 
 	// initialize original index
 	originalIndex := makeIntRange(0, length)
 	for i := len(sorters) - 1; i >= 0; i-- {
-		index, err := findContainerWithName(sorters[i].ContainerName, containers)
+		index, err := findContainerWithName(sorters[i].Name, containers)
 		if err != nil {
 			return nil, fmt.Errorf("position %v: %v", len(sorters)-1-i, err)
 		}
@@ -481,12 +481,12 @@ func sortContainers(containers []*valueContainer, sorters []Sorter, length int) 
 func (s *SeriesMutator) Sort(by ...Sorter) {
 	// default for handling no Sorters: values as float in ascending order
 	if len(by) == 0 {
-		by = []Sorter{{ContainerName: s.series.values.name, DType: Float, Descending: false}}
+		by = []Sorter{{Name: s.series.values.name, DType: Float, Descending: false}}
 	}
 	// replace "" with values
 	for i := range by {
-		if by[i].ContainerName == "" {
-			by[i].ContainerName = s.series.values.name
+		if by[i].Name == "" {
+			by[i].Name = s.series.values.name
 		}
 	}
 	mergedLabelsAndValues := append(s.series.labels, s.series.values)
