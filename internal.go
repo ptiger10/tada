@@ -2113,12 +2113,14 @@ func resample(t time.Time, by Resampler) time.Time {
 // default timezone: UTC
 func (vc *valueContainer) resample(by Resampler) {
 	vals := vc.dateTime().slice
+	retVals := make([]time.Time, len(vals))
 	if by.Location == nil {
 		by.Location = time.UTC
 	}
 	for i := range vals {
-		vals[i] = resample(vals[i], by)
+		retVals[i] = resample(vals[i], by)
 	}
+	vc.slice = retVals
 	return
 }
 

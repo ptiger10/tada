@@ -1314,13 +1314,13 @@ func (df *DataFrameMutator) Sort(by ...Sorter) {
 
 	// original index
 	mergedLabelsAndValues := append(df.dataframe.labels, df.dataframe.values...)
-	index, err := sortContainers(mergedLabelsAndValues, by, df.dataframe.Len())
+	newIndex, err := sortContainers(mergedLabelsAndValues, by, df.dataframe.Len())
 	if err != nil {
 		df.dataframe.resetWithError(fmt.Errorf("Sort(): %v", err))
 		return
 	}
 	// rearrange the data in place with the final index
-	df.Subset(index)
+	df.Subset(newIndex)
 }
 
 // -- GROUPERS

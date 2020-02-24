@@ -460,7 +460,7 @@ func (s *Series) Sort(by ...Sorter) *Series {
 }
 
 func sortContainers(containers []*valueContainer, sorters []Sorter, length int) ([]int, error) {
-	// original index
+	// initialize original index
 	originalIndex := makeIntRange(0, length)
 	for i := len(sorters) - 1; i >= 0; i-- {
 		index, err := findContainerWithName(sorters[i].ContainerName, containers)
@@ -469,8 +469,10 @@ func sortContainers(containers []*valueContainer, sorters []Sorter, length int) 
 		}
 		// must copy the values to be sorted to avoid prematurely overwriting underlying data
 		vals := containers[index].copy()
+		// pass in prior originalIndex to create new originalIndex
 		originalIndex = vals.sort(sorters[i].DType, sorters[i].Ascending, originalIndex)
 	}
+	// rearranging the original data by referencing these original row positions (in sequential order) will sort the series
 	return originalIndex, nil
 }
 
@@ -487,13 +489,13 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 		}
 	}
 	mergedLabelsAndValues := append(s.series.labels, s.series.values)
-	index, err := sortContainers(mergedLabelsAndValues, by, s.series.Len())
+	newIndex, err := sortContainers(mergedLabelsAndValues, by, s.series.Len())
 	if err != nil {
 		s.series.resetWithError(fmt.Errorf("Sort(): %v", err))
 		return
 	}
 	// rearrange the data in place with the final index
-	s.Subset(index)
+	s.Subset(newIndex)
 	return
 }
 
@@ -975,23 +977,31 @@ func (s *Series) PercentileCut(bins []float64, labels []string) *Series {
 
 // SliceFloat64 coerces the Series values into []float64.
 func (s *Series) SliceFloat64() []float64 {
-	return s.values.float().slice
+	output := make([]float64, s.Len())
+	copy(output, s.values.float().slice)
+	return output
 }
 
 // SliceString coerces the Series values into []string.
 func (s *Series) SliceString() []string {
-	return s.values.str().slice
+	output := make([]string, s.Len())
+	copy(output, s.values.str().slice)
+	return output
 
 }
 
 // SliceTime coerces the Series values into []time.Time.
 func (s *Series) SliceTime() []time.Time {
-	return s.values.dateTime().slice
+	output := make([]time.Time, s.Len())
+	copy(output, s.values.dateTime().slice)
+	return output
 }
 
 // SliceNulls returns whether each value is null or not.
 func (s *Series) SliceNulls() []bool {
-	return s.values.isNull
+	output := make([]bool, s.Len())
+	copy(output, s.values.isNull)
+	return output
 }
 
 // ValueCounts stub

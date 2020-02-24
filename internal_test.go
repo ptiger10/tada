@@ -1721,6 +1721,9 @@ func Test_valueContainer_sort(t *testing.T) {
 		{"float - no nulls",
 			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, false, false}, name: "foo"},
 			args{dtype: Float, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
+		{"float - convert from string",
+			fields{slice: []string{"3", "1", "0", "2"}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{dtype: Float, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
 		{"float - no nulls - descending",
 			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, false, false}, name: "foo"},
 			args{dtype: Float, ascending: false, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
@@ -1730,6 +1733,9 @@ func Test_valueContainer_sort(t *testing.T) {
 		{"strings - no nulls",
 			fields{slice: []string{"foo", "bar", "a", "baz"}, isNull: []bool{false, false, false, false}, name: "foo"},
 			args{dtype: String, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
+		{"strings - convert from float",
+			fields{slice: []string{"3", "11", "0", "2"}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{dtype: String, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
 		{"strings - no nulls - descending",
 			fields{slice: []string{"foo", "bar", "a", "baz"}, isNull: []bool{false, false, false, false}, name: "foo"},
 			args{dtype: String, ascending: false, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
@@ -1738,6 +1744,9 @@ func Test_valueContainer_sort(t *testing.T) {
 			args{dtype: String, ascending: true, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
 		{"datetime - no nulls",
 			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false, false}, name: "foo"},
+			args{dtype: DateTime, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
+		{"datetime - convert from string",
+			fields{slice: []string{"2020-01-04", "2020-01-02", "2020-01-01", "2020-01-03"}, isNull: []bool{false, false, false, false}, name: "foo"},
 			args{dtype: DateTime, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
 		{"datetime - no nulls - descending",
 			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false, false}, name: "foo"},
@@ -2746,7 +2755,7 @@ func Test_valueContainer_fillnull(t *testing.T) {
 }
 
 func Test_valueContainer_resample(t *testing.T) {
-	d := time.Date(2020, 2, 2, 12, 30, 45, 100, time.UTC)
+	d := time.Date(2020, 2, 2, 12, 30, 45, 0, time.UTC)
 	type fields struct {
 		slice  interface{}
 		isNull []bool
@@ -2762,6 +2771,10 @@ func Test_valueContainer_resample(t *testing.T) {
 		want   *valueContainer
 	}{
 		{"year", fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},
+			args{Resampler{ByYear: true}},
+			&valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
+				isNull: []bool{false}, name: "foo"}},
+		{"year - string", fields{slice: []string{"2020-02-02T12:30:45"}, isNull: []bool{false}, name: "foo"},
 			args{Resampler{ByYear: true}},
 			&valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
 				isNull: []bool{false}, name: "foo"}},

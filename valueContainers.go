@@ -112,6 +112,7 @@ func (vc *valueContainer) cast(dtype DType) {
 	return
 }
 
+// if already []float64, returns shared values, not new values
 func (vc *valueContainer) float() floatValueContainer {
 	newVals := make([]float64, reflect.ValueOf(vc.slice).Len())
 	isNull := vc.isNull
@@ -173,6 +174,7 @@ func (vc *valueContainer) float() floatValueContainer {
 	return ret
 }
 
+// if already []string, returns shared values, not new values
 func (vc *valueContainer) str() stringValueContainer {
 	newVals := make([]string, reflect.ValueOf(vc.slice).Len())
 	isNull := vc.isNull

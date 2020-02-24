@@ -2843,8 +2843,13 @@ func TestSeries_SliceFloat64(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.SliceFloat64(); !reflect.DeepEqual(got, tt.want) {
+			got := s.SliceFloat64()
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.SliceFloat64() = %v, want %v", got, tt.want)
+			}
+			got[0] = 10
+			if reflect.DeepEqual(got, s.SliceFloat64()) {
+				t.Errorf("Series.SliceFloat64() retained reference to original, want copy")
 			}
 		})
 	}
@@ -2865,9 +2870,9 @@ func TestSeries_SliceString(t *testing.T) {
 		want   []string
 	}{
 		{"default values", fields{
-			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			values: &valueContainer{slice: []string{"foo", "bar"}, isNull: []bool{false, true}, name: "foo"},
 			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
-			[]string{"1", "0"},
+			[]string{"foo", "bar"},
 		},
 	}
 	for _, tt := range tests {
@@ -2877,8 +2882,49 @@ func TestSeries_SliceString(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.SliceString(); !reflect.DeepEqual(got, tt.want) {
+			got := s.SliceString()
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.SliceString() = %v, want %v", got, tt.want)
+			}
+			got[0] = "baz"
+			if reflect.DeepEqual(got, s.SliceString()) {
+				t.Errorf("Series.SliceString() retained reference to original, want copy")
+			}
+		})
+	}
+}
+
+func TestSeries_SliceTime(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []time.Time
+	}{
+		{"default values", fields{
+			values: &valueContainer{slice: []string{"2020/1/1"}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
+			[]time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			got := s.SliceTime()
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.SliceTime() = %v, want %v", got, tt.want)
+			}
+			got[0] = time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC)
+			if reflect.DeepEqual(got, s.SliceNulls()) {
+				t.Errorf("Series.SliceTime() retained reference to original, want copy")
 			}
 		})
 	}
@@ -2911,38 +2957,13 @@ func TestSeries_SliceNulls(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.SliceNulls(); !reflect.DeepEqual(got, tt.want) {
+			got := s.SliceNulls()
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.SliceNulls() = %v, want %v", got, tt.want)
 			}
-		})
-	}
-}
-func TestSeries_SliceTime(t *testing.T) {
-	type fields struct {
-		values *valueContainer
-		labels []*valueContainer
-		err    error
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   []time.Time
-	}{
-		{"default values", fields{
-			values: &valueContainer{slice: []string{"2020/1/1"}, isNull: []bool{false}, name: "foo"},
-			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
-			[]time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values: tt.fields.values,
-				labels: tt.fields.labels,
-				err:    tt.fields.err,
-			}
-			if got := s.SliceTime(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.SliceTime() = %v, want %v", got, tt.want)
+			got[0] = true
+			if reflect.DeepEqual(got, s.SliceNulls()) {
+				t.Errorf("Series.SliceNulls() retained reference to original, want copy")
 			}
 		})
 	}
