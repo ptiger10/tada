@@ -1869,6 +1869,52 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 	}
 }
 
+func TestSeries_Merge(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		other *Series
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"matching keys",
+			fields{values: &valueContainer{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}},
+			args{&Series{
+				values: &valueContainer{slice: []string{"c"}, isNull: []bool{false}, name: "bar"},
+				labels: []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}}}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
+					{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "bar"},
+				},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.Merge(tt.args.other); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Merge() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSeries_Apply(t *testing.T) {
 	type fields struct {
 		values *valueContainer

@@ -715,6 +715,11 @@ func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, righ
 	return ret
 }
 
+// Merge stub
+func (s *Series) Merge(other *Series) *DataFrame {
+	return s.ToDataFrame().Merge(other.ToDataFrame())
+}
+
 // Add stub
 func (s *Series) Add(other *Series, ignoreMissing bool) *Series {
 	fn := func(v1 float64, v2 float64) float64 {
