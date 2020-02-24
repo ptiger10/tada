@@ -469,8 +469,9 @@ func sortContainers(containers []*valueContainer, sorters []Sorter, length int) 
 		}
 		// must copy the values to be sorted to avoid prematurely overwriting underlying data
 		vals := containers[index].copy()
+		ascending := !sorters[i].Descending
 		// pass in prior originalIndex to create new originalIndex
-		originalIndex = vals.sort(sorters[i].DType, sorters[i].Ascending, originalIndex)
+		originalIndex = vals.sort(sorters[i].DType, ascending, originalIndex)
 	}
 	// rearranging the original data by referencing these original row positions (in sequential order) will sort the series
 	return originalIndex, nil
@@ -480,7 +481,7 @@ func sortContainers(containers []*valueContainer, sorters []Sorter, length int) 
 func (s *SeriesMutator) Sort(by ...Sorter) {
 	// default for handling no Sorters: values as float in ascending order
 	if len(by) == 0 {
-		by = []Sorter{{ContainerName: s.series.values.name, DType: Float, Ascending: true}}
+		by = []Sorter{{ContainerName: s.series.values.name, DType: Float, Descending: false}}
 	}
 	// replace "" with values
 	for i := range by {

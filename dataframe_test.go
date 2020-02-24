@@ -1655,13 +1655,13 @@ func TestDataFrame_Sort(t *testing.T) {
 		args   args
 		want   *DataFrame
 	}{
-		{"float64 on one column", fields{
+		{"float64 on one column - ascending", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 2, 1}, isNull: []bool{false, false, false}, name: "foo"}},
 			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"},
 			name:          "baz"},
-			args{[]Sorter{{ContainerName: "foo", Ascending: true}}},
+			args{[]Sorter{{ContainerName: "foo", Descending: false}}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"}},
@@ -1698,7 +1698,7 @@ func TestDataFrame_Sort(t *testing.T) {
 				err:           tt.fields.err,
 			}
 			if got := df.Sort(tt.args.by...); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.Sort() = %v, want %v", got.err, tt.want.err)
+				t.Errorf("DataFrame.Sort() = %v, want %v", got, tt.want)
 			}
 		})
 	}
