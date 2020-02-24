@@ -50,6 +50,29 @@ func TestSetOptionMaxRows(t *testing.T) {
 	}
 }
 
+func TestSetOptionMaxColumns(t *testing.T) {
+	type args struct {
+		n int
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{"pass", args{5}},
+	}
+	for _, tt := range tests {
+		archive := optionMaxColumns
+		t.Run(tt.name, func(t *testing.T) {
+			SetOptionMaxColumns(tt.args.n)
+		})
+
+		if got := optionMaxColumns; got != tt.args.n {
+			t.Errorf("SetOptionMaxColumns() -> %v, want %v", got, tt.args.n)
+		}
+		optionMaxColumns = archive
+	}
+}
+
 func TestSetOptionAutoMerge(t *testing.T) {
 	type args struct {
 		set bool

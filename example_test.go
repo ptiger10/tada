@@ -18,6 +18,45 @@ func ExampleDataFrame() {
 	// name: qux
 }
 
+func ExampleDataFrame_excess_rows() {
+	df := NewDataFrame([]interface{}{
+		[]float64{1, 2, 3, 4, 5, 6, 7, 8}}).SetColNames([]string{"A"})
+	archive := optionMaxRows
+	SetOptionMaxRows(6)
+	fmt.Println(df)
+	SetOptionMaxRows(archive)
+	// Output:
+	// +-----+-----+
+	// |     |  A  |
+	// +-----+-----+
+	// |   0 |   1 |
+	// |   1 |   2 |
+	// |   2 |   3 |
+	// | ... | ... |
+	// |   5 |   6 |
+	// |   6 |   7 |
+	// |   7 |   8 |
+	// +-----+-----+
+}
+
+func ExampleDataFrame_excess_cols() {
+	df := NewDataFrame([]interface{}{
+		[]float64{1, 2}, []float64{3, 4}, []float64{5, 6},
+		[]float64{3, 4}, []float64{5, 6},
+	}).SetColNames([]string{"A", "B", "C", "D", "E"})
+	archive := optionMaxColumns
+	SetOptionMaxColumns(2)
+	fmt.Println(df)
+	SetOptionMaxColumns(archive)
+	// Output:
+	// +---+---+-----+---+
+	// |   | A |  .  | E |
+	// +---+---+-----+---+
+	// | 0 | 1 | ... | 5 |
+	// | 1 | 2 |     | 6 |
+	// +---+---+-----+---+
+}
+
 func ExampleDataFrame_null() {
 	df := NewDataFrame([]interface{}{[]float64{math.NaN(), 2}, []string{"foo", ""}}).SetColNames([]string{"a", "b"}).SetName("qux")
 	fmt.Println(df)

@@ -4,6 +4,7 @@ import "time"
 
 var optionLevelSeparator = "|"
 var optionMaxRows = 50
+var optionMaxColumns = 20
 var optionAutoMerge = true
 var optionSharedDataWarning = true
 var randSeed = time.Now().Unix()
@@ -16,6 +17,11 @@ func SetOptionLevelSeparator(sep string) {
 // SetOptionMaxRows stub
 func SetOptionMaxRows(n int) {
 	optionMaxRows = n
+}
+
+// SetOptionMaxColumns stub
+func SetOptionMaxColumns(n int) {
+	optionMaxColumns = n
 }
 
 // SetOptionAutoMerge stub

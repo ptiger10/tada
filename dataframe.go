@@ -319,32 +319,62 @@ func suppressDefaultName(name string) string {
 }
 
 func (df *DataFrame) String() string {
-	// do not try to print all rows
-	csv := df.Head(optionMaxRows).ToCSV(false)
-	for k := range csv[0] {
-		csv[0][k] = suppressDefaultName(csv[0][k])
+	var data [][]string
+	if df.Len() <= optionMaxRows {
+		data = df.ToCSV(false)
+	} else {
+		// truncate rows
+		n := optionMaxRows / 2
+		topHalf := df.Head(n).ToCSV(false)
+		bottomHalf := df.Tail(n).ToCSV(false)[df.numColLevels():]
+		filler := make([]string, df.numLevels()+df.numColumns())
+		for k := range filler {
+			filler[k] = "..."
+		}
+		data = append(
+			append(topHalf, filler),
+			bottomHalf...)
+	}
+	// do not print *0-type label names
+	for k := range data[0] {
+		data[0][k] = suppressDefaultName(data[0][k])
 	}
 	mergedLabelsAndCols := append(df.labels, df.values...)
-	// check for nulls, skipping headers
-	for i := range csv[df.numColLevels():] {
-		for k := range csv[i] {
+	// overwrite null values, skipping headers
+	for i := range data[df.numColLevels():] {
+		for k := range data[i] {
 			if mergedLabelsAndCols[k].isNull[i] {
-				csv[i+df.numColLevels()][k] = "n/a"
+				data[i+df.numColLevels()][k] = "n/a"
 			}
 		}
 	}
-	var caption string
-	if df.name != "" {
-		caption = fmt.Sprintf("name: %v", df.name)
+	// truncate columns
+	if df.numColumns() >= optionMaxColumns {
+		n := (optionMaxColumns / 2)
+
+		for i := range data {
+			labels := data[i][:df.numLevels()]
+			leftHalf := data[i][df.numLevels() : n+df.numLevels()]
+			filler := "..."
+			rightHalf := data[i][df.numLevels()+df.numColumns()-n:]
+			data[i] = append(
+				append(
+					labels,
+					append(leftHalf, filler)...),
+				rightHalf...)
+		}
 	}
 	var buf bytes.Buffer
 	table := tablewriter.NewWriter(&buf)
-	table.SetHeader(csv[0])
-	table.AppendBulk(csv[1:])
-	table.SetAutoMergeCells(optionAutoMerge)
-	if caption != "" {
-		table.SetCaption(true, caption)
+	// optional caption
+	if df.name != "" {
+		table.SetCaption(true, fmt.Sprintf("name: %v", df.name))
 	}
+
+	table.SetHeader(data[0])
+	table.AppendBulk(data[1:])
+	table.SetAutoMergeCells(optionAutoMerge)
+
 	table.Render()
 	return string(buf.Bytes())
 }
