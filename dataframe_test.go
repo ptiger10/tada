@@ -3749,3 +3749,74 @@ func TestDataFrame_FillNull(t *testing.T) {
 		})
 	}
 }
+
+func TestConcatSeries(t *testing.T) {
+	type args struct {
+		series []*Series
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *DataFrame
+		wantErr bool
+	}{
+		{"pass", args{
+			[]*Series{
+				{values: &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"},
+					}},
+				{values: &valueContainer{slice: []int{3, 4}, isNull: []bool{false, false}, name: "qux"},
+					labels: []*valueContainer{
+						{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"},
+					}}}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"},
+					{slice: []int{3, 4}, isNull: []bool{false, false}, name: "qux"},
+				},
+				labels:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			false,
+		},
+		{"fail - wrong number of rows", args{
+			[]*Series{
+				{values: &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"},
+					}},
+				{values: &valueContainer{slice: []int{3}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{
+						{slice: []string{"a"}, isNull: []bool{false}, name: "*0"},
+					}}}},
+			nil,
+			true,
+		},
+		{"fail - wrong number of levels", args{
+			[]*Series{
+				{values: &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"},
+					}},
+				{values: &valueContainer{slice: []int{3, 4}, isNull: []bool{false, false}, name: "qux"},
+					labels: []*valueContainer{
+						{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"},
+						{slice: []string{"c", "d"}, isNull: []bool{false, false}, name: "*0"},
+					}}}},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ConcatSeries(tt.args.series...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ConcatSeries() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ConcatSeries() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

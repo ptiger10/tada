@@ -51,6 +51,25 @@ func (df *DataFrame) Copy() *DataFrame {
 	}
 }
 
+// ConcatSeries stub
+func ConcatSeries(series ...*Series) (*DataFrame, error) {
+	ret := &DataFrame{colLevelNames: []string{"*0"}}
+	for k, s := range series {
+		if k == 0 {
+			ret.labels = s.labels
+		} else {
+			if s.Len() != ret.Len() {
+				return nil, fmt.Errorf("ConcatSeries(): position %d: all series must have same number of rows (%v != %v)", k, s.Len(), ret.Len())
+			}
+			if !reflect.DeepEqual(s.labels, ret.labels) {
+				return nil, fmt.Errorf("ConcatSeries(): position %d: all series must have same labels", k)
+			}
+		}
+		ret.values = append(ret.values, s.values)
+	}
+	return ret, nil
+}
+
 // Cast casts the underlying DataFrame column slice values to either []float64, []string, or []time.Time.
 // Use cast to improve performance when calling multiple operations on values.
 func (df *DataFrame) Cast(colAsType map[string]DType) error {
