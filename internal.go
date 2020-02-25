@@ -1126,6 +1126,7 @@ func sortContainers(containers []*valueContainer, sorters []Sorter) ([]int, erro
 		}
 		// must copy the values to be sorted to avoid prematurely overwriting underlying data
 		vals := containers[index].copy()
+		vals.subsetRows(originalIndex)
 		ascending := !sorters[i].Descending
 		// pass in prior originalIndex to create new originalIndex
 		originalIndex = vals.sort(sorters[i].DType, ascending, originalIndex)

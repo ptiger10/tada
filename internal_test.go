@@ -1770,8 +1770,8 @@ func Test_valueContainer_sort(t *testing.T) {
 }
 
 func Test_sortContainers(t *testing.T) {
-	// d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	// d1 := d.AddDate(0, 0, 1)
+	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	d1 := d.AddDate(0, 0, 1)
 	type args struct {
 		containers []*valueContainer
 		sorters    []Sorter
@@ -1782,36 +1782,36 @@ func Test_sortContainers(t *testing.T) {
 		want    []int
 		wantErr bool
 	}{
-		// {"multi sort - floats",
-		// 	args{[]*valueContainer{
-		// 		{slice: []float64{2, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
-		// 		{slice: []float64{3, 2, 1}, isNull: []bool{false, false, false}, name: "bar"},
-		// 	}, []Sorter{{Name: "foo"}, {Name: "bar"}}},
-		// 	[]int{1, 2, 0}, false},
+		{"multi sort - floats",
+			args{[]*valueContainer{
+				{slice: []float64{2, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []float64{3, 2, 1}, isNull: []bool{false, false, false}, name: "bar"},
+			}, []Sorter{{Name: "foo"}, {Name: "bar"}}},
+			[]int{1, 2, 0}, false},
 		{"multi sort - floats - ordered repeats",
 			args{[]*valueContainer{
 				{slice: []float64{2, 2, 1}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []float64{1, 2, 1}, isNull: []bool{false, false, false}, name: "bar"},
 			}, []Sorter{{Name: "foo"}, {Name: "bar"}}},
 			[]int{2, 0, 1}, false},
-		// {"multi sort - converted string to date + string",
-		// 	args{[]*valueContainer{
-		// 		{slice: []string{"2020-01-02 00:00:00 +0000 UTC", "2020-01-02 00:00:00 +0000 UTC", "2020-01-01 00:00:00 +0000 UTC", "2020-01-01 00:00:00 +0000 UTC"}, isNull: []bool{false, false, false, false}, name: "foo"},
-		// 		{slice: []string{"foo", "qux", "qux", "foo"}, isNull: []bool{false, false, false, false}, name: "bar"},
-		// 	}, []Sorter{{Name: "foo", DType: DateTime}, {Name: "bar", DType: String}}},
-		// 	[]int{3, 2, 0, 1}, false},
-		// {"multi sort - converted string to date + string",
-		// 	args{[]*valueContainer{
-		// 		{slice: []time.Time{d, d1, d, d1}, isNull: []bool{false, false, false, false}, name: "foo"},
-		// 		{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "bar"},
-		// 	}, []Sorter{{Name: "foo", DType: DateTime}, {Name: "bar", DType: String}}},
-		// 	[]int{2, 0, 3, 1}, false},
-		// {"fail - bad container",
-		// 	args{[]*valueContainer{
-		// 		{slice: []float64{2, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
-		// 		{slice: []float64{3, 2, 1}, isNull: []bool{false, false, false}, name: "bar"},
-		// 	}, []Sorter{{Name: "corge"}}},
-		// 	nil, true},
+		{"multi sort - converted string to date + string",
+			args{[]*valueContainer{
+				{slice: []string{"2020-01-02 00:00:00 +0000 UTC", "2020-01-02 00:00:00 +0000 UTC", "2020-01-01 00:00:00 +0000 UTC", "2020-01-01 00:00:00 +0000 UTC"}, isNull: []bool{false, false, false, false}, name: "foo"},
+				{slice: []string{"foo", "qux", "qux", "foo"}, isNull: []bool{false, false, false, false}, name: "bar"},
+			}, []Sorter{{Name: "foo", DType: DateTime}, {Name: "bar", DType: String}}},
+			[]int{3, 2, 0, 1}, false},
+		{"multi sort - converted string to date + string",
+			args{[]*valueContainer{
+				{slice: []time.Time{d, d1, d, d1}, isNull: []bool{false, false, false, false}, name: "foo"},
+				{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "bar"},
+			}, []Sorter{{Name: "foo", DType: DateTime}, {Name: "bar", DType: String}}},
+			[]int{2, 0, 3, 1}, false},
+		{"fail - bad container",
+			args{[]*valueContainer{
+				{slice: []float64{2, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []float64{3, 2, 1}, isNull: []bool{false, false, false}, name: "bar"},
+			}, []Sorter{{Name: "corge"}}},
+			nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
