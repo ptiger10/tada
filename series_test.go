@@ -3067,3 +3067,47 @@ func TestSeries_ValueCounts(t *testing.T) {
 		})
 	}
 }
+
+func TestSeries_ValueIsNull(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		i int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   bool
+	}{
+		{"false", fields{
+			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			args{0}, false},
+		{"true", fields{
+			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			args{1}, true},
+		{"out of bounds", fields{
+			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			args{2}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.ValueIsNull(tt.args.i); got != tt.want {
+				t.Errorf("Series.ValueIsNull() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

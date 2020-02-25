@@ -236,6 +236,14 @@ func (s *SeriesMutator) FillNull(how NullFiller) {
 	return
 }
 
+// ValueIsNull returns whether the value at row `i` is null. If `i` is out of range, returns true.
+func (s *Series) ValueIsNull(i int) bool {
+	if i >= s.Len() {
+		return true
+	}
+	return s.values.isNull[i]
+}
+
 // DropNull returns all the rows with non-null values.
 // Returns a new Series.
 func (s *Series) DropNull() *Series {
@@ -258,7 +266,7 @@ func (s *Series) Null() *Series {
 	return s.Subset(index)
 }
 
-// Shift shifts all the values `n` rows upward while keeping labels constant.
+// Shift replaces the value in row i with the value in row i - `n`, or null if that index is out of range.
 // Returns a new Series.
 func (s *Series) Shift(n int) *Series {
 	s = s.Copy()
@@ -266,7 +274,7 @@ func (s *Series) Shift(n int) *Series {
 	return s
 }
 
-// Shift shifts all the values `n` rows upward while keeping labels constant.
+// Shift replaces the value in row i with the value in row i - `n`, or null if that index is out of range.
 // // Modifies the underlying Series.
 func (s *SeriesMutator) Shift(n int) {
 	if s.series.Len() < n {
