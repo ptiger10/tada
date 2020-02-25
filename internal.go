@@ -1115,6 +1115,25 @@ func (vc *valueContainer) sort(dtype DType, ascending bool, index []int) []int {
 	return append(notNulls, nulls...)
 }
 
+func sortContainers(containers []*valueContainer, sorters []Sorter) ([]int, error) {
+	// initialize original index
+	length := reflect.ValueOf(containers[0].slice).Len()
+	originalIndex := makeIntRange(0, length)
+	for i := len(sorters) - 1; i >= 0; i-- {
+		index, err := findContainerWithName(sorters[i].Name, containers)
+		if err != nil {
+			return nil, fmt.Errorf("position %v: %v", len(sorters)-1-i, err)
+		}
+		// must copy the values to be sorted to avoid prematurely overwriting underlying data
+		vals := containers[index].copy()
+		ascending := !sorters[i].Descending
+		// pass in prior originalIndex to create new originalIndex
+		originalIndex = vals.sort(sorters[i].DType, ascending, originalIndex)
+	}
+	// rearranging the original data by referencing these original row positions (in sequential order) will sort the series
+	return originalIndex, nil
+}
+
 // convertColNamesToIndexPositions converts a slice of label or column names to index positions.
 // If any name is not in the set of columns, returns an error
 func convertColNamesToIndexPositions(names []string, columns []*valueContainer) ([]int, error) {

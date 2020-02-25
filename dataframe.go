@@ -1339,7 +1339,7 @@ func (df *DataFrameMutator) Sort(by ...Sorter) {
 
 	// original index
 	mergedLabelsAndValues := append(df.dataframe.labels, df.dataframe.values...)
-	newIndex, err := sortContainers(mergedLabelsAndValues, by, df.dataframe.Len())
+	newIndex, err := sortContainers(mergedLabelsAndValues, by)
 	if err != nil {
 		df.dataframe.resetWithError(fmt.Errorf("Sort(): %v", err))
 		return

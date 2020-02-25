@@ -2615,3 +2615,54 @@ func TestGroupedDataFrame_HavingCount(t *testing.T) {
 		})
 	}
 }
+
+func TestGroupedDataFrame_GetGroup(t *testing.T) {
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		df          *DataFrame
+		err         error
+	}
+	type args struct {
+		group string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{
+			name: "single level",
+			fields: fields{
+				rowIndices:  [][]int{{0, 1}, {2, 3}},
+				orderedKeys: []string{"foo", "bar"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				df: &DataFrame{values: []*valueContainer{
+					{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "baz"}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+					colLevelNames: []string{"*0"}}},
+			args: args{"bar"},
+			want: &DataFrame{values: []*valueContainer{{slice: []string{"c", "d"}, isNull: []bool{false, false}, name: "baz"}},
+				labels:        []*valueContainer{{slice: []string{"bar", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedDataFrame{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				df:          tt.fields.df,
+				err:         tt.fields.err,
+			}
+			if got := g.GetGroup(tt.args.group); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedDataFrame.GetGroup() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

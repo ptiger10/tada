@@ -346,6 +346,16 @@ func (g *GroupedDataFrame) dateTimeFunc(
 	}
 }
 
+// GetGroup stub
+func (g *GroupedDataFrame) GetGroup(group string) *DataFrame {
+	for m, key := range g.orderedKeys {
+		if key == group {
+			return g.df.Subset(g.rowIndices[m])
+		}
+	}
+	return dataFrameWithError(fmt.Errorf("GetGroup(): `group` (%v) not in groups", group))
+}
+
 // Sum stub
 func (g *GroupedDataFrame) Sum(colNames ...string) *DataFrame {
 	return g.floatFunc("sum", colNames, sum)

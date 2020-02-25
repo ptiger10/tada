@@ -444,24 +444,6 @@ func (s *Series) Sort(by ...Sorter) *Series {
 	return s
 }
 
-func sortContainers(containers []*valueContainer, sorters []Sorter, length int) ([]int, error) {
-	// initialize original index
-	originalIndex := makeIntRange(0, length)
-	for i := len(sorters) - 1; i >= 0; i-- {
-		index, err := findContainerWithName(sorters[i].Name, containers)
-		if err != nil {
-			return nil, fmt.Errorf("position %v: %v", len(sorters)-1-i, err)
-		}
-		// must copy the values to be sorted to avoid prematurely overwriting underlying data
-		vals := containers[index].copy()
-		ascending := !sorters[i].Descending
-		// pass in prior originalIndex to create new originalIndex
-		originalIndex = vals.sort(sorters[i].DType, ascending, originalIndex)
-	}
-	// rearranging the original data by referencing these original row positions (in sequential order) will sort the series
-	return originalIndex, nil
-}
-
 // Sort stub
 func (s *SeriesMutator) Sort(by ...Sorter) {
 	// default for handling no Sorters: values as float in ascending order
@@ -475,7 +457,7 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 		}
 	}
 	mergedLabelsAndValues := append(s.series.labels, s.series.values)
-	newIndex, err := sortContainers(mergedLabelsAndValues, by, s.series.Len())
+	newIndex, err := sortContainers(mergedLabelsAndValues, by)
 	if err != nil {
 		s.series.resetWithError(fmt.Errorf("Sort(): %v", err))
 		return
