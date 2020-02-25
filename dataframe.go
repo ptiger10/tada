@@ -191,6 +191,15 @@ func (df *DataFrame) ToCSV(ignoreLabels bool) [][]string {
 	if err != nil {
 		return nil
 	}
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	// overwrite null values, skipping headers
+	for i := range transposedStringValues[df.numColLevels():] {
+		for k := range transposedStringValues[i] {
+			if mergedLabelsAndCols[k].isNull[i] {
+				transposedStringValues[i+df.numColLevels()][k] = "n/a"
+			}
+		}
+	}
 	return transposedStringValues
 }
 
@@ -358,15 +367,7 @@ func (df *DataFrame) String() string {
 	for k := range data[0] {
 		data[0][k] = suppressDefaultName(data[0][k])
 	}
-	mergedLabelsAndCols := append(df.labels, df.values...)
-	// overwrite null values, skipping headers
-	for i := range data[df.numColLevels():] {
-		for k := range data[i] {
-			if mergedLabelsAndCols[k].isNull[i] {
-				data[i+df.numColLevels()][k] = "n/a"
-			}
-		}
-	}
+
 	// truncate columns
 	if df.numColumns() >= optionMaxColumns {
 		n := (optionMaxColumns / 2)

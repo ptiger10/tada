@@ -229,6 +229,11 @@ func TestSeries_ToCSV(t *testing.T) {
 			labels: []*valueContainer{{slice: []int{1}, name: "bar", isNull: []bool{false}}}},
 			args{false},
 			[][]string{{"bar", "foo"}, {"1", "1"}}, false},
+		{"with nulls", fields{
+			values: &valueContainer{slice: []float64{0}, name: "foo", isNull: []bool{true}},
+			labels: []*valueContainer{{slice: []int{1}, name: "bar", isNull: []bool{false}}}},
+			args{false},
+			[][]string{{"bar", "foo"}, {"1", "n/a"}}, false},
 		{"fail - empty", fields{
 			values: nil,
 			labels: nil},
