@@ -1353,35 +1353,36 @@ func lookupDataFrame(how string,
 	}
 }
 
-// cuts labels by leftOn and rightOn, anchors to labels in labels1, finds matches in labels2
-// looks up values in values2, converts to Series and preserves the name supplied
+// cuts labels by leftOn and rightOn, anchors to labels in anchorLabels, finds matches in lookupLabels
+// looks up values in lookupValues, converts to Series and preserves the name supplied
 func lookupWithAnchor(
-	name string, labels1 []*valueContainer, leftOn []int,
-	values2 *valueContainer, labels2 []*valueContainer, rightOn []int) *Series {
-	toLookup := concatenateLabelsToStrings(labels1, leftOn)
-	lookupSource := reduceContainersLimited(labels2, rightOn)
+	name string, anchorLabels []*valueContainer, leftOn []int,
+	lookupValues *valueContainer, lookupLabels []*valueContainer, rightOn []int) *Series {
+
+	toLookup := concatenateLabelsToStrings(anchorLabels, leftOn)
+	lookupSource := reduceContainersLimited(lookupLabels, rightOn)
 	matches := matchLabelPositions(toLookup, lookupSource)
-	lookupValues := reflect.ValueOf(values2.slice)
+	reflectLookup := reflect.ValueOf(lookupValues.slice)
 	isNull := make([]bool, len(matches))
 	// return type is set to same type as within lookupSource
-	vals := reflect.MakeSlice(lookupValues.Type(), len(matches), len(matches))
+	vals := reflect.MakeSlice(reflectLookup.Type(), len(matches), len(matches))
 	for i, matchedIndex := range matches {
 		// positive match: copy value from values2
 		dst := vals.Index(i)
 		if matchedIndex != -1 {
-			src := lookupValues.Index(matchedIndex)
+			src := reflectLookup.Index(matchedIndex)
 			dst.Set(src)
-			isNull[i] = values2.isNull[matchedIndex]
+			isNull[i] = lookupValues.isNull[matchedIndex]
 			// no match: set to zero value
 		} else {
-			src := reflect.TypeOf(values2.slice).Elem()
+			src := reflectLookup.Type().Elem()
 			dst.Set(reflect.Zero(src))
 			isNull[i] = true
 		}
 	}
 	return &Series{
 		values: &valueContainer{slice: vals.Interface(), isNull: isNull, name: name},
-		labels: labels1,
+		labels: copyContainers(anchorLabels),
 	}
 }
 
@@ -1430,7 +1431,7 @@ func lookupDataFrameWithAnchor(
 	}
 	return &DataFrame{
 		values:        retVals,
-		labels:        labels1,
+		labels:        copyContainers(labels1),
 		name:          name,
 		colLevelNames: colLevelNames,
 	}
