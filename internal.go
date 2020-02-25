@@ -1361,17 +1361,17 @@ func lookupWithAnchor(
 	toLookup := concatenateLabelsToStrings(labels1, leftOn)
 	lookupSource := reduceContainersLimited(labels2, rightOn)
 	matches := matchLabelPositions(toLookup, lookupSource)
-	v := reflect.ValueOf(values2.slice)
+	lookupValues := reflect.ValueOf(values2.slice)
 	isNull := make([]bool, len(matches))
 	// return type is set to same type as within lookupSource
-	vals := reflect.MakeSlice(v.Type(), len(matches), len(matches))
+	vals := reflect.MakeSlice(lookupValues.Type(), len(matches), len(matches))
 	for i, matchedIndex := range matches {
 		// positive match: copy value from values2
 		dst := vals.Index(i)
 		if matchedIndex != -1 {
-			src := v.Index(matchedIndex)
+			src := lookupValues.Index(matchedIndex)
 			dst.Set(src)
-			isNull[i] = values2.isNull[i]
+			isNull[i] = values2.isNull[matchedIndex]
 			// no match: set to zero value
 		} else {
 			src := reflect.TypeOf(values2.slice).Elem()

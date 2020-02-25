@@ -2974,3 +2974,36 @@ func Test_deduplicateContainerNames(t *testing.T) {
 		})
 	}
 }
+
+func Test_lookupWithAnchor(t *testing.T) {
+	type args struct {
+		name    string
+		labels1 []*valueContainer
+		leftOn  []int
+		values2 *valueContainer
+		labels2 []*valueContainer
+		rightOn []int
+	}
+	tests := []struct {
+		name string
+		args args
+		want *Series
+	}{
+		{"pass", args{name: "waldo", labels1: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+			leftOn:  []int{0},
+			values2: &valueContainer{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "qux"},
+			labels2: []*valueContainer{{slice: []float64{1, 0, 2}, isNull: []bool{false, false, false}, name: "foo"}},
+			rightOn: []int{0}},
+			&Series{
+				values: &valueContainer{slice: []string{"", "foo"}, isNull: []bool{true, false}, name: "waldo"},
+				labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := lookupWithAnchor(tt.args.name, tt.args.labels1, tt.args.leftOn, tt.args.values2, tt.args.labels2, tt.args.rightOn); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("lookupWithAnchor() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
