@@ -77,24 +77,24 @@ func ExampleSeries_null() {
 	s := NewSeries([]string{"foo", ""})
 	fmt.Println(s)
 	// Output:
-	// +----+-----+-----+
-	// | -- |  A  |  B  |
-	// +----+-----+-----+
-	// |  0 | n/a | foo |
-	// |  1 |   2 | n/a |
-	// +----+-----+-----+
-}
-
-func ExampleSeries() {
-	s := NewSeries([]float64{1, 2}, []string{"foo", "foo"}).SetName("A")
-	fmt.Println(s)
-	// Output:
 	// +----+-----+
 	// | -- |  0  |
 	// +----+-----+
 	// |  0 | foo |
 	// |  1 | n/a |
 	// +----+-----+
+}
+
+func ExampleSeries() {
+	s := NewSeries([]float64{1, 2}, []string{"foo", "foo"}).SetName("A")
+	fmt.Println(s)
+	// Output:
+	// +-----+---+
+	// | --  | A |
+	// +-----+---+
+	// | foo | 1 |
+	// |     | 2 |
+	// +-----+---+
 }
 
 func ExampleGroupedSeries() {
