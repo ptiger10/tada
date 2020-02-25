@@ -3007,3 +3007,79 @@ func Test_lookupWithAnchor(t *testing.T) {
 		})
 	}
 }
+
+func Test_lookupDataFrameWithAnchor(t *testing.T) {
+	type args struct {
+		name           string
+		colLevelNames  []string
+		anchorLabels   []*valueContainer
+		originalLabels []*valueContainer
+		leftOn         []int
+		lookupColumns  []*valueContainer
+		lookupLabels   []*valueContainer
+		rightOn        []int
+		exclude        []string
+	}
+	tests := []struct {
+		name string
+		args args
+		want *DataFrame
+	}{
+		{"pass", args{name: "waldo", colLevelNames: []string{"*0"},
+			anchorLabels: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
+			},
+			originalLabels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+			leftOn:         []int{0},
+			lookupColumns: []*valueContainer{
+				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "a"},
+				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "b"}},
+			lookupLabels: []*valueContainer{
+				{slice: []float64{1, 0, 2}, isNull: []bool{false, false, false}, name: "c"},
+				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "a"},
+				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "b"}},
+			rightOn: []int{0},
+			exclude: []string{"c"}},
+
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"", "foo"}, isNull: []bool{true, false}, name: "a"},
+					{slice: []string{"", "foo"}, isNull: []bool{true, false}, name: "b"},
+				},
+				labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+				name:   "waldo", colLevelNames: []string{"*0"},
+			}},
+		{"exclude", args{name: "waldo", colLevelNames: []string{"*0"},
+			anchorLabels: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
+			},
+			originalLabels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+			leftOn:         []int{0},
+			lookupColumns: []*valueContainer{
+				{slice: []float64{1, 0, 2}, isNull: []bool{false, true, false}, name: "a"},
+				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "b"}},
+			lookupLabels: []*valueContainer{
+				{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "c"},
+				{slice: []float64{1, 0, 2}, isNull: []bool{false, true, false}, name: "a"},
+				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "b"}},
+			rightOn: []int{1},
+			exclude: []string{"a"}},
+
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"", "foo"}, isNull: []bool{true, false}, name: "b"},
+				},
+				labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+				name:   "waldo", colLevelNames: []string{"*0"},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := lookupDataFrameWithAnchor(tt.args.name, tt.args.colLevelNames, tt.args.anchorLabels, tt.args.originalLabels, tt.args.leftOn, tt.args.lookupColumns, tt.args.lookupLabels, tt.args.rightOn, tt.args.exclude); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("lookupDataFrameWithAnchor() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

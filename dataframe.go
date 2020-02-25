@@ -1311,6 +1311,15 @@ func (df *DataFrame) Lookup(other *DataFrame) *DataFrame {
 	return df.LookupAdvanced(other, "left", nil, nil)
 }
 
+// LookupSeries stub
+func (df *DataFrame) LookupSeries(other *Series) *Series {
+	lookup := df.LookupAdvanced(other.ToDataFrame(), "left", nil, nil)
+	return &Series{
+		values: lookup.values[0],
+		labels: lookup.labels,
+	}
+}
+
 // LookupAdvanced stub
 func (df *DataFrame) LookupAdvanced(other *DataFrame, how string, leftOn []string, rightOn []string) *DataFrame {
 	mergedLabelsAndCols := append(df.labels, df.values...)

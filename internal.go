@@ -1391,25 +1391,26 @@ func lookupWithAnchor(
 // preserves the column names from values2, converts to dataframe with `name`
 func lookupDataFrameWithAnchor(
 	name string, colLevelNames []string,
-	mergedLabelsCols1 []*valueContainer, labels1 []*valueContainer, leftOn []int,
-	values2 []*valueContainer, mergedLabelsCols2 []*valueContainer, rightOn []int, exclude []string) *DataFrame {
-	toLookup := concatenateLabelsToStrings(mergedLabelsCols1, leftOn)
-	lookupSource := reduceContainersLimited(mergedLabelsCols2, rightOn)
+	anchorLabels []*valueContainer, originalLabels []*valueContainer, leftOn []int,
+	lookupColumns []*valueContainer, lookupLabels []*valueContainer, rightOn []int, exclude []string) *DataFrame {
+
+	toLookup := concatenateLabelsToStrings(anchorLabels, leftOn)
+	lookupSource := reduceContainersLimited(lookupLabels, rightOn)
 	matches := matchLabelPositions(toLookup, lookupSource)
 	// slice of slices
 	var retVals []*valueContainer
-	for k := range values2 {
+	for k := range lookupColumns {
 		var skip bool
 		for _, exclusion := range exclude {
 			// skip any column whose name is also used in the lookup
-			if values2[k].name == exclusion {
+			if lookupColumns[k].name == exclusion {
 				skip = true
 			}
 		}
 		if skip {
 			continue
 		}
-		v := reflect.ValueOf(values2[k].slice)
+		v := reflect.ValueOf(lookupColumns[k].slice)
 		isNull := make([]bool, len(matches))
 		// return type is set to same type as within lookupSource
 		vals := reflect.MakeSlice(v.Type(), len(matches), len(matches))
@@ -1419,19 +1420,21 @@ func lookupDataFrameWithAnchor(
 			if matchedIndex != -1 {
 				src := v.Index(matchedIndex)
 				dst.Set(src)
-				isNull[i] = values2[k].isNull[matchedIndex]
+				isNull[i] = lookupColumns[k].isNull[matchedIndex]
 				// no match
 			} else {
-				src := reflect.TypeOf(values2[k].slice).Elem()
+				src := reflect.TypeOf(lookupColumns[k].slice).Elem()
 				dst.Set(reflect.Zero(src))
 				isNull[i] = true
 			}
 		}
-		retVals = append(retVals, &valueContainer{slice: vals.Interface(), isNull: isNull, name: values2[k].name})
+		retVals = append(retVals, &valueContainer{
+			slice: vals.Interface(), isNull: isNull, name: lookupColumns[k].name})
 	}
+	// copy labels to avoid sharing data accidentally
 	return &DataFrame{
 		values:        retVals,
-		labels:        copyContainers(labels1),
+		labels:        copyContainers(originalLabels),
 		name:          name,
 		colLevelNames: colLevelNames,
 	}
