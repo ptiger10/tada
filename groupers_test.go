@@ -2666,3 +2666,184 @@ func TestGroupedDataFrame_GetGroup(t *testing.T) {
 		})
 	}
 }
+
+func TestGroupedSeries_IterGroups(t *testing.T) {
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		series      *Series
+		aligned     bool
+		err         error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []*Series
+	}{
+		{fields: fields{
+			orderedKeys: []string{"foo", "bar"},
+			rowIndices:  [][]int{{0, 1}, {2, 3}},
+			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			series: &Series{
+				values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			want: []*Series{
+				{values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "*0"}}},
+				{values: &valueContainer{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "qux"},
+					labels: []*valueContainer{
+						{slice: []string{"bar", "bar"}, isNull: []bool{false, false}, name: "*0"}}},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeries{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				series:      tt.fields.series,
+				aligned:     tt.fields.aligned,
+				err:         tt.fields.err,
+			}
+			if got := g.IterGroups(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedSeries.IterGroups() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGroupedSeries_ListGroups(t *testing.T) {
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		series      *Series
+		aligned     bool
+		err         error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []string
+	}{
+		{"pass", fields{
+			orderedKeys: []string{"foo", "bar"},
+			rowIndices:  [][]int{{0, 1}, {2, 3}},
+			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			series: &Series{
+				values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			[]string{"foo", "bar"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeries{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				series:      tt.fields.series,
+				aligned:     tt.fields.aligned,
+				err:         tt.fields.err,
+			}
+			if got := g.ListGroups(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedSeries.ListGroups() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGroupedDataFrame_IterGroups(t *testing.T) {
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		df          *DataFrame
+		err         error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []*DataFrame
+	}{
+		{name: "single level",
+			fields: fields{
+				rowIndices:  [][]int{{0, 1}, {2, 3}},
+				orderedKeys: []string{"foo", "bar"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				df: &DataFrame{values: []*valueContainer{
+					{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "baz"}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+					colLevelNames: []string{"*0"}}},
+			want: []*DataFrame{
+				{values: []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "baz"}},
+					labels:        []*valueContainer{{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "*0"}},
+					colLevelNames: []string{"*0"}},
+				{values: []*valueContainer{{slice: []string{"c", "d"}, isNull: []bool{false, false}, name: "baz"}},
+					labels:        []*valueContainer{{slice: []string{"bar", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+					colLevelNames: []string{"*0"}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedDataFrame{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				df:          tt.fields.df,
+				err:         tt.fields.err,
+			}
+			if got := g.IterGroups(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedDataFrame.IterGroups() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGroupedDataFrame_ListGroups(t *testing.T) {
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		df          *DataFrame
+		err         error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []string
+	}{
+		{name: "single level",
+			fields: fields{
+				rowIndices:  [][]int{{0, 1}, {2, 3}},
+				orderedKeys: []string{"foo", "bar"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				df: &DataFrame{values: []*valueContainer{
+					{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "baz"}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+					colLevelNames: []string{"*0"}}},
+			want: []string{"foo", "bar"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedDataFrame{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				df:          tt.fields.df,
+				err:         tt.fields.err,
+			}
+			if got := g.ListGroups(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedDataFrame.ListGroups() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

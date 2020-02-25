@@ -537,6 +537,20 @@ func (s *Series) RollingDuration(d time.Duration) *GroupedSeries {
 	}
 }
 
+// IterGroups stub
+func (g *GroupedSeries) IterGroups() []*Series {
+	ret := make([]*Series, len(g.rowIndices))
+	for m, key := range g.orderedKeys {
+		ret[m] = g.GetGroup(key)
+	}
+	return ret
+}
+
+// ListGroups stub
+func (g *GroupedSeries) ListGroups() []string {
+	return g.orderedKeys
+}
+
 // HavingCount stub
 func (g *GroupedDataFrame) HavingCount(lambda func(int) bool) *GroupedDataFrame {
 	indexToKeep := make([]int, 0)
@@ -558,4 +572,18 @@ func (g *GroupedDataFrame) HavingCount(lambda func(int) bool) *GroupedDataFrame 
 		labels:      labels,
 		df:          g.df,
 	}
+}
+
+// IterGroups stub
+func (g *GroupedDataFrame) IterGroups() []*DataFrame {
+	ret := make([]*DataFrame, len(g.rowIndices))
+	for m, key := range g.orderedKeys {
+		ret[m] = g.GetGroup(key)
+	}
+	return ret
+}
+
+// ListGroups stub
+func (g *GroupedDataFrame) ListGroups() []string {
+	return g.orderedKeys
 }
