@@ -913,7 +913,7 @@ func TestSeries_Relabel(t *testing.T) {
 	}
 }
 
-func TestSeries_SetLevelNames(t *testing.T) {
+func TestSeries_SetLabelNames(t *testing.T) {
 	type fields struct {
 		labels []*valueContainer
 		values *valueContainer
@@ -944,7 +944,7 @@ func TestSeries_SetLevelNames(t *testing.T) {
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"}}},
 			args{[]string{"bar", "qux"}},
 			&Series{
-				err: errors.New("SetLevelNames(): number of `levelNames` must match number of levels in Series (2 != 1)")},
+				err: errors.New("SetLabelNames(): number of `levelNames` must match number of levels in Series (2 != 1)")},
 		},
 		{"fail - too few", fields{
 			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
@@ -953,7 +953,7 @@ func TestSeries_SetLevelNames(t *testing.T) {
 				{slice: []float64{1}, isNull: []bool{false}, name: "*1"}}},
 			args{[]string{"qux"}},
 			&Series{
-				err: errors.New("SetLevelNames(): number of `levelNames` must match number of levels in Series (1 != 2)")},
+				err: errors.New("SetLabelNames(): number of `levelNames` must match number of levels in Series (1 != 2)")},
 		},
 	}
 	for _, tt := range tests {
@@ -963,8 +963,8 @@ func TestSeries_SetLevelNames(t *testing.T) {
 				values: tt.fields.values,
 				err:    tt.fields.err,
 			}
-			if got := df.SetLevelNames(tt.args.colNames); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.SetLevelNames() = %v, want %v", got, tt.want)
+			if got := df.SetLabelNames(tt.args.colNames); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.SetLabelNames() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -3112,6 +3112,38 @@ func TestSeries_ValueIsNull(t *testing.T) {
 			}
 			if got := s.ValueIsNull(tt.args.i); got != tt.want {
 				t.Errorf("Series.ValueIsNull() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_ListLabelNames(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []string
+	}{
+		{"false", fields{
+			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			[]string{"qux"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.ListLabelNames(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.ListLabelNames() = %v, want %v", got, tt.want)
 			}
 		})
 	}

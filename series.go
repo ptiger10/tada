@@ -422,16 +422,21 @@ func (s *SeriesMutator) Relabel(levelNames []string) {
 	return
 }
 
-// SetLevelNames sets the names of all the label levels in the Series and returns the entire Series.
-func (s *Series) SetLevelNames(levelNames []string) *Series {
+// SetLabelNames sets the names of all the label levels in the Series and returns the entire Series.
+func (s *Series) SetLabelNames(levelNames []string) *Series {
 	if len(levelNames) != len(s.labels) {
 		return seriesWithError(
-			fmt.Errorf("SetLevelNames(): number of `levelNames` must match number of levels in Series (%d != %d)", len(levelNames), len(s.labels)))
+			fmt.Errorf("SetLabelNames(): number of `levelNames` must match number of levels in Series (%d != %d)", len(levelNames), len(s.labels)))
 	}
 	for j := range levelNames {
 		s.labels[j].name = levelNames[j]
 	}
 	return s
+}
+
+// ListLabelNames returns the name and position of all the label levels in the Series
+func (s *Series) ListLabelNames() []string {
+	return listNames(s.labels)
 }
 
 // Name returns the name of the Series

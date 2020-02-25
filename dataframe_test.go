@@ -1282,7 +1282,7 @@ func TestDataFrame_Relabel(t *testing.T) {
 	}
 }
 
-func TestDataFrame_SetLevelNames(t *testing.T) {
+func TestDataFrame_SetLabelNames(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -1324,7 +1324,7 @@ func TestDataFrame_SetLevelNames(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{[]string{"bar", "qux"}},
 			&DataFrame{
-				err: fmt.Errorf("SetLevelNames(): number of `levelNames` must match number of levels in DataFrame (2 != 1)")},
+				err: fmt.Errorf("SetLabelNames(): number of `levelNames` must match number of levels in DataFrame (2 != 1)")},
 		},
 		{"fail - too few", fields{
 			values: []*valueContainer{
@@ -1336,7 +1336,7 @@ func TestDataFrame_SetLevelNames(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{[]string{"qux"}},
 			&DataFrame{
-				err: fmt.Errorf("SetLevelNames(): number of `levelNames` must match number of levels in DataFrame (1 != 2)")},
+				err: fmt.Errorf("SetLabelNames(): number of `levelNames` must match number of levels in DataFrame (1 != 2)")},
 		},
 	}
 	for _, tt := range tests {
@@ -1348,8 +1348,8 @@ func TestDataFrame_SetLevelNames(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.SetLevelNames(tt.args.colNames); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.SetLevelNames() = %v, want %v", got, tt.want)
+			if got := df.SetLabelNames(tt.args.colNames); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.SetLabelNames() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -2862,7 +2862,7 @@ func TestDataFrame_ListColumns(t *testing.T) {
 	}
 }
 
-func TestDataFrame_ListLevels(t *testing.T) {
+func TestDataFrame_ListLabelNames(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -2890,8 +2890,8 @@ func TestDataFrame_ListLevels(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.ListLevels(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.ListLevels() = %v, want %v", got, tt.want)
+			if got := df.ListLabelNames(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.ListLabelNames() = %v, want %v", got, tt.want)
 			}
 		})
 	}

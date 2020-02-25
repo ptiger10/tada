@@ -364,8 +364,14 @@ func (df *DataFrame) String() string {
 			bottomHalf...)
 	}
 	// do not print *0-type label names
-	for k := range data[0] {
-		data[0][k] = suppressDefaultName(data[0][k])
+	for j := 0; j < df.numLevels(); j++ {
+		data[0][j] = suppressDefaultName(data[0][j])
+	}
+	// demarcate index headers
+	for l := 0; l < df.numColLevels(); l++ {
+		for j := 0; j < df.numLevels(); j++ {
+			data[l][j] = fmt.Sprintf("-%v-", data[l][j])
+		}
 	}
 
 	// truncate columns
@@ -427,8 +433,8 @@ func (df *DataFrame) ListColumns() []string {
 	return listNames(df.values)
 }
 
-// ListLevels returns the name and position of all the label levels in the DataFrame
-func (df *DataFrame) ListLevels() []string {
+// ListLabelNames returns the name and position of all the label levels in the DataFrame
+func (df *DataFrame) ListLabelNames() []string {
 	return listNames(df.labels)
 }
 
@@ -982,11 +988,11 @@ func (df *DataFrame) Name() string {
 	return df.name
 }
 
-// SetLevelNames sets the names of all the label levels in the DataFrame and returns the entire DataFrame.
-func (df *DataFrame) SetLevelNames(levelNames []string) *DataFrame {
+// SetLabelNames sets the names of all the label levels in the DataFrame and returns the entire DataFrame.
+func (df *DataFrame) SetLabelNames(levelNames []string) *DataFrame {
 	if len(levelNames) != len(df.labels) {
 		return dataFrameWithError(
-			fmt.Errorf("SetLevelNames(): number of `levelNames` must match number of levels in DataFrame (%d != %d)", len(levelNames), len(df.labels)))
+			fmt.Errorf("SetLabelNames(): number of `levelNames` must match number of levels in DataFrame (%d != %d)", len(levelNames), len(df.labels)))
 	}
 	for j := range levelNames {
 		df.labels[j].name = levelNames[j]
