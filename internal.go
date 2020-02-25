@@ -1305,7 +1305,8 @@ func (s *Series) combineMath(other *Series, ignoreMissing bool, fn func(v1 float
 		retFloat[i] = combinedFloat
 		retIsNull[i] = originalNulls[i]
 	}
-	return &Series{values: &valueContainer{slice: retFloat, isNull: retIsNull}, labels: s.labels}
+	// copy the labels to avoid sharing data with derivative Series
+	return &Series{values: &valueContainer{slice: retFloat, isNull: retIsNull}, labels: copyContainers(s.labels)}
 }
 
 func lookup(how string,
