@@ -997,6 +997,12 @@ func (s *Series) SliceNulls() []bool {
 	return output
 }
 
+// Interface returns a copy of the underlying Series data as an interface.
+func (s *Series) Interface() interface{} {
+	ret := s.values.copy()
+	return ret.slice
+}
+
 // ValueCounts stub
 func (s *Series) ValueCounts() map[string]int {
 	return s.values.valueCounts()

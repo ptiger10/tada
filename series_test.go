@@ -2912,7 +2912,7 @@ func TestSeries_SliceTime(t *testing.T) {
 				t.Errorf("Series.SliceTime() = %v, want %v", got, tt.want)
 			}
 			got[0] = time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC)
-			if reflect.DeepEqual(got, s.SliceNulls()) {
+			if reflect.DeepEqual(got, s.SliceTime()) {
 				t.Errorf("Series.SliceTime() retained reference to original, want copy")
 			}
 		})
@@ -2953,6 +2953,44 @@ func TestSeries_SliceNulls(t *testing.T) {
 			got[0] = true
 			if reflect.DeepEqual(got, s.SliceNulls()) {
 				t.Errorf("Series.SliceNulls() retained reference to original, want copy")
+			}
+		})
+	}
+}
+
+func TestSeries_Interface(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   interface{}
+	}{
+		{"default values", fields{
+			values: &valueContainer{slice: []string{"foo", "bar"}, isNull: []bool{false, true}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
+			[]string{"foo", "bar"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			got := s.Interface()
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.Interface() = %v, want %v", got, tt.want)
+			}
+			got.([]string)[0] = ""
+			if reflect.DeepEqual(got, s.Interface()) {
+				t.Errorf("Series.Interface() retained reference to original, want copy")
 			}
 		})
 	}
