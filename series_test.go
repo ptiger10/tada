@@ -3278,3 +3278,36 @@ func TestSeries_At(t *testing.T) {
 		})
 	}
 }
+
+func TestSeries_DType(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{"pass", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
+			"[]float64",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.DType(); got != tt.want {
+				t.Errorf("Series.DType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

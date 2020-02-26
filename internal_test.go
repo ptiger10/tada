@@ -3077,3 +3077,32 @@ func Test_multiUniqueIndex(t *testing.T) {
 		})
 	}
 }
+
+func Test_valueContainer_dtype(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{"pass", fields{slice: []float64{1}, isNull: []bool{false}, name: "foo"}, "[]float64"},
+		{"pass", fields{slice: []string{"1"}, isNull: []bool{false}, name: "foo"}, "[]string"},
+		{"pass", fields{slice: [][]string{{"1"}}, isNull: []bool{false}, name: "foo"}, "[][]string"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			if got := vc.dtype(); got != tt.want {
+				t.Errorf("valueContainer.dtype() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

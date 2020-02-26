@@ -1003,6 +1003,11 @@ func (s *Series) Interface() interface{} {
 	return ret.slice
 }
 
+// DType returns the slice type of the underlying Series values
+func (s *Series) DType() string {
+	return s.values.dtype()
+}
+
 // ValueCounts stub
 func (s *Series) ValueCounts() map[string]int {
 	return s.values.valueCounts()

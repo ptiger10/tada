@@ -2209,3 +2209,7 @@ func multiUniqueIndex(containers []*valueContainer) []int {
 	}
 	return ret
 }
+
+func (vc *valueContainer) dtype() string {
+	return reflect.TypeOf(vc.slice).String()
+}
