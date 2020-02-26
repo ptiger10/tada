@@ -843,6 +843,26 @@ func (df *DataFrameMutator) WithCol(name string, input interface{}) {
 	df.dataframe.values = cols
 }
 
+// DropLabels drops the first label level matching `name`
+// Returns a new DataFrame.
+func (df *DataFrame) DropLabels(name string) *DataFrame {
+	df.Copy()
+	df.InPlace().DropLabels(name)
+	return df
+}
+
+// DropLabels drops the first label level matching `name`
+// Modifies the underlying DataFrame in place.
+func (df *DataFrameMutator) DropLabels(name string) {
+	newCols, err := dropFromContainers(name, df.dataframe.labels)
+	if err != nil {
+		df.dataframe.resetWithError(fmt.Errorf("DropCol(): %v", err))
+		return
+	}
+	df.dataframe.labels = newCols
+	return
+}
+
 // DropCol drops the first column matching `name`
 // Returns a new DataFrame.
 func (df *DataFrame) DropCol(name string) *DataFrame {
@@ -852,36 +872,32 @@ func (df *DataFrame) DropCol(name string) *DataFrame {
 }
 
 // DropCol drops the first column matching `name`
+// Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) DropCol(name string) {
-	toExclude, err := indexOfContainer(name, df.dataframe.values)
+	newCols, err := dropFromContainers(name, df.dataframe.values)
 	if err != nil {
 		df.dataframe.resetWithError(fmt.Errorf("DropCol(): %v", err))
 		return
 	}
-	if len(df.dataframe.values) == 1 {
-		df.dataframe.resetWithError(fmt.Errorf("DropCol(): cannot drop only column"))
-		return
-	}
-	index := excludeFromIndex(len(df.dataframe.values), toExclude)
-	df.SubsetCols(index)
+	df.dataframe.values = newCols
 	return
 }
 
-// Drop removes the row at the specified index.
+// DropRow removes the row at the specified index.
 // Returns a new DataFrame.
-func (df *DataFrame) Drop(index int) *DataFrame {
+func (df *DataFrame) DropRow(index int) *DataFrame {
 	df.Copy()
-	df.InPlace().Drop(index)
+	df.InPlace().DropRow(index)
 	return df
 }
 
-// Drop removes the row at the specified index.
+// DropRow removes the row at the specified index.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) Drop(index int) {
+func (df *DataFrameMutator) DropRow(index int) {
 	for k := range df.dataframe.values {
 		err := df.dataframe.values[k].dropRow(index)
 		if err != nil {
-			df.dataframe.resetWithError(fmt.Errorf("Drop(): %v", err))
+			df.dataframe.resetWithError(fmt.Errorf("DropRow(): %v", err))
 			return
 		}
 	}

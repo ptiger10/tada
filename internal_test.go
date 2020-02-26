@@ -3106,3 +3106,42 @@ func Test_valueContainer_dtype(t *testing.T) {
 		})
 	}
 }
+
+func Test_dropFromContainers(t *testing.T) {
+	type args struct {
+		name       string
+		containers []*valueContainer
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*valueContainer
+		wantErr bool
+	}{
+		{"pass", args{"foo", []*valueContainer{
+			{name: "foo"},
+			{name: "bar"},
+		}}, []*valueContainer{
+			{name: "bar"},
+		}, false},
+		{"fail - bad column", args{"corge", []*valueContainer{
+			{name: "foo"},
+			{name: "bar"},
+		}}, nil, true},
+		{"fail - last column", args{"foo", []*valueContainer{
+			{name: "foo"},
+		}}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := dropFromContainers(tt.args.name, tt.args.containers)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("dropFromContainers() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("dropFromContainers() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

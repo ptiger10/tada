@@ -3441,7 +3441,7 @@ func TestDataFrame_Cols(t *testing.T) {
 	}
 }
 
-func TestDataFrame_Drop(t *testing.T) {
+func TestDataFrame_DropRow(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -3476,7 +3476,7 @@ func TestDataFrame_Drop(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{10},
 			&DataFrame{
-				err: fmt.Errorf("Drop(): index out of range (10 > 1)")},
+				err: fmt.Errorf("DropRow(): index out of range (10 > 1)")},
 		},
 	}
 	for _, tt := range tests {
@@ -3488,8 +3488,8 @@ func TestDataFrame_Drop(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.Drop(tt.args.index); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.Drop() = %v, want %v", got.err, tt.want.err)
+			if got := df.DropRow(tt.args.index); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.DropRow() = %v, want %v", got.err, tt.want.err)
 			}
 		})
 	}
@@ -3605,25 +3605,6 @@ func TestDataFrame_DropCol(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
 		},
-		{"fail - cannot drop only column", fields{values: []*valueContainer{
-			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
-		},
-			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-			colLevelNames: []string{"*0"}},
-			args{"foo"},
-			&DataFrame{
-				err: fmt.Errorf("DropCol(): cannot drop only column")},
-		},
-		{"fail - bad col name", fields{values: []*valueContainer{
-			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
-			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
-		},
-			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-			colLevelNames: []string{"*0"}},
-			args{"corge"},
-			&DataFrame{
-				err: fmt.Errorf("DropCol(): `name` (corge) not found")},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3636,6 +3617,56 @@ func TestDataFrame_DropCol(t *testing.T) {
 			}
 			if got := df.DropCol(tt.args.name); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.DropCol() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_DropLabels(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		name string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"normal", fields{values: []*valueContainer{
+			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
+		},
+			labels: []*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"},
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
+			},
+			colLevelNames: []string{"*0"}},
+			args{"foo"},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
+				},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.DropLabels(tt.args.name); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.DropLabels() = %v, want %v", got, tt.want)
 			}
 		})
 	}

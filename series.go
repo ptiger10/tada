@@ -372,25 +372,45 @@ func (s *SeriesMutator) WithValues(input interface{}) {
 	return
 }
 
-// Drop removes the row at the specified index.
+// DropRow removes the row at the specified index.
 // Returns a new Series.
-func (s *Series) Drop(index int) *Series {
+func (s *Series) DropRow(index int) *Series {
 	s.Copy()
-	s.InPlace().Drop(index)
+	s.InPlace().DropRow(index)
 	return s
 }
 
-// Drop removes the row at the specified index.
+// DropRow removes the row at the specified index.
 // Modifies the underlying Series in place.
-func (s *SeriesMutator) Drop(index int) {
+func (s *SeriesMutator) DropRow(index int) {
 	err := s.series.values.dropRow(index)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("Drop(): %v", err))
+		s.series.resetWithError(fmt.Errorf("DropRow(): %v", err))
 		return
 	}
 	for j := range s.series.labels {
 		s.series.labels[j].dropRow(index)
 	}
+}
+
+// DropLabels removes the first label level matching `name`.
+// Returns a new Series.
+func (s *Series) DropLabels(name string) *Series {
+	s.Copy()
+	s.InPlace().DropLabels(name)
+	return s
+}
+
+// DropLabels removes the first label level matching `name`.
+// Modifies the underlying Series in place.
+func (s *SeriesMutator) DropLabels(name string) {
+	newCols, err := dropFromContainers(name, s.series.labels)
+	if err != nil {
+		s.series.resetWithError(fmt.Errorf("DropLabels(): %v", err))
+		return
+	}
+	s.series.labels = newCols
+	return
 }
 
 // Append adds the `other` values as new rows to the Series.

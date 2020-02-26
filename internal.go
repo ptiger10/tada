@@ -1451,6 +1451,17 @@ func (vc *valueContainer) dropRow(index int) error {
 	return nil
 }
 
+func dropFromContainers(name string, containers []*valueContainer) ([]*valueContainer, error) {
+	toExclude, err := indexOfContainer(name, containers)
+	if err != nil {
+		return nil, err
+	}
+	if len(containers) == 1 {
+		return nil, fmt.Errorf("cannot drop only container")
+	}
+	return append(containers[:toExclude], containers[toExclude+1:]...), nil
+}
+
 func excludeFromIndex(indexLength int, item int) []int {
 	var ret []int
 	for i := 0; i < indexLength; i++ {

@@ -1039,7 +1039,50 @@ func TestSeries_Name(t *testing.T) {
 	}
 }
 
-func TestSeries_Drop(t *testing.T) {
+func TestSeries_DropLabels(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		name string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"pass",
+			fields{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
+				labels: []*valueContainer{
+					{slice: []string{"foo"}, isNull: []bool{false}, name: "foo"},
+					{slice: []string{"bar"}, isNull: []bool{false}, name: "bar"},
+				}},
+			args{"bar"},
+			&Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
+				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "foo"}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.DropLabels(tt.args.name); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.DropLabels() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_DropRow(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -1068,7 +1111,7 @@ func TestSeries_Drop(t *testing.T) {
 				labels: []*valueContainer{{slice: []string{"foo", "bar", ""}, isNull: []bool{false, false, true}}}},
 			args{3},
 			&Series{
-				err: errors.New("Drop(): index out of range (3 > 2)")}},
+				err: errors.New("DropRow(): index out of range (3 > 2)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1077,8 +1120,8 @@ func TestSeries_Drop(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Drop(tt.args.index); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.Drop() = %v, want %v", got, tt.want)
+			if got := s.DropRow(tt.args.index); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.DropRow() = %v, want %v", got, tt.want)
 			}
 		})
 	}
