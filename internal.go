@@ -126,8 +126,8 @@ func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels
 	return leftKeys, rightKeys
 }
 
-// findContainerWithName returns the position of the first level within `cols` with a name matching `name`, or an error if no level matches
-func findContainerWithName(name string, cols []*valueContainer) (int, error) {
+// indexOfContainer returns the position of the first level within `cols` with a name matching `name`, or an error if no level matches
+func indexOfContainer(name string, cols []*valueContainer) (int, error) {
 	for j := range cols {
 		if strings.ToLower(cols[j].name) == strings.ToLower(name) {
 			return j, nil
@@ -140,7 +140,7 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 	switch reflect.TypeOf(input).Kind() {
 	// `input` is string: rename label level
 	case reflect.String:
-		lvl, err := findContainerWithName(name, cols)
+		lvl, err := indexOfContainer(name, cols)
 		if err != nil {
 			return nil, fmt.Errorf("cannot rename column: %v", err)
 		}
@@ -156,7 +156,7 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 				name, l, requiredLen)
 		}
 		// `input` is supported slice
-		lvl, err := findContainerWithName(name, cols)
+		lvl, err := indexOfContainer(name, cols)
 		if err != nil {
 			// `name` does not already exist: append new label level
 			cols = append(cols, &valueContainer{slice: input, name: name, isNull: isNull})
@@ -177,7 +177,7 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 				name, v.Len(), requiredLen)
 		}
 		// `name` does not already exist: append new level
-		lvl, err := findContainerWithName(name, cols)
+		lvl, err := indexOfContainer(name, cols)
 		if err != nil {
 			cols = append(cols, v.values)
 			cols[len(cols)-1].name = name
@@ -1120,7 +1120,7 @@ func sortContainers(containers []*valueContainer, sorters []Sorter) ([]int, erro
 	length := reflect.ValueOf(containers[0].slice).Len()
 	originalIndex := makeIntRange(0, length)
 	for i := len(sorters) - 1; i >= 0; i-- {
-		index, err := findContainerWithName(sorters[i].Name, containers)
+		index, err := indexOfContainer(sorters[i].Name, containers)
 		if err != nil {
 			return nil, fmt.Errorf("position %v: %v", len(sorters)-1-i, err)
 		}
@@ -1140,7 +1140,7 @@ func sortContainers(containers []*valueContainer, sorters []Sorter) ([]int, erro
 func convertColNamesToIndexPositions(names []string, columns []*valueContainer) ([]int, error) {
 	ret := make([]int, len(names))
 	for i, name := range names {
-		lvl, err := findContainerWithName(name, columns)
+		lvl, err := indexOfContainer(name, columns)
 		if err != nil {
 			return nil, err
 		}

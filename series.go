@@ -119,10 +119,19 @@ func (s *Series) Cast(dtype DType) {
 	return
 }
 
+// IndexOf stub. If name does not match any container, -1 is returned
+func (s *Series) IndexOf(name string) int {
+	i, err := indexOfContainer(name, s.labels)
+	if err != nil {
+		return -1
+	}
+	return i
+}
+
 // SelectLabels finds the first level with matching `name` and returns as a Series with all existing label levels (including itself).
 // If label level name is default (prefixed with *), removes the prefix.
 func (s *Series) SelectLabels(name string) *Series {
-	index, err := findContainerWithName(name, s.labels)
+	index, err := indexOfContainer(name, s.labels)
 	if err != nil {
 		return seriesWithError(fmt.Errorf("SelectLabels(): %v", err))
 	}
@@ -424,7 +433,7 @@ func (s *Series) Relabel(levelNames []string) *Series {
 // Relabel stub
 func (s *SeriesMutator) Relabel(levelNames []string) {
 	for _, name := range levelNames {
-		lvl, err := findContainerWithName(name, s.series.labels)
+		lvl, err := indexOfContainer(name, s.series.labels)
 		if err != nil {
 			s.series.resetWithError(fmt.Errorf("Relabel(): %v", err))
 			return
@@ -500,7 +509,7 @@ func filter(containers []*valueContainer, filters map[string]FilterFn) ([]int, e
 		if err != nil {
 			return nil, fmt.Errorf("filter: %v", err)
 		}
-		index, err := findContainerWithName(containerName, containers)
+		index, err := indexOfContainer(containerName, containers)
 		if err != nil {
 			return nil, fmt.Errorf("filter: %v", err)
 		}

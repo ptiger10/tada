@@ -613,7 +613,7 @@ func (g *GroupedSeries) HavingCount(lambda func(int) bool) *GroupedSeries {
 // Col isolates the Series at `containerName`, which may be either a label level or column in the underlying DataFrame.
 // Returns a GroupedSeries with the same groups and labels as in the GroupedDataFrame.
 func (g *GroupedDataFrame) Col(colName string) *GroupedSeries {
-	index, err := findContainerWithName(colName, g.df.values)
+	index, err := indexOfContainer(colName, g.df.values)
 	if err != nil {
 		return &GroupedSeries{
 			err: fmt.Errorf("Col(): %v", err),

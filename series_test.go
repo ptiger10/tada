@@ -3311,3 +3311,45 @@ func TestSeries_DType(t *testing.T) {
 		})
 	}
 }
+
+func TestSeries_IndexOf(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		name string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   int
+	}{
+		{"pass", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
+			args{"qux"}, 0,
+		},
+		{"fail - missing", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
+			args{"corge"}, -1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.IndexOf(tt.args.name); got != tt.want {
+				t.Errorf("Series.IndexOf() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

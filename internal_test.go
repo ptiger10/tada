@@ -1542,13 +1542,13 @@ func Test_findColWithName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := findContainerWithName(tt.args.name, tt.args.cols)
+			got, err := indexOfContainer(tt.args.name, tt.args.cols)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("findContainerWithName() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("indexOfContainer() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("findContainerWithName() = %v, want %v", got, tt.want)
+				t.Errorf("indexOfContainer() = %v, want %v", got, tt.want)
 			}
 		})
 	}
