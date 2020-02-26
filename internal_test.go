@@ -3054,3 +3054,26 @@ func Test_valueContainer_unique(t *testing.T) {
 		})
 	}
 }
+
+func Test_uniqueRows(t *testing.T) {
+	type args struct {
+		containers []*valueContainer
+	}
+	tests := []struct {
+		name string
+		args args
+		want []int
+	}{
+		{"pass", args{[]*valueContainer{
+			{slice: []float64{1, 1, 2, 1}, isNull: []bool{false, false, false, false}, name: "foo"},
+			{slice: []int{0, 0, 2, 3}, isNull: []bool{false, false, false, false}, name: "qux"},
+		}}, []int{0, 2, 3}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := uniqueRows(tt.args.containers); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("uniqueRows() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -2177,3 +2177,16 @@ func (vc *valueContainer) unique() []int {
 	}
 	return ret
 }
+
+func uniqueRows(containers []*valueContainer) []int {
+	stringifiedRows := concatenateLabelsToStrings(containers, makeIntRange(0, len(containers)))
+	m := make(map[string]bool)
+	ret := make([]int, 0)
+	for i, value := range stringifiedRows {
+		if _, ok := m[value]; !ok {
+			m[value] = true
+			ret = append(ret, i)
+		}
+	}
+	return ret
+}

@@ -3156,14 +3156,27 @@ func TestSeries_Unique(t *testing.T) {
 		sharedData bool
 		err        error
 	}
+	type args struct {
+		valuesOnly bool
+	}
 	tests := []struct {
 		name   string
 		fields fields
+		args   args
 		want   *Series
 	}{
-		{"pass", fields{
+		{"values only", fields{
 			values: &valueContainer{slice: []float64{1, 1, 2, 1}, isNull: []bool{false, false, false, false}, name: "foo"},
 			labels: []*valueContainer{{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "qux"}}},
+			args{true},
+			&Series{
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 2}, isNull: []bool{false, false}, name: "qux"}}},
+		},
+		{"values and labels", fields{
+			values: &valueContainer{slice: []float64{1, 1, 2, 2}, isNull: []bool{false, false, false, false}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 0, 2, 2}, isNull: []bool{false, false, false, false}, name: "qux"}}},
+			args{false},
 			&Series{
 				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 2}, isNull: []bool{false, false}, name: "qux"}}},
@@ -3177,8 +3190,52 @@ func TestSeries_Unique(t *testing.T) {
 				sharedData: tt.fields.sharedData,
 				err:        tt.fields.err,
 			}
-			if got := s.Unique(); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Unique(tt.args.valuesOnly); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.Unique() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_At(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		index int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   Element
+	}{
+		{"pass", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
+			args{0},
+			Element{Val: float64(1), IsNull: false},
+		},
+		{"out of range", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
+			args{1},
+			Element{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.At(tt.args.index); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.At() = %v, want %v", got, tt.want)
 			}
 		})
 	}

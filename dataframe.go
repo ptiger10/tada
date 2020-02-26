@@ -405,6 +405,21 @@ func (df *DataFrame) String() string {
 	return string(buf.Bytes())
 }
 
+// At returns the Element at the `row` and `column` index positions. If `row` or `column` is out of range, returns an empty Element.
+func (df *DataFrame) At(row, column int) Element {
+	if row >= df.Len() {
+		return Element{}
+	}
+	if column >= df.numColumns() {
+		return Element{}
+	}
+	v := reflect.ValueOf(df.values[column].slice)
+	return Element{
+		Val:    v.Index(row).Interface(),
+		IsNull: df.values[column].isNull[row],
+	}
+}
+
 // Len returns the number of rows in each column of the DataFrame.
 func (df *DataFrame) Len() int {
 	return reflect.ValueOf(df.values[0].slice).Len()

@@ -90,6 +90,18 @@ func (s *Series) Err() error {
 	return s.err
 }
 
+// At returns the Element at the `index` position. If `index` is out of range, returns an empty Element.
+func (s *Series) At(index int) Element {
+	if index >= s.Len() {
+		return Element{}
+	}
+	v := reflect.ValueOf(s.values.slice)
+	return Element{
+		Val:    v.Index(index).Interface(),
+		IsNull: s.values.isNull[index],
+	}
+}
+
 // Len returns the number of rows in the Series.
 func (s *Series) Len() int {
 	return reflect.ValueOf(s.values.slice).Len()
@@ -991,7 +1003,13 @@ func (s *Series) ValueCounts() map[string]int {
 }
 
 // Unique returns the first appearance of all non-null values in the Series.
-func (s *Series) Unique() *Series {
-	index := s.values.unique()
+func (s *Series) Unique(valuesOnly bool) *Series {
+	var index []int
+	if valuesOnly {
+		index = s.values.unique()
+	} else {
+		mergedLabelsAndValues := append(s.labels, s.values)
+		index = uniqueRows(mergedLabelsAndValues)
+	}
 	return s.Subset(index)
 }

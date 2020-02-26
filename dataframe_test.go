@@ -3820,3 +3820,68 @@ func TestConcatSeries(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_At(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		row    int
+		column int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   Element
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+				{slice: []int{3, 4}, isNull: []bool{false, false}, name: "qux"},
+			},
+			labels:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+			args{0, 0},
+			Element{Val: 0, IsNull: true},
+		},
+		{"fail - row out of range", fields{
+			values: []*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+				{slice: []int{3, 4}, isNull: []bool{false, false}, name: "qux"},
+			},
+			labels:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+			args{10, 0},
+			Element{},
+		},
+		{"fail - column out of range", fields{
+			values: []*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+				{slice: []int{3, 4}, isNull: []bool{false, false}, name: "qux"},
+			},
+			labels:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+			args{0, 10},
+			Element{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.At(tt.args.row, tt.args.column); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.At() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
