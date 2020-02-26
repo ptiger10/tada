@@ -21,6 +21,20 @@ func ExampleDataFrame() {
 	// name: qux
 }
 
+func ExampleSeries_nested() {
+	s := NewSeries([][]string{{"foo", "bar"}, {"baz"}, {}}).
+		SetName("a")
+	fmt.Println(s)
+	// Output:
+	// +----+-----------+
+	// | -- |     A     |
+	// +----+-----------+
+	// |  0 | [foo bar] |
+	// |  1 | [baz]     |
+	// |  2 | n/a       |
+	// +----+-----------+
+}
+
 func ExampleDataFrame_excess_rows() {
 	df := NewDataFrame([]interface{}{
 		[]float64{1, 2, 3, 4, 5, 6, 7, 8}}).SetColNames([]string{"A"})

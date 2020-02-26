@@ -164,6 +164,11 @@ func (vc *valueContainer) float() floatValueContainer {
 			v := d.Index(i).Interface()
 			newVals[i], isNull[i] = convertStringToFloat(fmt.Sprint(v), isNull[i])
 		}
+	default:
+		for i := range newVals {
+			newVals[i] = 0
+			isNull[i] = true
+		}
 	}
 
 	ret := floatValueContainer{
@@ -181,11 +186,24 @@ func (vc *valueContainer) str() stringValueContainer {
 	switch vc.slice.(type) {
 	case []string:
 		newVals = vc.slice.([]string)
-	default:
+	case []float64, []time.Time, []bool, []interface{},
+		[]float32, []uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64:
 		d := reflect.ValueOf(vc.slice)
 		for i := 0; i < d.Len(); i++ {
 			newVals[i] = fmt.Sprint(d.Index(i).Interface())
 		}
+	case [][]string, [][]float64, [][]time.Time:
+		d := reflect.ValueOf(vc.slice)
+		for i := 0; i < d.Len(); i++ {
+			nested := d.Index(i)
+			newVals[i] = fmt.Sprint(nested.Interface())
+		}
+	default:
+		for i := range newVals {
+			newVals[i] = ""
+			isNull[i] = true
+		}
+
 	}
 	ret := stringValueContainer{
 		slice:  newVals,

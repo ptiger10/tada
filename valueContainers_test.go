@@ -387,6 +387,8 @@ func Test_valueContainer_float(t *testing.T) {
 			floatValueContainer{slice: []float64{3.5, 1, 1, 1, 0, 0}, isNull: []bool{false, false, false, false, true, false}, index: []int{0, 1, 2, 3, 4, 5}}},
 		{"[]int", fields{slice: []int{1}, isNull: []bool{false}},
 			floatValueContainer{slice: []float64{1}, isNull: []bool{false}, index: []int{0}}},
+		{"[][]float64", fields{slice: [][]float64{{1}}, isNull: []bool{false}},
+			floatValueContainer{slice: []float64{0}, isNull: []bool{true}, index: []int{0}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -426,6 +428,10 @@ func Test_valueContainer_str(t *testing.T) {
 			stringValueContainer{slice: []string{"3.5", "1", "1", "1", "2020-01-01 00:00:00 +0000 UTC", "false"}, isNull: []bool{false, false, false, false, false, false}, index: []int{0, 1, 2, 3, 4, 5}}},
 		{"[]int", fields{slice: []int{1}, isNull: []bool{false}},
 			stringValueContainer{slice: []string{"1"}, isNull: []bool{false}, index: []int{0}}},
+		{"[][]string", fields{slice: [][]string{{"foo", "bar"}, {""}}, isNull: []bool{false, true}},
+			stringValueContainer{slice: []string{"[foo bar]", "[]"}, isNull: []bool{false, true}, index: []int{0, 1}}},
+		{"[][]float64", fields{slice: [][]float64{{1, 2}, {0}}, isNull: []bool{false, true}},
+			stringValueContainer{slice: []string{"[1 2]", "[0]"}, isNull: []bool{false, true}, index: []int{0, 1}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

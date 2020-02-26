@@ -1551,6 +1551,15 @@ func setNullsFromInterface(input interface{}) []bool {
 		for i := range ret {
 			ret[i] = vals[i].IsNull
 		}
+	// nested slices
+	case [][]string, [][]float64, [][]time.Time:
+		v := reflect.ValueOf(input)
+		l := v.Len()
+		ret = make([]bool, l)
+		for i := range ret {
+			// if slice is empty -> null
+			ret[i] = v.Index(i).Len() == 0
+		}
 	default:
 		return nil
 	}

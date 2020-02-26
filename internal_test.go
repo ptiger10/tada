@@ -224,6 +224,7 @@ func Test_setNullsFromInterface(t *testing.T) {
 			math.NaN(), "", time.Time{}}},
 			[]bool{false, false, false, false, false, false,
 				true, true, true}},
+		{"nested string", args{[][]string{{"foo"}, {}}}, []bool{false, true}},
 		{"nil - not slice", args{"foo"}, nil},
 	}
 	for _, tt := range tests {
