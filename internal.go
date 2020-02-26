@@ -1778,7 +1778,7 @@ func uniqueList(vals []string, isNull []bool, index []int) ([]string, bool) {
 		}
 	}
 	if !atLeastOneValid {
-		return nil, true
+		return []string{}, true
 	}
 	return ret, false
 }

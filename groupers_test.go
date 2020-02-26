@@ -3002,7 +3002,7 @@ func TestGroupedSeries_UniqueList(t *testing.T) {
 				series: &Series{values: &valueContainer{slice: []string{"a", "a", "c", "d", ""}, isNull: []bool{false, false, false, false, true}},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "bar", "bar", "bar", "baz"}, isNull: []bool{false, false, false, false, false}, name: "*0"}}}},
-			&Series{values: &valueContainer{slice: [][]string{{"a"}, {"c", "d"}, nil}, isNull: []bool{false, false, true}, name: "unique"},
+			&Series{values: &valueContainer{slice: [][]string{{"a"}, {"c", "d"}, {}}, isNull: []bool{false, false, true}, name: "unique"},
 				labels: []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "*0"}}}},
 	}
 	for _, tt := range tests {
