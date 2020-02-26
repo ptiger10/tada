@@ -276,6 +276,90 @@ func Test_groupedDateTimeFunc(t *testing.T) {
 	}
 }
 
+func Test_groupedIndexFunc(t *testing.T) {
+	type args struct {
+		vals       interface{}
+		nulls      []bool
+		name       string
+		aligned    bool
+		index      int
+		rowIndices [][]int
+	}
+	tests := []struct {
+		name string
+		args args
+		want *valueContainer
+	}{
+		{"grouped", args{
+			vals: []int{0, 1, 2, 3}, nulls: []bool{false, false, false, false},
+			name: "corge", aligned: false,
+			index:      0,
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+		},
+			&valueContainer{
+				slice:  []int{0, 2},
+				isNull: []bool{false, false},
+				name:   "corge",
+			},
+		},
+		{"out of range - too high", args{
+			vals: []int{0, 1, 2, 3}, nulls: []bool{false, false, false, false},
+			name: "corge", aligned: false,
+			index:      2,
+			rowIndices: [][]int{{0}, {1, 2, 3}},
+		},
+			&valueContainer{
+				slice:  []int{0, 3},
+				isNull: []bool{true, false},
+				name:   "corge",
+			},
+		},
+		{"out of range - too low", args{
+			vals: []int{0, 1, 2, 3}, nulls: []bool{false, false, false, false},
+			name: "corge", aligned: false,
+			index:      -2,
+			rowIndices: [][]int{{0}, {1, 2, 3}},
+		},
+			&valueContainer{
+				slice:  []int{0, 2},
+				isNull: []bool{true, false},
+				name:   "corge",
+			},
+		},
+		{"-1", args{
+			vals: []int{0, 1, 2, 3}, nulls: []bool{false, false, false, false},
+			name: "corge", aligned: false,
+			index:      -1,
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+		},
+			&valueContainer{
+				slice:  []int{1, 3},
+				isNull: []bool{false, false},
+				name:   "corge",
+			},
+		},
+		{"aligned", args{
+			vals: []string{"foo", "qux", "bar", "baz"}, nulls: []bool{false, false, false, false},
+			name: "corge", aligned: true,
+			index:      0,
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+		},
+			&valueContainer{
+				slice:  []string{"foo", "foo", "bar", "bar"},
+				isNull: []bool{false, false, false, false},
+				name:   "corge",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := groupedIndexFunc(tt.args.vals, tt.args.nulls, tt.args.name, tt.args.aligned, tt.args.index, tt.args.rowIndices); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("groupedIndexFunc() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestGroupedSeries_Sum(t *testing.T) {
 	type fields struct {
 		orderedKeys []string
@@ -2843,6 +2927,54 @@ func TestGroupedDataFrame_ListGroups(t *testing.T) {
 			}
 			if got := g.ListGroups(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GroupedDataFrame.ListGroups() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGroupedSeries_Nth(t *testing.T) {
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		series      *Series
+		aligned     bool
+		err         error
+	}
+	type args struct {
+		index int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{
+			name: "1st position - includes null",
+			fields: fields{
+				orderedKeys: []string{"foo", "bar"},
+				rowIndices:  [][]int{{0}, {1, 2, 3}},
+				labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				series: &Series{values: &valueContainer{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			args: args{1},
+			want: &Series{values: &valueContainer{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "nth"},
+				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeries{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				series:      tt.fields.series,
+				aligned:     tt.fields.aligned,
+				err:         tt.fields.err,
+			}
+			if got := g.Nth(tt.args.index); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedSeries.Nth() = %v, want %v", got, tt.want)
 			}
 		})
 	}

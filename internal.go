@@ -813,7 +813,6 @@ func (vc *valueContainer) shift(n int) *valueContainer {
 	for i := 0; i < v.Len(); i++ {
 		position := i - n
 		if position < 0 || position >= v.Len() {
-			vals.Index(i).Set(reflect.Zero(reflect.TypeOf(vc.slice).Elem()))
 			isNull[i] = true
 		} else {
 			vals.Index(i).Set(v.Index(position))
@@ -1376,8 +1375,6 @@ func lookupWithAnchor(
 			isNull[i] = lookupValues.isNull[matchedIndex]
 			// no match: set to zero value
 		} else {
-			src := reflectLookup.Type().Elem()
-			dst.Set(reflect.Zero(src))
 			isNull[i] = true
 		}
 	}
@@ -1424,8 +1421,6 @@ func lookupDataFrameWithAnchor(
 				isNull[i] = lookupColumns[k].isNull[matchedIndex]
 				// no match
 			} else {
-				src := reflect.TypeOf(lookupColumns[k].slice).Elem()
-				dst.Set(reflect.Zero(src))
 				isNull[i] = true
 			}
 		}
@@ -1843,26 +1838,6 @@ func latest(vals []time.Time, isNull []bool, index []int) (time.Time, bool) {
 		return time.Time{}, true
 	}
 	return max, false
-}
-
-// returns the first non-null value as a string
-func first(vals []string, isNull []bool, index []int) (string, bool) {
-	for _, i := range index {
-		if !isNull[i] {
-			return vals[i], false
-		}
-	}
-	return "", true
-}
-
-// returns the last non-null value as a string
-func last(vals []string, isNull []bool, index []int) (string, bool) {
-	for i := len(index) - 1; i >= 0; i-- {
-		if !isNull[index[i]] {
-			return vals[index[i]], false
-		}
-	}
-	return "", true
 }
 
 // cumsum is an aligned function, meaning it aligns with the original rows

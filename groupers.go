@@ -2,6 +2,7 @@ package tada
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 )
@@ -160,6 +161,91 @@ func (g *GroupedSeries) floatFunc(name string, fn func(val []float64, isNull []b
 	}
 }
 
+func groupedIndexFunc(
+	vals interface{},
+	nulls []bool,
+	name string,
+	aligned bool,
+	index int,
+	rowIndices [][]int) *valueContainer {
+	// default: return length is equal to the number of groups
+	retLength := len(rowIndices)
+	v := reflect.ValueOf(vals)
+	if aligned {
+		// if aligned: return length is overwritten to equal the length of original data
+		retLength = v.Len()
+	}
+
+	retVals := reflect.MakeSlice(v.Type(), retLength, retLength)
+	retNulls := make([]bool, retLength)
+	for i, rowIndex := range rowIndices {
+		// calculate last index position on the fly
+		modifiedIndex := index
+		if index < 0 {
+			// if original index is negative, try to index from right-to-left
+			modifiedIndex = len(rowIndex) + index
+		}
+		if modifiedIndex >= len(rowIndex) || modifiedIndex < 0 {
+			retNulls[i] = true
+			continue
+		}
+		toLookup := rowIndex[modifiedIndex]
+		output, isNull := v.Index(toLookup), nulls[toLookup]
+		if !aligned {
+			// default: write each output once and in sequential order
+			retVals.Index(i).Set(output)
+			retNulls[i] = isNull
+		} else {
+			// if aligned: write each output multiple times and out of order
+			for _, i := range rowIndex {
+				retVals.Index(i).Set(output)
+				retNulls[modifiedIndex] = isNull
+			}
+		}
+	}
+	return &valueContainer{
+		slice:  retVals.Interface(),
+		isNull: retNulls,
+		name:   name,
+	}
+}
+
+func (g *GroupedSeries) indexFunc(name string, index int) *Series {
+	var sharedData bool
+	if g.aligned {
+		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
+	}
+	retVals := groupedIndexFunc(
+		g.series.values.slice, g.series.values.isNull, name, g.aligned, index, g.rowIndices)
+	// default: grouped labels
+	retLabels := g.labels
+	if g.aligned {
+		// if aligned: all labels
+		retLabels = g.series.labels
+		sharedData = true
+	}
+	return &Series{
+		values:     retVals,
+		labels:     retLabels,
+		sharedData: sharedData,
+	}
+}
+
+// Nth stub
+func (g *GroupedSeries) Nth(index int) *Series {
+	return g.indexFunc("nth", index)
+}
+
+// First stub
+func (g *GroupedSeries) First() *Series {
+	return g.indexFunc("first", 0)
+}
+
+// Last stub
+func (g *GroupedSeries) Last() *Series {
+	return g.indexFunc("last", -1)
+}
+
 func (g *GroupedSeries) stringFunc(name string, fn func(val []string, isNull []bool, index []int) (string, bool)) *Series {
 	var sharedData bool
 	if g.aligned {
@@ -258,16 +344,6 @@ func (g *GroupedSeries) NUnique() *Series {
 	return g.stringFunc("nunique", nunique)
 }
 
-// First stub
-func (g *GroupedSeries) First() *Series {
-	return g.stringFunc("first", first)
-}
-
-// Last stub
-func (g *GroupedSeries) Last() *Series {
-	return g.stringFunc("last", last)
-}
-
 // Earliest stub
 func (g *GroupedSeries) Earliest() *Series {
 	return g.dateTimeFunc("earliest", earliest)
@@ -346,6 +422,26 @@ func (g *GroupedDataFrame) dateTimeFunc(
 	}
 }
 
+func (g *GroupedDataFrame) indexFunc(name string, cols []string, index int) *DataFrame {
+	if len(cols) == 0 {
+		cols = make([]string, len(g.df.values))
+		for k := range cols {
+			cols[k] = g.df.values[k].name
+		}
+	}
+	retVals := make([]*valueContainer, len(cols))
+	for k := range retVals {
+		retVals[k] = groupedIndexFunc(
+			g.df.values[k].slice, g.df.values[k].isNull, cols[k], false, index, g.rowIndices)
+	}
+	return &DataFrame{
+		values:        retVals,
+		labels:        g.labels,
+		colLevelNames: []string{"*0"},
+		name:          name,
+	}
+}
+
 // GetGroup stub
 func (g *GroupedDataFrame) GetGroup(group string) *DataFrame {
 	for m, key := range g.orderedKeys {
@@ -396,14 +492,19 @@ func (g *GroupedDataFrame) NUnique(colNames ...string) *DataFrame {
 	return g.stringFunc("nunique", colNames, nunique)
 }
 
+// Nth stub
+func (g *GroupedDataFrame) Nth(index int, colNames ...string) *DataFrame {
+	return g.indexFunc("nth", colNames, index)
+}
+
 // First stub
 func (g *GroupedDataFrame) First(colNames ...string) *DataFrame {
-	return g.stringFunc("first", colNames, first)
+	return g.indexFunc("first", colNames, 0)
 }
 
 // Last stub
 func (g *GroupedDataFrame) Last(colNames ...string) *DataFrame {
-	return g.stringFunc("last", colNames, last)
+	return g.indexFunc("last", colNames, -1)
 }
 
 // Earliest stub
