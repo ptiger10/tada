@@ -3023,7 +3023,7 @@ func Test_lookupDataFrameWithAnchor(t *testing.T) {
 	}
 }
 
-func Test_valueContainer_unique(t *testing.T) {
+func Test_valueContainer_uniqueIndex(t *testing.T) {
 	type fields struct {
 		slice  interface{}
 		isNull []bool
@@ -3048,14 +3048,14 @@ func Test_valueContainer_unique(t *testing.T) {
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
 			}
-			if got := vc.unique(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("valueContainer.unique() = %v, want %v", got, tt.want)
+			if got := vc.uniqueIndex(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.uniqueIndex() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_uniqueRows(t *testing.T) {
+func Test_multiUniqueIndex(t *testing.T) {
 	type args struct {
 		containers []*valueContainer
 	}
@@ -3071,8 +3071,8 @@ func Test_uniqueRows(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := uniqueRows(tt.args.containers); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("uniqueRows() = %v, want %v", got, tt.want)
+			if got := multiUniqueIndex(tt.args.containers); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("multiUniqueIndex() = %v, want %v", got, tt.want)
 			}
 		})
 	}

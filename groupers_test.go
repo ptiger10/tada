@@ -2979,3 +2979,45 @@ func TestGroupedSeries_Nth(t *testing.T) {
 		})
 	}
 }
+
+func TestGroupedSeries_UniqueList(t *testing.T) {
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		series      *Series
+		aligned     bool
+		err         error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass",
+			fields{
+				orderedKeys: []string{"foo", "bar", "baz"},
+				rowIndices:  [][]int{{0, 1}, {2, 3}, {4}},
+				labels:      []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "*0"}},
+				series: &Series{values: &valueContainer{slice: []string{"a", "a", "c", "d", ""}, isNull: []bool{false, false, false, false, true}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "bar", "bar", "baz"}, isNull: []bool{false, false, false, false, false}, name: "*0"}}}},
+			&Series{values: &valueContainer{slice: [][]string{{"a"}, {"c", "d"}, nil}, isNull: []bool{false, false, true}, name: "unique"},
+				labels: []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "*0"}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeries{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				series:      tt.fields.series,
+				aligned:     tt.fields.aligned,
+				err:         tt.fields.err,
+			}
+			if got := g.UniqueList(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedSeries.UniqueList() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

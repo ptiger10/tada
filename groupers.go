@@ -104,6 +104,42 @@ func groupedStringFunc(
 	}
 }
 
+func groupedStringFuncList(
+	vals []string,
+	nulls []bool,
+	name string,
+	aligned bool,
+	rowIndices [][]int,
+	fn func(val []string, isNull []bool, index []int) ([]string, bool)) *valueContainer {
+	// default: return length is equal to the number of groups
+	retLength := len(rowIndices)
+	if aligned {
+		// if aligned: return length is overwritten to equal the length of original data
+		retLength = len(vals)
+	}
+	retVals := make([][]string, retLength)
+	retNulls := make([]bool, retLength)
+	for i, rowIndex := range rowIndices {
+		output, isNull := fn(vals, nulls, rowIndex)
+		if !aligned {
+			// default: write each output once and in sequential order
+			retVals[i] = output
+			retNulls[i] = isNull
+		} else {
+			// if aligned: write each output multiple times and out of order
+			for _, index := range rowIndex {
+				retVals[index] = output
+				retNulls[index] = isNull
+			}
+		}
+	}
+	return &valueContainer{
+		slice:  retVals,
+		isNull: retNulls,
+		name:   name,
+	}
+}
+
 func groupedDateTimeFunc(
 	vals []time.Time,
 	nulls []bool,
@@ -288,6 +324,28 @@ func (g *GroupedSeries) dateTimeFunc(name string, fn func(val []time.Time, isNul
 	}
 }
 
+// similar to stringFunc, except output is []string per row
+func (g *GroupedSeries) stringFuncList(name string, fn func(val []string, isNull []bool, index []int) ([]string, bool)) *Series {
+	var sharedData bool
+	if g.aligned {
+		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
+	}
+	retVals := groupedStringFuncList(
+		g.series.values.str().slice, g.series.values.isNull, name, g.aligned, g.rowIndices, fn)
+	// default: grouped labels
+	retLabels := g.labels
+	if g.aligned {
+		// if aligned: all labels
+		retLabels = g.series.labels
+		sharedData = true
+	}
+	return &Series{
+		values:     retVals,
+		labels:     retLabels,
+		sharedData: sharedData,
+	}
+}
+
 // Apply stub
 func (g *GroupedSeries) Apply(name string, lambda GroupApplyFn) *Series {
 	// remove all nulls before running each set of values through custom user function
@@ -342,6 +400,11 @@ func (g *GroupedSeries) Max() *Series {
 // NUnique stub
 func (g *GroupedSeries) NUnique() *Series {
 	return g.stringFunc("nunique", nunique)
+}
+
+// UniqueList stub
+func (g *GroupedSeries) UniqueList() *Series {
+	return g.stringFuncList("unique", uniqueList)
 }
 
 // Earliest stub

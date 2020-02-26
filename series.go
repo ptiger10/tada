@@ -1006,10 +1006,10 @@ func (s *Series) ValueCounts() map[string]int {
 func (s *Series) Unique(valuesOnly bool) *Series {
 	var index []int
 	if valuesOnly {
-		index = s.values.unique()
+		index = s.values.uniqueIndex()
 	} else {
 		mergedLabelsAndValues := append(s.labels, s.values)
-		index = uniqueRows(mergedLabelsAndValues)
+		index = multiUniqueIndex(mergedLabelsAndValues)
 	}
 	return s.Subset(index)
 }

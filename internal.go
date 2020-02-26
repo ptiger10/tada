@@ -1764,6 +1764,25 @@ func nunique(vals []string, isNull []bool, index []int) (string, bool) {
 	return strconv.Itoa(len(m)), false
 }
 
+func uniqueList(vals []string, isNull []bool, index []int) ([]string, bool) {
+	m := make(map[string]bool)
+	ret := make([]string, 0)
+	var atLeastOneValid bool
+	for _, i := range index {
+		if !isNull[i] {
+			if _, ok := m[vals[i]]; !ok {
+				m[vals[i]] = true
+				ret = append(ret, vals[i])
+			}
+			atLeastOneValid = true
+		}
+	}
+	if !atLeastOneValid {
+		return nil, true
+	}
+	return ret, false
+}
+
 // min returns the min of the non-null values at the `index` positions in `vals`.
 // Compatible with Grouped calculations as well as Series
 func min(vals []float64, isNull []bool, index []int) (float64, bool) {
@@ -2165,7 +2184,7 @@ func deduplicateContainerNames(containers []*valueContainer) {
 	}
 }
 
-func (vc *valueContainer) unique() []int {
+func (vc *valueContainer) uniqueIndex() []int {
 	m := make(map[string]bool)
 	ret := make([]int, 0)
 	stringifiedVals := vc.str().slice
@@ -2178,7 +2197,7 @@ func (vc *valueContainer) unique() []int {
 	return ret
 }
 
-func uniqueRows(containers []*valueContainer) []int {
+func multiUniqueIndex(containers []*valueContainer) []int {
 	stringifiedRows := concatenateLabelsToStrings(containers, makeIntRange(0, len(containers)))
 	m := make(map[string]bool)
 	ret := make([]int, 0)
