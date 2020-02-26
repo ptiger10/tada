@@ -3083,3 +3083,35 @@ func Test_lookupDataFrameWithAnchor(t *testing.T) {
 		})
 	}
 }
+
+func Test_valueContainer_unique(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []int
+	}{
+		{"pass", fields{
+			slice:  []float64{1, 1, 2, 0},
+			isNull: []bool{false, false, false, true},
+			name:   "foo",
+		}, []int{0, 2, 3},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			if got := vc.unique(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.unique() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

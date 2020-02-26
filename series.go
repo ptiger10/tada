@@ -989,3 +989,9 @@ func (s *Series) SliceNulls() []bool {
 func (s *Series) ValueCounts() map[string]int {
 	return s.values.valueCounts()
 }
+
+// Unique returns the first appearance of all non-null values in the Series.
+func (s *Series) Unique() *Series {
+	index := s.values.unique()
+	return s.Subset(index)
+}

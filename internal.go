@@ -741,8 +741,9 @@ func (vc *valueContainer) subsetRows(index []int) error {
 			return fmt.Errorf("index out of range (%d > %d)", indexValue, l-1)
 		}
 		retIsNull[indexPosition] = vc.isNull[indexValue]
-		ptr := retVals.Index(indexPosition)
-		ptr.Set(v.Index(indexValue))
+		dst := retVals.Index(indexPosition)
+		src := v.Index(indexValue)
+		dst.Set(src)
 	}
 
 	vc.slice = retVals.Interface()
@@ -2178,4 +2179,17 @@ func deduplicateContainerNames(containers []*valueContainer) {
 			m[name]++
 		}
 	}
+}
+
+func (vc *valueContainer) unique() []int {
+	m := make(map[string]bool)
+	ret := make([]int, 0)
+	stringifiedVals := vc.str().slice
+	for i, value := range stringifiedVals {
+		if _, ok := m[value]; !ok {
+			m[value] = true
+			ret = append(ret, i)
+		}
+	}
+	return ret
 }
