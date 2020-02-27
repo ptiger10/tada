@@ -65,11 +65,20 @@ func MakeSlicesFromCrossProduct(values []interface{}) ([]interface{}, error) {
 }
 
 // NewDataFrame stub
+// If supplying `labels` as []interface{}, be sure to use the spread operator (...),
+// or else the labels will not be read properly.
 func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
-	// handle values
-	values, err := makeValueContainersFromInterfaces(slices, false)
-	if err != nil {
-		return dataFrameWithError(fmt.Errorf("NewDataFrame(): `slices`: %v", err))
+	if slices == nil && labels == nil {
+		return dataFrameWithError(fmt.Errorf("NewSeries(): `slices` and `labels` cannot both be nil"))
+	}
+	var values []*valueContainer
+	var err error
+	if slices != nil {
+		// handle values
+		values, err = makeValueContainersFromInterfaces(slices, false)
+		if err != nil {
+			return dataFrameWithError(fmt.Errorf("NewDataFrame(): `slices`: %v", err))
+		}
 	}
 	// handle labels
 	retLabels, err := makeValueContainersFromInterfaces(labels, true)
@@ -79,8 +88,13 @@ func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 	if len(retLabels) == 0 {
 		// handle default labels
 		numRows := reflect.ValueOf(slices[0]).Len()
-		defaultLabels := makeDefaultLabels(0, numRows)
+		defaultLabels := makeDefaultLabels(0, numRows, true)
 		retLabels = append(retLabels, defaultLabels)
+	}
+	if slices == nil {
+		// default values
+		defaultValues := makeDefaultLabels(0, reflect.ValueOf(labels[0]).Len(), false)
+		values = append(values, defaultValues)
 	}
 	return &DataFrame{values: values, labels: retLabels, colLevelNames: []string{"*0"}}
 }
@@ -214,7 +228,7 @@ func ReadStruct(slice interface{}) (*DataFrame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ReadStruct(): %v", err)
 	}
-	defaultLabels := makeDefaultLabels(0, reflect.ValueOf(slice).Len())
+	defaultLabels := makeDefaultLabels(0, reflect.ValueOf(slice).Len(), true)
 	return &DataFrame{
 		values:        values,
 		labels:        []*valueContainer{defaultLabels},
@@ -1104,7 +1118,7 @@ func (df *DataFrameMutator) ResetLabels(labelLevels ...int) {
 		df.dataframe.labels, _ = subsetContainers(df.dataframe.labels, exclude)
 	}
 	if df.dataframe.numLevels() == 0 {
-		defaultLabels := makeDefaultLabels(0, df.dataframe.Len())
+		defaultLabels := makeDefaultLabels(0, df.dataframe.Len(), true)
 		df.dataframe.labels = append(df.dataframe.labels, defaultLabels)
 	}
 	return

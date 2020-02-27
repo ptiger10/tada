@@ -77,17 +77,21 @@ func makeValueContainersFromInterfaces(slices []interface{}, prefixAsterisk bool
 
 // makeDefaultLabels returns a valueContainer with a
 // sequential series of numbers (inclusive of min, exclusive of max), a companion isNull slice, and a name.
-func makeDefaultLabels(min, max int) *valueContainer {
+func makeDefaultLabels(min, max int, prefixAsterisk bool) *valueContainer {
 	labels := make([]int, max-min)
 	isNull := make([]bool, len(labels))
 	for i := range labels {
 		labels[i] = min + i
 		isNull[i] = false
 	}
+	name := "0"
+	if prefixAsterisk {
+		name = "*0"
+	}
 	return &valueContainer{
 		slice:  labels,
 		isNull: isNull,
-		name:   "*0",
+		name:   name,
 	}
 }
 
@@ -504,7 +508,7 @@ func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 }
 func defaultLabelsIfEmpty(labels []*valueContainer, numRows int) []*valueContainer {
 	if len(labels) == 0 {
-		defaultLabels := makeDefaultLabels(0, numRows)
+		defaultLabels := makeDefaultLabels(0, numRows, true)
 		labels = append(labels, defaultLabels)
 	}
 	return labels

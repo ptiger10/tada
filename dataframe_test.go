@@ -83,6 +83,19 @@ func TestNewDataFrame(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
 		},
+		{"pass - default values", args{
+			nil,
+			[]interface{}{[]string{"a", "b"}}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "0"}},
+				labels:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+		},
+		{"fail - slices and labels nil", args{nil, nil},
+			&DataFrame{
+				err: errors.New("NewSeries(): `slices` and `labels` cannot both be nil")},
+		},
 		{"fail - unsupported kind", args{
 			[]interface{}{"foo"}, nil},
 			&DataFrame{

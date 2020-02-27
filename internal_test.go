@@ -300,19 +300,21 @@ func Test_valueContainer_copy(t *testing.T) {
 
 func Test_makeDefaultLabels(t *testing.T) {
 	type args struct {
-		min int
-		max int
+		min            int
+		max            int
+		prefixAsterisk bool
 	}
 	tests := []struct {
 		name       string
 		args       args
 		wantLabels *valueContainer
 	}{
-		{"normal", args{0, 2}, &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+		{"normal", args{0, 2, true}, &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+		{"normal", args{0, 2, false}, &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "0"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotLabels := makeDefaultLabels(tt.args.min, tt.args.max)
+			gotLabels := makeDefaultLabels(tt.args.min, tt.args.max, tt.args.prefixAsterisk)
 			if !reflect.DeepEqual(gotLabels, tt.wantLabels) {
 				t.Errorf("makeDefaultLabels() gotLabels = %v, want %v", gotLabels, tt.wantLabels)
 			}

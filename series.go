@@ -15,11 +15,20 @@ import (
 
 // NewSeries constructs a Series from a slice of values and optional label slices.
 // Supported underlying slice types: real numbers, string, time.Time, boolean, or interface.
+// If supplying `labels` as []interface{}, be sure to use the spread operator (...),
+// or else the labels will not be read properly.
 func NewSeries(slice interface{}, labels ...interface{}) *Series {
-	// handle values
-	values, err := makeValueContainerFromInterface(slice, "0")
-	if err != nil {
-		return seriesWithError(fmt.Errorf("NewSeries(): `slice`: %v", err))
+	if slice == nil && labels == nil {
+		return seriesWithError(fmt.Errorf("NewSeries(): `slice` and `labels` cannot both be nil"))
+	}
+	var values *valueContainer
+	var err error
+	if slice != nil {
+		// handle values
+		values, err = makeValueContainerFromInterface(slice, "0")
+		if err != nil {
+			return seriesWithError(fmt.Errorf("NewSeries(): `slice`: %v", err))
+		}
 	}
 
 	// handle labels
@@ -29,8 +38,13 @@ func NewSeries(slice interface{}, labels ...interface{}) *Series {
 	}
 	if len(retLabels) == 0 {
 		// default labels
-		defaultLabels := makeDefaultLabels(0, reflect.ValueOf(slice).Len())
+		defaultLabels := makeDefaultLabels(0, reflect.ValueOf(slice).Len(), true)
 		retLabels = append(retLabels, defaultLabels)
+	}
+	if slice == nil {
+		// default values
+		defaultValues := makeDefaultLabels(0, reflect.ValueOf(labels[0]).Len(), false)
+		values = defaultValues
 	}
 
 	return &Series{values: values, labels: retLabels}
