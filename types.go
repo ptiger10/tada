@@ -42,11 +42,6 @@ type Labels struct {
 	labels []*valueContainer
 }
 
-// LabelsMutator stub
-type LabelsMutator struct {
-	labels *Labels
-}
-
 // Matrix is an interface which is compatible with gonum's mat.Matrix interface
 type Matrix interface {
 	Dims() (r, c int)

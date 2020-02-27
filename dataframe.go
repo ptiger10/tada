@@ -497,6 +497,31 @@ func (df *DataFrameMutator) Subset(index []int) {
 	return
 }
 
+// SwapLabels swaps the label levels with names `i` and `j`.
+// Returns a new DataFrame.
+func (df *DataFrame) SwapLabels(i, j string) *DataFrame {
+	df = df.Copy()
+	df.InPlace().SwapLabels(i, j)
+	return df
+}
+
+// SwapLabels swaps the label levels with names `i` and `j`.
+// Modifies the underlying DataFrame in place.
+func (df *DataFrameMutator) SwapLabels(i, j string) {
+	index1, err := indexOfContainer(i, df.dataframe.labels)
+	if err != nil {
+		df.dataframe.resetWithError(fmt.Errorf("SwapLabels(): `i`: %v", err))
+		return
+	}
+	index2, err := indexOfContainer(j, df.dataframe.labels)
+	if err != nil {
+		df.dataframe.resetWithError(fmt.Errorf("SwapLabels(): `j`: %v", err))
+		return
+	}
+	df.dataframe.labels[index1], df.dataframe.labels[index2] = df.dataframe.labels[index2], df.dataframe.labels[index1]
+	return
+}
+
 // SubsetLabels returns only the labels specified at the index positions, in the order specified.
 // Returns a new DataFrame.
 func (df *DataFrame) SubsetLabels(index []int) *DataFrame {
