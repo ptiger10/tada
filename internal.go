@@ -346,7 +346,7 @@ func (df *DataFrame) toCSVByRows(ignoreLabels bool) ([][]string, error) {
 		for j := range df.labels {
 			// write label headers, index at first header row
 			ret[df.numColLevels()-1][j] = df.labels[j].name
-			v := df.labels[j].str().slice
+			v := df.labels[j].string().slice
 			// write label values, offset by header rows
 			for i := range v {
 				ret[i+df.numColLevels()][j] = v[i]
@@ -365,7 +365,7 @@ func (df *DataFrame) toCSVByRows(ignoreLabels bool) ([][]string, error) {
 			// write multi column headers, offset by label levels
 			ret[l][k+offset] = multiColHeaders[l]
 		}
-		v := df.values[k].str().slice
+		v := df.values[k].string().slice
 		// write label values, offset by header rows and label levels
 		for i := range v {
 			ret[i+df.numColLevels()][k+offset] = v[i]
@@ -686,7 +686,7 @@ func (vc *valueContainer) fillnull(lambda NullFiller) {
 		return
 	}
 	// // default: coerce to float and fill with 0
-	vals := vc.float().slice
+	vals := vc.float64().slice
 	for i := 0; i < len(vc.isNull); i++ {
 		if vc.isNull[i] {
 			vals[i] = lambda.FillFloat
@@ -828,7 +828,7 @@ func (vc *valueContainer) shift(n int) *valueContainer {
 
 // convert to string as lowest common denominator
 func (vc *valueContainer) append(other *valueContainer) *valueContainer {
-	retSlice := append(vc.str().slice, other.str().slice...)
+	retSlice := append(vc.string().slice, other.string().slice...)
 	retIsNull := append(vc.isNull, other.isNull...)
 	return &valueContainer{
 		slice:  retSlice,
@@ -981,14 +981,14 @@ func (vc *valueContainer) afterOrEqual(comparison time.Time) []int {
 func (vc *valueContainer) filter(filter FilterFn) ([]int, error) {
 	var index []int
 	if filter.F64 != nil {
-		slice := vc.float().slice
+		slice := vc.float64().slice
 		for i := range slice {
 			if filter.F64(slice[i]) && !vc.isNull[i] {
 				index = append(index, i)
 			}
 		}
 	} else if filter.String != nil {
-		slice := vc.str().slice
+		slice := vc.string().slice
 		for i := range slice {
 			if filter.String(slice[i]) && !vc.isNull[i] {
 				index = append(index, i)
@@ -1010,7 +1010,7 @@ func (vc *valueContainer) filter(filter FilterFn) ([]int, error) {
 func (vc *valueContainer) applyFormat(apply ApplyFormatFn) interface{} {
 	var ret interface{}
 	if apply.F64 != nil {
-		slice := vc.float().slice
+		slice := vc.float64().slice
 		retSlice := make([]string, len(slice))
 		for i := range slice {
 			retSlice[i] = apply.F64(slice[i])
@@ -1030,14 +1030,14 @@ func (vc *valueContainer) applyFormat(apply ApplyFormatFn) interface{} {
 func (vc *valueContainer) apply(apply ApplyFn) interface{} {
 	var ret interface{}
 	if apply.F64 != nil {
-		slice := vc.float().slice
+		slice := vc.float64().slice
 		retSlice := make([]float64, len(slice))
 		for i := range slice {
 			retSlice[i] = apply.F64(slice[i])
 		}
 		ret = retSlice
 	} else if apply.String != nil {
-		slice := vc.str().slice
+		slice := vc.string().slice
 		retSlice := make([]string, len(slice))
 		for i := range slice {
 			retSlice[i] = apply.String(slice[i])
@@ -1071,7 +1071,7 @@ func (vc *valueContainer) sort(dtype DType, ascending bool, index []int) []int {
 	var sortedIndex []int
 	switch dtype {
 	case Float:
-		d := vc.float()
+		d := vc.float64()
 		d.index = index
 		srt = d
 		if !ascending {
@@ -1082,7 +1082,7 @@ func (vc *valueContainer) sort(dtype DType, ascending bool, index []int) []int {
 		sortedIndex = d.index
 
 	case String:
-		d := vc.str()
+		d := vc.string()
 		d.index = index
 		srt = d
 		if !ascending {
@@ -1154,7 +1154,7 @@ func concatenateLabelsToStrings(labels []*valueContainer, index []int) []string 
 	labelStrings := make([][]string, len(index))
 	// coerce every label level referenced in the index to a separate string slice
 	for incrementor, j := range index {
-		labelStrings[incrementor] = labels[j].str().slice
+		labelStrings[incrementor] = labels[j].string().slice
 	}
 	ret := make([]string, len(labelStrings[0]))
 	// for each row, combine labels into one concatenated string
@@ -1279,9 +1279,9 @@ func (s *Series) combineMath(other *Series, ignoreMissing bool, fn func(v1 float
 	retFloat := make([]float64, s.Len())
 	retIsNull := make([]bool, s.Len())
 	lookupVals := s.Lookup(other)
-	lookupFloat := lookupVals.values.float().slice
+	lookupFloat := lookupVals.values.float64().slice
 	lookupNulls := lookupVals.values.isNull
-	originalFloat := s.values.float().slice
+	originalFloat := s.values.float64().slice
 	originalNulls := s.values.isNull
 	for i := range originalFloat {
 		// handle null lookup
@@ -1998,7 +1998,7 @@ func cut(vals []float64, isNull []bool,
 func (vc *valueContainer) cut(bins []float64, includeLess, includeMore bool, labels []string) ([]string, error) {
 	leftInclusive := false
 	rightExclusive := false
-	return cut(vc.float().slice, vc.isNull, bins, leftInclusive, rightExclusive, includeLess, includeMore, labels)
+	return cut(vc.float64().slice, vc.isNull, bins, leftInclusive, rightExclusive, includeLess, includeMore, labels)
 }
 
 func (vc *floatValueContainer) rank() []float64 {
@@ -2111,7 +2111,7 @@ func (vc *valueContainer) pcut(bins []float64, labels []string) ([]string, error
 			return nil, fmt.Errorf("all bin edges must be between 0 and 1 (%v at edge %d", edge, i)
 		}
 	}
-	pctile := percentile(vc.float().slice, vc.isNull, makeIntRange(0, len(vc.isNull)))
+	pctile := percentile(vc.float64().slice, vc.isNull, makeIntRange(0, len(vc.isNull)))
 	leftInclusive := true
 	rightExclusive := true
 	return cut(pctile, vc.isNull, bins, leftInclusive, rightExclusive, false, false, labels)
@@ -2166,7 +2166,7 @@ func (vc *valueContainer) resample(by Resampler) {
 }
 
 func (vc *valueContainer) valueCounts() map[string]int {
-	v := vc.str().slice
+	v := vc.string().slice
 	m := make(map[string]int)
 	for i := range v {
 		// skip nulls
@@ -2198,7 +2198,7 @@ func deduplicateContainerNames(containers []*valueContainer) {
 func (vc *valueContainer) uniqueIndex() []int {
 	m := make(map[string]bool)
 	ret := make([]int, 0)
-	stringifiedVals := vc.str().slice
+	stringifiedVals := vc.string().slice
 	for i, value := range stringifiedVals {
 		if _, ok := m[value]; !ok {
 			m[value] = true

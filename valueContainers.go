@@ -7,7 +7,26 @@ import (
 	"time"
 
 	"github.com/araddon/dateparse"
+	"github.com/cheekybits/genny/generic"
 )
+
+// -- support for generics for grouped types
+type genericType generic.Type
+
+type empty struct{}
+
+func (e empty) float64() float64         { return 0 }
+func (e empty) string() string           { return "" }
+func (e empty) dateTime() time.Time      { return time.Time{} }
+func (e empty) genericType() genericType { return nil }
+
+type genericTypeContainer struct {
+	slice []genericType
+}
+
+func (vc *valueContainer) genericType() genericTypeContainer {
+	return genericTypeContainer{}
+}
 
 // Less stub
 func (vc floatValueContainer) Less(i, j int) bool {
@@ -96,12 +115,12 @@ func (vc *valueContainer) cast(dtype DType) {
 	case Float:
 		_, ok := vc.slice.([]float64)
 		if !ok {
-			vc.slice = vc.float().slice
+			vc.slice = vc.float64().slice
 		}
 	case String:
 		_, ok := vc.slice.([]string)
 		if !ok {
-			vc.slice = vc.str().slice
+			vc.slice = vc.string().slice
 		}
 	case DateTime:
 		_, ok := vc.slice.([]time.Time)
@@ -113,7 +132,7 @@ func (vc *valueContainer) cast(dtype DType) {
 }
 
 // if already []float64, returns shared values, not new values
-func (vc *valueContainer) float() floatValueContainer {
+func (vc *valueContainer) float64() floatValueContainer {
 	newVals := make([]float64, reflect.ValueOf(vc.slice).Len())
 	isNull := vc.isNull
 	switch vc.slice.(type) {
@@ -180,7 +199,7 @@ func (vc *valueContainer) float() floatValueContainer {
 }
 
 // if already []string, returns shared values, not new values
-func (vc *valueContainer) str() stringValueContainer {
+func (vc *valueContainer) string() stringValueContainer {
 	newVals := make([]string, reflect.ValueOf(vc.slice).Len())
 	isNull := vc.isNull
 	switch vc.slice.(type) {

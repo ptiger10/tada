@@ -880,7 +880,7 @@ func (s *Series) Latest() time.Time {
 
 func (s *Series) floatFunc(floatFunction func([]float64, []bool, []int) (float64, bool)) float64 {
 	output, _ := floatFunction(
-		s.values.float().slice,
+		s.values.float64().slice,
 		s.values.isNull,
 		makeIntRange(0, s.Len()))
 	return output
@@ -888,7 +888,7 @@ func (s *Series) floatFunc(floatFunction func([]float64, []bool, []int) (float64
 
 func (s *Series) stringFunc(stringFunction func([]string, []bool, []int) (string, bool)) string {
 	output, _ := stringFunction(
-		s.values.str().slice,
+		s.values.string().slice,
 		s.values.isNull,
 		makeIntRange(0, s.Len()))
 	return output
@@ -905,7 +905,7 @@ func (s *Series) timeFunc(timeFunction func([]time.Time, []bool, []int) (time.Ti
 // aligns output with original series. analogous to Pandas transform concept
 func (s *Series) alignedMath(alignedFunction func([]float64, []bool, []int) []float64) []float64 {
 	retVals := alignedFunction(
-		s.values.float().slice,
+		s.values.float64().slice,
 		s.values.isNull,
 		makeIntRange(0, s.Len()))
 	return retVals
@@ -1000,14 +1000,14 @@ func (s *Series) PercentileCut(bins []float64, labels []string) *Series {
 // SliceFloat64 coerces the Series values into []float64.
 func (s *Series) SliceFloat64() []float64 {
 	output := make([]float64, s.Len())
-	copy(output, s.values.float().slice)
+	copy(output, s.values.float64().slice)
 	return output
 }
 
 // SliceString coerces the Series values into []string.
 func (s *Series) SliceString() []string {
 	output := make([]string, s.Len())
-	copy(output, s.values.str().slice)
+	copy(output, s.values.string().slice)
 	return output
 
 }

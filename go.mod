@@ -4,6 +4,7 @@ go 1.12
 
 require (
 	github.com/araddon/dateparse v0.0.0-20190622164848-0fb0a474d195
+	github.com/cheekybits/genny v1.0.0
 	github.com/d4l3k/messagediff v1.2.1
 	github.com/mattn/go-runewidth v0.0.8 // indirect
 	github.com/olekukonko/tablewriter v0.0.4

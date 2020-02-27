@@ -397,7 +397,7 @@ func Test_valueContainer_float(t *testing.T) {
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
 			}
-			if got := vc.float(); !reflect.DeepEqual(got, tt.want) {
+			if got := vc.float64(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("valueContainer.float() = %v, want %v", got, tt.want)
 			}
 		})
@@ -440,7 +440,7 @@ func Test_valueContainer_str(t *testing.T) {
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
 			}
-			if got := vc.str(); !reflect.DeepEqual(got, tt.want) {
+			if got := vc.string(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("valueContainer.str() = %v, want %v", got, tt.want)
 			}
 		})

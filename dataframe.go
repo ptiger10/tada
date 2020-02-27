@@ -1105,7 +1105,7 @@ func (df *DataFrame) Transpose() *DataFrame {
 
 	// iterate over labels to write column names and column level names
 	for j := range df.labels {
-		v := df.labels[j].str().slice
+		v := df.labels[j].string().slice
 		for i := range v {
 			colNames[i][j] = v[i]
 		}
@@ -1124,7 +1124,7 @@ func (df *DataFrame) Transpose() *DataFrame {
 			labelsIsNull[l][k] = false
 		}
 		// write values
-		v := df.values[k].str().slice
+		v := df.values[k].string().slice
 		for i := range v {
 			vals[i][k] = v[i]
 			valsIsNull[i][k] = df.values[k].isNull[i]
@@ -1547,7 +1547,7 @@ func (df *DataFrame) math(name string, mathFunction func([]float64, []bool, []in
 
 	for k := range df.values {
 		retVals[k], retIsNull[k] = mathFunction(
-			df.values[k].float().slice,
+			df.values[k].float64().slice,
 			df.values[k].isNull,
 			makeIntRange(0, df.Len()))
 

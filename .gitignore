@@ -1,2 +1,4 @@
 .vscode/*
 test_files/*
+Makefile
+cleanGeneratedCode.sh

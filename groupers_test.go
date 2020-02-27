@@ -107,7 +107,7 @@ func TestGroupedSeries_GetGroup(t *testing.T) {
 	}
 }
 
-func Test_groupedFloatFunc(t *testing.T) {
+func Test_groupedFloat64Func(t *testing.T) {
 	type args struct {
 		vals       []float64
 		nulls      []bool
@@ -156,8 +156,8 @@ func Test_groupedFloatFunc(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := groupedFloatFunc(tt.args.vals, tt.args.nulls, tt.args.name, tt.args.aligned, tt.args.rowIndices, tt.args.fn); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("groupedFloatFunc() = %v, want %v", got, tt.want)
+			if got := groupedFloat64Func(tt.args.vals, tt.args.nulls, tt.args.name, tt.args.aligned, tt.args.rowIndices, tt.args.fn); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("groupedFloat64Func() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1387,6 +1387,125 @@ func TestGroupedSeries_Apply(t *testing.T) {
 	}
 }
 
+func TestGroupedSeries_ApplyNested(t *testing.T) {
+	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		series      *Series
+		aligned     bool
+		err         error
+	}
+	type args struct {
+		name   string
+		lambda GroupApplyNestedFn
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		// -- float64
+		{"grouped", fields{
+			orderedKeys: []string{"foo", "bar"},
+			rowIndices:  [][]int{{0, 1}, {2, 3}},
+			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			aligned:     false,
+			series: &Series{
+				values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			args{"custom", GroupApplyNestedFn{F64: func(vals []float64) []float64 {
+				ret := make([]float64, 0)
+				for i := range vals {
+					ret = append(ret, vals[i])
+				}
+				return ret
+			}}},
+			&Series{values: &valueContainer{
+				slice: [][]float64{{1, 2}, {3, 4}}, isNull: []bool{false, false}, name: "custom"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
+				}}},
+
+		// -- string
+		{"grouped", fields{
+			orderedKeys: []string{"foo", "bar"},
+			rowIndices:  [][]int{{0, 1}, {2, 3}},
+			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			aligned:     false,
+			series: &Series{
+				values: &valueContainer{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "qux"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			args{"custom", GroupApplyNestedFn{String: func(vals []string) []string {
+				ret := make([]string, 0)
+				for i := range vals {
+					ret = append(ret, vals[i])
+				}
+				return ret
+			}}},
+			&Series{values: &valueContainer{
+				slice: [][]string{{"a", "b"}, {"c", "d"}}, isNull: []bool{false, false}, name: "custom"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
+				}}},
+
+		// -- datetime
+		{"grouped", fields{
+			orderedKeys: []string{"foo", "bar"},
+			rowIndices:  [][]int{{0, 1}, {2, 3}},
+			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			aligned:     false,
+			series: &Series{
+				values: &valueContainer{slice: []time.Time{d, d.AddDate(0, 0, 1), d.AddDate(0, 0, 2), d.AddDate(0, 0, 3)}, isNull: []bool{false, false, false, false}, name: "qux"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			args{"custom", GroupApplyNestedFn{DateTime: func(vals []time.Time) []time.Time {
+				ret := make([]time.Time, 0)
+				for i := range vals {
+					ret = append(ret, vals[i])
+				}
+				return ret
+			}}},
+			&Series{values: &valueContainer{
+				slice: [][]time.Time{
+					{d, d.AddDate(0, 0, 1)},
+					{d.AddDate(0, 0, 2), d.AddDate(0, 0, 3)}}, isNull: []bool{false, false}, name: "custom"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
+				}}},
+		{"fail", fields{
+			orderedKeys: []string{"foo", "bar"},
+			rowIndices:  [][]int{{0, 1}, {2, 3}},
+			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			aligned:     false,
+			series: &Series{
+				values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			args{"custom", GroupApplyNestedFn{}},
+			&Series{err: fmt.Errorf("ApplyNested(): no lambda function provided")}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeries{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				series:      tt.fields.series,
+				aligned:     tt.fields.aligned,
+				err:         tt.fields.err,
+			}
+			if got := g.ApplyNested(tt.args.name, tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedSeries.ApplyNested() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestGroupedDataFrame_Apply(t *testing.T) {
 	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	type fields struct {
@@ -1530,7 +1649,7 @@ func TestGroupedSeries_Align(t *testing.T) {
 	}
 }
 
-func TestGroupedDataFrame_floatFunc(t *testing.T) {
+func TestGroupedDataFrame_float64Func(t *testing.T) {
 	type fields struct {
 		orderedKeys []string
 		rowIndices  [][]int
@@ -1581,8 +1700,8 @@ func TestGroupedDataFrame_floatFunc(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.floatFunc(tt.args.name, tt.args.cols, tt.args.fn); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GroupedDataFrame.floatFunc() = %v, want %v", got, tt.want)
+			if got := g.float64Func(tt.args.name, tt.args.cols, tt.args.fn); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedDataFrame.float64Func() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -2975,48 +3094,6 @@ func TestGroupedSeries_Nth(t *testing.T) {
 			}
 			if got := g.Nth(tt.args.index); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("GroupedSeries.Nth() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestGroupedSeries_UniqueList(t *testing.T) {
-	type fields struct {
-		orderedKeys []string
-		rowIndices  [][]int
-		labels      []*valueContainer
-		series      *Series
-		aligned     bool
-		err         error
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   *Series
-	}{
-		{"pass",
-			fields{
-				orderedKeys: []string{"foo", "bar", "baz"},
-				rowIndices:  [][]int{{0, 1}, {2, 3}, {4}},
-				labels:      []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "*0"}},
-				series: &Series{values: &valueContainer{slice: []string{"a", "a", "c", "d", ""}, isNull: []bool{false, false, false, false, true}},
-					labels: []*valueContainer{
-						{slice: []string{"foo", "bar", "bar", "bar", "baz"}, isNull: []bool{false, false, false, false, false}, name: "*0"}}}},
-			&Series{values: &valueContainer{slice: [][]string{{"a"}, {"c", "d"}, {}}, isNull: []bool{false, false, true}, name: "unique"},
-				labels: []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "*0"}}}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			g := &GroupedSeries{
-				orderedKeys: tt.fields.orderedKeys,
-				rowIndices:  tt.fields.rowIndices,
-				labels:      tt.fields.labels,
-				series:      tt.fields.series,
-				aligned:     tt.fields.aligned,
-				err:         tt.fields.err,
-			}
-			if got := g.UniqueList(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GroupedSeries.UniqueList() = %v, want %v", got, tt.want)
 			}
 		})
 	}

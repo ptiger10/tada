@@ -108,6 +108,13 @@ type GroupApplyFn struct {
 	DateTime func(vals []time.Time) time.Time
 }
 
+// GroupApplyNestedFn stub
+type GroupApplyNestedFn struct {
+	F64      func(vals []float64) []float64
+	String   func(vals []string) []string
+	DateTime func(vals []time.Time) []time.Time
+}
+
 // ApplyFormatFn stub
 type ApplyFormatFn struct {
 	F64      func(val float64) string
