@@ -1,7 +1,6 @@
 package tada
 
 import (
-	"math"
 	"reflect"
 	"testing"
 	"time"
@@ -552,48 +551,6 @@ func Test_valueContainer_cast(t *testing.T) {
 			vc.cast(tt.args.dtype)
 			if !reflect.DeepEqual(vc, tt.want) {
 				t.Errorf("vc.cast() -> %v, want %v", vc, tt.want)
-			}
-		})
-	}
-}
-
-func Test_convertSliceStringToSliceFloat(t *testing.T) {
-	type args struct {
-		vals []string
-	}
-	tests := []struct {
-		name string
-		args args
-		want []float64
-	}{
-		{"pass", args{[]string{"foo", "1.5"}}, []float64{math.NaN(), 1.5}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// modified test to check for NaN
-			got := convertSliceStringToSliceFloat(tt.args.vals)
-			if !math.IsNaN(got[0]) || !(got[1] == tt.want[1]) {
-				t.Errorf("convertSliceStringToSliceFloat() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_convertSliceStringToSliceDateTime(t *testing.T) {
-	type args struct {
-		vals []string
-	}
-	tests := []struct {
-		name string
-		args args
-		want []time.Time
-	}{
-		{"pass", args{[]string{"foo", "1/1/20"}}, []time.Time{{}, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := convertSliceStringToSliceDateTime(tt.args.vals); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("convertSliceStringToSliceDateTime() = %v, want %v", got, tt.want)
 			}
 		})
 	}

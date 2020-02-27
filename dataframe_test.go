@@ -8,17 +8,14 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/d4l3k/messagediff"
 	"github.com/ptiger10/tablediff"
 )
 
 func TestMakeSlicesFromCrossProduct(t *testing.T) {
-	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	type args struct {
-		values [][]string
-		dtypes []DType
+		values []interface{}
 	}
 	tests := []struct {
 		name    string
@@ -26,39 +23,25 @@ func TestMakeSlicesFromCrossProduct(t *testing.T) {
 		want    []interface{}
 		wantErr bool
 	}{
-		{"pass", args{values: [][]string{
-			{"foo", "bar"},
-			{"1", "2", "3"},
-			{"1/1/20"},
-		}, dtypes: []DType{
-			String,
-			Float,
-			DateTime,
-		}},
+		{"pass", args{values: []interface{}{
+			[]string{"foo", "bar"},
+			[]float64{1, 2, 3}}},
 			[]interface{}{
 				[]string{"foo", "foo", "foo", "bar", "bar", "bar"},
 				[]float64{1, 2, 3, 1, 2, 3},
-				[]time.Time{d, d, d, d, d, d},
-			}, false,
-		},
-		{"pass - longest first", args{values: [][]string{
-			{"1", "2", "3"},
-			{"foo", "bar"},
-		}, dtypes: []DType{
-			Float,
-			String,
-		}},
+			}, false},
+		{"pass", args{values: []interface{}{
+			[]float64{1, 2, 3},
+			[]string{"foo", "bar"}}},
 			[]interface{}{
 				[]float64{1, 1, 2, 2, 3, 3},
 				[]string{"foo", "bar", "foo", "bar", "foo", "bar"},
-			}, false,
-		},
-		{"fail - wrong number of dtypes",
-			args{values: [][]string{{"foo", "bar"}}, dtypes: []DType{String, Float}}, nil, true},
+			}, false},
+		{"fail - not slice", args{[]interface{}{"foo"}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := MakeSlicesFromCrossProduct(tt.args.values, tt.args.dtypes)
+			got, err := MakeSlicesFromCrossProduct(tt.args.values)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("MakeSlicesFromCrossProduct() error = %v, wantErr %v", err, tt.wantErr)
 				return

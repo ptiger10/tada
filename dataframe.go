@@ -17,52 +17,50 @@ import (
 // -- CONSTRUCTORS
 
 // MakeSlicesFromCrossProduct stub
-func MakeSlicesFromCrossProduct(values [][]string, dtypes []DType) ([]interface{}, error) {
-	if len(values) != len(dtypes) {
-		return nil, fmt.Errorf("length of `values` must match length of `dtypes` (%d != %d)",
-			len(values), len(dtypes))
+func MakeSlicesFromCrossProduct(values []interface{}) ([]interface{}, error) {
+	for k := range values {
+		if !isSlice(values[k]) {
+			return nil, fmt.Errorf("MakeSlicesFromCrossProduct(): position %d: must be slice", k)
+		}
 	}
 	var numNewRows int
 	for k := range values {
+		v := reflect.ValueOf(values[k])
 		if k == 0 {
-			numNewRows = len(values[k])
+			numNewRows = v.Len()
 		} else {
-			numNewRows *= len(values[k])
+			numNewRows *= v.Len()
 		}
 	}
-	extendedValues := make([][]string, len(values))
+	ret := make([]interface{}, len(values))
 	for k := range values {
-		extendedValues[k] = make([]string, numNewRows)
-		numRepeats := numNewRows / len(values[k])
+		v := reflect.ValueOf(values[k])
+		newValues := reflect.MakeSlice(v.Type(), numNewRows, numNewRows)
+		numRepeats := numNewRows / v.Len()
 		// for first slice, repeat each value individaully
 		if k == 0 {
-			for i := 0; i < len(values[k]); i++ {
+			for i := 0; i < v.Len(); i++ {
 				for j := 0; j < numRepeats; j++ {
 					offset := j + i*numRepeats
-					extendedValues[k][offset] = values[k][i]
+					src := v.Index(i)
+					dst := newValues.Index(offset)
+					dst.Set(src)
 				}
 			}
 		} else {
 			// otherwise, repeat values in blocks as-is
 			for j := 0; j < numRepeats; j++ {
-				for i := 0; i < len(values[k]); i++ {
-					offset := i + j*len(values[k])
-					extendedValues[k][offset] = values[k][i]
+				for i := 0; i < v.Len(); i++ {
+					offset := i + j*v.Len()
+					src := v.Index(i)
+					dst := newValues.Index(offset)
+					dst.Set(src)
 				}
 			}
 		}
+		ret[k] = newValues.Interface()
 	}
-	ret := make([]interface{}, len(values))
-	for k := range dtypes {
-		switch dtypes[k] {
-		case Float:
-			ret[k] = convertSliceStringToSliceFloat(extendedValues[k])
-		case String:
-			ret[k] = extendedValues[k]
-		case DateTime:
-			ret[k] = convertSliceStringToSliceDateTime(extendedValues[k])
-		}
-	}
+
 	return ret, nil
 }
 
