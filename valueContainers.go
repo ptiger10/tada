@@ -2,6 +2,7 @@ package tada
 
 import (
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 	"time"
@@ -277,4 +278,30 @@ func (vc *valueContainer) dateTime() dateTimeValueContainer {
 	}
 	return ret
 
+}
+
+func convertSliceStringToSliceFloat(vals []string) []float64 {
+	ret := make([]float64, len(vals))
+	for i := range vals {
+		parsedVal, err := strconv.ParseFloat(vals[i], 64)
+		if err != nil {
+			ret[i] = math.NaN()
+		} else {
+			ret[i] = parsedVal
+		}
+	}
+	return ret
+}
+
+func convertSliceStringToSliceDateTime(vals []string) []time.Time {
+	ret := make([]time.Time, len(vals))
+	for i := range vals {
+		parsedVal, err := dateparse.ParseAny(vals[i])
+		if err != nil {
+			ret[i] = time.Time{}
+		} else {
+			ret[i] = parsedVal
+		}
+	}
+	return ret
 }

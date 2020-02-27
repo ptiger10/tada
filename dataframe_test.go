@@ -8,10 +8,67 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/d4l3k/messagediff"
 	"github.com/ptiger10/tablediff"
 )
+
+func TestMakeSlicesFromCrossProduct(t *testing.T) {
+	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	type args struct {
+		values [][]string
+		dtypes []DType
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []interface{}
+		wantErr bool
+	}{
+		{"pass", args{values: [][]string{
+			{"foo", "bar"},
+			{"1", "2", "3"},
+			{"1/1/20"},
+		}, dtypes: []DType{
+			String,
+			Float,
+			DateTime,
+		}},
+			[]interface{}{
+				[]string{"foo", "foo", "foo", "bar", "bar", "bar"},
+				[]float64{1, 2, 3, 1, 2, 3},
+				[]time.Time{d, d, d, d, d, d},
+			}, false,
+		},
+		{"pass - longest first", args{values: [][]string{
+			{"1", "2", "3"},
+			{"foo", "bar"},
+		}, dtypes: []DType{
+			Float,
+			String,
+		}},
+			[]interface{}{
+				[]float64{1, 1, 2, 2, 3, 3},
+				[]string{"foo", "bar", "foo", "bar", "foo", "bar"},
+			}, false,
+		},
+		{"fail - wrong number of dtypes",
+			args{values: [][]string{{"foo", "bar"}}, dtypes: []DType{String, Float}}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := MakeSlicesFromCrossProduct(tt.args.values, tt.args.dtypes)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("MakeSlicesFromCrossProduct() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("MakeSlicesFromCrossProduct() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
 
 func TestNewDataFrame(t *testing.T) {
 	type args struct {

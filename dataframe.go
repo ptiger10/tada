@@ -16,6 +16,56 @@ import (
 
 // -- CONSTRUCTORS
 
+// MakeSlicesFromCrossProduct stub
+func MakeSlicesFromCrossProduct(values [][]string, dtypes []DType) ([]interface{}, error) {
+	if len(values) != len(dtypes) {
+		return nil, fmt.Errorf("length of `values` must match length of `dtypes` (%d != %d)",
+			len(values), len(dtypes))
+	}
+	var numNewRows int
+	for k := range values {
+		if k == 0 {
+			numNewRows = len(values[k])
+		} else {
+			numNewRows *= len(values[k])
+		}
+	}
+	extendedValues := make([][]string, len(values))
+	for k := range values {
+		extendedValues[k] = make([]string, numNewRows)
+		numRepeats := numNewRows / len(values[k])
+		// for first slice, repeat each value individaully
+		if k == 0 {
+			for i := 0; i < len(values[k]); i++ {
+				for j := 0; j < numRepeats; j++ {
+					offset := j + i*numRepeats
+					extendedValues[k][offset] = values[k][i]
+				}
+			}
+		} else {
+			// otherwise, repeat values in blocks as-is
+			for j := 0; j < numRepeats; j++ {
+				for i := 0; i < len(values[k]); i++ {
+					offset := i + j*len(values[k])
+					extendedValues[k][offset] = values[k][i]
+				}
+			}
+		}
+	}
+	ret := make([]interface{}, len(values))
+	for k := range dtypes {
+		switch dtypes[k] {
+		case Float:
+			ret[k] = convertSliceStringToSliceFloat(extendedValues[k])
+		case String:
+			ret[k] = extendedValues[k]
+		case DateTime:
+			ret[k] = convertSliceStringToSliceDateTime(extendedValues[k])
+		}
+	}
+	return ret, nil
+}
+
 // NewDataFrame stub
 func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 	// handle values
