@@ -1605,60 +1605,6 @@ func isNullString(s string) bool {
 
 // math
 
-func convertUserFloatFunc(userFn func([]float64) float64) func([]float64, []bool, []int) (float64, bool) {
-	fn := func(vals []float64, isNull []bool, index []int) (float64, bool) {
-		var atLeastOneValid bool
-		inputVals := make([]float64, 0)
-		for _, i := range index {
-			if !isNull[i] {
-				inputVals = append(inputVals, vals[i])
-				atLeastOneValid = true
-			}
-		}
-		if !atLeastOneValid {
-			return 0, true
-		}
-		return userFn(inputVals), false
-	}
-	return fn
-}
-
-func convertUserStringFunc(userFn func([]string) string) func([]string, []bool, []int) (string, bool) {
-	fn := func(vals []string, isNull []bool, index []int) (string, bool) {
-		var atLeastOneValid bool
-		inputVals := make([]string, 0)
-		for _, i := range index {
-			if !isNull[i] {
-				inputVals = append(inputVals, vals[i])
-				atLeastOneValid = true
-			}
-		}
-		if !atLeastOneValid {
-			return "", true
-		}
-		return userFn(inputVals), false
-	}
-	return fn
-}
-
-func convertUserDateTimeFunc(userFn func([]time.Time) time.Time) func([]time.Time, []bool, []int) (time.Time, bool) {
-	fn := func(vals []time.Time, isNull []bool, index []int) (time.Time, bool) {
-		var atLeastOneValid bool
-		inputVals := make([]time.Time, 0)
-		for _, i := range index {
-			if !isNull[i] {
-				inputVals = append(inputVals, vals[i])
-				atLeastOneValid = true
-			}
-		}
-		if !atLeastOneValid {
-			return time.Time{}, true
-		}
-		return userFn(inputVals), false
-	}
-	return fn
-}
-
 // sum sums the non-null values at the index positions in `vals`. If all values are null, the final result is null.
 // Compatible with Grouped calculations as well as Series
 func sum(vals []float64, isNull []bool, index []int) (float64, bool) {

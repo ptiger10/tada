@@ -356,13 +356,13 @@ func (g *GroupedDataFrame) Col(colName string) *GroupedSeries {
 func (g *GroupedDataFrame) Apply(name string, cols []string, lambda GroupApplyFn) *DataFrame {
 	// remove all nulls before running each set of values through custom user function
 	if lambda.F64 != nil {
-		fn := convertUserFloatFunc(lambda.F64)
+		fn := convertSimplifiedFloat64Func(lambda.F64)
 		return g.float64Func(name, cols, fn)
 	} else if lambda.String != nil {
-		fn := convertUserStringFunc(lambda.String)
+		fn := convertSimplifiedStringFunc(lambda.String)
 		return g.stringFunc(name, cols, fn)
 	} else if lambda.DateTime != nil {
-		fn := convertUserDateTimeFunc(lambda.DateTime)
+		fn := convertSimplifiedDateTimeFunc(lambda.DateTime)
 		return g.dateTimeFunc(name, cols, fn)
 	}
 	return dataFrameWithError(fmt.Errorf("Apply(): no lambda function provided"))
