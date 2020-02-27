@@ -3396,3 +3396,70 @@ func TestSeries_IndexOf(t *testing.T) {
 		})
 	}
 }
+
+func TestSeries_SwapLabels(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		i string
+		j string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"pass", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{1}, isNull: []bool{false}, name: "bar"},
+				{slice: []int{0}, isNull: []bool{false}, name: "qux"},
+			}},
+			args{"qux", "bar"},
+			&Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "qux"},
+					{slice: []int{1}, isNull: []bool{false}, name: "bar"},
+				}},
+		},
+		{"fail - i", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{1}, isNull: []bool{false}, name: "bar"},
+				{slice: []int{0}, isNull: []bool{false}, name: "qux"},
+			}},
+			args{"corge", "bar"},
+			&Series{
+				err: errors.New("SwapLabels(): `i`: `name` (corge) not found")},
+		},
+		{"fail - j", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{1}, isNull: []bool{false}, name: "bar"},
+				{slice: []int{0}, isNull: []bool{false}, name: "qux"},
+			}},
+			args{"qux", "corge"},
+			&Series{
+				err: errors.New("SwapLabels(): `j`: `name` (corge) not found")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.SwapLabels(tt.args.i, tt.args.j); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.SwapLabels() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

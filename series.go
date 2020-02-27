@@ -130,6 +130,7 @@ func (s *Series) IndexOf(name string) int {
 
 // SelectLabels finds the first level with matching `name` and returns as a Series with all existing label levels (including itself).
 // If label level name is default (prefixed with *), removes the prefix.
+// Returns a new Series with shared labels.
 func (s *Series) SelectLabels(name string) *Series {
 	index, err := indexOfContainer(name, s.labels)
 	if err != nil {
@@ -149,6 +150,7 @@ func (s *Series) SelectLabels(name string) *Series {
 }
 
 // Subset returns only the rows specified at the index positions, in the order specified. Returns a new Series.
+// Returns a new Series.
 func (s *Series) Subset(index []int) *Series {
 	s = s.Copy()
 	s.InPlace().Subset(index)
@@ -171,6 +173,31 @@ func (s *SeriesMutator) Subset(index []int) {
 	for j := range s.series.labels {
 		s.series.labels[j].subsetRows(index)
 	}
+	return
+}
+
+// SwapLabels swaps the label levels with names `i` and `j`.
+// Returns a new Series.
+func (s *Series) SwapLabels(i, j string) *Series {
+	s = s.Copy()
+	s.InPlace().SwapLabels(i, j)
+	return s
+}
+
+// SwapLabels swaps the label levels with names `i` and `j`.
+// Modifies the underlying Series in place.
+func (s *SeriesMutator) SwapLabels(i, j string) {
+	index1, err := indexOfContainer(i, s.series.labels)
+	if err != nil {
+		s.series.resetWithError(fmt.Errorf("SwapLabels(): `i`: %v", err))
+		return
+	}
+	index2, err := indexOfContainer(j, s.series.labels)
+	if err != nil {
+		s.series.resetWithError(fmt.Errorf("SwapLabels(): `j`: %v", err))
+		return
+	}
+	s.series.labels[index1], s.series.labels[index2] = s.series.labels[index2], s.series.labels[index1]
 	return
 }
 

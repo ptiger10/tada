@@ -23,11 +23,6 @@ type SeriesMutator struct {
 	series *Series
 }
 
-// DataFrameMutator stub
-type DataFrameMutator struct {
-	dataframe *DataFrame
-}
-
 // DataFrame stub
 type DataFrame struct {
 	labels        []*valueContainer
@@ -35,6 +30,21 @@ type DataFrame struct {
 	name          string
 	err           error
 	colLevelNames []string
+}
+
+// DataFrameMutator stub
+type DataFrameMutator struct {
+	dataframe *DataFrame
+}
+
+// Labels stub
+type Labels struct {
+	labels []*valueContainer
+}
+
+// LabelsMutator stub
+type LabelsMutator struct {
+	labels *Labels
 }
 
 // Matrix is an interface which is compatible with gonum's mat.Matrix interface
