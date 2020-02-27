@@ -126,11 +126,22 @@ func (s *Series) numLevels() int {
 	return len(s.labels)
 }
 
-// Cast casts the underlying Series slice values to either []float64, []string, or []time.Time.
+// Cast casts the underlying container values (either label levels or Series values)
+// to []float64, []string, or []time.Time. To apply to Series values, supply empty string name ("") or the Series name.
 // Use cast to improve performance when calling multiple operations on values.
-func (s *Series) Cast(dtype DType) {
-	s.values.cast(dtype)
-	return
+func (s *Series) Cast(containerAsType map[string]DType) error {
+	mergedLabelsAndValues := append(s.labels, s.values)
+	for name, dtype := range containerAsType {
+		if name == "" {
+			name = s.values.name
+		}
+		index, err := indexOfContainer(name, mergedLabelsAndValues)
+		if err != nil {
+			return fmt.Errorf("Cast(): %v", err)
+		}
+		mergedLabelsAndValues[index].cast(dtype)
+	}
+	return nil
 }
 
 // IndexOf stub. If name does not match any container, -1 is returned

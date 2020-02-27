@@ -132,15 +132,16 @@ func ConcatSeries(series ...*Series) (*DataFrame, error) {
 	return ret, nil
 }
 
-// Cast casts the underlying DataFrame column slice values to either []float64, []string, or []time.Time.
+// Cast casts the underlying container values (column or label level) to []float64, []string, or []time.Time.
 // Use cast to improve performance when calling multiple operations on values.
-func (df *DataFrame) Cast(colAsType map[string]DType) error {
-	for name, dtype := range colAsType {
-		index, err := indexOfContainer(name, df.values)
+func (df *DataFrame) Cast(containerAsType map[string]DType) error {
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	for name, dtype := range containerAsType {
+		index, err := indexOfContainer(name, mergedLabelsAndCols)
 		if err != nil {
 			return fmt.Errorf("Cast(): %v", err)
 		}
-		df.values[index].cast(dtype)
+		mergedLabelsAndCols[index].cast(dtype)
 	}
 	return nil
 }

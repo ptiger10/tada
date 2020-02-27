@@ -98,7 +98,7 @@ func TestSeries_Cast(t *testing.T) {
 		err    error
 	}
 	type args struct {
-		dtype DType
+		containerAsType map[string]DType
 	}
 	tests := []struct {
 		name   string
@@ -109,7 +109,7 @@ func TestSeries_Cast(t *testing.T) {
 		{"pass", fields{
 			values: &valueContainer{slice: []int{1}, name: "foo", isNull: []bool{false}},
 			labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}},
-			args{Float},
+			args{map[string]DType{"": Float}},
 			&Series{
 				values: &valueContainer{slice: []float64{1}, name: "foo", isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}}},
@@ -121,7 +121,7 @@ func TestSeries_Cast(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			s.Cast(tt.args.dtype)
+			s.Cast(tt.args.containerAsType)
 			if !reflect.DeepEqual(s, tt.want) {
 				t.Errorf("Series.Cast() -> %v, want %v", s, tt.want)
 			}
