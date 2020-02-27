@@ -430,6 +430,11 @@ func (g *GroupedSeries) IterGroups() []*Series {
 	return ret
 }
 
+// Len returns the number of group labels.
+func (g *GroupedSeries) Len() int {
+	return len(g.rowIndices)
+}
+
 // ListGroups stub
 func (g *GroupedSeries) ListGroups() []string {
 	return g.orderedKeys
@@ -492,4 +497,9 @@ func (g *GroupedDataFrame) GetLabels() []interface{} {
 		ret = append(ret, labels[j].slice)
 	}
 	return ret
+}
+
+// Len returns the number of group labels.
+func (g *GroupedDataFrame) Len() int {
+	return len(g.rowIndices)
 }
