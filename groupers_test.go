@@ -3098,3 +3098,99 @@ func TestGroupedSeries_Nth(t *testing.T) {
 		})
 	}
 }
+
+func TestGroupedSeries_GetLabels(t *testing.T) {
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		series      *Series
+		aligned     bool
+		err         error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []interface{}
+	}{
+		{
+			name: "pass",
+			fields: fields{
+				orderedKeys: []string{"foo|0", "bar|0"},
+				rowIndices:  [][]int{{0}, {1, 2, 3}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
+					{slice: []int{0, 0}, isNull: []bool{false, false}, name: "*1"},
+				},
+				series: &Series{values: &valueContainer{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
+						{slice: []int{0, 0, 0, 0}, isNull: []bool{false, false, false, false}, name: "*1"}}}},
+			want: []interface{}{
+				[]string{"foo", "bar"},
+				[]int{0, 0},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeries{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				series:      tt.fields.series,
+				aligned:     tt.fields.aligned,
+				err:         tt.fields.err,
+			}
+			if got := g.GetLabels(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedSeries.GetLabels() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGroupedDataFrame_GetLabels(t *testing.T) {
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		df          *DataFrame
+		err         error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []interface{}
+	}{
+		{"preserve type",
+			fields{
+				orderedKeys: []string{"foo|0", "bar|0"},
+				rowIndices:  [][]int{{0}, {1, 2, 3}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
+					{slice: []int{0, 0}, isNull: []bool{false, false}, name: "*1"},
+				},
+				df: &DataFrame{values: []*valueContainer{{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
+						{slice: []int{0, 0, 0, 0}, isNull: []bool{false, false, false, false}, name: "*1"}}}},
+			[]interface{}{
+				[]string{"foo", "bar"},
+				[]int{0, 0}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedDataFrame{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				df:          tt.fields.df,
+				err:         tt.fields.err,
+			}
+			if got := g.GetLabels(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedDataFrame.GetLabels() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

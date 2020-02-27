@@ -4105,3 +4105,42 @@ func TestDataFrame_SwapLabels(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_GetLabels(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []interface{}
+	}{
+		{"pass", fields{values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []int{1}, isNull: []bool{false}, name: "bar"},
+				{slice: []int{0}, isNull: []bool{false}, name: "qux"}},
+		},
+			[]interface{}{
+				[]int{1},
+				[]int{0},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.GetLabels(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.GetLabels() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

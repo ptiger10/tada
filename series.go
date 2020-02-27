@@ -1053,10 +1053,21 @@ func (s *Series) SliceNulls() []bool {
 	return output
 }
 
-// Interface returns a copy of the underlying Series data as an interface.
-func (s *Series) Interface() interface{} {
+// GetValues returns a copy of the underlying Series data as an interface.
+func (s *Series) GetValues() interface{} {
 	ret := s.values.copy()
 	return ret.slice
+}
+
+// GetLabels returns label levels as slices within an []interface
+// that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
+func (s *Series) GetLabels() []interface{} {
+	var ret []interface{}
+	labels := copyContainers(s.labels)
+	for j := range labels {
+		ret = append(ret, labels[j].slice)
+	}
+	return ret
 }
 
 // DType returns the slice type of the underlying Series values

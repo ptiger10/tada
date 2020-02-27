@@ -435,6 +435,17 @@ func (g *GroupedSeries) ListGroups() []string {
 	return g.orderedKeys
 }
 
+// GetLabels returns label levels as slices within an []interface
+// that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
+func (g *GroupedSeries) GetLabels() []interface{} {
+	var ret []interface{}
+	labels := copyContainers(g.labels)
+	for j := range labels {
+		ret = append(ret, labels[j].slice)
+	}
+	return ret
+}
+
 // HavingCount stub
 func (g *GroupedDataFrame) HavingCount(lambda func(int) bool) *GroupedDataFrame {
 	indexToKeep := make([]int, 0)
@@ -470,4 +481,15 @@ func (g *GroupedDataFrame) IterGroups() []*DataFrame {
 // ListGroups stub
 func (g *GroupedDataFrame) ListGroups() []string {
 	return g.orderedKeys
+}
+
+// GetLabels returns label levels as slices within an []interface
+// that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
+func (g *GroupedDataFrame) GetLabels() []interface{} {
+	var ret []interface{}
+	labels := copyContainers(g.labels)
+	for j := range g.labels {
+		ret = append(ret, labels[j].slice)
+	}
+	return ret
 }

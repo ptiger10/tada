@@ -643,6 +643,17 @@ func (df *DataFrame) IndexOf(name string, columns bool) int {
 	return i
 }
 
+// GetLabels returns label levels as slices within an []interface
+// that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
+func (df *DataFrame) GetLabels() []interface{} {
+	var ret []interface{}
+	labels := copyContainers(df.labels)
+	for j := range labels {
+		ret = append(ret, labels[j].slice)
+	}
+	return ret
+}
+
 // SelectLabels finds the first level with matching `name` and returns as a Series with all existing label levels (including itself).
 // If label level name is default (prefixed with *), removes the prefix.
 func (df *DataFrame) SelectLabels(name string) *Series {
