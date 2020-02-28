@@ -40,7 +40,7 @@ func TestNewSeries(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewSeries(tt.args.slice, tt.args.labels...); !reflect.DeepEqual(got, tt.want) {
+			if got := NewSeries(tt.args.slice, tt.args.labels...); !EqualSeries(got, tt.want) {
 				t.Errorf("NewSeries() = %v, want %v", got, tt.want)
 				t.Errorf("Error %v vs %v", got.err, tt.want.err)
 			}
@@ -75,16 +75,16 @@ func TestSeries_Copy(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			got := s.Copy()
-			if !reflect.DeepEqual(got, tt.want) {
+			if !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Copy() = %v, want %v", got, tt.want)
 			}
 			got.values.isNull[0] = true
-			if reflect.DeepEqual(got, s) {
+			if EqualSeries(got, s) {
 				t.Errorf("Series.Copy() = retained reference to original values")
 			}
 			got = s.Copy()
 			got.err = errors.New("foo")
-			if reflect.DeepEqual(got, s) {
+			if EqualSeries(got, s) {
 				t.Errorf("Series.Copy() retained reference to original error")
 			}
 		})
@@ -122,7 +122,7 @@ func TestSeries_Cast(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			s.Cast(tt.args.containerAsType)
-			if !reflect.DeepEqual(s, tt.want) {
+			if !EqualSeries(s, tt.want) {
 				t.Errorf("Series.Cast() -> %v, want %v", s, tt.want)
 			}
 		})
@@ -159,7 +159,7 @@ func TestSeries_ToDataFrame(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			got := s.ToDataFrame()
-			if !reflect.DeepEqual(got, tt.want) {
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("Series.ToDataFrame() = %v, want %v", got, tt.want)
 			}
 			got.labels[0] = &valueContainer{slice: []float64{10}, name: "baz", isNull: []bool{false}}
@@ -346,7 +346,7 @@ func TestSeries_Subset(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Subset(tt.args.index); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Subset(tt.args.index); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Subset() = %#v, want %#v", got.err, tt.want.err)
 			}
 		})
@@ -391,7 +391,7 @@ func TestSeries_SubsetLabels(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.SubsetLabels(tt.args.index); !reflect.DeepEqual(got, tt.want) {
+			if got := s.SubsetLabels(tt.args.index); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.SubsetLabels() = %#v, want %#v", got.labels[0], tt.want.labels[0])
 			}
 		})
@@ -437,7 +437,7 @@ func TestSeries_Head(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Head(tt.args.rows); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Head(tt.args.rows); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Head() = %v, want %v", got, tt.want)
 			}
 		})
@@ -483,7 +483,7 @@ func TestSeries_Tail(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Tail(tt.args.rows); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Tail(tt.args.rows); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Tail() = %v, want %v", got.values, tt.want.values)
 			}
 		})
@@ -543,7 +543,7 @@ func TestSeries_Range(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Range(tt.args.first, tt.args.last); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Range(tt.args.first, tt.args.last); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Range() = %v, want %v", got, tt.want)
 			}
 		})
@@ -581,7 +581,7 @@ func TestSeries_FillNull(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.FillNull(tt.args.how); !reflect.DeepEqual(got, tt.want) {
+			if got := s.FillNull(tt.args.how); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.FillNull() = %v, want %v", got, tt.want)
 			}
 		})
@@ -614,7 +614,7 @@ func TestSeries_DropNull(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.DropNull(); !reflect.DeepEqual(got, tt.want) {
+			if got := s.DropNull(); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.DropNull() = %v, want %v", got, tt.want)
 			}
 		})
@@ -647,7 +647,7 @@ func TestSeries_Null(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Null(); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Null(); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Null() = %v, want %v", got, tt.want)
 			}
 		})
@@ -751,7 +751,7 @@ func TestSeries_WithLabels(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.WithLabels(tt.args.name, tt.args.arg); !reflect.DeepEqual(got, tt.want) {
+			if got := s.WithLabels(tt.args.name, tt.args.arg); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.WithLabels() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
@@ -807,7 +807,7 @@ func TestSeries_WithValues(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.WithValues(tt.args.input); !reflect.DeepEqual(got, tt.want) {
+			if got := s.WithValues(tt.args.input); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.WithValues() = %v, want %v", got, tt.want)
 			}
 		})
@@ -860,7 +860,7 @@ func TestSeries_Append(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Append(tt.args.other); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Append(tt.args.other); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Append() = %v, want %v", got, tt.want)
 			}
 		})
@@ -911,7 +911,7 @@ func TestSeries_Relabel(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Relabel(tt.args.levelNames); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Relabel(tt.args.levelNames); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Relabel() = %v, want %v", got, tt.want)
 			}
 		})
@@ -968,7 +968,7 @@ func TestSeries_SetLabelNames(t *testing.T) {
 				values: tt.fields.values,
 				err:    tt.fields.err,
 			}
-			if got := df.SetLabelNames(tt.args.colNames); !reflect.DeepEqual(got, tt.want) {
+			if got := df.SetLabelNames(tt.args.colNames); !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.SetLabelNames() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1006,7 +1006,7 @@ func TestSeries_SetName(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.SetName(tt.args.name); !reflect.DeepEqual(got, tt.want) {
+			if got := s.SetName(tt.args.name); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.SetName() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1080,7 +1080,7 @@ func TestSeries_DropLabels(t *testing.T) {
 				sharedData: tt.fields.sharedData,
 				err:        tt.fields.err,
 			}
-			if got := s.DropLabels(tt.args.name); !reflect.DeepEqual(got, tt.want) {
+			if got := s.DropLabels(tt.args.name); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.DropLabels() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1125,7 +1125,7 @@ func TestSeries_DropRow(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.DropRow(tt.args.index); !reflect.DeepEqual(got, tt.want) {
+			if got := s.DropRow(tt.args.index); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.DropRow() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1186,7 +1186,7 @@ func TestSeries_Sort(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Sort(tt.args.by...); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Sort(tt.args.by...); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Sort() = %v, want %v", got.err, tt.want.err)
 			}
 		})
@@ -1899,7 +1899,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.LookupAdvanced(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !reflect.DeepEqual(got, tt.want) {
+			if got := s.LookupAdvanced(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.LookupAdvanced() = %v, want %v", got.err, tt.want.err)
 			}
 		})
@@ -1945,7 +1945,7 @@ func TestSeries_Merge(t *testing.T) {
 				sharedData: tt.fields.sharedData,
 				err:        tt.fields.err,
 			}
-			if got := s.Merge(tt.args.other); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Merge(tt.args.other); !EqualDataFrames(got, tt.want) {
 				t.Errorf("Series.Merge() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1998,7 +1998,7 @@ func TestSeries_Apply(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Apply(tt.args.function); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Apply(tt.args.function); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Apply() = %v, want %v", got.err, tt.want.err)
 			}
 		})
@@ -2043,7 +2043,7 @@ func TestSeries_ApplyFormat(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.ApplyFormat(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+			if got := s.ApplyFormat(tt.args.lambda); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.ApplyFormat() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2096,7 +2096,7 @@ func TestSeries_Add(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Add(tt.args.other, tt.args.ignoreMissing); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Add(tt.args.other, tt.args.ignoreMissing); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Add() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2149,7 +2149,7 @@ func TestSeries_Subtract(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Subtract(tt.args.other, tt.args.ignoreMissing); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Subtract(tt.args.other, tt.args.ignoreMissing); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Subtract() = %v, want %v", got.values, tt.want.values)
 			}
 		})
@@ -2202,7 +2202,7 @@ func TestSeries_Multiply(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Multiply(tt.args.other, tt.args.ignoreMissing); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Multiply(tt.args.other, tt.args.ignoreMissing); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Multiply() = %v, want %v", got.values, tt.want.values)
 			}
 		})
@@ -2255,7 +2255,7 @@ func TestSeries_Divide(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Divide(tt.args.other, tt.args.ignoreMissing); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Divide(tt.args.other, tt.args.ignoreMissing); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Divide() = %v, want %v", got.values, tt.want.values)
 			}
 		})
@@ -2524,7 +2524,7 @@ func TestSeries_GroupBy(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.GroupBy(tt.args.names...); !reflect.DeepEqual(got, tt.want) {
+			if got := s.GroupBy(tt.args.names...); !equalGroupedSeries(got, tt.want) {
 				t.Errorf("Series.GroupBy() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
@@ -2580,7 +2580,7 @@ func TestSeries_Shift(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Shift(tt.args.n); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Shift(tt.args.n); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Shift() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
@@ -2633,7 +2633,7 @@ func TestSeries_Where(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Where(tt.args.filters, tt.args.ifTrue, tt.args.ifFalse); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Where(tt.args.filters, tt.args.ifTrue, tt.args.ifFalse); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Where() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2681,7 +2681,7 @@ func TestSeries_Cut(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Cut(tt.args.bins, tt.args.andLess, tt.args.andMore, tt.args.labels); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Cut(tt.args.bins, tt.args.andLess, tt.args.andMore, tt.args.labels); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Cut() = %v, want %v", got.err, tt.want.err)
 			}
 		})
@@ -2713,7 +2713,7 @@ func TestSeries_CumSum(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.CumSum(); !reflect.DeepEqual(got, tt.want) {
+			if got := s.CumSum(); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.CumSum() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2745,7 +2745,7 @@ func TestSeries_Rank(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Rank(); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Rank(); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Rank() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2791,7 +2791,7 @@ func TestSeries_PercentileCut(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.PercentileCut(tt.args.bins, tt.args.labels); !reflect.DeepEqual(got, tt.want) {
+			if got := s.PercentileCut(tt.args.bins, tt.args.labels); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.PercentileCut() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3110,7 +3110,7 @@ func TestSeries_Resample(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Resample(tt.args.by); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Resample(tt.args.by); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Resample() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3157,7 +3157,7 @@ func TestSeries_SelectLabels(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.SelectLabels(tt.args.name); !reflect.DeepEqual(got, tt.want) {
+			if got := s.SelectLabels(tt.args.name); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.SelectLabels() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3311,7 +3311,7 @@ func TestSeries_Unique(t *testing.T) {
 				sharedData: tt.fields.sharedData,
 				err:        tt.fields.err,
 			}
-			if got := s.Unique(tt.args.valuesOnly); !reflect.DeepEqual(got, tt.want) {
+			if got := s.Unique(tt.args.valuesOnly); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Unique() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3497,7 +3497,7 @@ func TestSeries_SwapLabels(t *testing.T) {
 				sharedData: tt.fields.sharedData,
 				err:        tt.fields.err,
 			}
-			if got := s.SwapLabels(tt.args.i, tt.args.j); !reflect.DeepEqual(got, tt.want) {
+			if got := s.SwapLabels(tt.args.i, tt.args.j); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.SwapLabels() = %v, want %v", got, tt.want)
 			}
 		})

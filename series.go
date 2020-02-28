@@ -465,7 +465,8 @@ func (s *SeriesMutator) DropLabels(name string) {
 	return
 }
 
-// Append adds the `other` values as new rows to the Series.
+// Append adds the `other` labels and values as new rows to the Series.
+// If the types of any container do not match, all the values in that container are coerced to string.
 // Returns a new Series.
 func (s *Series) Append(other *Series) *Series {
 	s.Copy()
@@ -473,7 +474,8 @@ func (s *Series) Append(other *Series) *Series {
 	return s
 }
 
-// Append adds the `other` values as new rows to the Series by coercing all values to string.
+// Append adds the `other` labels and values as new rows to the Series.
+// If the types of any container do not match, all the values in that container are coerced to string.
 // Returns a new Series.
 func (s *SeriesMutator) Append(other *Series) {
 	if len(other.labels) != len(s.series.labels) {

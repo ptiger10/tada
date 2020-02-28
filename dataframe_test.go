@@ -109,8 +109,8 @@ func TestNewDataFrame(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := NewDataFrame(tt.args.slices, tt.args.labels...); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("NewDataFrame() = %v, want %v", got.err, tt.want.err)
+			if got := NewDataFrame(tt.args.slices, tt.args.labels...); !EqualDataFrames(got, tt.want) {
+				t.Errorf("NewDataFrame() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
@@ -182,7 +182,7 @@ func TestDataFrame_Cast(t *testing.T) {
 			if err := df.Cast(tt.args.colAsType); (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.Cast() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if !reflect.DeepEqual(df, tt.want) {
+			if !EqualDataFrames(df, tt.want) {
 				t.Errorf("DataFrame.Cast() -> %v, want %v", df, tt.want)
 			}
 		})
@@ -225,7 +225,7 @@ func TestDataFrame_ToSeries(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.ToSeries(); !reflect.DeepEqual(got, tt.want) {
+			if got := df.ToSeries(); !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.ToSeries() = %v, want %v", got, tt.want)
 			}
 		})
@@ -268,26 +268,26 @@ func TestDataFrame_Copy(t *testing.T) {
 				err:           tt.fields.err,
 			}
 			got := df.Copy()
-			if !reflect.DeepEqual(got, tt.want) {
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Copy() = %v, want %v", got, tt.want)
 			}
 			got.values[0].isNull[0] = true
-			if reflect.DeepEqual(got, df) {
+			if EqualDataFrames(got, df) {
 				t.Errorf("DataFrame.Copy() = retained reference to original values")
 			}
 			got = df.Copy()
 			got.err = errors.New("foo")
-			if reflect.DeepEqual(got, df) {
+			if EqualDataFrames(got, df) {
 				t.Errorf("DataFrame.Copy() retained reference to original error")
 			}
 			got = df.Copy()
 			got.name = "qux"
-			if reflect.DeepEqual(got, df) {
+			if EqualDataFrames(got, df) {
 				t.Errorf("DataFrame.Copy() retained reference to original name")
 			}
 			got = df.Copy()
 			got.colLevelNames[0] = "*1"
-			if reflect.DeepEqual(got, df) {
+			if EqualDataFrames(got, df) {
 				t.Errorf("DataFrame.Copy() retained reference to original col level names")
 			}
 		})
@@ -355,7 +355,7 @@ func TestDataFrame_Subset(t *testing.T) {
 				name:          tt.fields.name,
 				err:           tt.fields.err,
 			}
-			if got := df.Subset(tt.args.index); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Subset(tt.args.index); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Subset() = %v, want %v", got.err, tt.want.err)
 			}
 		})
@@ -411,7 +411,7 @@ func TestReadCSV(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := ReadCSV(tt.args.csv, tt.args.config)
-			if !reflect.DeepEqual(got, tt.want) {
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("ReadCSV() = %v, want %v", got, tt.want)
 			}
 		})
@@ -474,7 +474,7 @@ func TestDataFrame_SubsetLabels(t *testing.T) {
 				name:          tt.fields.name,
 				err:           tt.fields.err,
 			}
-			if got := df.SubsetLabels(tt.args.index); !reflect.DeepEqual(got, tt.want) {
+			if got := df.SubsetLabels(tt.args.index); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.SubsetLabels() = %v, want %v", got, tt.want)
 			}
 		})
@@ -538,7 +538,7 @@ func TestDataFrame_SubsetCols(t *testing.T) {
 				name:          tt.fields.name,
 				err:           tt.fields.err,
 			}
-			if got := df.SubsetCols(tt.args.index); !reflect.DeepEqual(got, tt.want) {
+			if got := df.SubsetCols(tt.args.index); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.SubsetCols() = %v, want %v", got, tt.want)
 			}
 		})
@@ -582,7 +582,7 @@ func TestDataFrame_Head(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.Head(tt.args.n); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Head(tt.args.n); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Head() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
@@ -638,7 +638,7 @@ func TestDataFrame_Tail(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.Tail(tt.args.n); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Tail(tt.args.n); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Tail() = %v, want %v", got.labels[0], tt.want.labels[0])
 			}
 		})
@@ -709,7 +709,7 @@ func TestDataFrame_Range(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.Range(tt.args.first, tt.args.last); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Range(tt.args.first, tt.args.last); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Range() = %v, want %v", got, tt.want)
 			}
 		})
@@ -856,7 +856,7 @@ func TestDataFrame_WithCol(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.WithCol(tt.args.name, tt.args.input); !reflect.DeepEqual(got, tt.want) {
+			if got := df.WithCol(tt.args.name, tt.args.input); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.WithCol() = %v, want %v", got.values, tt.want.values)
 			}
 		})
@@ -938,7 +938,7 @@ func TestDataFrame_WithLabels(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.WithLabels(tt.args.name, tt.args.input); !reflect.DeepEqual(got, tt.want) {
+			if got := df.WithLabels(tt.args.name, tt.args.input); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.WithLabels() = %v, want %v", got.err, tt.want.err)
 			}
 		})
@@ -1012,7 +1012,7 @@ func TestDataFrame_DropNull(t *testing.T) {
 				name:          tt.fields.name,
 				err:           tt.fields.err,
 			}
-			if got := df.DropNull(tt.args.subset...); !reflect.DeepEqual(got, tt.want) {
+			if got := df.DropNull(tt.args.subset...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.DropNull() = %v, want %v", got.values, tt.want.values)
 			}
 		})
@@ -1087,7 +1087,7 @@ func TestDataFrame_Null(t *testing.T) {
 				name:          tt.fields.name,
 				err:           tt.fields.err,
 			}
-			if got := df.Null(tt.args.subset...); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Null(tt.args.subset...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Null() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1152,7 +1152,7 @@ func TestDataFrame_SetLabels(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.SetLabels(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {
+			if got := df.SetLabels(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.SetLabels() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
@@ -1234,7 +1234,7 @@ func TestDataFrame_ResetLabels(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.ResetLabels(tt.args.index...); !reflect.DeepEqual(got, tt.want) {
+			if got := df.ResetLabels(tt.args.index...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.ResetLabels() = %v, want %v", got.err, tt.want.err)
 			}
 		})
@@ -1328,7 +1328,7 @@ func TestDataFrame_Relabel(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.Relabel(tt.args.levelNames); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Relabel(tt.args.levelNames); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Relabel() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1401,7 +1401,7 @@ func TestDataFrame_SetLabelNames(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.SetLabelNames(tt.args.colNames); !reflect.DeepEqual(got, tt.want) {
+			if got := df.SetLabelNames(tt.args.colNames); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.SetLabelNames() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1474,7 +1474,7 @@ func TestDataFrame_SetColNames(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.SetColNames(tt.args.colNames); !reflect.DeepEqual(got, tt.want) {
+			if got := df.SetColNames(tt.args.colNames); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.SetColNames() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1610,7 +1610,7 @@ func TestDataFrame_Apply(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.Apply(tt.args.lambdas); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Apply(tt.args.lambdas); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Apply() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1684,7 +1684,7 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.ApplyFormat(tt.args.lambdas); !reflect.DeepEqual(got, tt.want) {
+			if got := df.ApplyFormat(tt.args.lambdas); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.ApplyFormat() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1750,7 +1750,7 @@ func TestDataFrame_Sort(t *testing.T) {
 				name:          tt.fields.name,
 				err:           tt.fields.err,
 			}
-			if got := df.Sort(tt.args.by...); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Sort(tt.args.by...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Sort() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1825,7 +1825,7 @@ func TestDataFrame_Sum(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.Sum(); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Sum(); !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.Sum() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1865,7 +1865,7 @@ func TestDataFrame_Mean(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.Mean(); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Mean(); !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.Mean() = %v, want %v", got.values, tt.want.values)
 			}
 		})
@@ -1905,7 +1905,7 @@ func TestDataFrame_Median(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.Median(); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Median(); !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.Median() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1945,7 +1945,7 @@ func TestDataFrame_Std(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.Std(); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Std(); !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.Std() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1984,7 +1984,7 @@ func TestDataFrame_Count(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.Count(); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Count(); !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.Count() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2023,7 +2023,7 @@ func TestDataFrame_Min(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.Min(); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Min(); !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.Min() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2062,7 +2062,7 @@ func TestDataFrame_Max(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.Max(); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Max(); !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.Max() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2113,7 +2113,7 @@ func TestDataFrame_Merge(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.Merge(tt.args.other); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Merge(tt.args.other); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Merge() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2243,7 +2243,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 				colLevelNames: tt.fields.colLevelNames,
 				err:           tt.fields.err,
 			}
-			if got := df.LookupAdvanced(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !reflect.DeepEqual(got, tt.want) {
+			if got := df.LookupAdvanced(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.LookupAdvanced() = %v, want %v", got.err, tt.want.err)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 
@@ -2288,7 +2288,7 @@ func TestDataFrame_Transpose(t *testing.T) {
 				colLevelNames: tt.fields.colLevelNames,
 				err:           tt.fields.err,
 			}
-			if got := df.Transpose(); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Transpose(); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Transpose() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
@@ -2354,7 +2354,7 @@ func TestDataFrame_GroupBy(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.GroupBy(tt.args.names...); !reflect.DeepEqual(got, tt.want) {
+			if got := df.GroupBy(tt.args.names...); !equalGroupedDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.GroupBy() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 
@@ -2479,7 +2479,7 @@ func TestDataFrame_PromoteToColLevel(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.PromoteToColLevel(tt.args.name); !reflect.DeepEqual(got, tt.want) {
+			if got := df.PromoteToColLevel(tt.args.name); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.PromoteToColLevel() = %v, want %v", got.err, tt.want.err)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
@@ -2550,7 +2550,7 @@ func TestDataFrame_PromoteToColLevel(t *testing.T) {
 // 				err:           tt.fields.err,
 // 				colLevelNames: tt.fields.colLevelNames,
 // 			}
-// 			if got := df.UnstackColLevel(tt.args.level); !reflect.DeepEqual(got, tt.want) {
+// 			if got := df.UnstackColLevel(tt.args.level); !EqualDataFrames(got, tt.want) {
 // 				t.Errorf("DataFrame.UnstackColLevel() = %v, want %v", got, tt.want)
 // 			}
 // 		})
@@ -2699,7 +2699,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.PivotTable(tt.args.labels, tt.args.columns, tt.args.values, tt.args.aggFn); !reflect.DeepEqual(got, tt.want) {
+			if got := df.PivotTable(tt.args.labels, tt.args.columns, tt.args.values, tt.args.aggFn); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.PivotTable() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
@@ -2781,7 +2781,7 @@ func TestReadMatrix(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ReadMatrix(tt.args.mat); !reflect.DeepEqual(got, tt.want) {
+			if got := ReadMatrix(tt.args.mat); !EqualDataFrames(got, tt.want) {
 				t.Errorf("ReadMatrix() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
@@ -2826,7 +2826,7 @@ func TestReadStruct(t *testing.T) {
 				t.Errorf("ReadStruct() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("ReadStruct() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3085,7 +3085,7 @@ func TestImportCSV(t *testing.T) {
 				t.Errorf("ImportCSV() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("ImportCSV() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3141,7 +3141,7 @@ func TestReadInterface(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := ReadInterface(tt.args.input, tt.args.config)
-			if !reflect.DeepEqual(got, tt.want) {
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("ReadInterface() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3378,7 +3378,7 @@ func TestDataFrame_SelectLabels(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.SelectLabels(tt.args.name); !reflect.DeepEqual(got, tt.want) {
+			if got := df.SelectLabels(tt.args.name); !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.SelectLabels() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3433,7 +3433,7 @@ func TestDataFrame_Col(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.Col(tt.args.name); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Col(tt.args.name); !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.Col() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3487,7 +3487,7 @@ func TestDataFrame_Cols(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.Cols(tt.args.names...); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Cols(tt.args.names...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Cols() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3541,7 +3541,7 @@ func TestDataFrame_DropRow(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.DropRow(tt.args.index); !reflect.DeepEqual(got, tt.want) {
+			if got := df.DropRow(tt.args.index); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.DropRow() = %v, want %v", got.err, tt.want.err)
 			}
 		})
@@ -3620,7 +3620,7 @@ func TestDataFrame_Append(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.Append(tt.args.other); !reflect.DeepEqual(got, tt.want) {
+			if got := df.Append(tt.args.other); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Append() = %v, want %v", got.err, tt.want.err)
 			}
 		})
@@ -3668,7 +3668,7 @@ func TestDataFrame_DropCol(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.DropCol(tt.args.name); !reflect.DeepEqual(got, tt.want) {
+			if got := df.DropCol(tt.args.name); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.DropCol() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3718,7 +3718,7 @@ func TestDataFrame_DropLabels(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.DropLabels(tt.args.name); !reflect.DeepEqual(got, tt.want) {
+			if got := df.DropLabels(tt.args.name); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.DropLabels() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3762,7 +3762,7 @@ func TestDataFrame_DeduplicateNames(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.DeduplicateNames(); !reflect.DeepEqual(got, tt.want) {
+			if got := df.DeduplicateNames(); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.DeduplicateNames() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3827,7 +3827,7 @@ func TestDataFrame_FillNull(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.FillNull(tt.args.how); !reflect.DeepEqual(got, tt.want) {
+			if got := df.FillNull(tt.args.how); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.FillNull() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3898,7 +3898,7 @@ func TestConcatSeries(t *testing.T) {
 				t.Errorf("ConcatSeries() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("ConcatSeries() = %v, want %v", got, tt.want)
 			}
 		})
@@ -4095,7 +4095,7 @@ func TestDataFrame_SwapLabels(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.SwapLabels(tt.args.i, tt.args.j); !reflect.DeepEqual(got, tt.want) {
+			if got := df.SwapLabels(tt.args.i, tt.args.j); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.SwapLabels() = %v, want %v", got, tt.want)
 			}
 		})

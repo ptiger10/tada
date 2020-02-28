@@ -100,7 +100,7 @@ func TestGroupedSeries_GetGroup(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.GetGroup(tt.args.group); !reflect.DeepEqual(got, tt.want) {
+			if got := g.GetGroup(tt.args.group); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.GetGroup() = %v, want %v", got, tt.want)
 			}
 		})
@@ -432,7 +432,7 @@ func TestGroupedSeries_Sum(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.Sum(); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Sum(); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.Sum() = %v, want %v", got, tt.want)
 			}
 		})
@@ -511,7 +511,7 @@ func TestGroupedSeries_Mean(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.Mean(); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Mean(); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.Mean() = %v, want %v", got, tt.want)
 			}
 		})
@@ -590,7 +590,7 @@ func TestGroupedSeries_Median(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.Median(); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Median(); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.Median() = %v, want %v", got, tt.want)
 			}
 		})
@@ -668,7 +668,7 @@ func TestGroupedSeries_Std(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.Std(); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Std(); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.Std() = %v, want %v", got, tt.want)
 			}
 		})
@@ -729,7 +729,7 @@ func TestGroupedSeries_Min(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.Min(); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Min(); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.Min() = %v, want %v", got, tt.want)
 			}
 		})
@@ -790,7 +790,7 @@ func TestGroupedSeries_Max(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.Max(); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Max(); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.Max() = %v, want %v", got, tt.want)
 			}
 		})
@@ -851,7 +851,7 @@ func TestGroupedSeries_Count(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.Count(); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Count(); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.Count() = %v, want %v", got, tt.want)
 			}
 		})
@@ -912,7 +912,7 @@ func TestGroupedSeries_First(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.First(); !reflect.DeepEqual(got, tt.want) {
+			if got := g.First(); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.First() = %v, want %v", got, tt.want)
 			}
 		})
@@ -973,7 +973,7 @@ func TestGroupedSeries_Last(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.Last(); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Last(); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.Last() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1035,7 +1035,7 @@ func TestGroupedSeries_Earliest(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.Earliest(); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Earliest(); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.Earliest() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1097,7 +1097,7 @@ func TestGroupedSeries_Latest(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.Latest(); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Latest(); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.Latest() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1380,7 +1380,7 @@ func TestGroupedSeries_Apply(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.Apply(tt.args.name, tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Apply(tt.args.name, tt.args.lambda); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.Apply() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1499,7 +1499,7 @@ func TestGroupedSeries_ApplyNested(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.ApplyNested(tt.args.name, tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+			if got := g.ApplyNested(tt.args.name, tt.args.lambda); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.ApplyNested() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1616,7 +1616,7 @@ func TestGroupedDataFrame_Apply(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.Apply(tt.args.name, tt.args.cols, tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Apply(tt.args.name, tt.args.cols, tt.args.lambda); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.Apply() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1642,7 +1642,7 @@ func TestGroupedSeries_Align(t *testing.T) {
 				aligned: tt.fields.aligned,
 				err:     tt.fields.err,
 			}
-			if got := g.Align(); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Align(); !equalGroupedSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.Align() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1700,7 +1700,7 @@ func TestGroupedDataFrame_float64Func(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.float64Func(tt.args.name, tt.args.cols, tt.args.fn); !reflect.DeepEqual(got, tt.want) {
+			if got := g.float64Func(tt.args.name, tt.args.cols, tt.args.fn); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.float64Func() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1758,7 +1758,7 @@ func TestGroupedDataFrame_stringFunc(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.stringFunc(tt.args.name, tt.args.cols, tt.args.fn); !reflect.DeepEqual(got, tt.want) {
+			if got := g.stringFunc(tt.args.name, tt.args.cols, tt.args.fn); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.stringFunc() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1817,7 +1817,7 @@ func TestGroupedDataFrame_dateTimeFunc(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.dateTimeFunc(tt.args.name, tt.args.cols, tt.args.fn); !reflect.DeepEqual(got, tt.want) {
+			if got := g.dateTimeFunc(tt.args.name, tt.args.cols, tt.args.fn); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.dateTimeFunc() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1877,7 +1877,7 @@ func TestGroupedDataFrame_Sum(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.Sum(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Sum(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.Sum() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1937,7 +1937,7 @@ func TestGroupedDataFrame_Mean(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.Mean(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Mean(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.Mean() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1997,7 +1997,7 @@ func TestGroupedDataFrame_Median(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.Median(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Median(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.Median() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2057,7 +2057,7 @@ func TestGroupedDataFrame_Std(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.Std(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Std(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.Std() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2117,7 +2117,7 @@ func TestGroupedDataFrame_Count(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.Count(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Count(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.Count() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2177,7 +2177,7 @@ func TestGroupedDataFrame_Min(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.Min(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Min(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.Min() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2237,7 +2237,7 @@ func TestGroupedDataFrame_Max(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.Max(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Max(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.Max() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2297,7 +2297,7 @@ func TestGroupedDataFrame_First(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.First(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {
+			if got := g.First(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.First() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2357,7 +2357,7 @@ func TestGroupedDataFrame_Last(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.Last(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Last(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.Last() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2418,7 +2418,7 @@ func TestGroupedDataFrame_Earliest(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.Earliest(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Earliest(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.Earliest() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2479,7 +2479,7 @@ func TestGroupedDataFrame_Latest(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.Latest(tt.args.colNames...); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Latest(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.Latest() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2557,7 +2557,7 @@ func TestGroupedDataFrame_Col(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.Col(tt.args.colName); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Col(tt.args.colName); !equalGroupedSeries(got, tt.want) {
 				t.Errorf("GroupedDataFrame.Col() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2640,7 +2640,7 @@ func TestSeries_RollingN(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.RollingN(tt.args.n); !reflect.DeepEqual(got, tt.want) {
+			if got := s.RollingN(tt.args.n); !equalGroupedSeries(got, tt.want) {
 				t.Errorf("Series.RollingN() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
@@ -2694,7 +2694,7 @@ func TestSeries_RollingDuration(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.RollingDuration(tt.args.d); !reflect.DeepEqual(got, tt.want) {
+			if got := s.RollingDuration(tt.args.d); !equalGroupedSeries(got, tt.want) {
 				t.Errorf("Series.RollingDuration() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2754,7 +2754,7 @@ func TestGroupedSeries_HavingCount(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.HavingCount(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+			if got := g.HavingCount(tt.args.lambda); !equalGroupedSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.HavingCount() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2812,7 +2812,7 @@ func TestGroupedDataFrame_HavingCount(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.HavingCount(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+			if got := g.HavingCount(tt.args.lambda); !equalGroupedDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.HavingCount() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2863,7 +2863,7 @@ func TestGroupedDataFrame_GetGroup(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.GetGroup(tt.args.group); !reflect.DeepEqual(got, tt.want) {
+			if got := g.GetGroup(tt.args.group); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.GetGroup() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2911,8 +2911,11 @@ func TestGroupedSeries_IterGroups(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.IterGroups(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GroupedSeries.IterGroups() = %v, want %v", got, tt.want)
+			got := g.IterGroups()
+			for k := range got {
+				if !EqualSeries(got[k], tt.want[k]) {
+					t.Errorf("GroupedSeries.IterGroups() = %v, want %v", got, tt.want)
+				}
 			}
 		})
 	}
@@ -3002,8 +3005,11 @@ func TestGroupedDataFrame_IterGroups(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.IterGroups(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GroupedDataFrame.IterGroups() = %v, want %v", got, tt.want)
+			got := g.IterGroups()
+			for k := range got {
+				if !EqualDataFrames(got[k], tt.want[k]) {
+					t.Errorf("GroupedDataFrame.IterGroups() = %v, want %v", got, tt.want)
+				}
 			}
 		})
 	}
@@ -3092,7 +3098,7 @@ func TestGroupedSeries_Nth(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.Nth(tt.args.index); !reflect.DeepEqual(got, tt.want) {
+			if got := g.Nth(tt.args.index); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.Nth() = %v, want %v", got, tt.want)
 			}
 		})

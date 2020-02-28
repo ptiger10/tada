@@ -2181,3 +2181,157 @@ func multiUniqueIndex(containers []*valueContainer) []int {
 func (vc *valueContainer) dtype() string {
 	return reflect.TypeOf(vc.slice).String()
 }
+
+// -- equality checks
+
+// EqualSeries returns whether two Series are identical or not.
+func EqualSeries(a, b *Series) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if (a == nil) && (b == nil) {
+		return true
+	}
+	if !reflect.DeepEqual(a.labels, b.labels) {
+		return false
+	}
+	if !reflect.DeepEqual(a.values, b.values) {
+		return false
+	}
+	if a.sharedData != b.sharedData {
+		return false
+	}
+	if (a.err == nil) != (b.err == nil) {
+		return false
+	}
+	if a.err != nil {
+		if a.err.Error() != b.err.Error() {
+			return false
+		}
+	}
+	return true
+}
+
+func equalGroupedSeries(a, b *GroupedSeries) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if (a == nil) && (b == nil) {
+		return true
+	}
+	if !reflect.DeepEqual(a.orderedKeys, b.orderedKeys) {
+		return false
+	}
+	if !reflect.DeepEqual(a.rowIndices, b.rowIndices) {
+		return false
+	}
+	if !reflect.DeepEqual(a.labels, b.labels) {
+		return false
+	}
+	if (a.series == nil) != (b.series == nil) {
+		return false
+	}
+	if a.series != nil {
+		if !EqualSeries(a.series, b.series) {
+			return false
+		}
+	}
+	if (a.err == nil) != (b.err == nil) {
+		return false
+	}
+	if a.err != nil {
+		if a.err.Error() != b.err.Error() {
+			return false
+		}
+	}
+	return true
+}
+
+// EqualDataFrames returns whether two dataframes are identical or not
+func EqualDataFrames(a, b *DataFrame) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if (a == nil) && (b == nil) {
+		return true
+	}
+	if !reflect.DeepEqual(a.labels, b.labels) {
+		return false
+	}
+	if !reflect.DeepEqual(a.values, b.values) {
+		return false
+	}
+	if !reflect.DeepEqual(a.colLevelNames, b.colLevelNames) {
+		return false
+	}
+	if a.name != b.name {
+		return false
+	}
+	if (a.err == nil) != (b.err == nil) {
+		return false
+	}
+	if a.err != nil {
+		if a.err.Error() != b.err.Error() {
+			return false
+		}
+	}
+	return true
+}
+
+func equalGroupedDataFrames(a, b *GroupedDataFrame) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if (a == nil) && (b == nil) {
+		return true
+	}
+	if !reflect.DeepEqual(a.orderedKeys, b.orderedKeys) {
+		return false
+	}
+	if !reflect.DeepEqual(a.rowIndices, b.rowIndices) {
+		return false
+	}
+	if !reflect.DeepEqual(a.labels, b.labels) {
+		return false
+	}
+	if (a.df == nil) != (b.df == nil) {
+		return false
+	}
+	if a.df != nil {
+		if !EqualDataFrames(a.df, b.df) {
+			return false
+		}
+	}
+	if (a.err == nil) != (b.err == nil) {
+		return false
+	}
+	if a.err != nil {
+		if a.err.Error() != b.err.Error() {
+			return false
+		}
+	}
+	return true
+}
+
+func dataFrameEqualsDistinct(a, b *DataFrame) bool {
+	if !EqualDataFrames(a, b) {
+		return false
+	}
+	for j := range a.labels {
+		if a.labels[j] == b.labels[j] {
+			return false
+		}
+	}
+	for k := range a.values {
+		// fmt.Printf("%p\n", a.values[k].isNull)
+		// fmt.Printf("%p\n", b.values[k].isNull)
+		if a.values[k] == b.values[k] {
+			return false
+		}
+	}
+	fmt.Printf("%p - %p\n", &a.colLevelNames, &b.colLevelNames)
+	if &a.colLevelNames == &b.colLevelNames {
+		return false
+	}
+	return true
+}

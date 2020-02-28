@@ -105,11 +105,13 @@ func (df *DataFrame) Copy() *DataFrame {
 	copy(colLevelNames, df.colLevelNames)
 
 	return &DataFrame{
-		values:        copyContainers(df.values),
+		values: copyContainers(df.values),
+		// values: df.values,
 		labels:        copyContainers(df.labels),
 		err:           df.err,
 		colLevelNames: colLevelNames,
-		name:          df.name,
+		// colLevelNames: df.colLevelNames,
+		name: df.name,
 	}
 }
 
@@ -410,6 +412,11 @@ func suppressDefaultName(name string) string {
 }
 
 func (df *DataFrame) String() string {
+	if df.values == nil {
+		if df.Err() != nil {
+			return df.Err().Error()
+		}
+	}
 	var data [][]string
 	if df.Len() <= optionMaxRows {
 		data = df.ToCSV(false)
@@ -1006,7 +1013,8 @@ func (df *DataFrameMutator) DropRow(index int) {
 	return
 }
 
-// Append adds the `other` values as new rows to the DataFrame.
+// Append adds the `other` labels and values as new rows to the DataFrame.
+// If the types of any container do not match, all the values in that container are coerced to string.
 // Returns a new DataFrame.
 func (df *DataFrame) Append(other *DataFrame) *DataFrame {
 	df.Copy()
@@ -1014,7 +1022,8 @@ func (df *DataFrame) Append(other *DataFrame) *DataFrame {
 	return df
 }
 
-// Append adds the `other` values as new rows to the Series by coercing all values to string.
+// Append adds the `other` labels and values as new rows to the DataFrame.
+// If the types of any container do not match, all the values in that container are coerced to string.
 // Returns a new Series.
 func (df *DataFrameMutator) Append(other *DataFrame) {
 	if len(other.labels) != len(df.dataframe.labels) {

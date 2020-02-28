@@ -50,7 +50,7 @@ func TestDataFrame_resetWithError(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if df.resetWithError(tt.args.err); !reflect.DeepEqual(df, tt.want) {
+			if df.resetWithError(tt.args.err); !EqualDataFrames(df, tt.want) {
 				t.Errorf("df.resetWithError() = %v, want %v", df.err, tt.want.err)
 				t.Errorf(messagediff.PrettyDiff(df, tt.want))
 			}
@@ -71,7 +71,7 @@ func Test_dataFrameWithError(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := dataFrameWithError(tt.args.err); !reflect.DeepEqual(got, tt.want) {
+			if got := dataFrameWithError(tt.args.err); !EqualDataFrames(got, tt.want) {
 				t.Errorf("dataFrameWithError() = %v, want %v", got, tt.want)
 			}
 		})
@@ -414,7 +414,7 @@ func Test_lookup(t *testing.T) {
 				t.Errorf("lookup() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if !EqualSeries(got, tt.want) {
 				t.Errorf("lookup() = %v, want %v", got.labels[0], tt.want.labels[0])
 			}
 		})
@@ -530,7 +530,7 @@ func Test_lookupDataFrame(t *testing.T) {
 				t.Errorf("lookupDataFrame() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(got, tt.want) {
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("lookupDataFrame() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2177,7 +2177,7 @@ func Test_readCSVByRows(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := readCSVByRows(tt.args.csv, tt.args.config); !reflect.DeepEqual(got, tt.want) {
+			if got := readCSVByRows(tt.args.csv, tt.args.config); !EqualDataFrames(got, tt.want) {
 				t.Errorf("readCSVByRows() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
@@ -2217,7 +2217,7 @@ func Test_readCSVByCols(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := readCSVByCols(tt.args.csv, tt.args.config); !reflect.DeepEqual(got, tt.want) {
+			if got := readCSVByCols(tt.args.csv, tt.args.config); !EqualDataFrames(got, tt.want) {
 				t.Errorf("readCSVByCols() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2945,7 +2945,8 @@ func Test_lookupWithAnchor(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := lookupWithAnchor(tt.args.name, tt.args.labels1, tt.args.leftOn, tt.args.values2, tt.args.labels2, tt.args.rightOn); !reflect.DeepEqual(got, tt.want) {
+			if got := lookupWithAnchor(
+				tt.args.name, tt.args.labels1, tt.args.leftOn, tt.args.values2, tt.args.labels2, tt.args.rightOn); !EqualSeries(got, tt.want) {
 				t.Errorf("lookupWithAnchor() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3021,7 +3022,10 @@ func Test_lookupDataFrameWithAnchor(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := lookupDataFrameWithAnchor(tt.args.name, tt.args.colLevelNames, tt.args.anchorLabels, tt.args.originalLabels, tt.args.leftOn, tt.args.lookupColumns, tt.args.lookupLabels, tt.args.rightOn, tt.args.exclude); !reflect.DeepEqual(got, tt.want) {
+			if got := lookupDataFrameWithAnchor(
+				tt.args.name, tt.args.colLevelNames, tt.args.anchorLabels,
+				tt.args.originalLabels, tt.args.leftOn, tt.args.lookupColumns, tt.args.lookupLabels,
+				tt.args.rightOn, tt.args.exclude); !EqualDataFrames(got, tt.want) {
 				t.Errorf("lookupDataFrameWithAnchor() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3146,6 +3150,685 @@ func Test_dropFromContainers(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("dropFromContainers() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEqualSeries(t *testing.T) {
+	type args struct {
+		a *Series
+		b *Series
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"pass", args{
+			a: &Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				err: errors.New("foo")},
+			b: &Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				err: errors.New("foo")},
+		}, true},
+		{"pass - both nil", args{
+			a: nil,
+			b: nil,
+		}, true},
+		{"fail - nil", args{
+			a: &Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				err: errors.New("foo")},
+			b: nil,
+		}, false},
+		{"fail - values", args{
+			a: &Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				err: errors.New("foo")},
+			b: &Series{
+				values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				err: errors.New("foo")},
+		}, false},
+		{"fail - labels", args{
+			a: &Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				err: errors.New("foo")},
+			b: &Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{1}, isNull: []bool{false}, name: "bar"},
+				},
+				err: errors.New("foo")},
+		}, false},
+		{"fail - shared data", args{
+			a: &Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				sharedData: true,
+				err:        errors.New("foo")},
+			b: &Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				sharedData: false,
+				err:        errors.New("foo")},
+		}, false},
+		{"fail - has err", args{
+			a: &Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				err: errors.New("foo")},
+			b: &Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				err: nil},
+		}, false},
+		{"fail - err value", args{
+			a: &Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				err: errors.New("foo")},
+			b: &Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				err: errors.New("bar")},
+		}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := EqualSeries(tt.args.a, tt.args.b); got != tt.want {
+				t.Errorf("EqualSeries() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEqualDataFrames(t *testing.T) {
+	type args struct {
+		a *DataFrame
+		b *DataFrame
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"pass", args{
+			a: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "baz",
+				err:           errors.New("foo")},
+			b: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "baz",
+				err:           errors.New("foo")},
+		}, true},
+		{"pass - both nil", args{
+			a: nil,
+			b: nil,
+		}, true},
+		{"fail - nil", args{
+			a: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "baz",
+				err:           errors.New("foo")},
+			b: nil,
+		}, false},
+		{"fail - values", args{
+			a: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "baz",
+				err:           errors.New("foo")},
+			b: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{2}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "baz",
+				err:           errors.New("foo")},
+		}, false},
+		{"fail - labels", args{
+			a: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "baz",
+				err:           errors.New("foo")},
+			b: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{1}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "baz",
+				err:           errors.New("foo")},
+		}, false},
+		{"fail - colLevel names", args{
+			a: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "baz",
+				err:           errors.New("foo")},
+			b: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*1"},
+				name:          "baz",
+				err:           errors.New("foo")},
+		}, false},
+		{"fail - names", args{
+			a: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "baz",
+				err:           errors.New("foo")},
+			b: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "corge",
+				err:           errors.New("foo")},
+		}, false},
+		{"fail - has err", args{
+			a: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "baz",
+				err:           errors.New("foo")},
+			b: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "baz",
+				err:           nil},
+		}, false},
+		{"fail - err value", args{
+			a: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "baz",
+				err:           errors.New("foo")},
+			b: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "baz",
+				err:           errors.New("bar")},
+		}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := EqualDataFrames(tt.args.a, tt.args.b); got != tt.want {
+				t.Errorf("EqualDataFrames() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_equalGroupedSeries(t *testing.T) {
+	type args struct {
+		a *GroupedSeries
+		b *GroupedSeries
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"pass", args{
+			a: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")}},
+			true},
+		{"pass - both nil", args{
+			a: nil,
+			b: nil,
+		}, true},
+		{"fail - nil", args{
+			a: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: nil,
+		}, false},
+		{"fail - orderedKeys", args{
+			a: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedSeries{
+				orderedKeys: []string{"bar"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")}},
+			false},
+		{"fail - rowIndices", args{
+			a: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{1}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")}},
+			false},
+		{"fail - labels", args{
+			a: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "baz"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")}},
+			false},
+		{"fail - nil series", args{
+			a: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				err:         errors.New("foo")}},
+			false},
+		{"fail - series", args{
+			a: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "corge"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")}},
+			false},
+		{"fail - has err", args{
+			a: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: nil}},
+			false},
+		{"fail - err value", args{
+			a: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedSeries{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				series: &Series{
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("bar")}},
+			false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := equalGroupedSeries(tt.args.a, tt.args.b); got != tt.want {
+				t.Errorf("equalGroupedSeries() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_equalGroupedDataFrames(t *testing.T) {
+	type args struct {
+		a *GroupedDataFrame
+		b *GroupedDataFrame
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"pass", args{
+			a: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")}},
+			true},
+		{"pass - both nil", args{
+			a: nil,
+			b: nil,
+		}, true},
+		{"fail - nil", args{
+			a: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: nil,
+		}, false},
+		{"fail - orderedKeys", args{
+			a: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedDataFrame{
+				orderedKeys: []string{"bar"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")}},
+			false},
+		{"fail - rowIndices", args{
+			a: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{1}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")}},
+			false},
+		{"fail - labels", args{
+			a: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "baz"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")}},
+			false},
+		{"fail - has df", args{
+			a: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				err:         errors.New("foo")}},
+			false},
+		{"fail - df", args{
+			a: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "corge"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")}},
+			false},
+		{"fail - has err", args{
+			a: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: nil}},
+			false},
+		{"fail - err value", args{
+			a: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("foo")},
+			b: &GroupedDataFrame{
+				orderedKeys: []string{"foo"},
+				rowIndices:  [][]int{{0}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				df: &DataFrame{
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				},
+				err: errors.New("bar")}},
+			false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := equalGroupedDataFrames(tt.args.a, tt.args.b); got != tt.want {
+				t.Errorf("equalGroupedDataFrames() = %v, want %v", got, tt.want)
 			}
 		})
 	}
