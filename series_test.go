@@ -1302,43 +1302,6 @@ func TestSeries_GT(t *testing.T) {
 	}
 }
 
-func TestSeries_GTE(t *testing.T) {
-	type fields struct {
-		values *valueContainer
-		labels []*valueContainer
-		err    error
-	}
-	type args struct {
-		comparison float64
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   []int
-	}{
-		{"gte",
-			fields{
-				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{1},
-			[]int{0, 1, 2},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values: tt.fields.values,
-				labels: tt.fields.labels,
-				err:    tt.fields.err,
-			}
-			if got := s.GTE(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.GTE() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestSeries_LT(t *testing.T) {
 	type fields struct {
 		values *valueContainer
@@ -1371,117 +1334,6 @@ func TestSeries_LT(t *testing.T) {
 			}
 			if got := s.LT(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.LT() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestSeries_LTE(t *testing.T) {
-	type fields struct {
-		values *valueContainer
-		labels []*valueContainer
-		err    error
-	}
-	type args struct {
-		comparison float64
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   []int
-	}{
-		{"lte",
-			fields{
-				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{2},
-			[]int{0, 1},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values: tt.fields.values,
-				labels: tt.fields.labels,
-				err:    tt.fields.err,
-			}
-			if got := s.LTE(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.LTE() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestSeries_FloatEQ(t *testing.T) {
-	type fields struct {
-		values *valueContainer
-		labels []*valueContainer
-		err    error
-	}
-	type args struct {
-		comparison float64
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   []int
-	}{
-		{"eq",
-			fields{
-				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{2},
-			[]int{1},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values: tt.fields.values,
-				labels: tt.fields.labels,
-				err:    tt.fields.err,
-			}
-			if got := s.FloatEQ(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.FloatEQ() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestSeries_FloatNEQ(t *testing.T) {
-	type fields struct {
-		values *valueContainer
-		labels []*valueContainer
-		err    error
-	}
-	type args struct {
-		comparison float64
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   []int
-	}{
-		{"neq",
-			fields{
-				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{2},
-			[]int{0, 2},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values: tt.fields.values,
-				labels: tt.fields.labels,
-				err:    tt.fields.err,
-			}
-			if got := s.FloatNEQ(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.FloatNEQ() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1636,44 +1488,6 @@ func TestSeries_Before(t *testing.T) {
 	}
 }
 
-func TestSeries_BeforeOrEqual(t *testing.T) {
-	sample := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	type fields struct {
-		values *valueContainer
-		labels []*valueContainer
-		err    error
-	}
-	type args struct {
-		comparison time.Time
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   []int
-	}{
-		{"beforeOrEqual",
-			fields{
-				values: &valueContainer{slice: []time.Time{sample, sample.AddDate(0, 0, 1), sample.AddDate(0, 0, 2)}, isNull: []bool{false, false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{sample.AddDate(0, 0, 1)},
-			[]int{0, 1},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values: tt.fields.values,
-				labels: tt.fields.labels,
-				err:    tt.fields.err,
-			}
-			if got := s.BeforeOrEqual(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.BeforeOrEqual() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestSeries_After(t *testing.T) {
 	sample := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	type fields struct {
@@ -1707,44 +1521,6 @@ func TestSeries_After(t *testing.T) {
 			}
 			if got := s.After(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.After() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestSeries_AfterOrEqual(t *testing.T) {
-	sample := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	type fields struct {
-		values *valueContainer
-		labels []*valueContainer
-		err    error
-	}
-	type args struct {
-		comparison time.Time
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   []int
-	}{
-		{"after",
-			fields{
-				values: &valueContainer{slice: []time.Time{sample, sample.AddDate(0, 0, 1), sample.AddDate(0, 0, 2)}, isNull: []bool{false, false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{sample.AddDate(0, 0, 1)},
-			[]int{1, 2},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values: tt.fields.values,
-				labels: tt.fields.labels,
-				err:    tt.fields.err,
-			}
-			if got := s.AfterOrEqual(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.AfterOrEqual() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -652,29 +652,9 @@ func (s *Series) GT(comparison float64) []int {
 	return s.values.gt(comparison)
 }
 
-// GTE coerces Series values to float64 and returns each row position with a non-null value greater than or equal to `comparison`.
-func (s *Series) GTE(comparison float64) []int {
-	return s.values.gte(comparison)
-}
-
 // LT coerces Series values to float64 and returns each row position with a non-null value less than `comparison`.
 func (s *Series) LT(comparison float64) []int {
 	return s.values.lt(comparison)
-}
-
-// LTE coerces Series values to float64 and returns each row position with a non-null value less than or equal to `comparison`.
-func (s *Series) LTE(comparison float64) []int {
-	return s.values.lte(comparison)
-}
-
-// FloatEQ coerces Series values to float64 and returns each row position with a non-null value equal to `comparison`.
-func (s *Series) FloatEQ(comparison float64) []int {
-	return s.values.floateq(comparison)
-}
-
-// FloatNEQ coerces Series values to float64 and returns each row position with a non-null value not equal to `comparison`.
-func (s *Series) FloatNEQ(comparison float64) []int {
-	return s.values.floatneq(comparison)
 }
 
 // EQ coerces Series values to string and returns each row position with a non-null value equal to `comparison`.
@@ -697,21 +677,9 @@ func (s *Series) Before(comparison time.Time) []int {
 	return s.values.before(comparison)
 }
 
-// BeforeOrEqual coerces Series values to time.Time and returns
-// each row position with a non-null value before or equal to `comparison`.
-func (s *Series) BeforeOrEqual(comparison time.Time) []int {
-	return s.values.beforeOrEqual(comparison)
-}
-
 // After coerces Series values to time.Time and returns each row position with a non-null value after `comparison`.
 func (s *Series) After(comparison time.Time) []int {
 	return s.values.after(comparison)
-}
-
-// AfterOrEqual coerces Series values to time.Time and returns
-// each row position with a non-null value after or equal to `comparison`.
-func (s *Series) AfterOrEqual(comparison time.Time) []int {
-	return s.values.afterOrEqual(comparison)
 }
 
 // -- APPLY
