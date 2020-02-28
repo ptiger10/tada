@@ -832,7 +832,14 @@ func (vc *valueContainer) shift(n int) *valueContainer {
 
 // convert to string as lowest common denominator
 func (vc *valueContainer) append(other *valueContainer) *valueContainer {
-	retSlice := append(vc.string().slice, other.string().slice...)
+	var retSlice interface{}
+	if reflect.TypeOf(vc.slice) == reflect.TypeOf(other.slice) {
+		retSlice = reflect.AppendSlice(
+			reflect.ValueOf(vc.slice), reflect.ValueOf(other.slice)).Interface()
+	} else {
+		retSlice = append(vc.string().slice, other.string().slice...)
+	}
+
 	retIsNull := append(vc.isNull, other.isNull...)
 	return &valueContainer{
 		slice:  retSlice,

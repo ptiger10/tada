@@ -3576,7 +3576,7 @@ func TestDataFrame_Append(t *testing.T) {
 				colLevelNames: []string{"anything"}}},
 			&DataFrame{
 				values:        []*valueContainer{{slice: []string{"a", "b", "c"}, isNull: []bool{false, false, false}, name: "foo"}},
-				labels:        []*valueContainer{{slice: []string{"0", "1", "2"}, isNull: []bool{false, false, false}, name: "*0"}},
+				labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
 		},
 		{"fail - wrong number of levels",

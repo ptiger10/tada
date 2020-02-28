@@ -1353,6 +1353,9 @@ func Test_valueContainer_append(t *testing.T) {
 	}{
 		{"floats", fields{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 			args{&valueContainer{slice: []float64{2}, isNull: []bool{false}, name: "bar"}},
+			&valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"}},
+		{"floats and ints", fields{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			args{&valueContainer{slice: []int{2}, isNull: []bool{false}, name: "bar"}},
 			&valueContainer{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"}},
 	}
 	for _, tt := range tests {

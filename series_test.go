@@ -834,10 +834,10 @@ func TestSeries_Append(t *testing.T) {
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "qux"},
 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "bar"}}},
 			args{&Series{
-				values: &valueContainer{slice: []int{2}, isNull: []bool{false}, name: "corge"},
+				values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, name: "corge"},
 				labels: []*valueContainer{{slice: []bool{true}, isNull: []bool{false}, name: "baz"}}}},
 			&Series{
-				values: &valueContainer{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "qux"},
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
 				labels: []*valueContainer{{slice: []string{"0", "true"}, isNull: []bool{false, false}, name: "bar"}}},
 		},
 		{"fail - different number of levels",
