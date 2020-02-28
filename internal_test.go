@@ -1117,7 +1117,7 @@ func Test_valueContainer_applyFormat(t *testing.T) {
 	}{
 		{"float",
 			fields{slice: []float64{.75}, isNull: []bool{false}},
-			args{ApplyFormatFn{F64: func(v float64) string {
+			args{ApplyFormatFn{Float: func(v float64) string {
 				return strconv.FormatFloat(v, 'f', 1, 64)
 			}}},
 			[]string{"0.8"}},
@@ -1684,7 +1684,7 @@ func Test_valueContainer_apply(t *testing.T) {
 			slice:  []float64{1, 2},
 			isNull: []bool{false, false},
 			name:   "foo"},
-			args{ApplyFn{F64: func(v float64) float64 { return v * 2 }}},
+			args{ApplyFn{Float: func(v float64) float64 { return v * 2 }}},
 			[]float64{2, 4}},
 		{"string", fields{
 			slice:  []string{"foo", "bar"},

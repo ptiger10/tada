@@ -1187,7 +1187,7 @@ func TestSeries_Sort(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := s.Sort(tt.args.by...); !EqualSeries(got, tt.want) {
-				t.Errorf("Series.Sort() = %v, want %v", got.err, tt.want.err)
+				t.Errorf("Series.Sort() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1212,7 +1212,7 @@ func TestSeries_Filter(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{map[string]FilterFn{"": {F64: func(val float64) bool {
+			args{map[string]FilterFn{"": {Float: func(val float64) bool {
 				if val > 1 {
 					return true
 				}
@@ -1222,7 +1222,7 @@ func TestSeries_Filter(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
 				labels: []*valueContainer{{name: "*0", slice: []string{"bar", "foo", "baz"}, isNull: []bool{false, false, false}}}},
-			args{map[string]FilterFn{"foo": {F64: func(val float64) bool {
+			args{map[string]FilterFn{"foo": {Float: func(val float64) bool {
 				if val > 1 {
 					return true
 				}
@@ -1249,7 +1249,7 @@ func TestSeries_Filter(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
-			args{map[string]FilterFn{"corge": {F64: func(float64) bool { return true }}}}, []int{-999}},
+			args{map[string]FilterFn{"corge": {Float: func(float64) bool { return true }}}}, []int{-999}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1676,7 +1676,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := s.LookupAdvanced(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !EqualSeries(got, tt.want) {
-				t.Errorf("Series.LookupAdvanced() = %v, want %v", got.err, tt.want.err)
+				t.Errorf("Series.LookupAdvanced() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1747,7 +1747,7 @@ func TestSeries_Apply(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFn{F64: func(v float64) float64 { return v * 2 }}},
+			args{ApplyFn{Float: func(v float64) float64 { return v * 2 }}},
 			&Series{
 				values: &valueContainer{slice: []float64{0, 2}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
@@ -1755,7 +1755,7 @@ func TestSeries_Apply(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{true, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFn{F64: func(v float64) float64 { return v * 2 }}},
+			args{ApplyFn{Float: func(v float64) float64 { return v * 2 }}},
 			&Series{
 				values: &valueContainer{slice: []float64{0, 2}, isNull: []bool{true, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}}},
@@ -1775,7 +1775,7 @@ func TestSeries_Apply(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := s.Apply(tt.args.function); !EqualSeries(got, tt.want) {
-				t.Errorf("Series.Apply() = %v, want %v", got.err, tt.want.err)
+				t.Errorf("Series.Apply() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1800,7 +1800,7 @@ func TestSeries_ApplyFormat(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, .25}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFormatFn{F64: func(v float64) string { return strconv.FormatFloat(v, 'f', 1, 64) }}},
+			args{ApplyFormatFn{Float: func(v float64) string { return strconv.FormatFloat(v, 'f', 1, 64) }}},
 			&Series{
 				values: &valueContainer{slice: []string{"0.0", "0.2"}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
@@ -2385,7 +2385,7 @@ func TestSeries_Where(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
-			args{map[string]FilterFn{"qux": {F64: func(v float64) bool {
+			args{map[string]FilterFn{"qux": {Float: func(v float64) bool {
 				if v > 1 {
 					return true
 				}
@@ -2458,7 +2458,7 @@ func TestSeries_Cut(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := s.Cut(tt.args.bins, tt.args.andLess, tt.args.andMore, tt.args.labels); !EqualSeries(got, tt.want) {
-				t.Errorf("Series.Cut() = %v, want %v", got.err, tt.want.err)
+				t.Errorf("Series.Cut() = %v, want %v", got, tt.want)
 			}
 		})
 	}

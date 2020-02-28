@@ -1502,7 +1502,7 @@ func TestDataFrame_Filter(t *testing.T) {
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, false, false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{map[string]FilterFn{"foo": {F64: func(val float64) bool {
+			args{map[string]FilterFn{"foo": {Float: func(val float64) bool {
 				if val > 1 {
 					return true
 				}
@@ -1532,7 +1532,7 @@ func TestDataFrame_Filter(t *testing.T) {
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{map[string]FilterFn{"corge": {F64: func(float64) bool { return true }}}}, []int{-999}},
+			args{map[string]FilterFn{"corge": {Float: func(float64) bool { return true }}}}, []int{-999}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1571,7 +1571,7 @@ func TestDataFrame_Apply(t *testing.T) {
 				{slice: []int{1}, isNull: []bool{false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			name:   "baz"},
-			args{map[string]ApplyFn{"foo": {F64: func(v float64) float64 {
+			args{map[string]ApplyFn{"foo": {Float: func(v float64) float64 {
 				return v + 1
 			}}}},
 			&DataFrame{
@@ -1597,7 +1597,7 @@ func TestDataFrame_Apply(t *testing.T) {
 				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			name:   "baz"},
-			args{map[string]ApplyFn{"corge": {F64: func(float64) float64 { return 0 }}}},
+			args{map[string]ApplyFn{"corge": {Float: func(float64) float64 { return 0 }}}},
 			&DataFrame{
 				err: fmt.Errorf("Apply(): `name` (corge) not found")},
 		},
@@ -1642,7 +1642,7 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 			labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
 			name:          "baz",
 			colLevelNames: []string{"*0"}},
-			args{map[string]ApplyFormatFn{"foo": {F64: func(v float64) string {
+			args{map[string]ApplyFormatFn{"foo": {Float: func(v float64) string {
 				return strconv.FormatFloat(v, 'f', 1, 64)
 			}}}},
 			&DataFrame{
@@ -1670,7 +1670,7 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			name:   "baz"},
-			args{map[string]ApplyFormatFn{"corge": {F64: func(float64) string { return "" }}}},
+			args{map[string]ApplyFormatFn{"corge": {Float: func(float64) string { return "" }}}},
 			&DataFrame{
 				err: fmt.Errorf("ApplyFormat(): `name` (corge) not found")},
 		},
@@ -2244,7 +2244,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 				err:           tt.fields.err,
 			}
 			if got := df.LookupAdvanced(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !EqualDataFrames(got, tt.want) {
-				t.Errorf("DataFrame.LookupAdvanced() = %v, want %v", got.err, tt.want.err)
+				t.Errorf("DataFrame.LookupAdvanced() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 
 			}

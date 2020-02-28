@@ -7,32 +7,62 @@ import (
 	"time"
 )
 
-// GroupedSeries
+// special reduce funcs
 
-// Err returns the underlying error, if any
-func (g *GroupedSeries) Err() error {
-	return g.err
-}
+func groupedInterfaceReduceFunc(
+	slice interface{},
+	nulls []bool,
+	name string,
+	aligned bool,
+	rowIndices [][]int,
+	fn func(slice interface{}, isNull []bool) (interface{}, error)) (*valueContainer, error) {
 
-func (g *GroupedSeries) String() string {
-	groups := make([]string, len(g.orderedKeys))
-	for i, k := range g.orderedKeys {
-		groups[i] = k
+	// default: return length is equal to the number of groups
+	retLength := len(rowIndices)
+	v := reflect.ValueOf(slice)
+	if aligned {
+		// if aligned: return length is overwritten to equal the length of original data
+		retLength = v.Len()
 	}
-	return "Groups: " + strings.Join(groups, ",")
-}
+	// must deduce output type
+	sampleRows := subsetInterfaceSlice(slice, rowIndices[0])
+	sampleNulls := subsetNulls(nulls, rowIndices[0])
+	sampleOutput, err := fn(sampleRows, sampleNulls)
+	if err != nil {
+		return nil, fmt.Errorf("user-defined error (%v) for slice %v and nulls %v",
+			err, sampleRows, sampleNulls)
+	}
 
-// GetGroup stub
-func (g *GroupedSeries) GetGroup(group string) *Series {
-	for m, key := range g.orderedKeys {
-		if key == group {
-			return g.series.Subset(g.rowIndices[m])
+	retVals := reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(sampleOutput)), retLength, retLength)
+	for i, rowIndex := range rowIndices {
+		subsetRows := subsetInterfaceSlice(slice, rowIndex)
+		subsetNulls := subsetNulls(nulls, rowIndex)
+		output, err := fn(subsetRows, subsetNulls)
+		if err != nil {
+			return nil, fmt.Errorf("user-defined error (%v) for slice %v and nulls %v",
+				err, subsetRows, subsetNulls)
+		}
+		src := reflect.ValueOf(output)
+		if !aligned {
+			// default: write each output once and in sequential order into retVals
+			dst := retVals.Index(i)
+			dst.Set(src)
+		} else {
+			// if aligned: write each output multiple times and out of order into retVals
+			for _, index := range rowIndex {
+				dst := retVals.Index(index)
+				dst.Set(src)
+			}
 		}
 	}
-	return seriesWithError(fmt.Errorf("GetGroup(): `group` (%v) not in groups", group))
+	ret, err := makeValueContainerFromInterface(retVals.Interface(), name)
+	if err != nil {
+		return nil, fmt.Errorf("interface{} output: %v", err)
+	}
+	return ret, nil
 }
 
-func groupedIndexFunc(
+func groupedIndexReduceFunc(
 	vals interface{},
 	nulls []bool,
 	name string,
@@ -82,12 +112,62 @@ func groupedIndexFunc(
 	}
 }
 
-func (g *GroupedSeries) indexFunc(name string, index int) *Series {
+// GroupedSeries
+
+// Err returns the underlying error, if any
+func (g *GroupedSeries) Err() error {
+	return g.err
+}
+
+func (g *GroupedSeries) String() string {
+	groups := make([]string, len(g.orderedKeys))
+	for i, k := range g.orderedKeys {
+		groups[i] = k
+	}
+	return "Groups: " + strings.Join(groups, ",")
+}
+
+// GetGroup stub
+func (g *GroupedSeries) GetGroup(group string) *Series {
+	for m, key := range g.orderedKeys {
+		if key == group {
+			return g.series.Subset(g.rowIndices[m])
+		}
+	}
+	return seriesWithError(fmt.Errorf("GetGroup(): `group` (%v) not in groups", group))
+}
+
+func (g *GroupedSeries) interfaceReduceFunc(name string, fn func(interface{}, []bool) (interface{}, error)) (*Series, error) {
 	var sharedData bool
 	if g.aligned {
 		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
 	}
-	retVals := groupedIndexFunc(
+	retVals, err := groupedInterfaceReduceFunc(
+		g.series.values.slice, g.series.values.isNull, name, g.aligned, g.rowIndices, fn)
+	if err != nil {
+		return nil, err
+	}
+	// default: grouped labels
+	retLabels := g.labels
+	if g.aligned {
+		// if aligned: all labels
+		retLabels = g.series.labels
+		sharedData = true
+	}
+	return &Series{
+		values:     retVals,
+		labels:     retLabels,
+		sharedData: sharedData,
+	}, nil
+}
+
+// for each group, returns the row at the selected index as a new row in a new Series
+func (g *GroupedSeries) indexReduceFunc(name string, index int) *Series {
+	var sharedData bool
+	if g.aligned {
+		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
+	}
+	retVals := groupedIndexReduceFunc(
 		g.series.values.slice, g.series.values.isNull, name, g.aligned, index, g.rowIndices)
 	// default: grouped labels
 	retLabels := g.labels
@@ -105,99 +185,89 @@ func (g *GroupedSeries) indexFunc(name string, index int) *Series {
 
 // Nth stub
 func (g *GroupedSeries) Nth(index int) *Series {
-	return g.indexFunc("nth", index)
+	return g.indexReduceFunc("nth", index)
 }
 
 // First stub
 func (g *GroupedSeries) First() *Series {
-	return g.indexFunc("first", 0)
+	return g.indexReduceFunc("first", 0)
 }
 
 // Last stub
 func (g *GroupedSeries) Last() *Series {
-	return g.indexFunc("last", -1)
+	return g.indexReduceFunc("last", -1)
 }
 
-// Apply stub
-func (g *GroupedSeries) Apply(name string, lambda GroupApplyFn) *Series {
+// Reduce stub
+func (g *GroupedSeries) Reduce(name string, lambda GroupReduceFn) *Series {
 	// remove all nulls before running each set of values through custom user function
-	if lambda.F64 != nil {
-		fn := convertSimplifiedFloat64Func(lambda.F64)
-		return g.float64Func(name, fn)
+	if lambda.Float != nil {
+		fn := convertSimplifiedFloat64ReduceFunc(lambda.Float)
+		return g.float64ReduceFunc(name, fn)
 	} else if lambda.String != nil {
-		fn := convertSimplifiedStringFunc(lambda.String)
-		return g.stringFunc(name, fn)
+		fn := convertSimplifiedStringReduceFunc(lambda.String)
+		return g.stringReduceFunc(name, fn)
 	} else if lambda.DateTime != nil {
-		fn := convertSimplifiedDateTimeFunc(lambda.DateTime)
-		return g.dateTimeFunc(name, fn)
+		fn := convertSimplifiedDateTimeReduceFunc(lambda.DateTime)
+		return g.dateTimeReduceFunc(name, fn)
+	} else if lambda.Interface != nil {
+		newSeries, err := g.interfaceReduceFunc(name, lambda.Interface)
+		if err != nil {
+			return seriesWithError(fmt.Errorf("GroupedSeries.Reduce(): %v", err))
+		}
+		return newSeries
 	}
-	return seriesWithError(fmt.Errorf("Apply(): no lambda function provided"))
-}
-
-// ApplyNested stub
-func (g *GroupedSeries) ApplyNested(name string, lambda GroupApplyNestedFn) *Series {
-	// remove all nulls before running each set of values through custom user function
-	if lambda.F64 != nil {
-		fn := convertSimplifiedFloat64FuncNested(lambda.F64)
-		return g.float64FuncNested(name, fn)
-	} else if lambda.String != nil {
-		fn := convertSimplifiedStringFuncNested(lambda.String)
-		return g.stringFuncNested(name, fn)
-	} else if lambda.DateTime != nil {
-		fn := convertSimplifiedDateTimeFuncNested(lambda.DateTime)
-		return g.dateTimeFuncNested(name, fn)
-	}
-	return seriesWithError(fmt.Errorf("ApplyNested(): no lambda function provided"))
+	return seriesWithError(fmt.Errorf("Reduce(): no lambda function provided"))
 }
 
 // Sum stub
 func (g *GroupedSeries) Sum() *Series {
-	return g.float64Func("sum", sum)
+	return g.float64ReduceFunc("sum", sum)
 }
 
 // Mean stub
 func (g *GroupedSeries) Mean() *Series {
-	return g.float64Func("mean", mean)
+	return g.float64ReduceFunc("mean", mean)
 }
 
 // Median stub
 func (g *GroupedSeries) Median() *Series {
-	return g.float64Func("median", median)
+	return g.float64ReduceFunc("median", median)
 }
 
 // Std stub
 func (g *GroupedSeries) Std() *Series {
-	return g.float64Func("std", std)
+	return g.float64ReduceFunc("std", std)
 }
 
 // Count stub
 func (g *GroupedSeries) Count() *Series {
-	return g.float64Func("count", count)
+	return g.float64ReduceFunc("count", count)
 }
 
 // Min stub
 func (g *GroupedSeries) Min() *Series {
-	return g.float64Func("min", min)
+	return g.float64ReduceFunc("min", min)
 }
 
 // Max stub
 func (g *GroupedSeries) Max() *Series {
-	return g.float64Func("max", max)
+	return g.float64ReduceFunc("max", max)
 }
 
 // NUnique stub
 func (g *GroupedSeries) NUnique() *Series {
-	return g.stringFunc("nunique", nunique)
+	return g.stringReduceFunc("nunique", nunique)
 }
 
 // Earliest stub
 func (g *GroupedSeries) Earliest() *Series {
-	return g.dateTimeFunc("earliest", earliest)
+	return g.dateTimeReduceFunc("earliest", earliest)
 }
 
 // Latest stub
 func (g *GroupedSeries) Latest() *Series {
-	return g.dateTimeFunc("latest", latest)
+	return g.dateTimeReduceFunc("latest", latest)
 }
 
 // Err returns the underlying error, if any
@@ -205,7 +275,7 @@ func (g *GroupedDataFrame) Err() error {
 	return g.err
 }
 
-func (g *GroupedDataFrame) indexFunc(name string, cols []string, index int) *DataFrame {
+func (g *GroupedDataFrame) indexReduceFunc(name string, cols []string, index int) *DataFrame {
 	if len(cols) == 0 {
 		cols = make([]string, len(g.df.values))
 		for k := range cols {
@@ -214,7 +284,7 @@ func (g *GroupedDataFrame) indexFunc(name string, cols []string, index int) *Dat
 	}
 	retVals := make([]*valueContainer, len(cols))
 	for k := range retVals {
-		retVals[k] = groupedIndexFunc(
+		retVals[k] = groupedIndexReduceFunc(
 			g.df.values[k].slice, g.df.values[k].isNull, cols[k], false, index, g.rowIndices)
 	}
 	return &DataFrame{
@@ -237,67 +307,67 @@ func (g *GroupedDataFrame) GetGroup(group string) *DataFrame {
 
 // Sum stub
 func (g *GroupedDataFrame) Sum(colNames ...string) *DataFrame {
-	return g.float64Func("sum", colNames, sum)
+	return g.float64ReduceFunc("sum", colNames, sum)
 }
 
 // Mean stub
 func (g *GroupedDataFrame) Mean(colNames ...string) *DataFrame {
-	return g.float64Func("mean", colNames, mean)
+	return g.float64ReduceFunc("mean", colNames, mean)
 }
 
 // Median stub
 func (g *GroupedDataFrame) Median(colNames ...string) *DataFrame {
-	return g.float64Func("median", colNames, median)
+	return g.float64ReduceFunc("median", colNames, median)
 }
 
 // Std stub
 func (g *GroupedDataFrame) Std(colNames ...string) *DataFrame {
-	return g.float64Func("std", colNames, std)
+	return g.float64ReduceFunc("std", colNames, std)
 }
 
 // Count stub
 func (g *GroupedDataFrame) Count(colNames ...string) *DataFrame {
-	return g.float64Func("count", colNames, count)
+	return g.float64ReduceFunc("count", colNames, count)
 }
 
 // Min stub
 func (g *GroupedDataFrame) Min(colNames ...string) *DataFrame {
-	return g.float64Func("min", colNames, min)
+	return g.float64ReduceFunc("min", colNames, min)
 }
 
 // Max stub
 func (g *GroupedDataFrame) Max(colNames ...string) *DataFrame {
-	return g.float64Func("max", colNames, max)
+	return g.float64ReduceFunc("max", colNames, max)
 }
 
 // NUnique stub
 func (g *GroupedDataFrame) NUnique(colNames ...string) *DataFrame {
-	return g.stringFunc("nunique", colNames, nunique)
+	return g.stringReduceFunc("nunique", colNames, nunique)
 }
 
 // Nth stub
 func (g *GroupedDataFrame) Nth(index int, colNames ...string) *DataFrame {
-	return g.indexFunc("nth", colNames, index)
+	return g.indexReduceFunc("nth", colNames, index)
 }
 
 // First stub
 func (g *GroupedDataFrame) First(colNames ...string) *DataFrame {
-	return g.indexFunc("first", colNames, 0)
+	return g.indexReduceFunc("first", colNames, 0)
 }
 
 // Last stub
 func (g *GroupedDataFrame) Last(colNames ...string) *DataFrame {
-	return g.indexFunc("last", colNames, -1)
+	return g.indexReduceFunc("last", colNames, -1)
 }
 
 // Earliest stub
 func (g *GroupedDataFrame) Earliest(colNames ...string) *DataFrame {
-	return g.dateTimeFunc("earliest", colNames, earliest)
+	return g.dateTimeReduceFunc("earliest", colNames, earliest)
 }
 
 // Latest stub
 func (g *GroupedDataFrame) Latest(colNames ...string) *DataFrame {
-	return g.dateTimeFunc("latest", colNames, latest)
+	return g.dateTimeReduceFunc("latest", colNames, latest)
 }
 
 // Align stub
@@ -352,20 +422,22 @@ func (g *GroupedDataFrame) Col(colName string) *GroupedSeries {
 	}
 }
 
-// Apply stub
-func (g *GroupedDataFrame) Apply(name string, cols []string, lambda GroupApplyFn) *DataFrame {
+// Reduce stub
+func (g *GroupedDataFrame) Reduce(name string, cols []string, lambda GroupReduceFn) *DataFrame {
 	// remove all nulls before running each set of values through custom user function
-	if lambda.F64 != nil {
-		fn := convertSimplifiedFloat64Func(lambda.F64)
-		return g.float64Func(name, cols, fn)
+	if lambda.Float != nil {
+		fn := convertSimplifiedFloat64ReduceFunc(lambda.Float)
+		return g.float64ReduceFunc(name, cols, fn)
 	} else if lambda.String != nil {
-		fn := convertSimplifiedStringFunc(lambda.String)
-		return g.stringFunc(name, cols, fn)
+		fn := convertSimplifiedStringReduceFunc(lambda.String)
+		return g.stringReduceFunc(name, cols, fn)
 	} else if lambda.DateTime != nil {
-		fn := convertSimplifiedDateTimeFunc(lambda.DateTime)
-		return g.dateTimeFunc(name, cols, fn)
+		fn := convertSimplifiedDateTimeReduceFunc(lambda.DateTime)
+		return g.dateTimeReduceFunc(name, cols, fn)
+	} else if lambda.Interface != nil {
+
 	}
-	return dataFrameWithError(fmt.Errorf("Apply(): no lambda function provided"))
+	return dataFrameWithError(fmt.Errorf("Reduce(): no lambda function provided"))
 }
 
 // RollingN stub

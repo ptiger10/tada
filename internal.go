@@ -731,27 +731,41 @@ func subsetContainerRows(containers []*valueContainer, index []int) error {
 	return nil
 }
 
+// expects index to be in range
+func subsetInterfaceSlice(slice interface{}, index []int) interface{} {
+	v := reflect.ValueOf(slice)
+	retVals := reflect.MakeSlice(v.Type(), len(index), len(index))
+	// []int{1, 5}
+	// incrementor: [0, 1], i: [1,5]
+	for incrementor, i := range index {
+		dst := retVals.Index(incrementor)
+		src := v.Index(i)
+		dst.Set(src)
+	}
+	return retVals.Interface()
+}
+
+func subsetNulls(nulls []bool, index []int) []bool {
+	retNulls := make([]bool, len(index))
+	for incrementor, i := range index {
+		retNulls[incrementor] = nulls[i]
+	}
+	return retNulls
+}
+
 // subsetRows modifies vc in place to contain ony the rows specified by index.
 // If any position is out of range, returns an error
 func (vc *valueContainer) subsetRows(index []int) error {
-	v := reflect.ValueOf(vc.slice)
-	l := v.Len()
-	retIsNull := make([]bool, len(index))
-	retVals := reflect.MakeSlice(v.Type(), len(index), len(index))
-	// []int{1, 5}
-	// indexPosition: [0, 1], indexValue: [1,5]
-	for indexPosition, indexValue := range index {
-		if indexValue >= l {
-			return fmt.Errorf("index out of range (%d > %d)", indexValue, l-1)
+	l := reflect.ValueOf(vc.slice).Len()
+	for _, i := range index {
+		if i >= l {
+			return fmt.Errorf("index out of range (%d > %d)", i, l-1)
 		}
-		retIsNull[indexPosition] = vc.isNull[indexValue]
-		dst := retVals.Index(indexPosition)
-		src := v.Index(indexValue)
-		dst.Set(src)
 	}
+	retVals := subsetInterfaceSlice(vc.slice, index)
 
-	vc.slice = retVals.Interface()
-	vc.isNull = retIsNull
+	vc.slice = retVals
+	vc.isNull = subsetNulls(vc.isNull, index)
 	return nil
 }
 
@@ -855,7 +869,7 @@ func (vc *valueContainer) iterRow(index int) Element {
 }
 
 func (vc *valueContainer) gt(comparison float64) []int {
-	index, _ := vc.filter(FilterFn{F64: func(v float64) bool {
+	index, _ := vc.filter(FilterFn{Float: func(v float64) bool {
 		if v > comparison {
 			return true
 		}
@@ -865,48 +879,8 @@ func (vc *valueContainer) gt(comparison float64) []int {
 }
 
 func (vc *valueContainer) lt(comparison float64) []int {
-	index, _ := vc.filter(FilterFn{F64: func(v float64) bool {
+	index, _ := vc.filter(FilterFn{Float: func(v float64) bool {
 		if v < comparison {
-			return true
-		}
-		return false
-	}})
-	return index
-}
-
-func (vc *valueContainer) gte(comparison float64) []int {
-	index, _ := vc.filter(FilterFn{F64: func(v float64) bool {
-		if v >= comparison {
-			return true
-		}
-		return false
-	}})
-	return index
-}
-
-func (vc *valueContainer) lte(comparison float64) []int {
-	index, _ := vc.filter(FilterFn{F64: func(v float64) bool {
-		if v <= comparison {
-			return true
-		}
-		return false
-	}})
-	return index
-}
-
-func (vc *valueContainer) floateq(comparison float64) []int {
-	index, _ := vc.filter(FilterFn{F64: func(v float64) bool {
-		if v == comparison {
-			return true
-		}
-		return false
-	}})
-	return index
-}
-
-func (vc *valueContainer) floatneq(comparison float64) []int {
-	index, _ := vc.filter(FilterFn{F64: func(v float64) bool {
-		if v != comparison {
 			return true
 		}
 		return false
@@ -954,16 +928,6 @@ func (vc *valueContainer) before(comparison time.Time) []int {
 	return index
 }
 
-func (vc *valueContainer) beforeOrEqual(comparison time.Time) []int {
-	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
-		if v.Before(comparison) || v.Equal(comparison) {
-			return true
-		}
-		return false
-	}})
-	return index
-}
-
 func (vc *valueContainer) relabel() {
 	vc.slice = makeIntRange(0, len(vc.isNull))
 	return
@@ -979,22 +943,12 @@ func (vc *valueContainer) after(comparison time.Time) []int {
 	return index
 }
 
-func (vc *valueContainer) afterOrEqual(comparison time.Time) []int {
-	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
-		if v.After(comparison) || v.Equal(comparison) {
-			return true
-		}
-		return false
-	}})
-	return index
-}
-
 func (vc *valueContainer) filter(filter FilterFn) ([]int, error) {
 	var index []int
-	if filter.F64 != nil {
+	if filter.Float != nil {
 		slice := vc.float64().slice
 		for i := range slice {
-			if filter.F64(slice[i]) && !vc.isNull[i] {
+			if filter.Float(slice[i]) && !vc.isNull[i] {
 				index = append(index, i)
 			}
 		}
@@ -1020,11 +974,11 @@ func (vc *valueContainer) filter(filter FilterFn) ([]int, error) {
 
 func (vc *valueContainer) applyFormat(apply ApplyFormatFn) interface{} {
 	var ret interface{}
-	if apply.F64 != nil {
+	if apply.Float != nil {
 		slice := vc.float64().slice
 		retSlice := make([]string, len(slice))
 		for i := range slice {
-			retSlice[i] = apply.F64(slice[i])
+			retSlice[i] = apply.Float(slice[i])
 		}
 		ret = retSlice
 	} else if apply.DateTime != nil {
@@ -1040,11 +994,11 @@ func (vc *valueContainer) applyFormat(apply ApplyFormatFn) interface{} {
 
 func (vc *valueContainer) apply(apply ApplyFn) interface{} {
 	var ret interface{}
-	if apply.F64 != nil {
+	if apply.Float != nil {
 		slice := vc.float64().slice
 		retSlice := make([]float64, len(slice))
 		for i := range slice {
-			retSlice[i] = apply.F64(slice[i])
+			retSlice[i] = apply.Float(slice[i])
 		}
 		ret = retSlice
 	} else if apply.String != nil {
@@ -1841,7 +1795,7 @@ func cumsum(vals []float64, isNull []bool, index []int) []float64 {
 }
 
 func (filter FilterFn) validate() error {
-	if filter.F64 == nil {
+	if filter.Float == nil {
 		if filter.String == nil {
 			if filter.DateTime == nil {
 				return fmt.Errorf("no filter function provided")
@@ -1852,7 +1806,7 @@ func (filter FilterFn) validate() error {
 }
 
 func (lambda ApplyFn) validate() error {
-	if lambda.F64 == nil {
+	if lambda.Float == nil {
 		if lambda.String == nil {
 			if lambda.DateTime == nil {
 				return fmt.Errorf("no apply function provided")
@@ -1863,7 +1817,7 @@ func (lambda ApplyFn) validate() error {
 }
 
 func (lambda ApplyFormatFn) validate() error {
-	if lambda.F64 == nil {
+	if lambda.Float == nil {
 		if lambda.DateTime == nil {
 			return fmt.Errorf("no apply function provided")
 		}

@@ -94,35 +94,29 @@ type NullFiller struct {
 
 // FilterFn stub
 type FilterFn struct {
-	F64      func(val float64) bool
+	Float    func(val float64) bool
 	String   func(val string) bool
 	DateTime func(val time.Time) bool
 }
 
 // ApplyFn stub
 type ApplyFn struct {
-	F64      func(val float64) float64
+	Float    func(val float64) float64
 	String   func(val string) string
 	DateTime func(val time.Time) time.Time
 }
 
-// GroupApplyFn stub
-type GroupApplyFn struct {
-	F64      func(vals []float64) float64
-	String   func(vals []string) string
-	DateTime func(vals []time.Time) time.Time
-}
-
-// GroupApplyNestedFn stub
-type GroupApplyNestedFn struct {
-	F64      func(vals []float64) []float64
-	String   func(vals []string) []string
-	DateTime func(vals []time.Time) []time.Time
+// GroupReduceFn stub
+type GroupReduceFn struct {
+	Float     func(vals []float64) float64
+	String    func(vals []string) string
+	DateTime  func(vals []time.Time) time.Time
+	Interface func(vals interface{}, isNull []bool) (interface{}, error)
 }
 
 // ApplyFormatFn stub
 type ApplyFormatFn struct {
-	F64      func(val float64) string
+	Float    func(val float64) string
 	DateTime func(val time.Time) string
 }
 
