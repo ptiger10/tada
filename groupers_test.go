@@ -3284,3 +3284,187 @@ func TestGroupedSeries_interfaceReduceFunc(t *testing.T) {
 		})
 	}
 }
+
+func Test_groupedInterfaceTransformFunc(t *testing.T) {
+	type args struct {
+		slice      interface{}
+		nulls      []bool
+		name       string
+		rowIndices [][]int
+		fn         func(slice interface{}, isNull []bool) (interface{}, error)
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *valueContainer
+		wantErr bool
+	}{
+		{"pass", args{
+			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			name:       "foo",
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+			fn: func(slice interface{}, isNull []bool) (interface{}, error) {
+				vals := slice.([]float64)
+				ret := make([]float64, len(vals))
+				for i := range vals {
+					ret[i] = vals[i] - 1
+				}
+				return ret, nil
+			}},
+			&valueContainer{
+				slice:  []float64{0, 1, 2, 3},
+				isNull: []bool{false, false, false, false},
+				name:   "foo",
+			},
+			false},
+		{"pass - new type", args{
+			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			name:       "foo",
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+			fn: func(slice interface{}, isNull []bool) (interface{}, error) {
+				vals := slice.([]float64)
+				ret := make([]string, len(vals))
+				for i := range vals {
+					ret[i] = fmt.Sprintf("%.0f", vals[i])
+				}
+				return ret, nil
+			}},
+			&valueContainer{
+				slice:  []string{"1", "2", "3", "4"},
+				isNull: []bool{false, false, false, false},
+				name:   "foo",
+			},
+			false},
+		{"fail - wrong length", args{
+			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			name:       "foo",
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+			fn: func(slice interface{}, isNull []bool) (interface{}, error) {
+				return []float64{0}, nil
+			}},
+			nil,
+			true},
+		{"fail - not slice", args{
+			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			name:       "foo",
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+			fn: func(slice interface{}, isNull []bool) (interface{}, error) {
+				return 0, nil
+			}},
+			nil,
+			true},
+		{"fail - not slice on not-first group", args{
+			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			name:       "foo",
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+			fn: func(slice interface{}, isNull []bool) (interface{}, error) {
+				vals := slice.([]float64)
+				if vals[0] != 1 {
+					return 0, nil
+				}
+				return []float64{1, 2}, nil
+			}},
+			nil,
+			true},
+		{"fail - user error message slice", args{
+			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			name:       "foo",
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+			fn: func(slice interface{}, isNull []bool) (interface{}, error) {
+				return nil, fmt.Errorf("foo")
+			}},
+			nil,
+			true},
+		{"fail - user error message on non-first group", args{
+			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			name:       "foo",
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+			fn: func(slice interface{}, isNull []bool) (interface{}, error) {
+				vals := slice.([]float64)
+				if vals[0] != 1 {
+					return nil, fmt.Errorf("foo")
+				}
+				return []float64{1, 2}, nil
+			}},
+			nil,
+			true},
+		{"fail - unsupported type", args{
+			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			name:       "foo",
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+			fn: func(slice interface{}, isNull []bool) (interface{}, error) {
+				return []complex64{1, 2}, nil
+			}},
+			nil,
+			true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := groupedInterfaceTransformFunc(tt.args.slice, tt.args.nulls, tt.args.name, tt.args.rowIndices, tt.args.fn)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("groupedInterfaceTransformFunc() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("groupedInterfaceTransformFunc() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGroupedSeries_Transform(t *testing.T) {
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		series      *Series
+		aligned     bool
+		err         error
+	}
+	type args struct {
+		name   string
+		lambda func(interface{}, []bool) (interface{}, error)
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"pass",
+			fields{
+				rowIndices:  [][]int{{0, 1}, {2, 3}},
+				orderedKeys: []string{"foo", "bar"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				series: &Series{values: &valueContainer{
+					slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "baz"},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			args{name: "foo", lambda: func(slice interface{}, isNull []bool) (interface{}, error) {
+				vals := slice.([]string)
+				ret := make([]int, len(vals))
+				for i := range vals {
+					ret[i] = i
+				}
+				return ret, nil
+			}},
+			&Series{values: &valueContainer{slice: []int{0, 1, 0, 1}, isNull: []bool{false, false, false, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeries{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				series:      tt.fields.series,
+				aligned:     tt.fields.aligned,
+				err:         tt.fields.err,
+			}
+			if got := g.Transform(tt.args.name, tt.args.lambda); !EqualSeries(got, tt.want) {
+				t.Errorf("GroupedSeries.Transform() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

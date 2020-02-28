@@ -96,6 +96,11 @@ func (s *Series) ToCSV(ignoreLabels bool) ([][]string, error) {
 // -- GETTERS
 
 func (s *Series) String() string {
+	if s.values == nil {
+		if s.Err() != nil {
+			return s.Err().Error()
+		}
+	}
 	return s.ToDataFrame().String()
 }
 
