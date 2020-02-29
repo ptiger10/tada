@@ -13,12 +13,12 @@ func convertSimplifiedFloat64ReduceFunc(
 	simplifiedFn func([]float64) float64) func(
 	[]float64, []bool, []int) (float64, bool) {
 
-	fn := func(vals []float64, isNull []bool, index []int) (float64, bool) {
+	fn := func(slice []float64, isNull []bool, index []int) (float64, bool) {
 		var atLeastOneValid bool
 		inputVals := make([]float64, 0)
 		for _, i := range index {
 			if !isNull[i] {
-				inputVals = append(inputVals, vals[i])
+				inputVals = append(inputVals, slice[i])
 				atLeastOneValid = true
 			}
 		}
@@ -31,22 +31,22 @@ func convertSimplifiedFloat64ReduceFunc(
 }
 
 func groupedFloat64ReduceFunc(
-	vals []float64,
+	slice []float64,
 	nulls []bool,
 	name string,
 	aligned bool,
 	rowIndices [][]int,
-	fn func(val []float64, isNull []bool, index []int) (float64, bool)) *valueContainer {
+	fn func([]float64, []bool, []int) (float64, bool)) *valueContainer {
 	// default: return length is equal to the number of groups
 	retLength := len(rowIndices)
 	if aligned {
 		// if aligned: return length is overwritten to equal the length of original data
-		retLength = len(vals)
+		retLength = len(slice)
 	}
 	retVals := make([]float64, retLength)
 	retNulls := make([]bool, retLength)
 	for i, rowIndex := range rowIndices {
-		output, isNull := fn(vals, nulls, rowIndex)
+		output, isNull := fn(slice, nulls, rowIndex)
 		if !aligned {
 			// default: write each output once and in sequential order into retVals
 			retVals[i] = output
@@ -66,7 +66,7 @@ func groupedFloat64ReduceFunc(
 	}
 }
 
-func (g *GroupedSeries) float64ReduceFunc(name string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *Series {
+func (g *GroupedSeries) float64ReduceFunc(name string, fn func(slice []float64, isNull []bool, index []int) (float64, bool)) *Series {
 	var sharedData bool
 	if g.aligned {
 		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
@@ -88,7 +88,7 @@ func (g *GroupedSeries) float64ReduceFunc(name string, fn func(val []float64, is
 }
 
 func (g *GroupedDataFrame) float64ReduceFunc(
-	name string, cols []string, fn func(val []float64, isNull []bool, index []int) (float64, bool)) *DataFrame {
+	name string, cols []string, fn func(slice []float64, isNull []bool, index []int) (float64, bool)) *DataFrame {
 	if len(cols) == 0 {
 		cols = make([]string, len(g.df.values))
 		for k := range cols {
@@ -113,12 +113,12 @@ func convertSimplifiedStringReduceFunc(
 	simplifiedFn func([]string) string) func(
 	[]string, []bool, []int) (string, bool) {
 
-	fn := func(vals []string, isNull []bool, index []int) (string, bool) {
+	fn := func(slice []string, isNull []bool, index []int) (string, bool) {
 		var atLeastOneValid bool
 		inputVals := make([]string, 0)
 		for _, i := range index {
 			if !isNull[i] {
-				inputVals = append(inputVals, vals[i])
+				inputVals = append(inputVals, slice[i])
 				atLeastOneValid = true
 			}
 		}
@@ -131,22 +131,22 @@ func convertSimplifiedStringReduceFunc(
 }
 
 func groupedStringReduceFunc(
-	vals []string,
+	slice []string,
 	nulls []bool,
 	name string,
 	aligned bool,
 	rowIndices [][]int,
-	fn func(val []string, isNull []bool, index []int) (string, bool)) *valueContainer {
+	fn func([]string, []bool, []int) (string, bool)) *valueContainer {
 	// default: return length is equal to the number of groups
 	retLength := len(rowIndices)
 	if aligned {
 		// if aligned: return length is overwritten to equal the length of original data
-		retLength = len(vals)
+		retLength = len(slice)
 	}
 	retVals := make([]string, retLength)
 	retNulls := make([]bool, retLength)
 	for i, rowIndex := range rowIndices {
-		output, isNull := fn(vals, nulls, rowIndex)
+		output, isNull := fn(slice, nulls, rowIndex)
 		if !aligned {
 			// default: write each output once and in sequential order into retVals
 			retVals[i] = output
@@ -166,7 +166,7 @@ func groupedStringReduceFunc(
 	}
 }
 
-func (g *GroupedSeries) stringReduceFunc(name string, fn func(val []string, isNull []bool, index []int) (string, bool)) *Series {
+func (g *GroupedSeries) stringReduceFunc(name string, fn func(slice []string, isNull []bool, index []int) (string, bool)) *Series {
 	var sharedData bool
 	if g.aligned {
 		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
@@ -188,7 +188,7 @@ func (g *GroupedSeries) stringReduceFunc(name string, fn func(val []string, isNu
 }
 
 func (g *GroupedDataFrame) stringReduceFunc(
-	name string, cols []string, fn func(val []string, isNull []bool, index []int) (string, bool)) *DataFrame {
+	name string, cols []string, fn func(slice []string, isNull []bool, index []int) (string, bool)) *DataFrame {
 	if len(cols) == 0 {
 		cols = make([]string, len(g.df.values))
 		for k := range cols {
@@ -213,12 +213,12 @@ func convertSimplifiedDateTimeReduceFunc(
 	simplifiedFn func([]time.Time) time.Time) func(
 	[]time.Time, []bool, []int) (time.Time, bool) {
 
-	fn := func(vals []time.Time, isNull []bool, index []int) (time.Time, bool) {
+	fn := func(slice []time.Time, isNull []bool, index []int) (time.Time, bool) {
 		var atLeastOneValid bool
 		inputVals := make([]time.Time, 0)
 		for _, i := range index {
 			if !isNull[i] {
-				inputVals = append(inputVals, vals[i])
+				inputVals = append(inputVals, slice[i])
 				atLeastOneValid = true
 			}
 		}
@@ -231,22 +231,22 @@ func convertSimplifiedDateTimeReduceFunc(
 }
 
 func groupedDateTimeReduceFunc(
-	vals []time.Time,
+	slice []time.Time,
 	nulls []bool,
 	name string,
 	aligned bool,
 	rowIndices [][]int,
-	fn func(val []time.Time, isNull []bool, index []int) (time.Time, bool)) *valueContainer {
+	fn func([]time.Time, []bool, []int) (time.Time, bool)) *valueContainer {
 	// default: return length is equal to the number of groups
 	retLength := len(rowIndices)
 	if aligned {
 		// if aligned: return length is overwritten to equal the length of original data
-		retLength = len(vals)
+		retLength = len(slice)
 	}
 	retVals := make([]time.Time, retLength)
 	retNulls := make([]bool, retLength)
 	for i, rowIndex := range rowIndices {
-		output, isNull := fn(vals, nulls, rowIndex)
+		output, isNull := fn(slice, nulls, rowIndex)
 		if !aligned {
 			// default: write each output once and in sequential order into retVals
 			retVals[i] = output
@@ -266,7 +266,7 @@ func groupedDateTimeReduceFunc(
 	}
 }
 
-func (g *GroupedSeries) dateTimeReduceFunc(name string, fn func(val []time.Time, isNull []bool, index []int) (time.Time, bool)) *Series {
+func (g *GroupedSeries) dateTimeReduceFunc(name string, fn func(slice []time.Time, isNull []bool, index []int) (time.Time, bool)) *Series {
 	var sharedData bool
 	if g.aligned {
 		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
@@ -288,7 +288,7 @@ func (g *GroupedSeries) dateTimeReduceFunc(name string, fn func(val []time.Time,
 }
 
 func (g *GroupedDataFrame) dateTimeReduceFunc(
-	name string, cols []string, fn func(val []time.Time, isNull []bool, index []int) (time.Time, bool)) *DataFrame {
+	name string, cols []string, fn func(slice []time.Time, isNull []bool, index []int) (time.Time, bool)) *DataFrame {
 	if len(cols) == 0 {
 		cols = make([]string, len(g.df.values))
 		for k := range cols {

@@ -1015,6 +1015,20 @@ func (vc *valueContainer) apply(apply ApplyFn) interface{} {
 			retSlice[i] = apply.DateTime(slice[i])
 		}
 		ret = retSlice
+	} else if apply.Interface != nil {
+		slice := vc.slice
+		v := reflect.ValueOf(slice)
+		sample := apply.Interface(v.Index(0).Interface())
+		outputType := reflect.SliceOf(reflect.TypeOf(sample))
+		retSlice := reflect.MakeSlice(outputType, v.Len(), v.Len())
+		for i := 0; i < v.Len(); i++ {
+			newVal := apply.Interface(v.Index(i).Interface())
+			src := reflect.ValueOf(newVal)
+			dst := retSlice.Index(i)
+			dst.Set(src)
+		}
+		ret = retSlice.Interface()
+
 	}
 	return ret
 }

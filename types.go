@@ -101,9 +101,10 @@ type FilterFn struct {
 
 // ApplyFn stub
 type ApplyFn struct {
-	Float    func(val float64) float64
-	String   func(val string) string
-	DateTime func(val time.Time) time.Time
+	Float     func(val float64) float64
+	String    func(val string) string
+	DateTime  func(val time.Time) time.Time
+	Interface func(val interface{}) interface{}
 }
 
 // GroupReduceFn stub
@@ -111,7 +112,7 @@ type GroupReduceFn struct {
 	Float     func(slice []float64) float64
 	String    func(slice []string) string
 	DateTime  func(slice []time.Time) time.Time
-	Interface func(slice interface{}, isNull []bool) interface{}
+	Interface func(slice interface{}) interface{}
 }
 
 // ApplyFormatFn stub

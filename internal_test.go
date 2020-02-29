@@ -1698,6 +1698,15 @@ func Test_valueContainer_apply(t *testing.T) {
 			name:   "foo"},
 			args{ApplyFn{DateTime: func(v time.Time) time.Time { return v.AddDate(0, 0, 1) }}},
 			[]time.Time{time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC)}},
+		{"inferface", fields{
+			slice:  []string{"foo", "bar"},
+			isNull: []bool{false, false},
+			name:   "foo"},
+			args{ApplyFn{Interface: func(v interface{}) interface{} {
+				val := v.(string)
+				return strings.Replace(val, "o", "a", -1)
+			}}},
+			[]string{"faa", "bar"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

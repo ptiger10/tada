@@ -10,12 +10,12 @@ func convertSimplifiedgenericTypeReduceFunc(
 	simplifiedFn func([]genericType) genericType) func(
 	[]genericType, []bool, []int) (genericType, bool) {
 
-	fn := func(vals []genericType, isNull []bool, index []int) (genericType, bool) {
+	fn := func(slice []genericType, isNull []bool, index []int) (genericType, bool) {
 		var atLeastOneValid bool
 		inputVals := make([]genericType, 0)
 		for _, i := range index {
 			if !isNull[i] {
-				inputVals = append(inputVals, vals[i])
+				inputVals = append(inputVals, slice[i])
 				atLeastOneValid = true
 			}
 		}
@@ -28,22 +28,22 @@ func convertSimplifiedgenericTypeReduceFunc(
 }
 
 func groupedgenericTypeReduceFunc(
-	vals []genericType,
+	slice []genericType,
 	nulls []bool,
 	name string,
 	aligned bool,
 	rowIndices [][]int,
-	fn func(val []genericType, isNull []bool, index []int) (genericType, bool)) *valueContainer {
+	fn func([]genericType, []bool, []int) (genericType, bool)) *valueContainer {
 	// default: return length is equal to the number of groups
 	retLength := len(rowIndices)
 	if aligned {
 		// if aligned: return length is overwritten to equal the length of original data
-		retLength = len(vals)
+		retLength = len(slice)
 	}
 	retVals := make([]genericType, retLength)
 	retNulls := make([]bool, retLength)
 	for i, rowIndex := range rowIndices {
-		output, isNull := fn(vals, nulls, rowIndex)
+		output, isNull := fn(slice, nulls, rowIndex)
 		if !aligned {
 			// default: write each output once and in sequential order into retVals
 			retVals[i] = output
@@ -63,7 +63,7 @@ func groupedgenericTypeReduceFunc(
 	}
 }
 
-func (g *GroupedSeries) genericTypeReduceFunc(name string, fn func(val []genericType, isNull []bool, index []int) (genericType, bool)) *Series {
+func (g *GroupedSeries) genericTypeReduceFunc(name string, fn func(slice []genericType, isNull []bool, index []int) (genericType, bool)) *Series {
 	var sharedData bool
 	if g.aligned {
 		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
@@ -85,7 +85,7 @@ func (g *GroupedSeries) genericTypeReduceFunc(name string, fn func(val []generic
 }
 
 func (g *GroupedDataFrame) genericTypeReduceFunc(
-	name string, cols []string, fn func(val []genericType, isNull []bool, index []int) (genericType, bool)) *DataFrame {
+	name string, cols []string, fn func(slice []genericType, isNull []bool, index []int) (genericType, bool)) *DataFrame {
 	if len(cols) == 0 {
 		cols = make([]string, len(g.df.values))
 		for k := range cols {

@@ -11,11 +11,10 @@ import (
 
 func groupedInterfaceReduceFunc(
 	slice interface{},
-	nulls []bool,
 	name string,
 	aligned bool,
 	rowIndices [][]int,
-	fn func(slice interface{}, isNull []bool) interface{}) (*valueContainer, error) {
+	fn func(slice interface{}) interface{}) (*valueContainer, error) {
 
 	// default: return length is equal to the number of groups
 	retLength := len(rowIndices)
@@ -26,14 +25,12 @@ func groupedInterfaceReduceFunc(
 	}
 	// must deduce output type
 	sampleRows := subsetInterfaceSlice(slice, rowIndices[0])
-	sampleNulls := subsetNulls(nulls, rowIndices[0])
-	sampleOutput := fn(sampleRows, sampleNulls)
+	sampleOutput := fn(sampleRows)
 
 	retVals := reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(sampleOutput)), retLength, retLength)
 	for i, rowIndex := range rowIndices {
 		subsetRows := subsetInterfaceSlice(slice, rowIndex)
-		subsetNulls := subsetNulls(nulls, rowIndex)
-		output := fn(subsetRows, subsetNulls)
+		output := fn(subsetRows)
 
 		src := reflect.ValueOf(output)
 		if !aligned {
@@ -58,18 +55,16 @@ func groupedInterfaceReduceFunc(
 // transforms each original Series row and maintains their order, regardless of whether groupedSeries is aligned
 func groupedInterfaceTransformFunc(
 	slice interface{},
-	nulls []bool,
 	name string,
 	rowIndices [][]int,
-	fn func(slice interface{}, isNull []bool) interface{}) (*valueContainer, error) {
+	fn func(slice interface{}) interface{}) (*valueContainer, error) {
 
 	// default: return length is equal to the number of groups
 	retLength := reflect.ValueOf(slice).Len()
 
 	// must deduce output type
 	sampleRows := subsetInterfaceSlice(slice, rowIndices[0])
-	sampleNulls := subsetNulls(nulls, rowIndices[0])
-	sampleOutput := fn(sampleRows, sampleNulls)
+	sampleOutput := fn(sampleRows)
 	if !isSlice(sampleOutput) {
 		return nil, fmt.Errorf("group 0: output must be slice (%v != slice)",
 			reflect.TypeOf(sampleOutput).Kind())
@@ -78,8 +73,7 @@ func groupedInterfaceTransformFunc(
 	retVals := reflect.MakeSlice(reflect.TypeOf(sampleOutput), retLength, retLength)
 	for i, rowIndex := range rowIndices {
 		subsetRows := subsetInterfaceSlice(slice, rowIndex)
-		subsetNulls := subsetNulls(nulls, rowIndex)
-		output := fn(subsetRows, subsetNulls)
+		output := fn(subsetRows)
 
 		if !isSlice(output) {
 			return nil, fmt.Errorf("group %d: output must be slice (%v != slice)",
@@ -179,9 +173,9 @@ func (g *GroupedSeries) GetGroup(group string) *Series {
 }
 
 // Transform stub
-func (g *GroupedSeries) Transform(name string, lambda func(interface{}, []bool) interface{}) *Series {
+func (g *GroupedSeries) Transform(name string, lambda func(interface{}) interface{}) *Series {
 	vals, err := groupedInterfaceTransformFunc(
-		g.series.values.slice, g.series.values.isNull, name, g.rowIndices, lambda)
+		g.series.values.slice, name, g.rowIndices, lambda)
 	if err != nil {
 		return seriesWithError(fmt.Errorf("GroupedSeries.Transform(): %v", err))
 	}
@@ -191,13 +185,13 @@ func (g *GroupedSeries) Transform(name string, lambda func(interface{}, []bool) 
 	}
 }
 
-func (g *GroupedSeries) interfaceReduceFunc(name string, fn func(interface{}, []bool) interface{}) (*Series, error) {
+func (g *GroupedSeries) interfaceReduceFunc(name string, fn func(interface{}) interface{}) (*Series, error) {
 	var sharedData bool
 	if g.aligned {
 		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
 	}
 	retVals, err := groupedInterfaceReduceFunc(
-		g.series.values.slice, g.series.values.isNull, name, g.aligned, g.rowIndices, fn)
+		g.series.values.slice, name, g.aligned, g.rowIndices, fn)
 	if err != nil {
 		return nil, err
 	}
