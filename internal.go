@@ -1590,10 +1590,10 @@ func isNullInterface(i interface{}) bool {
 }
 
 func isNullString(s string) bool {
-	if _, ok := optionNullStrings[s]; ok {
-		return true
+	if _, ok := optionNullStrings[s]; !ok {
+		return false
 	}
-	return false
+	return true
 }
 
 // math
