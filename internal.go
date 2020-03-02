@@ -2,6 +2,7 @@ package tada
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"math/rand"
 	"reflect"
@@ -13,13 +14,23 @@ import (
 	"github.com/araddon/dateparse"
 )
 
+func errorWarning(err error) {
+	if optionWarnings {
+		log.Println(err)
+	}
+}
+
 func (s *Series) resetWithError(err error) {
+	errorWarning(err)
+
 	s.values = nil
 	s.labels = nil
 	s.err = err
 }
 
 func (df *DataFrame) resetWithError(err error) {
+	errorWarning(err)
+
 	df.values = nil
 	df.labels = nil
 	df.name = ""
@@ -28,12 +39,16 @@ func (df *DataFrame) resetWithError(err error) {
 }
 
 func seriesWithError(err error) *Series {
+	errorWarning(err)
+
 	return &Series{
 		err: err,
 	}
 }
 
 func dataFrameWithError(err error) *DataFrame {
+	errorWarning(err)
+
 	return &DataFrame{
 		err: err,
 	}

@@ -366,7 +366,7 @@ func (s *SeriesMutator) Shift(n int) {
 // InPlace returns a SeriesMutator, which contains most of the same methods as Series but never returns a new Series.
 // If you want to save memory and improve performance and do not need to preserve the original Series, consider using InPlace().
 func (s *Series) InPlace() *SeriesMutator {
-	if optionSharedDataWarning && s.sharedData {
+	if optionWarnings && s.sharedData {
 		log.Print(
 			"WARNING: this Series shares its labels and values with the Series/DataFrame " +
 				"from which it was derived, so InPlace changes will modify those objects too. " +

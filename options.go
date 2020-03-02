@@ -6,7 +6,7 @@ var optionLevelSeparator = "|"
 var optionMaxRows = 50
 var optionMaxColumns = 20
 var optionAutoMerge = true
-var optionSharedDataWarning = true
+var optionWarnings = true
 var randSeed = time.Now().Unix()
 
 // SetOptionLevelSeparator stub
@@ -29,7 +29,12 @@ func SetOptionAutoMerge(set bool) {
 	optionAutoMerge = set
 }
 
-// SetOptionSharedDataWarning stub
-func SetOptionSharedDataWarning(set bool) {
-	optionSharedDataWarning = set
+// DisableWarnings stub
+func DisableWarnings() {
+	optionWarnings = false
+}
+
+// EnableWarnings stub
+func EnableWarnings() {
+	optionWarnings = true
 }

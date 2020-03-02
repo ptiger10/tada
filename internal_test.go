@@ -3,6 +3,7 @@ package tada
 import (
 	"errors"
 	"math"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -11,6 +12,12 @@ import (
 
 	"github.com/d4l3k/messagediff"
 )
+
+func TestMain(m *testing.M) {
+	DisableWarnings()
+	code := m.Run()
+	os.Exit(code)
+}
 
 func TestDataFrame_resetWithError(t *testing.T) {
 	type fields struct {
