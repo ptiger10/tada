@@ -16,7 +16,7 @@ import (
 
 func errorWarning(err error) {
 	if optionWarnings {
-		log.Println(err)
+		log.Println("Error Warning:", err)
 	}
 }
 
@@ -1590,11 +1590,8 @@ func isNullInterface(i interface{}) bool {
 }
 
 func isNullString(s string) bool {
-	nullStrings := []string{"NaN", "n/a", "N/A", "", "nil"}
-	for _, ns := range nullStrings {
-		if strings.TrimSpace(s) == ns {
-			return true
-		}
+	if _, ok := optionNullStrings[s]; ok {
+		return true
 	}
 	return false
 }

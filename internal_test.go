@@ -3646,3 +3646,25 @@ func Test_equalGroupedDataFrames(t *testing.T) {
 		})
 	}
 }
+
+func Test_isNullString(t *testing.T) {
+	type args struct {
+		s string
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"is null", args{""}, true},
+		{"is null", args{"n/a"}, true},
+		{"not null", args{"foo"}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isNullString(tt.args.s); got != tt.want {
+				t.Errorf("isNullString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

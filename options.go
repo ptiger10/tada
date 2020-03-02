@@ -7,6 +7,7 @@ var optionMaxRows = 50
 var optionMaxColumns = 20
 var optionAutoMerge = true
 var optionWarnings = true
+var optionNullStrings = map[string]bool{"NaN": true, "n/a": true, "N/A": true, "": true, "nil": true}
 var randSeed = time.Now().Unix()
 
 // SetOptionLevelSeparator stub

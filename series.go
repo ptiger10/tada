@@ -368,8 +368,9 @@ func (s *SeriesMutator) Shift(n int) {
 func (s *Series) InPlace() *SeriesMutator {
 	if optionWarnings && s.sharedData {
 		log.Print(
-			"WARNING: this Series shares its labels and values with the Series/DataFrame " +
-				"from which it was derived, so InPlace changes will modify those objects too. " +
+			"Shared Data Warning: this Series shares its labels and/or values with the object " +
+				"from which it was derived (via Col(), SelectLabels() or Align())," +
+				"so InPlace changes will modify the original object too. " +
 				"To avoid this, make a new Series with Series.Copy()")
 	}
 	return &SeriesMutator{series: s}
