@@ -818,7 +818,7 @@ func (s *Series) GroupBy(names ...string) *GroupedSeries {
 	} else {
 		index, err = convertColNamesToIndexPositions(names, s.labels)
 		if err != nil {
-			return &GroupedSeries{err: fmt.Errorf("GroupBy(): %v", err)}
+			return groupedSeriesWithError(fmt.Errorf("GroupBy(): %v", err))
 		}
 	}
 	newLabels, rowIndices, orderedKeys, _ := reduceContainers(s.labels, index)

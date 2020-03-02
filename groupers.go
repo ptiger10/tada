@@ -453,9 +453,7 @@ func (g *GroupedSeries) HavingCount(lambda func(int) bool) *GroupedSeries {
 func (g *GroupedDataFrame) Col(colName string) *GroupedSeries {
 	index, err := indexOfContainer(colName, g.df.values)
 	if err != nil {
-		return &GroupedSeries{
-			err: fmt.Errorf("Col(): %v", err),
-		}
+		return groupedSeriesWithError(fmt.Errorf("Col(): %v", err))
 	}
 	series := &Series{
 		values:     g.df.values[index],
@@ -491,7 +489,7 @@ func (g *GroupedDataFrame) Reduce(name string, cols []string, lambda GroupReduce
 // RollingN stub
 func (s *Series) RollingN(n int) *GroupedSeries {
 	if n < 1 {
-		return &GroupedSeries{err: fmt.Errorf("RollingN(): `n` must be greater than zero (not %v)", n)}
+		return groupedSeriesWithError(fmt.Errorf("RollingN(): `n` must be greater than zero (not %v)", n))
 	}
 	rowIndices := make([][]int, s.Len())
 	for i := 0; i < s.Len(); i++ {
@@ -514,7 +512,7 @@ func (s *Series) RollingN(n int) *GroupedSeries {
 func (s *Series) RollingDuration(d time.Duration) *GroupedSeries {
 	// assumes positive duration
 	if d < 0 {
-		return &GroupedSeries{err: fmt.Errorf("RollingDuration(): `d` must be greater than zero (not %v)", d)}
+		return groupedSeriesWithError(fmt.Errorf("RollingDuration(): `d` must be greater than zero (not %v)", d))
 	}
 	vals := s.values.dateTime().slice
 	rowIndices := make([][]int, s.Len())

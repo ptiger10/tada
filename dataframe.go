@@ -1545,7 +1545,7 @@ func (df *DataFrame) GroupBy(names ...string) *GroupedDataFrame {
 	} else {
 		index, err = convertColNamesToIndexPositions(names, mergedLabelsAndCols)
 		if err != nil {
-			return &GroupedDataFrame{err: fmt.Errorf("GroupBy(): %v", err)}
+			return groupedDataFrameWithError(fmt.Errorf("GroupBy(): %v", err))
 		}
 	}
 	return df.groupby(index)

@@ -54,6 +54,22 @@ func dataFrameWithError(err error) *DataFrame {
 	}
 }
 
+func groupedSeriesWithError(err error) *GroupedSeries {
+	errorWarning(err)
+
+	return &GroupedSeries{
+		err: err,
+	}
+}
+
+func groupedDataFrameWithError(err error) *GroupedDataFrame {
+	errorWarning(err)
+
+	return &GroupedDataFrame{
+		err: err,
+	}
+}
+
 func isSlice(input interface{}) bool {
 	return reflect.TypeOf(input).Kind() == reflect.Slice
 }
