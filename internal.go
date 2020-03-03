@@ -1586,13 +1586,16 @@ func setNullsFromInterface(input interface{}) []bool {
 			ret[i] = vals[i].IsNull
 		}
 	// nested slices
-	case [][]string, [][]float64, [][]time.Time:
+	case [][]string, [][]float64, [][]time.Time,
+		[][]bool, [][]float32,
+		[][]uint, [][]uint8, [][]uint16, [][]uint32, [][]uint64,
+		[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
 		v := reflect.ValueOf(input)
 		l := v.Len()
 		ret = make([]bool, l)
 		for i := range ret {
 			// if slice is empty -> null
-			ret[i] = v.Index(i).Len() == 0
+			ret[i] = (v.Index(i).Len() == 0)
 		}
 	default:
 		return nil
@@ -2355,9 +2358,13 @@ func dataFrameEqualsDistinct(a, b *DataFrame) bool {
 // parses the first row only to get number of fields
 func extractCSVDimensions(b []byte, comma rune) (numRows, numCols int, err error) {
 	numRows = bytes.Count(b, []byte{'\n'})
+	// no trailing \n?
 	if len(b) > 0 && b[len(b)-1] != '\n' {
 		numRows++
 	}
+	// subtract empty rows (back-to-back newlines)
+	emptyRows := bytes.Count(b, []byte{'\n', '\n'})
+	numRows -= emptyRows
 	r := bytes.NewReader(b)
 	csvReader := csv.NewReader(r)
 	if comma != 0 {
