@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/araddon/dateparse"
@@ -2325,12 +2326,18 @@ func dataFrameEqualsDistinct(a, b *DataFrame) bool {
 	return true
 }
 
-func extractCSVDimensions(b []byte, delimiter rune) (numRows, numCols int, err error) {
+// expects a final newline
+// does not skip comment lines or blank lines
+// parses the first row only to get number of fields
+func extractCSVDimensions(b []byte, comma rune) (numRows, numCols int, err error) {
 	numRows = bytes.Count(b, []byte{'\n'})
+	if len(b) > 0 && b[len(b)-1] != '\n' {
+		numRows++
+	}
 	r := bytes.NewReader(b)
 	csvReader := csv.NewReader(r)
-	if delimiter != 0 {
-		csvReader.Comma = delimiter
+	if comma != 0 {
+		csvReader.Comma = comma
 	}
 	fields, err := csvReader.Read()
 	if err != nil {
@@ -2341,14 +2348,22 @@ func extractCSVDimensions(b []byte, delimiter rune) (numRows, numCols int, err e
 }
 
 // major dimension: column
+// trims leading whitespace
+// supports custom comma but not comments
 func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune) error {
 	br := bufio.NewReaderSize(r, 1024)
 	commaLen := utf8.RuneLen(comma)
-	lengthNL := func(b []byte) int {
+	lengthLineEnd := func(b []byte) int {
 		if b[len(b)-1] == '\n' {
 			return 1
 		}
 		return 0
+	}
+	stripQuotationMarks := func(b []byte) []byte {
+		if len(b) > 0 && b[0] == '"' && b[len(b)-1] == '"' {
+			return b[1 : len(b)-1]
+		}
+		return b
 	}
 	var rowNumber int
 	for {
@@ -2361,19 +2376,23 @@ func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune
 		var fieldCount int
 		for {
 			// iterate over fields in each row
+			// trim leading whitespace
+			line = bytes.TrimLeftFunc(line, unicode.IsSpace)
 			i := bytes.IndexRune(line, comma)
 			field := line
 			if i >= 0 {
 				field = field[:i]
 			} else {
-				field = field[:len(field)-lengthNL(field)]
+				// comma not found? use the remaining line up until the end, which may or may not be \n
+				field = field[:len(field)-lengthLineEnd(field)]
 			}
 			if fieldCount >= len(dstVals) {
 				return fmt.Errorf("row %d: too many fields (max %d)",
 					rowNumber, len(dstVals))
 			}
 			// write fields into column-oriented receiver
-			dstVals[columnNumber][rowNumber] = string(field)
+
+			dstVals[columnNumber][rowNumber] = string(stripQuotationMarks(field))
 			if isNullString(string(field)) {
 				dstNulls[columnNumber][rowNumber] = true
 			}

@@ -3685,6 +3685,7 @@ func Test_extractCSVDimensions(t *testing.T) {
 	}{
 		{"pass", args{[]byte("foo, bar, 1\n baz, qux, 2\n"), 0}, 2, 3, false},
 		{"custom delimiter", args{[]byte("foo| bar| 1\n baz| qux| 2\n"), '|'}, 2, 3, false},
+		{"no final \n", args{[]byte("foo| bar| 1\n baz| qux| 2"), '|'}, 2, 3, false},
 		{"bad delimiter", args{[]byte("foo| bar| 1\n baz| qux| 2\n"), '"'}, 0, 0, true},
 	}
 	for _, tt := range tests {
@@ -3705,11 +3706,13 @@ func Test_extractCSVDimensions(t *testing.T) {
 }
 
 func Test_readCSVBytes(t *testing.T) {
+	b0 := "\"foo\",\"bar\"\n\"qux\",\"quz\""
 	b1 := "foo,bar,baz\nqux,quux,quz\n"
-	b2 := ",foo\n"
-	b3 := "foo,bar\nqux,quz"
-	b4 := "foo\nbar,baz\n"
-	b5 := "foo,bar\nbaz\n"
+	b2 := "foo, bar\nqux, quz\n"
+	b3 := ",foo\n"
+	b4 := "foo,bar\nqux,quz"
+	b5 := "foo\nbar,baz\n"
+	b6 := "foo,bar\nbaz\n"
 	type args struct {
 		r        io.Reader
 		dstVals  [][]string
@@ -3723,7 +3726,17 @@ func Test_readCSVBytes(t *testing.T) {
 		wantNulls [][]bool
 		wantErr   bool
 	}{
-		{name: "pass",
+		{name: "pass with quotes",
+			args: args{
+				r:        bytes.NewBuffer([]byte(b0)),
+				dstVals:  [][]string{{"", ""}, {"", ""}},
+				dstNulls: [][]bool{{false, false}, {false, false}},
+				comma:    ','},
+			wantVals:  [][]string{{"foo", "qux"}, {"bar", "quz"}},
+			wantNulls: [][]bool{{false, false}, {false, false}},
+			wantErr:   false,
+		},
+		{name: "pass normal",
 			args: args{
 				r:        bytes.NewBuffer([]byte(b1)),
 				dstVals:  [][]string{{"", ""}, {"", ""}, {"", ""}},
@@ -3733,9 +3746,19 @@ func Test_readCSVBytes(t *testing.T) {
 			wantNulls: [][]bool{{false, false}, {false, false}, {false, false}},
 			wantErr:   false,
 		},
-		{name: "pass with nil",
+		{name: "pass with leading whitespace",
 			args: args{
 				r:        bytes.NewBuffer([]byte(b2)),
+				dstVals:  [][]string{{"", ""}, {"", ""}},
+				dstNulls: [][]bool{{false, false}, {false, false}},
+				comma:    ','},
+			wantVals:  [][]string{{"foo", "qux"}, {"bar", "quz"}},
+			wantNulls: [][]bool{{false, false}, {false, false}},
+			wantErr:   false,
+		},
+		{name: "pass with nil",
+			args: args{
+				r:        bytes.NewBuffer([]byte(b3)),
 				dstVals:  [][]string{{""}, {""}},
 				dstNulls: [][]bool{{true}, {false}},
 				comma:    ','},
@@ -3745,7 +3768,7 @@ func Test_readCSVBytes(t *testing.T) {
 		},
 		{name: "pass with no final \n",
 			args: args{
-				r:        bytes.NewBuffer([]byte(b3)),
+				r:        bytes.NewBuffer([]byte(b4)),
 				dstVals:  [][]string{{"", ""}, {"", ""}},
 				dstNulls: [][]bool{{false, false}, {false, false}},
 				comma:    ','},
@@ -3755,7 +3778,7 @@ func Test_readCSVBytes(t *testing.T) {
 		},
 		{name: "too many fields",
 			args: args{
-				r:        bytes.NewBuffer([]byte(b4)),
+				r:        bytes.NewBuffer([]byte(b5)),
 				dstVals:  [][]string{{"", ""}},
 				dstNulls: [][]bool{{false, false}},
 				comma:    ','},
@@ -3765,7 +3788,7 @@ func Test_readCSVBytes(t *testing.T) {
 		},
 		{name: "too few fields",
 			args: args{
-				r:        bytes.NewBuffer([]byte(b5)),
+				r:        bytes.NewBuffer([]byte(b6)),
 				dstVals:  [][]string{{"", ""}, {"", ""}},
 				dstNulls: [][]bool{{false, false}, {false, false}},
 				comma:    ','},
