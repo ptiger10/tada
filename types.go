@@ -156,6 +156,7 @@ type ReadConfig struct {
 	NumHeaderRows  int
 	NumLabelCols   int
 	MajorDimIsCols bool
+	Delimiter      rune
 }
 
 // Resampler stub

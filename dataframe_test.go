@@ -413,6 +413,7 @@ func TestReadCSV(t *testing.T) {
 			got := ReadCSV(tt.args.csv, tt.args.config)
 			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("ReadCSV() = %v, want %v", got, tt.want)
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}

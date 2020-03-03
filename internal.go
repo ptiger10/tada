@@ -1,7 +1,11 @@
 package tada
 
 import (
+	"bufio"
+	"bytes"
+	"encoding/csv"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"math/rand"
@@ -10,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/araddon/dateparse"
 )
@@ -90,10 +95,10 @@ func makeValueContainerFromInterface(slice interface{}, name string) (*valueCont
 	}, nil
 }
 
-func makeValueContainersFromInterfaces(slices []interface{}, prefixAsterisk bool) ([]*valueContainer, error) {
+func makeValueContainersFromInterfaces(slices []interface{}, usePrefix bool) ([]*valueContainer, error) {
 	var namePrefix string
-	if prefixAsterisk {
-		namePrefix = "*"
+	if usePrefix {
+		namePrefix = optionPrefix
 	}
 	ret := make([]*valueContainer, len(slices))
 	for i, slice := range slices {
@@ -504,16 +509,16 @@ func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 		offsetFromLabelCols := k + cfg.NumLabelCols
 		valsNames[k] = strings.Join(csv[offsetFromLabelCols][:cfg.NumHeaderRows], optionLevelSeparator)
 	}
-	for column := range csv {
-		if column < cfg.NumLabelCols {
+	for container := range csv {
+		if container < cfg.NumLabelCols {
 			// write label values as slice, offset for header rows
-			valsToWrite := csv[column][cfg.NumHeaderRows:]
-			labels[column] = valsToWrite
-			labelsIsNull[column] = setNullsFromInterface(valsToWrite)
+			valsToWrite := csv[container][cfg.NumHeaderRows:]
+			labels[container] = valsToWrite
+			labelsIsNull[container] = setNullsFromInterface(valsToWrite)
 		} else {
 			// write column values as slice, offset for label cols and header rows
-			offsetFromLabelCols := column - cfg.NumLabelCols
-			valsToWrite := csv[column][cfg.NumHeaderRows:]
+			offsetFromLabelCols := container - cfg.NumLabelCols
+			valsToWrite := csv[container][cfg.NumHeaderRows:]
 			vals[offsetFromLabelCols] = valsToWrite
 			valsIsNull[offsetFromLabelCols] = setNullsFromInterface(valsToWrite)
 		}
@@ -544,6 +549,8 @@ func defaultLabelsIfEmpty(labels []*valueContainer, numRows int) []*valueContain
 	}
 	return labels
 }
+
+// (colLevelNames, columnValues)
 func defaultColsIfNoHeader(numHeaderRows int, columns []*valueContainer) ([]string, []*valueContainer) {
 	if numHeaderRows <= 0 {
 		// if no header rows, change the names of the columns to be 0, 1...
@@ -562,7 +569,7 @@ func defaultColsIfNoHeader(numHeaderRows int, columns []*valueContainer) ([]stri
 
 func defaultConfigIfNil(config *ReadConfig) *ReadConfig {
 	if config == nil {
-		config = &ReadConfig{NumHeaderRows: 1}
+		config = &ReadConfig{NumHeaderRows: 1, Delimiter: ','}
 	}
 	return config
 }
@@ -2316,4 +2323,130 @@ func dataFrameEqualsDistinct(a, b *DataFrame) bool {
 		return false
 	}
 	return true
+}
+
+func extractCSVDimensions(b []byte, delimiter rune) (numRows, numCols int, err error) {
+	numRows = bytes.Count(b, []byte{'\n'})
+	r := bytes.NewReader(b)
+	csvReader := csv.NewReader(r)
+	if delimiter != 0 {
+		csvReader.Comma = delimiter
+	}
+	fields, err := csvReader.Read()
+	if err != nil {
+		return 0, 0, err
+	}
+	numCols = len(fields)
+	return numRows, numCols, nil
+}
+
+// major dimension: column
+func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune) error {
+	br := bufio.NewReaderSize(r, 1024)
+	commaLen := utf8.RuneLen(comma)
+	lengthNL := func(b []byte) int {
+		if b[len(b)-1] == '\n' {
+			return 1
+		}
+		return 0
+	}
+	var rowNumber int
+	for {
+		// iterate over rows
+		line, err := br.ReadBytes('\n')
+		if len(line) == 0 && err == io.EOF {
+			return nil
+		}
+		var columnNumber int
+		var fieldCount int
+		for {
+			// iterate over fields in each row
+			i := bytes.IndexRune(line, comma)
+			field := line
+			if i >= 0 {
+				field = field[:i]
+			} else {
+				field = field[:len(field)-lengthNL(field)]
+			}
+			if fieldCount >= len(dstVals) {
+				return fmt.Errorf("row %d: too many fields (max %d)",
+					rowNumber, len(dstVals))
+			}
+			// write fields into column-oriented receiver
+			dstVals[columnNumber][rowNumber] = string(field)
+			if isNullString(string(field)) {
+				dstNulls[columnNumber][rowNumber] = true
+			}
+			if i >= 0 {
+				line = line[i+commaLen:]
+				columnNumber++
+				fieldCount++
+			} else {
+				if fieldCount != len(dstVals)-1 {
+					return fmt.Errorf("row %d: not enough fields (%d < %d)",
+						rowNumber, fieldCount, len(dstVals)-1)
+				}
+				break
+			}
+		}
+		if err == io.EOF {
+			return nil
+		}
+		rowNumber++
+	}
+}
+
+// major dimension: columns
+func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *ReadConfig) *DataFrame {
+	numCols := len(values) - config.NumLabelCols
+	numRows := len(values[0]) - config.NumHeaderRows
+	labelNames := make([]string, config.NumLabelCols)
+	// iterate over all label levels to get header names
+	for j := 0; j < config.NumLabelCols; j++ {
+		// write label headers, no offset
+		labelNames[j] = strings.Join(values[j][:config.NumHeaderRows], optionLevelSeparator)
+	}
+
+	colNames := make([]string, numCols)
+	for k := 0; k < numCols; k++ {
+		// write column headers, offset by label levels
+		colNames[k] = strings.Join(values[k+config.NumLabelCols][:config.NumHeaderRows], optionLevelSeparator)
+	}
+
+	// remove headers
+	for container := 0; container < len(values); container++ {
+		values[container] = values[container][config.NumHeaderRows:]
+		isNull[container] = isNull[container][config.NumHeaderRows:]
+	}
+	labels := copyStringsIntoValueContainers(
+		values[:config.NumLabelCols],
+		isNull[:config.NumLabelCols],
+		labelNames,
+	)
+
+	columns := copyStringsIntoValueContainers(
+		values[config.NumLabelCols:],
+		isNull[config.NumLabelCols:],
+		colNames,
+	)
+
+	// create default labels if no labels
+	labels = defaultLabelsIfEmpty(labels, numRows)
+
+	// update label names if labels provided but no header
+	if config.NumHeaderRows == 0 && config.NumLabelCols != 0 {
+		for j := range labels {
+			labels[j].name = optionPrefix + fmt.Sprint(j)
+		}
+	}
+
+	// create default col level names
+	var colLevelNames []string
+	colLevelNames, columns = defaultColsIfNoHeader(config.NumHeaderRows, columns)
+
+	return &DataFrame{
+		values:        columns,
+		labels:        labels,
+		colLevelNames: colLevelNames,
+	}
 }

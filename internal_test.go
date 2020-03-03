@@ -1,7 +1,9 @@
 package tada
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"math"
 	"os"
 	"reflect"
@@ -307,9 +309,9 @@ func Test_valueContainer_copy(t *testing.T) {
 
 func Test_makeDefaultLabels(t *testing.T) {
 	type args struct {
-		min            int
-		max            int
-		prefixAsterisk bool
+		min       int
+		max       int
+		usePrefix bool
 	}
 	tests := []struct {
 		name       string
@@ -321,7 +323,7 @@ func Test_makeDefaultLabels(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotLabels := makeDefaultLabels(tt.args.min, tt.args.max, tt.args.prefixAsterisk)
+			gotLabels := makeDefaultLabels(tt.args.min, tt.args.max, tt.args.usePrefix)
 			if !reflect.DeepEqual(gotLabels, tt.wantLabels) {
 				t.Errorf("makeDefaultLabels() gotLabels = %v, want %v", gotLabels, tt.wantLabels)
 			}
@@ -3664,6 +3666,187 @@ func Test_isNullString(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := isNullString(tt.args.s); got != tt.want {
 				t.Errorf("isNullString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_extractCSVDimensions(t *testing.T) {
+	type args struct {
+		b     []byte
+		comma rune
+	}
+	tests := []struct {
+		name        string
+		args        args
+		wantNumRows int
+		wantNumCols int
+		wantErr     bool
+	}{
+		{"pass", args{[]byte("foo, bar, 1\n baz, qux, 2\n"), 0}, 2, 3, false},
+		{"custom delimiter", args{[]byte("foo| bar| 1\n baz| qux| 2\n"), '|'}, 2, 3, false},
+		{"bad delimiter", args{[]byte("foo| bar| 1\n baz| qux| 2\n"), '"'}, 0, 0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotNumRows, gotNumCols, err := extractCSVDimensions(tt.args.b, tt.args.comma)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("extractCSVDimensions() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotNumRows != tt.wantNumRows {
+				t.Errorf("extractCSVDimensions() gotNumRows = %v, want %v", gotNumRows, tt.wantNumRows)
+			}
+			if gotNumCols != tt.wantNumCols {
+				t.Errorf("extractCSVDimensions() gotNumCols = %v, want %v", gotNumCols, tt.wantNumCols)
+			}
+		})
+	}
+}
+
+func Test_readCSVBytes(t *testing.T) {
+	b1 := "foo,bar,baz\nqux,quux,quz\n"
+	b2 := ",foo\n"
+	b3 := "foo,bar\nqux,quz"
+	b4 := "foo\nbar,baz\n"
+	b5 := "foo,bar\nbaz\n"
+	type args struct {
+		r        io.Reader
+		dstVals  [][]string
+		dstNulls [][]bool
+		comma    rune
+	}
+	tests := []struct {
+		name      string
+		args      args
+		wantVals  [][]string
+		wantNulls [][]bool
+		wantErr   bool
+	}{
+		{name: "pass",
+			args: args{
+				r:        bytes.NewBuffer([]byte(b1)),
+				dstVals:  [][]string{{"", ""}, {"", ""}, {"", ""}},
+				dstNulls: [][]bool{{false, false}, {false, false}, {false, false}},
+				comma:    ','},
+			wantVals:  [][]string{{"foo", "qux"}, {"bar", "quux"}, {"baz", "quz"}},
+			wantNulls: [][]bool{{false, false}, {false, false}, {false, false}},
+			wantErr:   false,
+		},
+		{name: "pass with nil",
+			args: args{
+				r:        bytes.NewBuffer([]byte(b2)),
+				dstVals:  [][]string{{""}, {""}},
+				dstNulls: [][]bool{{true}, {false}},
+				comma:    ','},
+			wantVals:  [][]string{{""}, {"foo"}},
+			wantNulls: [][]bool{{true}, {false}},
+			wantErr:   false,
+		},
+		{name: "pass with no final \n",
+			args: args{
+				r:        bytes.NewBuffer([]byte(b3)),
+				dstVals:  [][]string{{"", ""}, {"", ""}},
+				dstNulls: [][]bool{{false, false}, {false, false}},
+				comma:    ','},
+			wantVals:  [][]string{{"foo", "qux"}, {"bar", "quz"}},
+			wantNulls: [][]bool{{false, false}, {false, false}},
+			wantErr:   false,
+		},
+		{name: "too many fields",
+			args: args{
+				r:        bytes.NewBuffer([]byte(b4)),
+				dstVals:  [][]string{{"", ""}},
+				dstNulls: [][]bool{{false, false}},
+				comma:    ','},
+			wantVals:  [][]string{{"foo", "bar"}},
+			wantNulls: [][]bool{{false, false}},
+			wantErr:   true,
+		},
+		{name: "too few fields",
+			args: args{
+				r:        bytes.NewBuffer([]byte(b5)),
+				dstVals:  [][]string{{"", ""}, {"", ""}},
+				dstNulls: [][]bool{{false, false}, {false, false}},
+				comma:    ','},
+			wantVals:  [][]string{{"foo", "baz"}, {"bar", ""}},
+			wantNulls: [][]bool{{false, false}, {false, false}},
+			wantErr:   true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := readCSVBytes(tt.args.r, tt.args.dstVals, tt.args.dstNulls, tt.args.comma)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readCSVBytes() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(tt.args.dstVals, tt.wantVals) {
+				t.Errorf("readCSVBytes() -> dstVals = %v, wantVals %v", tt.args.dstVals, tt.wantVals)
+			}
+			if !reflect.DeepEqual(tt.args.dstNulls, tt.wantNulls) {
+				t.Errorf("readCSVBytes() -> dstNulls = %v, wantNulls %v", tt.args.dstNulls, tt.wantNulls)
+			}
+		})
+	}
+}
+
+func Test_makeDataFrameFromMatrices(t *testing.T) {
+	type args struct {
+		values [][]string
+		isNull [][]bool
+		config *ReadConfig
+	}
+	tests := []struct {
+		name string
+		args args
+		want *DataFrame
+	}{
+		{"pass - 1 header col", args{
+			values: [][]string{{"foo", "bar"}, {"baz", ""}},
+			isNull: [][]bool{{false, false}, {false, true}},
+			config: &ReadConfig{NumHeaderRows: 1}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"bar"}, isNull: []bool{false}, name: "foo"},
+					{slice: []string{""}, isNull: []bool{true}, name: "baz"},
+				},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"},
+				},
+				colLevelNames: []string{"*0"},
+			}},
+		{"pass - 1 header col, 1 label level", args{
+			values: [][]string{{"foo", "bar"}, {"baz", ""}},
+			isNull: [][]bool{{false, false}, {false, true}},
+			config: &ReadConfig{NumHeaderRows: 1, NumLabelCols: 1}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{""}, isNull: []bool{true}, name: "baz"},
+				},
+				labels: []*valueContainer{
+					{slice: []string{"bar"}, isNull: []bool{false}, name: "foo"},
+				},
+				colLevelNames: []string{"*0"},
+			}},
+		{"pass - 1 label level", args{
+			values: [][]string{{"foo", "bar"}, {"baz", ""}},
+			isNull: [][]bool{{false, false}, {false, true}},
+			config: &ReadConfig{NumLabelCols: 1}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"baz", ""}, isNull: []bool{false, true}, name: "0"},
+				},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
+				},
+				colLevelNames: []string{"*0"},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := makeDataFrameFromMatrices(tt.args.values, tt.args.isNull, tt.args.config); !EqualDataFrames(got, tt.want) {
+				t.Errorf("makeDataFrameFromMatrices() = %v, want %v", got, tt.want)
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}

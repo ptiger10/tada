@@ -167,23 +167,22 @@ func ReadCSV(csv [][]string, config *ReadConfig) *DataFrame {
 // ImportCSV stub
 func ImportCSV(path string, config *ReadConfig) (*DataFrame, error) {
 	config = defaultConfigIfNil(config)
-
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("ImportCSV(): %s", err)
 	}
-	reader := csv.NewReader(bytes.NewReader(data))
-
-	csv, err := reader.ReadAll()
+	numRows, numCols, err := extractCSVDimensions(data, config.Delimiter)
+	if numRows == 0 {
+		return nil, fmt.Errorf("ImportCSV(): must have at least one row")
+	}
+	retVals := makeStringMatrix(numCols, numRows)
+	retNulls := makeBoolMatrix(numCols, numRows)
+	r := bytes.NewReader(data)
+	err = readCSVBytes(r, retVals, retNulls, config.Delimiter)
 	if err != nil {
 		return nil, fmt.Errorf("ImportCSV(): %s", err)
 	}
-
-	if len(csv) == 0 {
-		return nil, fmt.Errorf("ImportCSV(): csv must have at least one row")
-	}
-	return readCSVByRows(csv, config), nil
-
+	return makeDataFrameFromMatrices(retVals, retNulls, config), nil
 }
 
 // ReadInterface stub
