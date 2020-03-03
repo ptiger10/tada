@@ -760,6 +760,7 @@ func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, righ
 			return seriesWithError(fmt.Errorf("LookupAdvanced(): %v", err))
 		}
 	}
+
 	ret, err := lookup(how, s.values, s.labels, leftKeys, other.values, other.labels, rightKeys)
 	if err != nil {
 		return seriesWithError(fmt.Errorf("LookupAdvanced(): %v", err))
@@ -773,38 +774,38 @@ func (s *Series) Merge(other *Series) *DataFrame {
 }
 
 // Add stub
-func (s *Series) Add(other *Series, ignoreMissing bool) *Series {
+func (s *Series) Add(other *Series, ignoreNulls bool) *Series {
 	fn := func(v1 float64, v2 float64) float64 {
 		return v1 + v2
 	}
-	return s.combineMath(other, ignoreMissing, fn)
+	return s.combineMath(other, ignoreNulls, fn)
 }
 
 // Subtract stub
-func (s *Series) Subtract(other *Series, ignoreMissing bool) *Series {
+func (s *Series) Subtract(other *Series, ignoreNulls bool) *Series {
 	fn := func(v1 float64, v2 float64) float64 {
 		return v1 - v2
 	}
-	return s.combineMath(other, ignoreMissing, fn)
+	return s.combineMath(other, ignoreNulls, fn)
 }
 
 // Multiply stub
-func (s *Series) Multiply(other *Series, ignoreMissing bool) *Series {
+func (s *Series) Multiply(other *Series, ignoreNulls bool) *Series {
 	fn := func(v1 float64, v2 float64) float64 {
 		return v1 * v2
 	}
-	return s.combineMath(other, ignoreMissing, fn)
+	return s.combineMath(other, ignoreNulls, fn)
 }
 
 // Divide stub
-func (s *Series) Divide(other *Series, ignoreMissing bool) *Series {
+func (s *Series) Divide(other *Series, ignoreNulls bool) *Series {
 	fn := func(v1 float64, v2 float64) float64 {
 		defer func() {
 			recover()
 		}()
 		return v1 / v2
 	}
-	return s.combineMath(other, ignoreMissing, fn)
+	return s.combineMath(other, ignoreNulls, fn)
 }
 
 // -- GROUPERS

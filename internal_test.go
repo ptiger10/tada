@@ -641,7 +641,6 @@ func Test_reduceContainers(t *testing.T) {
 func Test_reduceContainersLimited(t *testing.T) {
 	type args struct {
 		containers []*valueContainer
-		index      []int
 	}
 	tests := []struct {
 		name string
@@ -652,13 +651,12 @@ func Test_reduceContainersLimited(t *testing.T) {
 			args: args{containers: []*valueContainer{
 				{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []string{"bar", "qux", "bar"}, isNull: []bool{false, false, false}, name: "baz"},
-			},
-				index: []int{1}},
-			want: map[string]int{"bar": 0, "qux": 1}},
+			}},
+			want: map[string]int{"1|bar": 0, "2|qux": 1, "3|bar": 2}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := reduceContainersLimited(tt.args.containers, tt.args.index); !reflect.DeepEqual(got, tt.want) {
+			if got := reduceContainersLimited(tt.args.containers); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("reduceContainersLimited() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1031,7 +1029,6 @@ func Test_valueContainer_after(t *testing.T) {
 func Test_concatenateLabelsToStrings(t *testing.T) {
 	type args struct {
 		labels []*valueContainer
-		index  []int
 	}
 	tests := []struct {
 		name string
@@ -1039,28 +1036,16 @@ func Test_concatenateLabelsToStrings(t *testing.T) {
 		want []string
 	}{
 		{"one level", args{labels: []*valueContainer{
-			{slice: []string{"foo", "bar"}}},
-			index: []int{0}},
+			{slice: []string{"foo", "bar"}}}},
 			[]string{"foo", "bar"}},
-		{"two levels, one index", args{labels: []*valueContainer{
-			{slice: []string{"foo", "bar"}},
-			{slice: []int{0, 1}}},
-			index: []int{0}},
-			[]string{"foo", "bar"}},
-		{"two levels, one index", args{labels: []*valueContainer{
-			{slice: []string{"foo", "bar"}},
-			{slice: []int{0, 1}}},
-			index: []int{1}},
-			[]string{"0", "1"}},
 		{"two levels, two index", args{labels: []*valueContainer{
 			{slice: []string{"foo", "bar"}},
-			{slice: []int{0, 1}}},
-			index: []int{0, 1}},
+			{slice: []int{0, 1}}}},
 			[]string{"foo|0", "bar|1"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := concatenateLabelsToStrings(tt.args.labels, tt.args.index); !reflect.DeepEqual(got, tt.want) {
+			if got := concatenateLabelsToStrings(tt.args.labels); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("concatenateLabelsToStrings() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3870,6 +3855,123 @@ func Test_makeDataFrameFromMatrices(t *testing.T) {
 			if got := makeDataFrameFromMatrices(tt.args.values, tt.args.isNull, tt.args.config); !EqualDataFrames(got, tt.want) {
 				t.Errorf("makeDataFrameFromMatrices() = %v, want %v", got, tt.want)
 				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+			}
+		})
+	}
+}
+
+func TestSeries_combineMath(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		other      *Series
+		ignoreNull bool
+		fn         func(v1 float64, v2 float64) float64
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"same index", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+			}},
+			args{
+				other: &Series{
+					values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+						{slice: []int{1}, isNull: []bool{false}, name: "qux"}}},
+				ignoreNull: false,
+				fn:         func(v1, v2 float64) float64 { return v1 + v2 }},
+			&Series{
+				values: &valueContainer{slice: []float64{3}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
+			},
+		},
+		{"different index", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+			}},
+			args{
+				other: &Series{
+					values: &valueContainer{slice: []float64{2, 20}, isNull: []bool{false, false}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []int{0, 1}, isNull: []bool{false, false}, name: "bar"}}},
+				ignoreNull: false,
+				fn:         func(v1, v2 float64) float64 { return v1 + v2 }},
+			&Series{
+				values: &valueContainer{slice: []float64{3}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
+			},
+		},
+		{"divide by zero", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+			}},
+			args{
+				other: &Series{
+					values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+						{slice: []int{1}, isNull: []bool{false}, name: "qux"}}},
+				ignoreNull: false,
+				fn:         func(v1, v2 float64) float64 { return v1 / v2 }},
+			&Series{
+				values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
+			},
+		},
+		{"divide by zero", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+			}},
+			args{
+				other: &Series{
+					values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+						{slice: []int{1}, isNull: []bool{false}, name: "qux"}}},
+				ignoreNull: false,
+				fn:         func(v1, v2 float64) float64 { return v1 / v2 }},
+			&Series{
+				values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.combineMath(tt.args.other, tt.args.ignoreNull, tt.args.fn); !EqualSeries(got, tt.want) {
+				t.Errorf("Series.combineMath() = %v, want %v", got, tt.want)
 			}
 		})
 	}

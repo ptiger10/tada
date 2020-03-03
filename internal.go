@@ -1154,16 +1154,16 @@ func convertColNamesToIndexPositions(names []string, columns []*valueContainer) 
 }
 
 // concatenateLabelsToStrings reduces all label levels referenced in the index to a single slice of concatenated strings
-func concatenateLabelsToStrings(labels []*valueContainer, index []int) []string {
-	labelStrings := make([][]string, len(index))
+func concatenateLabelsToStrings(labels []*valueContainer) []string {
+	labelStrings := make([][]string, len(labels))
 	// coerce every label level referenced in the index to a separate string slice
-	for incrementor, j := range index {
-		labelStrings[incrementor] = labels[j].string().slice
+	for j := range labels {
+		labelStrings[j] = labels[j].string().slice
 	}
 	ret := make([]string, len(labelStrings[0]))
 	// for each row, combine labels into one concatenated string
 	for i := 0; i < len(labelStrings[0]); i++ {
-		labelComponents := make([]string, len(index))
+		labelComponents := make([]string, len(labels))
 		for j := range labelStrings {
 			labelComponents[j] = labelStrings[j][i]
 		}
@@ -1187,7 +1187,7 @@ func reduceContainers(containers []*valueContainer, index []int) (
 	oldToNewRowMapping map[int]int) {
 	subset, _ := subsetContainers(containers, index)
 	// coerce all label levels to string for use as map keys
-	stringifiedLabels := concatenateLabelsToStrings(containers, index)
+	stringifiedLabels := concatenateLabelsToStrings(subset)
 	// create receiver for unique labels of same type as original levels
 	newContainers = make([]*valueContainer, len(subset))
 	for j := range subset {
@@ -1242,9 +1242,9 @@ func reduceContainers(containers []*valueContainer, index []int) (
 }
 
 // similar to reduceContainers, but only returns map of unique label combos and the row index where they first appear
-func reduceContainersLimited(containers []*valueContainer, index []int) map[string]int {
+func reduceContainersLimited(containers []*valueContainer) map[string]int {
 	ret := make(map[string]int)
-	stringifiedLabels := concatenateLabelsToStrings(containers, index)
+	stringifiedLabels := concatenateLabelsToStrings(containers)
 	for i, key := range stringifiedLabels {
 		if _, ok := ret[key]; !ok {
 			ret[key] = i
@@ -1279,38 +1279,45 @@ func matchLabelPositions(labels1 []string, labels2 map[string]int) []int {
 	return ret
 }
 
-func (s *Series) combineMath(other *Series, ignoreMissing bool, fn func(v1 float64, v2 float64) float64) *Series {
+func (s *Series) combineMath(other *Series, ignoreNulls bool, fn func(v1 float64, v2 float64) float64) *Series {
 	retFloat := make([]float64, s.Len())
 	retIsNull := make([]bool, s.Len())
-	lookupVals := s.Lookup(other)
-	lookupFloat := lookupVals.values.float64().slice
-	lookupNulls := lookupVals.values.isNull
 	originalFloat := s.values.float64().slice
 	originalNulls := s.values.isNull
+	lookupVals := s.Lookup(other)
+	otherFloat := lookupVals.values.float64().slice
+	otherNulls := lookupVals.values.isNull
+
 	for i := range originalFloat {
 		// handle null lookup
-		if lookupNulls[i] {
-			if ignoreMissing {
-				retFloat[i] = originalFloat[i]
-				retIsNull[i] = originalNulls[i]
-				continue
-			}
+		if (otherNulls[i] || originalNulls[i]) && !ignoreNulls {
 			retFloat[i] = 0
 			retIsNull[i] = true
 			continue
 		}
+		if otherNulls[i] {
+			retFloat[i] = originalFloat[i]
+			retIsNull[i] = originalNulls[i]
+			continue
+		} else if originalNulls[i] {
+			retFloat[i] = otherFloat[i]
+			retIsNull[i] = otherNulls[i]
+			continue
+		}
 		// actual combination logic
-		combinedFloat := fn(originalFloat[i], lookupFloat[i])
+		combinedFloat := fn(originalFloat[i], otherFloat[i])
 		// handle division by 0
 		if math.IsNaN(combinedFloat) || math.IsInf(combinedFloat, 0) {
 			retIsNull[i] = true
-			continue
+		} else {
+			retFloat[i] = combinedFloat
+			retIsNull[i] = originalNulls[i]
 		}
-		retFloat[i] = combinedFloat
-		retIsNull[i] = originalNulls[i]
 	}
 	// copy the labels to avoid sharing data with derivative Series
-	return &Series{values: &valueContainer{slice: retFloat, isNull: retIsNull}, labels: copyContainers(s.labels)}
+	return &Series{
+		values: &valueContainer{slice: retFloat, isNull: retIsNull, name: s.values.name},
+		labels: copyContainers(s.labels)}
 }
 
 func lookup(how string,
@@ -1363,8 +1370,17 @@ func lookupWithAnchor(
 	name string, anchorLabels []*valueContainer, leftOn []int,
 	lookupValues *valueContainer, lookupLabels []*valueContainer, rightOn []int) *Series {
 
-	toLookup := concatenateLabelsToStrings(anchorLabels, leftOn)
-	lookupSource := reduceContainersLimited(lookupLabels, rightOn)
+	subsetLeft, _ := subsetContainers(anchorLabels, leftOn)
+	subsetRight, _ := subsetContainers(lookupLabels, rightOn)
+	if reflect.DeepEqual(subsetLeft, subsetRight) {
+		return &Series{
+			values: lookupValues.copy(),
+			labels: copyContainers(anchorLabels),
+		}
+	}
+
+	toLookup := concatenateLabelsToStrings(subsetLeft)
+	lookupSource := reduceContainersLimited(subsetRight)
 	matches := matchLabelPositions(toLookup, lookupSource)
 	reflectLookup := reflect.ValueOf(lookupValues.slice)
 	isNull := make([]bool, len(matches))
@@ -1396,8 +1412,16 @@ func lookupDataFrameWithAnchor(
 	anchorLabels []*valueContainer, originalLabels []*valueContainer, leftOn []int,
 	lookupColumns []*valueContainer, lookupLabels []*valueContainer, rightOn []int, exclude []string) *DataFrame {
 
-	toLookup := concatenateLabelsToStrings(anchorLabels, leftOn)
-	lookupSource := reduceContainersLimited(lookupLabels, rightOn)
+	subsetLeft, _ := subsetContainers(anchorLabels, leftOn)
+	subsetRight, _ := subsetContainers(lookupLabels, rightOn)
+	if reflect.DeepEqual(subsetLeft, subsetRight) {
+		return &DataFrame{
+			values: copyContainers(lookupColumns),
+			labels: copyContainers(anchorLabels),
+		}
+	}
+	toLookup := concatenateLabelsToStrings(subsetLeft)
+	lookupSource := reduceContainersLimited(subsetRight)
 	matches := matchLabelPositions(toLookup, lookupSource)
 	// slice of slices
 	var retVals []*valueContainer
@@ -2156,7 +2180,7 @@ func (vc *valueContainer) uniqueIndex() []int {
 }
 
 func multiUniqueIndex(containers []*valueContainer) []int {
-	stringifiedRows := concatenateLabelsToStrings(containers, makeIntRange(0, len(containers)))
+	stringifiedRows := concatenateLabelsToStrings(containers)
 	m := make(map[string]bool)
 	ret := make([]int, 0)
 	for i, value := range stringifiedRows {
