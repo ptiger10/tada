@@ -49,9 +49,9 @@ func Benchmark_concatenateStringLabels(b *testing.B) {
 	for i := range f {
 		f[i] = rand.Float64()
 	}
-	s := make([]string, n)
+	s := make([]int, n)
 	for i := range f {
-		s[i] = "foo"
+		s[i] = rand.Int()
 	}
 	vcs := []*valueContainer{
 		&valueContainer{slice: f},
@@ -59,43 +59,5 @@ func Benchmark_concatenateStringLabels(b *testing.B) {
 	}
 	for i := 0; i < b.N; i++ {
 		concatenateLabelsToStrings(vcs)
-	}
-}
-
-func Benchmark_hashLabels(b *testing.B) {
-	n := 10000
-	f := make([]float64, n)
-	for i := range f {
-		f[i] = rand.Float64()
-	}
-	s := make([]string, n)
-	for i := range f {
-		s[i] = "foo"
-	}
-	vcs := []*valueContainer{
-		&valueContainer{slice: f},
-		&valueContainer{slice: s},
-	}
-	for i := 0; i < b.N; i++ {
-		hashLabels(vcs)
-	}
-}
-
-func Benchmark_encodeRows(b *testing.B) {
-	n := 10000
-	f := make([]float64, n)
-	for i := range f {
-		f[i] = rand.Float64()
-	}
-	s := make([]string, n)
-	for i := range f {
-		s[i] = "foo"
-	}
-	vcs := []*valueContainer{
-		&valueContainer{slice: f},
-		&valueContainer{slice: s},
-	}
-	for i := 0; i < b.N; i++ {
-		encodeRows(vcs)
 	}
 }

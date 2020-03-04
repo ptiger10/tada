@@ -197,6 +197,17 @@ func (vc *valueContainer) float64() floatValueContainer {
 	return ret
 }
 
+func convertInterfaceToString(i interface{}) string {
+	switch i.(type) {
+	case string:
+		return i.(string)
+	case []byte:
+		return string(i.([]byte))
+	default:
+		return fmt.Sprint(i)
+	}
+}
+
 // if already []string, returns shared values, not new values
 func (vc *valueContainer) string() stringValueContainer {
 	newVals := make([]string, reflect.ValueOf(vc.slice).Len())
@@ -205,20 +216,21 @@ func (vc *valueContainer) string() stringValueContainer {
 	case []string:
 		newVals = vc.slice.([]string)
 
-	case []float64, []time.Time, []bool, []interface{},
-		[]uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64:
-		d := reflect.ValueOf(vc.slice)
-		for i := 0; i < d.Len(); i++ {
-			newVals[i] = fmt.Sprint(d.Index(i).Interface())
+	case [][]byte:
+		arr := vc.slice.([][]byte)
+		for i := range arr {
+			newVals[i] = string(arr[i])
 		}
-	case [][]string, [][]float64, [][]time.Time,
+
+	case []float64, []time.Time, []bool, []interface{},
+		[]uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64,
+		[][]string, [][]float64, [][]time.Time,
 		[][]bool, [][]float32,
-		[][]uint, [][]uint8, [][]uint16, [][]uint32, [][]uint64,
+		[][]uint, [][]uint16, [][]uint32, [][]uint64,
 		[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
 		d := reflect.ValueOf(vc.slice)
 		for i := 0; i < d.Len(); i++ {
-			nested := d.Index(i)
-			newVals[i] = fmt.Sprint(nested.Interface())
+			newVals[i] = fmt.Sprint(d.Index(i).Interface())
 		}
 	default:
 		for i := range newVals {

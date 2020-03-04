@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/d4l3k/messagediff"
-	"github.com/mitchellh/hashstructure"
 )
 
 func TestMain(m *testing.M) {
@@ -227,6 +226,7 @@ func Test_setNullsFromInterface(t *testing.T) {
 		{"float", args{[]float64{1, math.NaN()}}, []bool{false, true}},
 		{"int", args{[]int{0}}, []bool{false}},
 		{"string", args{[]string{"foo", ""}}, []bool{false, true}},
+		{"bytes", args{[][]byte{[]byte("foo"), []byte("")}}, []bool{false, true}},
 		{"dateTime", args{[]time.Time{time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC), {}}}, []bool{false, true, true}},
 		{"element", args{[]Element{{0, true}, {1, false}}}, []bool{true, false}},
 		{"interface", args{[]interface{}{
@@ -3979,71 +3979,22 @@ func TestSeries_combineMath(t *testing.T) {
 	}
 }
 
-func Test_hashLabels(t *testing.T) {
-	// h1, _ := hashstructure.Hash([]interface{}{"foo", "bar"}, nil)
-	h2, _ := hashstructure.Hash([]interface{}{int(1), float64(1), time.Time{}}, nil)
+func Test_isNullByte(t *testing.T) {
 	type args struct {
-		labels []*valueContainer
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    []uint64
-		wantErr bool
-	}{
-		// {"string",
-		// 	args{[]*valueContainer{
-		// 		{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"},
-		// 		{slice: []string{"bar"}, isNull: []bool{false}, name: "qux"},
-		// 	}},
-		// 	[]uint64{h1},
-		// 	false,
-		// },
-		{"multiple",
-			args{[]*valueContainer{
-				{slice: []int{1}, isNull: []bool{false}, name: "bar"},
-				{slice: []float64{1}, isNull: []bool{false}, name: "qux"},
-				{slice: []time.Time{{}}, isNull: []bool{false}, name: "quz"},
-			}},
-			[]uint64{h2},
-			false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := hashLabels(tt.args.labels)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("hashLabels() error = %#v, want %#v", got, tt.want)
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("hashLabels() = %#v, want %#v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_encodeRows(t *testing.T) {
-	type args struct {
-		containers []*valueContainer
+		b []byte
 	}
 	tests := []struct {
 		name string
 		args args
-		want []string
+		want bool
 	}{
-		{"pass", args{[]*valueContainer{
-			{slice: []int{1, 1}, isNull: []bool{false}, name: "bar"},
-			{slice: []float64{1, 1}, isNull: []bool{false}, name: "qux"},
-			{slice: []string{"foo", "foo"}, isNull: []bool{false}, name: "qux"},
-		}}, []string{
-			"AwQAAgUIAP7wPwYMAANmb28=",
-			"AwQAAgUIAP7wPwYMAANmb28=",
-		}},
+		{"not null", args{[]byte("foo")}, false},
+		{"is null", args{[]byte("")}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := encodeRows(tt.args.containers); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("encodeRows() = %v, want %v", got, tt.want)
+			if got := isNullByte(tt.args.b); got != tt.want {
+				t.Errorf("isNullByte() = %v, want %v", got, tt.want)
 			}
 		})
 	}

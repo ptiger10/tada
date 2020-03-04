@@ -8,6 +8,7 @@ var optionMaxColumns = 20
 var optionAutoMerge = true
 var optionWarnings = true
 var optionNullStrings = map[string]bool{"NaN": true, "n/a": true, "N/A": true, "": true, "nil": true}
+var optionNullBytes = [][]byte{[]byte("NaN"), []byte("n/a"), []byte("N/A"), []byte(""), []byte("nil")}
 var optionPrefix = "*"
 var randSeed = time.Now().Unix()
 

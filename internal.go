@@ -3,9 +3,7 @@ package tada
 import (
 	"bufio"
 	"bytes"
-	"encoding/base64"
 	"encoding/csv"
-	"encoding/gob"
 	"fmt"
 	"io"
 	"log"
@@ -20,7 +18,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/araddon/dateparse"
-	"github.com/mitchellh/hashstructure"
 )
 
 func errorWarning(err error) {
@@ -1177,62 +1174,26 @@ func concatenateLabelsToStrings(labels []*valueContainer) []string {
 	return ret
 }
 
-func concatenateLabelsToBytes(labels []*valueContainer) [][]byte {
-	v := reflect.ValueOf(labels[0].slice)
-	ret := make([][]byte, v.Len())
-	concatVal := make([]byte, 0)
-	for i := 0; i < v.Len(); i++ {
-		for j := range labels {
-			src := reflect.ValueOf(labels[j].slice).Index(i).Bytes()
-			concatVal = append(concatVal,
-				append([]byte(optionLevelSeparator), src...)...)
-		}
-		ret[i] = concatVal
+// concatenateLabelsToStrings reduces all container rows to a single slice of concatenated strings, one per row
+func concatenateLabelsToStringsNew(labels []*valueContainer) []string {
+
+	labelStrings := make([][]string, len(labels))
+	// coerce every label level referenced in the index to a separate string slice
+	for j := range labels {
+		labelStrings[j] = labels[j].string().slice
 	}
+	ret := make([]string, len(labelStrings[0]))
+	// for each row, combine labels into one concatenated string
+	for i := 0; i < len(labelStrings[0]); i++ {
+		labelComponents := make([]string, len(labels))
+		for j := range labelStrings {
+			labelComponents[j] = labelStrings[j][i]
+		}
+		concatenatedString := strings.Join(labelComponents, optionLevelSeparator)
+		ret[i] = concatenatedString
+	}
+	// return a single slice of strings
 	return ret
-}
-
-func encodeRows(containers []*valueContainer) []string {
-	v := reflect.ValueOf(containers[0].slice)
-	ret := make([]string, v.Len())
-	// reuse concatLabels
-	buf := new(bytes.Buffer)
-	for i := 0; i < v.Len(); i++ {
-		enc := gob.NewEncoder(buf)
-		for j := range containers {
-			enc.EncodeValue(
-				reflect.ValueOf(containers[j].slice).Index(i))
-		}
-		ret[i] = base64.StdEncoding.EncodeToString(buf.Bytes())
-		buf.Reset()
-	}
-	return ret
-}
-
-func hashInterface(i []interface{}) (uint64, error) {
-	hash, err := hashstructure.Hash(i, nil)
-	if err != nil {
-		return 0, err
-	}
-	return hash, nil
-}
-
-func hashLabels(labels []*valueContainer) (ret []uint64, err error) {
-	v := reflect.ValueOf(labels[0].slice)
-	ret = make([]uint64, v.Len())
-	for i := 0; i < v.Len(); i++ {
-		concatLabels := make([]interface{}, len(labels))
-		for j := range labels {
-			src := reflect.ValueOf(labels[j].slice)
-			concatLabels[j] = src.Index(i).Interface()
-		}
-		ret[i], err = hashInterface(concatLabels)
-		if err != nil {
-			return nil, err
-		}
-
-	}
-	return ret, nil
 }
 
 // reduceContainers reduces the containers referenced in the index
@@ -1616,6 +1577,16 @@ func setNullsFromInterface(input interface{}) []bool {
 				ret[i] = false
 			}
 		}
+	case [][]byte:
+		vals := input.([][]byte)
+		ret = make([]bool, len(vals))
+		for i := range ret {
+			if isNullByte(vals[i]) {
+				ret[i] = true
+			} else {
+				ret[i] = false
+			}
+		}
 	case []time.Time:
 		vals := input.([]time.Time)
 		ret = make([]bool, len(vals))
@@ -1653,7 +1624,7 @@ func setNullsFromInterface(input interface{}) []bool {
 	// nested slices
 	case [][]string, [][]float64, [][]time.Time,
 		[][]bool, [][]float32,
-		[][]uint, [][]uint8, [][]uint16, [][]uint32, [][]uint64,
+		[][]uint, [][]uint16, [][]uint32, [][]uint64,
 		[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
 		v := reflect.ValueOf(input)
 		l := v.Len()
@@ -1694,6 +1665,15 @@ func isNullString(s string) bool {
 		return false
 	}
 	return true
+}
+
+func isNullByte(b []byte) bool {
+	for i := range optionNullBytes {
+		if bytes.Equal(b, optionNullBytes[i]) {
+			return true
+		}
+	}
+	return false
 }
 
 // math
