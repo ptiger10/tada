@@ -3999,3 +3999,29 @@ func Test_isNullByte(t *testing.T) {
 		})
 	}
 }
+
+func Test_concatenateLabelsToStringsNew(t *testing.T) {
+	type args struct {
+		labels []*valueContainer
+	}
+	tests := []struct {
+		name string
+		args args
+		want []string
+	}{
+		{"one level", args{labels: []*valueContainer{
+			{slice: []string{"foo", "bar"}}}},
+			[]string{"foo", "bar"}},
+		{"two levels, two index", args{labels: []*valueContainer{
+			{slice: []string{"foo", "bar"}},
+			{slice: []int{0, 1}}}},
+			[]string{"foo|0", "bar|1"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := concatenateLabelsToStringsDirectAccess(tt.args.labels); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("concatenateLabelsToStringsNew() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

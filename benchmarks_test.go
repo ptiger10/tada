@@ -61,3 +61,41 @@ func Benchmark_concatenateStringLabels(b *testing.B) {
 		concatenateLabelsToStrings(vcs)
 	}
 }
+
+func Benchmark_concatenateStringLabelsDirectAccess(b *testing.B) {
+	n := 10000
+	f := make([]float64, n)
+	for i := range f {
+		f[i] = rand.Float64()
+	}
+	s := make([]int, n)
+	for i := range f {
+		s[i] = rand.Int()
+	}
+	vcs := []*valueContainer{
+		&valueContainer{slice: f},
+		&valueContainer{slice: s},
+	}
+	for i := 0; i < b.N; i++ {
+		concatenateLabelsToStringsDirectAccess(vcs)
+	}
+}
+
+func Benchmark_concatenateStringLabelsBytesFirst(b *testing.B) {
+	n := 10000
+	f := make([]float64, n)
+	for i := range f {
+		f[i] = rand.Float64()
+	}
+	s := make([]int, n)
+	for i := range f {
+		s[i] = rand.Int()
+	}
+	vcs := []*valueContainer{
+		&valueContainer{slice: f},
+		&valueContainer{slice: s},
+	}
+	for i := 0; i < b.N; i++ {
+		concatenateLabelsToStringsByteFirst(vcs)
+	}
+}

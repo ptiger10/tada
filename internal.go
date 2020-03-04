@@ -1175,8 +1175,24 @@ func concatenateLabelsToStrings(labels []*valueContainer) []string {
 }
 
 // concatenateLabelsToStrings reduces all container rows to a single slice of concatenated strings, one per row
-func concatenateLabelsToStringsNew(labels []*valueContainer) []string {
+func concatenateLabelsToStringsDirectAccess(labels []*valueContainer) []string {
+	l := reflect.ValueOf(labels[0].slice).Len()
+	ret := make([]string, l)
+	// for each row, combine labels into one concatenated string
+	for i := 0; i < l; i++ {
+		var s string
+		for j := range labels {
+			s += convertInterfaceToString(
+				reflect.ValueOf(labels[j].slice).Index(i)) + optionLevelSeparator
+		}
+		ret[i] = s
+	}
+	// return a single slice of strings
+	return ret
+}
 
+// concatenateLabelsToStrings reduces all container rows to a single slice of concatenated strings, one per row
+func concatenateLabelsToStringsByteFirst(labels []*valueContainer) []string {
 	labelStrings := make([][]string, len(labels))
 	// coerce every label level referenced in the index to a separate string slice
 	for j := range labels {
@@ -1185,12 +1201,11 @@ func concatenateLabelsToStringsNew(labels []*valueContainer) []string {
 	ret := make([]string, len(labelStrings[0]))
 	// for each row, combine labels into one concatenated string
 	for i := 0; i < len(labelStrings[0]); i++ {
-		labelComponents := make([]string, len(labels))
+		var b []byte
 		for j := range labelStrings {
-			labelComponents[j] = labelStrings[j][i]
+			b = append(b, []byte(labelStrings[j][i]+optionLevelSeparator)...)
 		}
-		concatenatedString := strings.Join(labelComponents, optionLevelSeparator)
-		ret[i] = concatenatedString
+		ret[i] = string(b)
 	}
 	// return a single slice of strings
 	return ret
