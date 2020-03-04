@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/d4l3k/messagediff"
+	"github.com/mitchellh/hashstructure"
 )
 
 func TestMain(m *testing.M) {
@@ -3973,6 +3974,76 @@ func TestSeries_combineMath(t *testing.T) {
 			}
 			if got := s.combineMath(tt.args.other, tt.args.ignoreNull, tt.args.fn); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.combineMath() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_hashLabels(t *testing.T) {
+	// h1, _ := hashstructure.Hash([]interface{}{"foo", "bar"}, nil)
+	h2, _ := hashstructure.Hash([]interface{}{int(1), float64(1), time.Time{}}, nil)
+	type args struct {
+		labels []*valueContainer
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []uint64
+		wantErr bool
+	}{
+		// {"string",
+		// 	args{[]*valueContainer{
+		// 		{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"},
+		// 		{slice: []string{"bar"}, isNull: []bool{false}, name: "qux"},
+		// 	}},
+		// 	[]uint64{h1},
+		// 	false,
+		// },
+		{"multiple",
+			args{[]*valueContainer{
+				{slice: []int{1}, isNull: []bool{false}, name: "bar"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "qux"},
+				{slice: []time.Time{{}}, isNull: []bool{false}, name: "quz"},
+			}},
+			[]uint64{h2},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := hashLabels(tt.args.labels)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("hashLabels() error = %#v, want %#v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("hashLabels() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_encodeRows(t *testing.T) {
+	type args struct {
+		containers []*valueContainer
+	}
+	tests := []struct {
+		name string
+		args args
+		want []string
+	}{
+		{"pass", args{[]*valueContainer{
+			{slice: []int{1, 1}, isNull: []bool{false}, name: "bar"},
+			{slice: []float64{1, 1}, isNull: []bool{false}, name: "qux"},
+			{slice: []string{"foo", "foo"}, isNull: []bool{false}, name: "qux"},
+		}}, []string{
+			"AwQAAgUIAP7wPwYMAANmb28=",
+			"AwQAAgUIAP7wPwYMAANmb28=",
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := encodeRows(tt.args.containers); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("encodeRows() = %v, want %v", got, tt.want)
 			}
 		})
 	}

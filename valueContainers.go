@@ -148,7 +148,6 @@ func (vc *valueContainer) float64() floatValueContainer {
 	case []time.Time:
 		arr := vc.slice.([]time.Time)
 		for i := range arr {
-			// newVals[i] = float64(arr[i].UnixNano())
 			newVals[i], isNull[i] = convertDateTimeToFloat(arr[i], isNull[i])
 		}
 
@@ -191,7 +190,7 @@ func (vc *valueContainer) float64() floatValueContainer {
 	}
 
 	ret := floatValueContainer{
-		isNull: isNull,
+		isNull: copyNulls(isNull),
 		slice:  newVals,
 		index:  makeIntRange(0, len(newVals)),
 	}
@@ -205,8 +204,9 @@ func (vc *valueContainer) string() stringValueContainer {
 	switch vc.slice.(type) {
 	case []string:
 		newVals = vc.slice.([]string)
+
 	case []float64, []time.Time, []bool, []interface{},
-		[]float32, []uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64:
+		[]uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64:
 		d := reflect.ValueOf(vc.slice)
 		for i := 0; i < d.Len(); i++ {
 			newVals[i] = fmt.Sprint(d.Index(i).Interface())
@@ -229,7 +229,7 @@ func (vc *valueContainer) string() stringValueContainer {
 	}
 	ret := stringValueContainer{
 		slice:  newVals,
-		isNull: isNull,
+		isNull: copyNulls(isNull),
 		index:  makeIntRange(0, len(newVals)),
 	}
 	return ret
@@ -274,8 +274,8 @@ func (vc *valueContainer) dateTime() dateTimeValueContainer {
 		}
 	}
 	ret := dateTimeValueContainer{
-		isNull: isNull,
 		slice:  newVals,
+		isNull: copyNulls(isNull),
 		index:  makeIntRange(0, len(newVals)),
 	}
 	return ret

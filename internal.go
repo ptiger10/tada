@@ -3,7 +3,9 @@ package tada
 import (
 	"bufio"
 	"bytes"
+	"encoding/base64"
 	"encoding/csv"
+	"encoding/gob"
 	"fmt"
 	"io"
 	"log"
@@ -18,6 +20,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/araddon/dateparse"
+	"github.com/mitchellh/hashstructure"
 )
 
 func errorWarning(err error) {
@@ -1153,7 +1156,7 @@ func convertColNamesToIndexPositions(names []string, columns []*valueContainer) 
 	return ret, nil
 }
 
-// concatenateLabelsToStrings reduces all label levels referenced in the index to a single slice of concatenated strings
+// concatenateLabelsToStrings reduces all container rows to a single slice of concatenated strings, one per row
 func concatenateLabelsToStrings(labels []*valueContainer) []string {
 	labelStrings := make([][]string, len(labels))
 	// coerce every label level referenced in the index to a separate string slice
@@ -1172,6 +1175,64 @@ func concatenateLabelsToStrings(labels []*valueContainer) []string {
 	}
 	// return a single slice of strings
 	return ret
+}
+
+func concatenateLabelsToBytes(labels []*valueContainer) [][]byte {
+	v := reflect.ValueOf(labels[0].slice)
+	ret := make([][]byte, v.Len())
+	concatVal := make([]byte, 0)
+	for i := 0; i < v.Len(); i++ {
+		for j := range labels {
+			src := reflect.ValueOf(labels[j].slice).Index(i).Bytes()
+			concatVal = append(concatVal,
+				append([]byte(optionLevelSeparator), src...)...)
+		}
+		ret[i] = concatVal
+	}
+	return ret
+}
+
+func encodeRows(containers []*valueContainer) []string {
+	v := reflect.ValueOf(containers[0].slice)
+	ret := make([]string, v.Len())
+	// reuse concatLabels
+	buf := new(bytes.Buffer)
+	for i := 0; i < v.Len(); i++ {
+		enc := gob.NewEncoder(buf)
+		for j := range containers {
+			enc.EncodeValue(
+				reflect.ValueOf(containers[j].slice).Index(i))
+		}
+		ret[i] = base64.StdEncoding.EncodeToString(buf.Bytes())
+		buf.Reset()
+	}
+	return ret
+}
+
+func hashInterface(i []interface{}) (uint64, error) {
+	hash, err := hashstructure.Hash(i, nil)
+	if err != nil {
+		return 0, err
+	}
+	return hash, nil
+}
+
+func hashLabels(labels []*valueContainer) (ret []uint64, err error) {
+	v := reflect.ValueOf(labels[0].slice)
+	ret = make([]uint64, v.Len())
+	for i := 0; i < v.Len(); i++ {
+		concatLabels := make([]interface{}, len(labels))
+		for j := range labels {
+			src := reflect.ValueOf(labels[j].slice)
+			concatLabels[j] = src.Index(i).Interface()
+		}
+		ret[i], err = hashInterface(concatLabels)
+		if err != nil {
+			return nil, err
+		}
+
+	}
+	return ret, nil
 }
 
 // reduceContainers reduces the containers referenced in the index
@@ -1500,6 +1561,12 @@ func excludeFromIndex(indexLength int, item int) []int {
 	return ret
 }
 
+func copyNulls(isNull []bool) []bool {
+	ret := make([]bool, len(isNull))
+	copy(ret, isNull)
+	return ret
+}
+
 func copyContainers(containers []*valueContainer) []*valueContainer {
 	ret := make([]*valueContainer, len(containers))
 	for k := range containers {
@@ -1515,11 +1582,9 @@ func (vc *valueContainer) copy() *valueContainer {
 		ptr := vals.Index(i)
 		ptr.Set(v.Index(i))
 	}
-	isNull := make([]bool, len(vc.isNull))
-	copy(isNull, vc.isNull)
 	return &valueContainer{
 		slice:  vals.Interface(),
-		isNull: isNull,
+		isNull: copyNulls(vc.isNull),
 		name:   vc.name,
 	}
 }
