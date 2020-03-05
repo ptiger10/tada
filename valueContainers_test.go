@@ -459,7 +459,14 @@ func Test_convertStringToDateTime(t *testing.T) {
 		want  time.Time
 		want1 bool
 	}{
-		{"not null", args{"1/1/20"}, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), false},
+		{"not null", args{"2020-02-01"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
+		{"not null", args{"02-01-2020"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
+		{"not null", args{"02/01/2020"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
+		{"not null", args{"2/1/2020"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
+		{"not null", args{"2020-02-01 00:00:00 +0000 UTC"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
+		{"RFC3339", args{"2020-02-01T00:00:00Z"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
+		{"RFC3339Nano", args{"2020-02-01T00:00:00.0000000000Z"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
+		{"RFC822", args{"01 Feb 20 00:00 UTC"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
 		{"null", args{"foo"}, time.Time{}, true},
 	}
 	for _, tt := range tests {
@@ -489,7 +496,7 @@ func Test_valueContainer_dateTime(t *testing.T) {
 	}{
 		{"[]float64", fields{slice: []float64{1}, isNull: []bool{false}},
 			dateTimeValueContainer{slice: []time.Time{{}}, isNull: []bool{true}}},
-		{"[]string", fields{slice: []string{"", "1/1/20", "foo"}, isNull: []bool{true, false, true}},
+		{"[]string", fields{slice: []string{"", "1/1/2020", "foo"}, isNull: []bool{true, false, true}},
 			dateTimeValueContainer{slice: []time.Time{{}, d, {}}, isNull: []bool{true, false, true}}},
 		{"[]time.Time", fields{slice: []time.Time{{}, d}, isNull: []bool{true, false}},
 			dateTimeValueContainer{slice: []time.Time{{}, d}, isNull: []bool{true, false}}},

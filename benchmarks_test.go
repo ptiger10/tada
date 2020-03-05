@@ -21,11 +21,11 @@ func makeBenchmarkDF() *DataFrame {
 
 var benchmarkDF = makeBenchmarkDF()
 
-func Benchmark_DropNull(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		benchmarkDF.DropNull()
-	}
-}
+// func Benchmark_DropNull(b *testing.B) {
+// 	for i := 0; i < b.N; i++ {
+// 		benchmarkDF.DropNull()
+// 	}
+// }
 
 // func Benchmark_ReadCSV(b *testing.B) {
 // 	for i := 0; i < b.N; i++ {
@@ -115,9 +115,11 @@ func Benchmark_concatenateStringLabels(b *testing.B) {
 		// &valueContainer{slice: f},
 		// &valueContainer{slice: f},
 		// &valueContainer{slice: i},
-		&valueContainer{slice: d},
-		&valueContainer{slice: d},
-		&valueContainer{slice: d},
+		// &valueContainer{slice: d},
+		// &valueContainer{slice: d},
+		// &valueContainer{slice: d},
+		// &valueContainer{slice: s},
+		// &valueContainer{slice: s},
 		// &valueContainer{slice: s},
 	}
 	for i := 0; i < b.N; i++ {

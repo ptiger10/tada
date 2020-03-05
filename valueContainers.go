@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/araddon/dateparse"
 	"github.com/cheekybits/genny/generic"
 )
 
@@ -263,10 +262,13 @@ func (vc *valueContainer) string() stringValueContainer {
 	return ret
 }
 
+// returns parsed time and whether value is null
 func convertStringToDateTime(val string) (time.Time, bool) {
-	parsedVal, err := dateparse.ParseAny(val)
-	if err == nil {
-		return parsedVal, false
+	for _, format := range optionDateTimeFormats {
+		parsedVal, err := time.Parse(format, val)
+		if err == nil {
+			return parsedVal, false
+		}
 	}
 	return time.Time{}, true
 }

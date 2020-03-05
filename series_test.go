@@ -2719,7 +2719,7 @@ func TestSeries_SliceTime(t *testing.T) {
 		want   []time.Time
 	}{
 		{"default values", fields{
-			values: &valueContainer{slice: []string{"2020/1/1"}, isNull: []bool{false}, name: "foo"},
+			values: &valueContainer{slice: []string{"1/1/2020"}, isNull: []bool{false}, name: "foo"},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
 			[]time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
 		},

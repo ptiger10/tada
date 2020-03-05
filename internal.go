@@ -16,8 +16,6 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
-
-	"github.com/araddon/dateparse"
 )
 
 func errorWarning(err error) {
@@ -632,7 +630,7 @@ func inferType(input string) string {
 	if _, err := strconv.ParseFloat(input, 64); err == nil {
 		return "float"
 	}
-	if t, err := dateparse.ParseAny(input); err == nil {
+	if t, null := convertStringToDateTime(input); !null {
 		if t.Hour() == 0 && t.Minute() == 0 && t.Second() == 0 && t.Nanosecond() == 0 {
 			return "date"
 		}

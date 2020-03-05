@@ -10,6 +10,9 @@ var optionWarnings = true
 var optionNullStrings = map[string]bool{"NaN": true, "n/a": true, "N/A": true, "": true, "nil": true}
 var optionNullBytes = [][]byte{[]byte("NaN"), []byte("n/a"), []byte("N/A"), []byte(""), []byte("nil")}
 var optionPrefix = "*"
+var optionDateTimeFormats = []string{
+	"2006-01-02", "01-02-2006", "01/02/2006", "1/2/2006", "2006-01-02 15:04:05 -0700 MST",
+	time.RFC3339, time.RFC3339Nano, time.RFC822}
 var randSeed = time.Now().Unix()
 
 // SetOptionLevelSeparator stub
@@ -40,4 +43,10 @@ func DisableWarnings() {
 // EnableWarnings stub
 func EnableWarnings() {
 	optionWarnings = true
+}
+
+// SetOptionAddTimeFormat adds `format` to the list of time formats that
+// can be parsed when converting values from string to time.Time
+func SetOptionAddTimeFormat(format string) {
+	optionDateTimeFormats = append(optionDateTimeFormats, format)
 }
