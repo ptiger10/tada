@@ -190,22 +190,10 @@ func (vc *valueContainer) float64() floatValueContainer {
 	}
 
 	ret := floatValueContainer{
-		isNull: copyNulls(isNull),
+		isNull: isNull,
 		slice:  newVals,
-		index:  makeIntRange(0, len(newVals)),
 	}
 	return ret
-}
-
-func convertInterfaceToString(i interface{}) string {
-	switch i.(type) {
-	case string:
-		return i.(string)
-	case []byte:
-		return string(i.([]byte))
-	default:
-		return fmt.Sprint(i)
-	}
 }
 
 // if already []string, returns shared values, not new values
@@ -221,9 +209,20 @@ func (vc *valueContainer) string() stringValueContainer {
 		for i := range arr {
 			newVals[i] = string(arr[i])
 		}
+	case []time.Time:
+		arr := vc.slice.([]time.Time)
+		for i := range arr {
+			newVals[i] = arr[i].String()
+		}
 
-	case []float64, []time.Time, []bool, []interface{},
-		[]uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64,
+	case []int:
+		arr := vc.slice.([]int)
+		for i := range arr {
+			newVals[i] = strconv.Itoa(arr[i])
+		}
+
+	case []float64, []bool, []interface{},
+		[]uint, []uint8, []uint16, []uint32, []uint64, []int8, []int16, []int32, []int64,
 		[][]string, [][]float64, [][]time.Time,
 		[][]bool, [][]float32,
 		[][]uint, [][]uint16, [][]uint32, [][]uint64,
@@ -241,8 +240,63 @@ func (vc *valueContainer) string() stringValueContainer {
 	}
 	ret := stringValueContainer{
 		slice:  newVals,
-		isNull: copyNulls(isNull),
-		index:  makeIntRange(0, len(newVals)),
+		isNull: isNull,
+	}
+	return ret
+}
+
+// for use in groupby statements (rounds float64, format datetime)
+func (vc *valueContainer) groupedString() stringValueContainer {
+	newVals := make([]string, reflect.ValueOf(vc.slice).Len())
+
+	isNull := vc.isNull
+	switch vc.slice.(type) {
+	case []string:
+		newVals = vc.slice.([]string)
+
+	case [][]byte:
+		arr := vc.slice.([][]byte)
+		for i := range arr {
+			newVals[i] = string(arr[i])
+		}
+
+	case []time.Time:
+		arr := vc.slice.([]time.Time)
+		for i := range arr {
+			newVals[i] = arr[i].Format(time.RFC3339)
+		}
+
+	case []int:
+		arr := vc.slice.([]int)
+		for i := range arr {
+			newVals[i] = strconv.Itoa(arr[i])
+		}
+
+	case []float64:
+		arr := vc.slice.([]float64)
+		for i := range arr {
+			newVals[i] = strconv.Itoa(int(arr[i]))
+		}
+	case []bool, []interface{},
+		[]uint, []uint8, []uint16, []uint32, []uint64, []int8, []int16, []int32, []int64,
+		[][]string, [][]float64, [][]time.Time,
+		[][]bool, [][]float32,
+		[][]uint, [][]uint16, [][]uint32, [][]uint64,
+		[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
+		d := reflect.ValueOf(vc.slice)
+		for i := 0; i < d.Len(); i++ {
+			newVals[i] = fmt.Sprint(d.Index(i).Interface())
+		}
+	default:
+		for i := range newVals {
+			newVals[i] = ""
+			isNull[i] = true
+		}
+
+	}
+	ret := stringValueContainer{
+		slice:  newVals,
+		isNull: isNull,
 	}
 	return ret
 }
@@ -287,8 +341,7 @@ func (vc *valueContainer) dateTime() dateTimeValueContainer {
 	}
 	ret := dateTimeValueContainer{
 		slice:  newVals,
-		isNull: copyNulls(isNull),
-		index:  makeIntRange(0, len(newVals)),
+		isNull: isNull,
 	}
 	return ret
 

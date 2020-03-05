@@ -1175,37 +1175,21 @@ func concatenateLabelsToStrings(labels []*valueContainer) []string {
 }
 
 // concatenateLabelsToStrings reduces all container rows to a single slice of concatenated strings, one per row
-func concatenateLabelsToStringsDirectAccess(labels []*valueContainer) []string {
-	l := reflect.ValueOf(labels[0].slice).Len()
-	ret := make([]string, l)
-	// for each row, combine labels into one concatenated string
-	for i := 0; i < l; i++ {
-		var s string
-		for j := range labels {
-			s += convertInterfaceToString(
-				reflect.ValueOf(labels[j].slice).Index(i)) + optionLevelSeparator
-		}
-		ret[i] = s
-	}
-	// return a single slice of strings
-	return ret
-}
-
-// concatenateLabelsToStrings reduces all container rows to a single slice of concatenated strings, one per row
-func concatenateLabelsToStringsByteFirst(labels []*valueContainer) []string {
+func concatenateLabelsToStringsGrouped(labels []*valueContainer) []string {
 	labelStrings := make([][]string, len(labels))
 	// coerce every label level referenced in the index to a separate string slice
 	for j := range labels {
-		labelStrings[j] = labels[j].string().slice
+		labelStrings[j] = labels[j].groupedString().slice
 	}
 	ret := make([]string, len(labelStrings[0]))
 	// for each row, combine labels into one concatenated string
 	for i := 0; i < len(labelStrings[0]); i++ {
-		var b []byte
+		labelComponents := make([]string, len(labels))
 		for j := range labelStrings {
-			b = append(b, []byte(labelStrings[j][i]+optionLevelSeparator)...)
+			labelComponents[j] = labelStrings[j][i]
 		}
-		ret[i] = string(b)
+		concatenatedString := strings.Join(labelComponents, optionLevelSeparator)
+		ret[i] = concatenatedString
 	}
 	// return a single slice of strings
 	return ret
@@ -1551,15 +1535,35 @@ func copyContainers(containers []*valueContainer) []*valueContainer {
 	return ret
 }
 
-func (vc *valueContainer) copy() *valueContainer {
-	v := reflect.ValueOf(vc.slice)
-	vals := reflect.MakeSlice(v.Type(), v.Len(), v.Len())
-	for i := 0; i < v.Len(); i++ {
-		ptr := vals.Index(i)
-		ptr.Set(v.Index(i))
+func copyInterface(i interface{}) interface{} {
+	v := reflect.ValueOf(i)
+	l := v.Len()
+	switch i.(type) {
+	case []float64:
+		vals := make([]float64, l)
+		copy(vals, i.([]float64))
+		return vals
+	case []string:
+		vals := make([]string, l)
+		copy(vals, i.([]string))
+		return vals
+	case []time.Time:
+		vals := make([]time.Time, l)
+		copy(vals, i.([]time.Time))
+		return vals
+	default:
+		vals := reflect.MakeSlice(v.Type(), l, l)
+		for i := 0; i < v.Len(); i++ {
+			ptr := vals.Index(i)
+			ptr.Set(v.Index(i))
+		}
+		return vals.Interface()
 	}
+}
+
+func (vc *valueContainer) copy() *valueContainer {
 	return &valueContainer{
-		slice:  vals.Interface(),
+		slice:  copyInterface(vc.slice),
 		isNull: copyNulls(vc.isNull),
 		name:   vc.name,
 	}

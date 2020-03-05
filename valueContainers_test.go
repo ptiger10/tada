@@ -363,7 +363,7 @@ func Test_convertBoolToFloat(t *testing.T) {
 	}
 }
 
-func Test_valueContainer_float(t *testing.T) {
+func Test_valueContainer_float64(t *testing.T) {
 	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	type fields struct {
 		slice  interface{}
@@ -376,19 +376,19 @@ func Test_valueContainer_float(t *testing.T) {
 		want   floatValueContainer
 	}{
 		{"[]float64", fields{slice: []float64{1}, isNull: []bool{false}},
-			floatValueContainer{slice: []float64{1}, isNull: []bool{false}, index: []int{0}}},
+			floatValueContainer{slice: []float64{1}, isNull: []bool{false}}},
 		{"[]string", fields{slice: []string{"", "foo", "3.5"}, isNull: []bool{true, false, false}},
-			floatValueContainer{slice: []float64{0, 0, 3.5}, isNull: []bool{true, true, false}, index: []int{0, 1, 2}}},
+			floatValueContainer{slice: []float64{0, 0, 3.5}, isNull: []bool{true, true, false}}},
 		{"[]time.Time", fields{slice: []time.Time{{}, d}, isNull: []bool{true, false}},
-			floatValueContainer{slice: []float64{0, 0}, isNull: []bool{true, true}, index: []int{0, 1}}},
+			floatValueContainer{slice: []float64{0, 0}, isNull: []bool{true, true}}},
 		{"[]bool", fields{slice: []bool{false, true, false}, isNull: []bool{false, false, true}},
-			floatValueContainer{slice: []float64{0, 1, 0}, isNull: []bool{false, false, true}, index: []int{0, 1, 2}}},
+			floatValueContainer{slice: []float64{0, 1, 0}, isNull: []bool{false, false, true}}},
 		{"[]interface", fields{slice: []interface{}{"3.5", float64(1), int(1), uint(1), d, false}, isNull: []bool{false, false, false, false, false, false}},
-			floatValueContainer{slice: []float64{3.5, 1, 1, 1, 0, 0}, isNull: []bool{false, false, false, false, true, false}, index: []int{0, 1, 2, 3, 4, 5}}},
+			floatValueContainer{slice: []float64{3.5, 1, 1, 1, 0, 0}, isNull: []bool{false, false, false, false, true, false}}},
 		{"[]int", fields{slice: []int{1}, isNull: []bool{false}},
-			floatValueContainer{slice: []float64{1}, isNull: []bool{false}, index: []int{0}}},
+			floatValueContainer{slice: []float64{1}, isNull: []bool{false}}},
 		{"[][]float64", fields{slice: [][]float64{{1}}, isNull: []bool{false}},
-			floatValueContainer{slice: []float64{0}, isNull: []bool{true}, index: []int{0}}},
+			floatValueContainer{slice: []float64{0}, isNull: []bool{true}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -398,13 +398,13 @@ func Test_valueContainer_float(t *testing.T) {
 				name:   tt.fields.name,
 			}
 			if got := vc.float64(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("valueContainer.float() = %v, want %v", got, tt.want)
+				t.Errorf("valueContainer.float64() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func Test_valueContainer_str(t *testing.T) {
+func Test_valueContainer_string(t *testing.T) {
 	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	type fields struct {
 		slice  interface{}
@@ -417,23 +417,23 @@ func Test_valueContainer_str(t *testing.T) {
 		want   stringValueContainer
 	}{
 		{"[]float64", fields{slice: []float64{1}, isNull: []bool{false}},
-			stringValueContainer{slice: []string{"1"}, isNull: []bool{false}, index: []int{0}}},
+			stringValueContainer{slice: []string{"1"}, isNull: []bool{false}}},
 		{"[]string", fields{slice: []string{"", "foo", "3.5"}, isNull: []bool{true, false, false}},
-			stringValueContainer{slice: []string{"", "foo", "3.5"}, isNull: []bool{true, false, false}, index: []int{0, 1, 2}}},
+			stringValueContainer{slice: []string{"", "foo", "3.5"}, isNull: []bool{true, false, false}}},
 		{"[]time.Time", fields{slice: []time.Time{{}, d}, isNull: []bool{true, false}},
-			stringValueContainer{slice: []string{"0001-01-01 00:00:00 +0000 UTC", "2020-01-01 00:00:00 +0000 UTC"}, isNull: []bool{true, false}, index: []int{0, 1}}},
+			stringValueContainer{slice: []string{"0001-01-01 00:00:00 +0000 UTC", "2020-01-01 00:00:00 +0000 UTC"}, isNull: []bool{true, false}}},
 		{"[]bool", fields{slice: []bool{false, true, false}, isNull: []bool{false, false, true}},
-			stringValueContainer{slice: []string{"false", "true", "false"}, isNull: []bool{false, false, true}, index: []int{0, 1, 2}}},
+			stringValueContainer{slice: []string{"false", "true", "false"}, isNull: []bool{false, false, true}}},
 		{"[]interface", fields{slice: []interface{}{"3.5", float64(1), int(1), uint(1), d, false}, isNull: []bool{false, false, false, false, false, false}},
-			stringValueContainer{slice: []string{"3.5", "1", "1", "1", "2020-01-01 00:00:00 +0000 UTC", "false"}, isNull: []bool{false, false, false, false, false, false}, index: []int{0, 1, 2, 3, 4, 5}}},
+			stringValueContainer{slice: []string{"3.5", "1", "1", "1", "2020-01-01 00:00:00 +0000 UTC", "false"}, isNull: []bool{false, false, false, false, false, false}}},
 		{"[]int", fields{slice: []int{1}, isNull: []bool{false}},
-			stringValueContainer{slice: []string{"1"}, isNull: []bool{false}, index: []int{0}}},
+			stringValueContainer{slice: []string{"1"}, isNull: []bool{false}}},
 		{"[][]byte", fields{slice: [][]byte{{100, 100}, {105, 105}}, isNull: []bool{false, false}},
-			stringValueContainer{slice: []string{"dd", "ii"}, isNull: []bool{false, false}, index: []int{0, 1}}},
+			stringValueContainer{slice: []string{"dd", "ii"}, isNull: []bool{false, false}}},
 		{"[][]string", fields{slice: [][]string{{"foo", "bar"}, {""}}, isNull: []bool{false, true}},
-			stringValueContainer{slice: []string{"[foo bar]", "[]"}, isNull: []bool{false, true}, index: []int{0, 1}}},
+			stringValueContainer{slice: []string{"[foo bar]", "[]"}, isNull: []bool{false, true}}},
 		{"[][]float64", fields{slice: [][]float64{{1, 2}, {0}}, isNull: []bool{false, true}},
-			stringValueContainer{slice: []string{"[1 2]", "[0]"}, isNull: []bool{false, true}, index: []int{0, 1}}},
+			stringValueContainer{slice: []string{"[1 2]", "[0]"}, isNull: []bool{false, true}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -444,6 +444,51 @@ func Test_valueContainer_str(t *testing.T) {
 			}
 			if got := vc.string(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("valueContainer.str() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_groupedString(t *testing.T) {
+	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   stringValueContainer
+	}{
+		{"[]float64", fields{slice: []float64{1.5}, isNull: []bool{false}},
+			stringValueContainer{slice: []string{"1"}, isNull: []bool{false}}},
+		{"[]string", fields{slice: []string{"", "foo", "3.5"}, isNull: []bool{true, false, false}},
+			stringValueContainer{slice: []string{"", "foo", "3.5"}, isNull: []bool{true, false, false}}},
+		{"[]time.Time", fields{slice: []time.Time{{}, d}, isNull: []bool{true, false}},
+			stringValueContainer{slice: []string{"0001-01-01T00:00:00Z", "2020-01-01T00:00:00Z"}, isNull: []bool{true, false}}},
+		{"[]bool", fields{slice: []bool{false, true, false}, isNull: []bool{false, false, true}},
+			stringValueContainer{slice: []string{"false", "true", "false"}, isNull: []bool{false, false, true}}},
+		{"[]interface", fields{slice: []interface{}{"3.5", float64(1), int(1), uint(1), d, false}, isNull: []bool{false, false, false, false, false, false}},
+			stringValueContainer{slice: []string{"3.5", "1", "1", "1", "2020-01-01 00:00:00 +0000 UTC", "false"}, isNull: []bool{false, false, false, false, false, false}}},
+		{"[]int", fields{slice: []int{1}, isNull: []bool{false}},
+			stringValueContainer{slice: []string{"1"}, isNull: []bool{false}}},
+		{"[][]byte", fields{slice: [][]byte{{100, 100}, {105, 105}}, isNull: []bool{false, false}},
+			stringValueContainer{slice: []string{"dd", "ii"}, isNull: []bool{false, false}}},
+		{"[][]string", fields{slice: [][]string{{"foo", "bar"}, {""}}, isNull: []bool{false, true}},
+			stringValueContainer{slice: []string{"[foo bar]", "[]"}, isNull: []bool{false, true}}},
+		{"[][]float64", fields{slice: [][]float64{{1, 2}, {0}}, isNull: []bool{false, true}},
+			stringValueContainer{slice: []string{"[1 2]", "[0]"}, isNull: []bool{false, true}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			if got := vc.groupedString(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.groupedString() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -488,17 +533,17 @@ func Test_valueContainer_dateTime(t *testing.T) {
 		want   dateTimeValueContainer
 	}{
 		{"[]float64", fields{slice: []float64{1}, isNull: []bool{false}},
-			dateTimeValueContainer{slice: []time.Time{{}}, isNull: []bool{true}, index: []int{0}}},
+			dateTimeValueContainer{slice: []time.Time{{}}, isNull: []bool{true}}},
 		{"[]string", fields{slice: []string{"", "1/1/20", "foo"}, isNull: []bool{true, false, true}},
-			dateTimeValueContainer{slice: []time.Time{{}, d, {}}, isNull: []bool{true, false, true}, index: []int{0, 1, 2}}},
+			dateTimeValueContainer{slice: []time.Time{{}, d, {}}, isNull: []bool{true, false, true}}},
 		{"[]time.Time", fields{slice: []time.Time{{}, d}, isNull: []bool{true, false}},
-			dateTimeValueContainer{slice: []time.Time{{}, d}, isNull: []bool{true, false}, index: []int{0, 1}}},
+			dateTimeValueContainer{slice: []time.Time{{}, d}, isNull: []bool{true, false}}},
 		{"[]bool", fields{slice: []bool{false, true, false}, isNull: []bool{false, false, true}},
-			dateTimeValueContainer{slice: []time.Time{{}, {}, {}}, isNull: []bool{true, true, true}, index: []int{0, 1, 2}}},
+			dateTimeValueContainer{slice: []time.Time{{}, {}, {}}, isNull: []bool{true, true, true}}},
 		{"[]interface", fields{slice: []interface{}{"foo", float64(1), int(1), uint(1), d, false}, isNull: []bool{false, false, false, false, false, false}},
-			dateTimeValueContainer{slice: []time.Time{{}, {}, {}, {}, d, {}}, isNull: []bool{true, true, true, true, false, true}, index: []int{0, 1, 2, 3, 4, 5}}},
+			dateTimeValueContainer{slice: []time.Time{{}, {}, {}, {}, d, {}}, isNull: []bool{true, true, true, true, false, true}}},
 		{"[]int", fields{slice: []int{1}, isNull: []bool{false}},
-			dateTimeValueContainer{slice: []time.Time{{}}, isNull: []bool{true}, index: []int{0}}},
+			dateTimeValueContainer{slice: []time.Time{{}}, isNull: []bool{true}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

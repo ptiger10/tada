@@ -4000,7 +4000,7 @@ func Test_isNullByte(t *testing.T) {
 	}
 }
 
-func Test_concatenateLabelsToStringsNew(t *testing.T) {
+func Test_concatenateLabelsToStringsGrouped(t *testing.T) {
 	type args struct {
 		labels []*valueContainer
 	}
@@ -4016,11 +4016,17 @@ func Test_concatenateLabelsToStringsNew(t *testing.T) {
 			{slice: []string{"foo", "bar"}},
 			{slice: []int{0, 1}}}},
 			[]string{"foo|0", "bar|1"}},
+		{"float is rounded", args{labels: []*valueContainer{
+			{slice: []float64{1.2}}}},
+			[]string{"1"}},
+		{"datetime is stringified", args{labels: []*valueContainer{
+			{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}}}},
+			[]string{"2020-01-01T00:00:00Z"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := concatenateLabelsToStringsDirectAccess(tt.args.labels); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("concatenateLabelsToStringsNew() = %v, want %v", got, tt.want)
+			if got := concatenateLabelsToStringsGrouped(tt.args.labels); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("concatenateLabelsToStringsGrouped() = %v, want %v", got, tt.want)
 			}
 		})
 	}

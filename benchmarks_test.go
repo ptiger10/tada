@@ -3,6 +3,7 @@ package tada
 import (
 	"math/rand"
 	"testing"
+	"time"
 )
 
 // func Benchmark_ReadCSV(b *testing.B) {
@@ -43,59 +44,151 @@ import (
 // 	}
 // }
 
+// func Benchmark_string(b *testing.B) {
+// 	n := 10000
+// 	f := make([]float64, n)
+// 	for i := range f {
+// 		f[i] = rand.Float64()
+// 	}
+// 	i := make([]int, n)
+// 	for k := range i {
+// 		i[k] = rand.Int()
+// 	}
+// 	d := make([]time.Time, n)
+// 	for i := range d {
+// 		d[i] = time.Date(rand.Int(), 1, 1, 0, 0, 0, 0, time.UTC)
+// 	}
+// 	// vcs := []*valueContainer{
+// 	// &valueContainer{slice: f},
+// 	// &valueContainer{slice: s},
+// 	// 	&valueContainer{slice: d},
+// 	// }
+// 	// vc := &valueContainer{slice: d}
+// 	// vc := &valueContainer{slice: i}
+// 	vc := &valueContainer{slice: f}
+// 	for i := 0; i < b.N; i++ {
+// 		vc.string()
+// 	}
+// }
+
+// func Benchmark_stringGrouped(b *testing.B) {
+// 	n := 10000
+// 	f := make([]float64, n)
+// 	for i := range f {
+// 		f[i] = rand.Float64()
+// 	}
+// 	i := make([]int, n)
+// 	for k := range i {
+// 		i[k] = rand.Int()
+// 	}
+// 	d := make([]time.Time, n)
+// 	for i := range d {
+// 		d[i] = time.Date(rand.Int(), 1, 1, 0, 0, 0, 0, time.UTC)
+// 	}
+// 	// vcs := []*valueContainer{
+// 	// &valueContainer{slice: f},
+// 	// &valueContainer{slice: s},
+// 	// 	&valueContainer{slice: d},
+// 	// }
+// 	// vc := &valueContainer{slice: d}
+// 	// vc := &valueContainer{slice: i}
+// 	vc := &valueContainer{slice: f}
+// 	for i := 0; i < b.N; i++ {
+// 		vc.groupedString()
+// 	}
+// }
+
 func Benchmark_concatenateStringLabels(b *testing.B) {
 	n := 10000
 	f := make([]float64, n)
 	for i := range f {
 		f[i] = rand.Float64()
 	}
-	s := make([]int, n)
-	for i := range f {
-		s[i] = rand.Int()
+	i := make([]int, n)
+	for a := range i {
+		i[a] = rand.Int()
+	}
+	d := make([]time.Time, n)
+	for i := range d {
+		d[i] = time.Date(rand.Int(), 1, 1, 0, 0, 0, 0, time.UTC)
+	}
+	s := make([]string, n)
+	for i := range s {
+		s[i] = "foo"
 	}
 	vcs := []*valueContainer{
-		&valueContainer{slice: f},
-		&valueContainer{slice: s},
+		// &valueContainer{slice: f},
+		// &valueContainer{slice: f},
+		// &valueContainer{slice: f},
+		// &valueContainer{slice: i},
+		&valueContainer{slice: d},
+		&valueContainer{slice: d},
+		&valueContainer{slice: d},
+		// &valueContainer{slice: s},
 	}
 	for i := 0; i < b.N; i++ {
 		concatenateLabelsToStrings(vcs)
 	}
 }
 
-func Benchmark_concatenateStringLabelsDirectAccess(b *testing.B) {
+func Benchmark_concatenateStringLabelsGrouped(b *testing.B) {
 	n := 10000
 	f := make([]float64, n)
 	for i := range f {
 		f[i] = rand.Float64()
 	}
-	s := make([]int, n)
-	for i := range f {
-		s[i] = rand.Int()
+	i := make([]int, n)
+	for a := range i {
+		i[a] = rand.Int()
+	}
+	d := make([]time.Time, n)
+	for i := range d {
+		d[i] = time.Date(rand.Int(), 1, 1, 0, 0, 0, 0, time.UTC)
+	}
+	s := make([]string, n)
+	for i := range s {
+		s[i] = "foo"
 	}
 	vcs := []*valueContainer{
-		&valueContainer{slice: f},
-		&valueContainer{slice: s},
+		// &valueContainer{slice: f},
+		// &valueContainer{slice: f},
+		// &valueContainer{slice: f},
+		// &valueContainer{slice: i},
+		&valueContainer{slice: d},
+		&valueContainer{slice: d},
+		&valueContainer{slice: d},
+		// &valueContainer{slice: s},
 	}
 	for i := 0; i < b.N; i++ {
-		concatenateLabelsToStringsDirectAccess(vcs)
+		concatenateLabelsToStringsGrouped(vcs)
 	}
 }
 
-func Benchmark_concatenateStringLabelsBytesFirst(b *testing.B) {
-	n := 10000
-	f := make([]float64, n)
-	for i := range f {
-		f[i] = rand.Float64()
-	}
-	s := make([]int, n)
-	for i := range f {
-		s[i] = rand.Int()
-	}
-	vcs := []*valueContainer{
-		&valueContainer{slice: f},
-		&valueContainer{slice: s},
-	}
-	for i := 0; i < b.N; i++ {
-		concatenateLabelsToStringsByteFirst(vcs)
-	}
-}
+// func Benchmark_concatenateStringLabelsDirectAccess(b *testing.B) {
+// 	n := 10000
+// 	f := make([]float64, n)
+// 	for i := range f {
+// 		f[i] = rand.Float64()
+// 	}
+// 	i := make([]int, n)
+// 	for a := range i {
+// 		i[a] = rand.Int()
+// 	}
+// 	d := make([]time.Time, n)
+// 	for i := range d {
+// 		d[i] = time.Date(rand.Int(), 1, 1, 0, 0, 0, 0, time.UTC)
+// 	}
+// 	s := make([]string, n)
+// 	for i := range s {
+// 		s[i] = "foo"
+// 	}
+// 	vcs := []*valueContainer{
+// 		&valueContainer{slice: f},
+// 		&valueContainer{slice: i},
+// 		&valueContainer{slice: d},
+// 		&valueContainer{slice: s},
+// 	}
+// 	for i := 0; i < b.N; i++ {
+// 		concatenateLabelsToStringsDirectAccess(vcs)
+// 	}
+// }
