@@ -6,21 +6,26 @@ import (
 	"time"
 )
 
-// func Benchmark_DropNull(b *testing.B) {
-// 	n := 100000
-// 	s := make([]string, n)
-// 	for i := range s {
-// 		if rand.Float64() > .5 {
-// 			s[i] = ""
-// 		} else {
-// 			s[i] = "foo"
-// 		}
-// 	}
-// 	df := NewDataFrame([]interface{}{s})
-// 	for i := 0; i < b.N; i++ {
-// 		df.DropNull()
-// 	}
-// }
+func makeBenchmarkDF() *DataFrame {
+	n := 100000
+	s := make([]string, n)
+	for i := range s {
+		if rand.Float64() > .5 {
+			s[i] = ""
+		} else {
+			s[i] = "foo"
+		}
+	}
+	return NewDataFrame([]interface{}{s})
+}
+
+var benchmarkDF = makeBenchmarkDF()
+
+func Benchmark_DropNull(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		benchmarkDF.DropNull()
+	}
+}
 
 // func Benchmark_ReadCSV(b *testing.B) {
 // 	for i := 0; i < b.N; i++ {

@@ -302,7 +302,7 @@ func makeBoolMatrix(numCols, numRows int) [][]bool {
 }
 
 func intersection(slices [][]int, maxLen int) []int {
-	// if all slices are the max length, then intersection is all index values in order
+	// if all slices are the max length, then intersection is all the index values in order
 	for k := range slices {
 		if len(slices[k]) != maxLen {
 			break
@@ -311,7 +311,7 @@ func intersection(slices [][]int, maxLen int) []int {
 	}
 	orderedKeys := make([]int, maxLen)
 	var counter int
-	set := make(map[int]int)
+	set := make(map[int]int, maxLen)
 	for _, slice := range slices {
 		for _, i := range slice {
 			if _, ok := set[i]; !ok {
@@ -323,19 +323,16 @@ func intersection(slices [][]int, maxLen int) []int {
 			}
 		}
 	}
-	var ret []int
-	// orderedKeys := make([]int, 0)
-	// for k := range set {
-	// 	orderedKeys = append(orderedKeys, k)
-	// }
-	// sort.Ints(orderedKeys)
+	ret := make([]int, maxLen)
+	qualifyingCounter := 0
 	for _, key := range orderedKeys[:counter] {
 		// this means that the value appeared in every slice
 		if set[key] == len(slices) {
-			ret = append(ret, key)
+			ret[qualifyingCounter] = key
+			qualifyingCounter++
 		}
 	}
-	return ret
+	return ret[:qualifyingCounter]
 }
 
 func union(slices [][]int) []int {
@@ -789,16 +786,48 @@ func subsetContainerRows(containers []*valueContainer, index []int) error {
 
 // expects index to be in range
 func subsetInterfaceSlice(slice interface{}, index []int) interface{} {
-	v := reflect.ValueOf(slice)
-	retVals := reflect.MakeSlice(v.Type(), len(index), len(index))
-	// []int{1, 5}
-	// incrementor: [0, 1], i: [1,5]
-	for incrementor, i := range index {
-		dst := retVals.Index(incrementor)
-		src := v.Index(i)
-		dst.Set(src)
+	switch slice.(type) {
+	case []float64:
+		v := slice.([]float64)
+		retVals := make([]float64, len(index))
+		for incrementor, i := range index {
+			retVals[incrementor] = v[i]
+		}
+		return retVals
+	case []string:
+		v := slice.([]string)
+		retVals := make([]string, len(index))
+		for incrementor, i := range index {
+			retVals[incrementor] = v[i]
+		}
+		return retVals
+	case []time.Time:
+		v := slice.([]time.Time)
+		retVals := make([]time.Time, len(index))
+		for incrementor, i := range index {
+			retVals[incrementor] = v[i]
+		}
+		return retVals
+	case []int:
+		v := slice.([]int)
+		retVals := make([]int, len(index))
+		for incrementor, i := range index {
+			retVals[incrementor] = v[i]
+		}
+		return retVals
+	default:
+		v := reflect.ValueOf(slice)
+		retVals := reflect.MakeSlice(v.Type(), len(index), len(index))
+		// []int{1, 5}
+		// incrementor: [0, 1], i: [1,5]
+		for incrementor, i := range index {
+			dst := retVals.Index(incrementor)
+			src := v.Index(i)
+			dst.Set(src)
+		}
+		return retVals.Interface()
 	}
-	return retVals.Interface()
+
 }
 
 func subsetNulls(nulls []bool, index []int) []bool {
@@ -823,9 +852,8 @@ func (vc *valueContainer) subsetRows(index []int) error {
 			return fmt.Errorf("index out of range (%d > %d)", i, l-1)
 		}
 	}
-	retVals := subsetInterfaceSlice(vc.slice, index)
 
-	vc.slice = retVals
+	vc.slice = subsetInterfaceSlice(vc.slice, index)
 	vc.isNull = subsetNulls(vc.isNull, index)
 	return nil
 }
@@ -1551,6 +1579,10 @@ func copyInterface(i interface{}) interface{} {
 	case []time.Time:
 		vals := make([]time.Time, l)
 		copy(vals, i.([]time.Time))
+		return vals
+	case []int:
+		vals := make([]int, l)
+		copy(vals, i.([]int))
 		return vals
 	default:
 		vals := reflect.MakeSlice(v.Type(), l, l)

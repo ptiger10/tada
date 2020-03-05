@@ -3,3 +3,4 @@ test_files/*
 Makefile
 cleanGeneratedCode.sh
 *.out
+*.test
