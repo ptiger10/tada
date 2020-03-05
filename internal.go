@@ -302,7 +302,12 @@ func makeBoolMatrix(numCols, numRows int) [][]bool {
 }
 
 func intersection(slices [][]int, maxLen int) []int {
-	// if all slices are the max length, then intersection is all the index values in order
+	// only one slice? intersection is that slice
+	if len(slices) == 1 {
+		return slices[0]
+	}
+
+	// all slices are the max length? intersection should be all the index values in sequential order
 	for k := range slices {
 		if len(slices[k]) != maxLen {
 			break
@@ -1096,10 +1101,14 @@ func isEitherNull(isNull1, isNull2 []bool) []bool {
 	return ret
 }
 
+func (vc *valueContainer) len() int {
+	return reflect.ValueOf(vc.slice).Len()
+}
+
 func (vc *valueContainer) sort(dtype DType, ascending bool, index []int) []int {
 	var srt sort.Interface
-	nulls := make([]int, 0)
-	notNulls := make([]int, 0)
+	nulls := make([]int, vc.len())
+	notNulls := make([]int, vc.len())
 	var sortedIsNull []bool
 	var sortedIndex []int
 	switch dtype {
@@ -1137,15 +1146,18 @@ func (vc *valueContainer) sort(dtype DType, ascending bool, index []int) []int {
 		sortedIndex = d.index
 	}
 	// iterate over each sorted row and check whether it is null or not
+	var nullCounter, validCounter int
 	for i := range sortedIsNull {
 		if sortedIsNull[i] {
-			nulls = append(nulls, sortedIndex[i])
+			nulls[nullCounter] = sortedIndex[i]
+			nullCounter++
 		} else {
-			notNulls = append(notNulls, sortedIndex[i])
+			notNulls[validCounter] = sortedIndex[i]
+			validCounter++
 		}
 	}
 	// move all null values to the bottom
-	return append(notNulls, nulls...)
+	return append(notNulls[:validCounter], nulls[:nullCounter]...)
 }
 
 func sortContainers(containers []*valueContainer, sorters []Sorter) ([]int, error) {
@@ -1184,27 +1196,6 @@ func convertColNamesToIndexPositions(names []string, columns []*valueContainer) 
 
 // concatenateLabelsToStrings reduces all container rows to a single slice of concatenated strings, one per row
 func concatenateLabelsToStrings(labels []*valueContainer) []string {
-	labelStrings := make([][]string, len(labels))
-	// coerce every label level referenced in the index to a separate string slice
-	for j := range labels {
-		labelStrings[j] = labels[j].string().slice
-	}
-	ret := make([]string, len(labelStrings[0]))
-	// for each row, combine labels into one concatenated string
-	for i := 0; i < len(labelStrings[0]); i++ {
-		labelComponents := make([]string, len(labels))
-		for j := range labelStrings {
-			labelComponents[j] = labelStrings[j][i]
-		}
-		concatenatedString := strings.Join(labelComponents, optionLevelSeparator)
-		ret[i] = concatenatedString
-	}
-	// return a single slice of strings
-	return ret
-}
-
-// concatenateLabelsToStrings reduces all container rows to a single slice of concatenated strings, one per row
-func concatenateLabelsToStringsGrouped(labels []*valueContainer) []string {
 	labelStrings := make([][]string, len(labels))
 	// coerce every label level referenced in the index to a separate string slice
 	for j := range labels {
@@ -2279,6 +2270,7 @@ func (vc *valueContainer) uniqueIndex() []int {
 	return ret
 }
 
+// returns row positions with unique values only (accounting for all container values)
 func multiUniqueIndex(containers []*valueContainer) []int {
 	stringifiedRows := concatenateLabelsToStrings(containers)
 	m := make(map[string]bool)
