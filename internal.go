@@ -254,6 +254,15 @@ func copyInterfaceIntoValueContainers(slices []interface{}, isNull [][]bool, nam
 	return ret
 }
 
+// convert bytes to interface. if isNull is nil, sets null values from `slices`
+func copyBytesIntoValueContainers(slices [][][]byte, isNull [][]bool, names []string) []*valueContainer {
+	slicesInterface := make([]interface{}, len(slices))
+	for k := range slices {
+		slicesInterface[k] = slices[k]
+	}
+	return copyInterfaceIntoValueContainers(slicesInterface, isNull, names)
+}
+
 // convert strings to interface. if isNull is nil, sets null values from `slices`
 func copyStringsIntoValueContainers(slices [][]string, isNull [][]bool, names []string) []*valueContainer {
 	slicesInterface := make([]interface{}, len(slices))
@@ -270,6 +279,18 @@ func copyFloatsIntoValueContainers(slices [][]float64, isNull [][]bool, names []
 		slicesInterface[k] = slices[k]
 	}
 	return copyInterfaceIntoValueContainers(slicesInterface, isNull, names)
+}
+
+// columns as major dimension
+func makeByteMatrix(numCols, numRows int) [][][]byte {
+	ret := make([][][]byte, numCols)
+	for k := 0; k < numCols; k++ {
+		ret[k] = make([][]byte, numRows)
+		for i := range ret[k] {
+			ret[k][i] = make([]byte, 0)
+		}
+	}
+	return ret
 }
 
 // columns as major dimension
@@ -1213,6 +1234,27 @@ func concatenateLabelsToStrings(labels []*valueContainer) []string {
 	return ret
 }
 
+// concatenateLabelsToStrings reduces all container rows to a single slice of concatenated strings, one per row
+func concatenateLabelsToStringsBytes(labels []*valueContainer) []string {
+	labelStrings := make([][]string, len(labels))
+	// coerce every label level referenced in the index to a separate string slice
+	for j := range labels {
+		labelStrings[j] = labels[j].string().slice
+	}
+	ret := make([]string, len(labelStrings[0]))
+	// for each row, combine labels into one concatenated string
+	for i := 0; i < len(labelStrings[0]); i++ {
+		buf := new(bytes.Buffer)
+		b := bufio.NewWriterSize(buf, 512)
+		for j := range labelStrings {
+			b.Write([]byte(labelStrings[j][i]))
+		}
+		ret[i] = string(buf.Bytes())
+	}
+	// return a single slice of strings
+	return ret
+}
+
 // reduceContainers reduces the containers referenced in the index
 // to 1) a new []*valueContainer with slices with one unique combination of labels per row (same type as original labels),
 // 2) an []int that maps each new row
@@ -1622,7 +1664,7 @@ func setNullsFromInterface(input interface{}) []bool {
 		vals := input.([][]byte)
 		ret = make([]bool, len(vals))
 		for i := range ret {
-			if isNullByte(vals[i]) {
+			if isNullString(string(vals[i])) {
 				ret[i] = true
 			} else {
 				ret[i] = false
@@ -1706,15 +1748,6 @@ func isNullString(s string) bool {
 		return false
 	}
 	return true
-}
-
-func isNullByte(b []byte) bool {
-	for i := range optionNullBytes {
-		if bytes.Equal(b, optionNullBytes[i]) {
-			return true
-		}
-	}
-	return false
 }
 
 // math
@@ -2468,7 +2501,7 @@ func extractCSVDimensions(b []byte, comma rune) (numRows, numCols int, err error
 // major dimension: column
 // trims leading whitespace
 // supports custom comma but not comments
-func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune) error {
+func readCSVBytes(r io.Reader, dstVals [][][]byte, dstNulls [][]bool, comma rune) error {
 	br := bufio.NewReaderSize(r, 1024)
 	commaLen := utf8.RuneLen(comma)
 	lengthLineEnd := func(b []byte) int {
@@ -2510,7 +2543,7 @@ func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune
 			}
 			// write fields into column-oriented receiver
 
-			dstVals[columnNumber][rowNumber] = string(stripQuotationMarks(field))
+			dstVals[columnNumber][rowNumber] = stripQuotationMarks(field)
 			if isNullString(string(field)) {
 				dstNulls[columnNumber][rowNumber] = true
 			}
@@ -2534,20 +2567,22 @@ func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune
 }
 
 // major dimension: columns
-func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *ReadConfig) *DataFrame {
+func makeDataFrameFromMatrices(values [][][]byte, isNull [][]bool, config *ReadConfig) *DataFrame {
 	numCols := len(values) - config.NumLabelCols
 	numRows := len(values[0]) - config.NumHeaderRows
 	labelNames := make([]string, config.NumLabelCols)
 	// iterate over all label levels to get header names
 	for j := 0; j < config.NumLabelCols; j++ {
 		// write label headers, no offset
-		labelNames[j] = strings.Join(values[j][:config.NumHeaderRows], optionLevelSeparator)
+		labelNames[j] = string(
+			bytes.Join(values[j][:config.NumHeaderRows], optionLevelSeparatorBytes))
 	}
 
 	colNames := make([]string, numCols)
 	for k := 0; k < numCols; k++ {
 		// write column headers, offset by label levels
-		colNames[k] = strings.Join(values[k+config.NumLabelCols][:config.NumHeaderRows], optionLevelSeparator)
+		colNames[k] = string(
+			bytes.Join(values[k+config.NumLabelCols][:config.NumHeaderRows], optionLevelSeparatorBytes))
 	}
 
 	// remove headers
@@ -2555,13 +2590,13 @@ func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *ReadC
 		values[container] = values[container][config.NumHeaderRows:]
 		isNull[container] = isNull[container][config.NumHeaderRows:]
 	}
-	labels := copyStringsIntoValueContainers(
+	labels := copyBytesIntoValueContainers(
 		values[:config.NumLabelCols],
 		isNull[:config.NumLabelCols],
 		labelNames,
 	)
 
-	columns := copyStringsIntoValueContainers(
+	columns := copyBytesIntoValueContainers(
 		values[config.NumLabelCols:],
 		isNull[config.NumLabelCols:],
 		colNames,
@@ -2586,4 +2621,15 @@ func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *ReadC
 		labels:        labels,
 		colLevelNames: colLevelNames,
 	}
+}
+
+func concatBytes() {
+	buf := new(bytes.Buffer)
+	b := bufio.NewWriterSize(buf, 512)
+	for _, by := range [][]byte{[]byte("foo"), []byte("bar")} {
+		fmt.Println(by)
+		b.Write(by)
+		b.Flush()
+	}
+	print(string(buf.Len()))
 }

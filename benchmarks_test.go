@@ -27,11 +27,11 @@ var benchmarkDF = makeBenchmarkDF()
 // 	}
 // }
 
-// func Benchmark_ReadCSV(b *testing.B) {
-// 	for i := 0; i < b.N; i++ {
-// 		ImportCSV("test_files/big.csv", nil)
-// 	}
-// }
+func Benchmark_ReadCSV(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		ImportCSV("test_files/big.csv", nil)
+	}
+}
 
 // func Benchmark_ConvertToString(b *testing.B) {
 // 	n := 100000
@@ -120,7 +120,7 @@ func Benchmark_concatenateStringLabels(b *testing.B) {
 		// &valueContainer{slice: d},
 		// &valueContainer{slice: s},
 		// &valueContainer{slice: s},
-		// &valueContainer{slice: s},
+		&valueContainer{slice: s},
 	}
 	for i := 0; i < b.N; i++ {
 		concatenateLabelsToStrings(vcs)

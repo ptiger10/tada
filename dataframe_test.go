@@ -3064,8 +3064,8 @@ func TestImportCSV(t *testing.T) {
 			args{"test_files/1_header_0_labels.csv", nil},
 			&DataFrame{
 				values: []*valueContainer{
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "Name"},
-					{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "Age"}},
+					{slice: [][]byte{[]byte("foo"), []byte("bar")}, isNull: []bool{false, false}, name: "Name"},
+					{slice: [][]byte{[]byte("1"), []byte("2")}, isNull: []bool{false, false}, name: "Age"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				name:          "",
 				colLevelNames: []string{"*0"}}, false},

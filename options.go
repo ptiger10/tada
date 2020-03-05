@@ -3,12 +3,12 @@ package tada
 import "time"
 
 var optionLevelSeparator = "|"
+var optionLevelSeparatorBytes = []byte{'|'}
 var optionMaxRows = 50
 var optionMaxColumns = 20
 var optionAutoMerge = true
 var optionWarnings = true
 var optionNullStrings = map[string]bool{"NaN": true, "n/a": true, "N/A": true, "": true, "nil": true}
-var optionNullBytes = [][]byte{[]byte("NaN"), []byte("n/a"), []byte("N/A"), []byte(""), []byte("nil")}
 var optionPrefix = "*"
 var optionDateTimeFormats = []string{
 	"2006-01-02", "01-02-2006", "01/02/2006", "1/2/2006", "2006-01-02 15:04:05 -0700 MST",
