@@ -335,18 +335,19 @@ func Test_makeDefaultLabels(t *testing.T) {
 func Test_intersection(t *testing.T) {
 	type args struct {
 		slices [][]int
+		maxLen int
 	}
 	tests := []struct {
 		name string
 		args args
 		want []int
 	}{
-		{"1 match", args{[][]int{{0, 1}, {1, 2}}}, []int{1}},
-		{"all matches", args{[][]int{{2, 1}, {1, 2}}}, []int{1, 2}},
+		{"1 match", args{[][]int{{0, 1}, {1, 2}}, 3}, []int{1}},
+		{"all matches", args{[][]int{{1, 0}, {0, 1}}, 2}, []int{0, 1}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := intersection(tt.args.slices); !reflect.DeepEqual(got, tt.want) {
+			if got := intersection(tt.args.slices, tt.args.maxLen); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("intersection() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1527,12 +1528,12 @@ func Test_sortContainers(t *testing.T) {
 		want    []int
 		wantErr bool
 	}{
-		{"multi sort - floats",
-			args{[]*valueContainer{
-				{slice: []float64{2, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
-				{slice: []float64{3, 2, 1}, isNull: []bool{false, false, false}, name: "bar"},
-			}, []Sorter{{Name: "foo"}, {Name: "bar"}}},
-			[]int{1, 2, 0}, false},
+		// {"multi sort - floats",
+		// 	args{[]*valueContainer{
+		// 		{slice: []float64{2, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+		// 		{slice: []float64{3, 2, 1}, isNull: []bool{false, false, false}, name: "bar"},
+		// 	}, []Sorter{{Name: "foo"}, {Name: "bar"}}},
+		// 	[]int{1, 2, 0}, false},
 		{"multi sort - floats - ordered repeats",
 			args{[]*valueContainer{
 				{slice: []float64{2, 2, 1}, isNull: []bool{false, false, false}, name: "foo"},
@@ -4027,6 +4028,144 @@ func Test_concatenateLabelsToStringsGrouped(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := concatenateLabelsToStringsGrouped(tt.args.labels); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("concatenateLabelsToStringsGrouped() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_valid(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []int
+	}{
+		{"pass", fields{slice: []float64{1, 0, 2}, isNull: []bool{false, true, false}}, []int{0, 2}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			if got := vc.valid(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.valid() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_null(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []int
+	}{
+		{"pass", fields{slice: []float64{1, 0, 2}, isNull: []bool{false, true, false}}, []int{1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			if got := vc.null(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.null() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_subsetRows(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	type args struct {
+		index []int
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *valueContainer
+		wantErr bool
+	}{
+		{"pass", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"},
+			args{[]int{1}},
+			&valueContainer{slice: []float64{1}, isNull: []bool{true}, name: "foo"}, false},
+		{"return existing", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"},
+			args{[]int{0, 1, 2}},
+			&valueContainer{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"}, false},
+		{"fail", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"},
+			args{[]int{10}},
+			&valueContainer{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			err := vc.subsetRows(tt.args.index)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("valueContainer.subsetRows() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(vc, tt.want) {
+				t.Errorf("valueContainer.subsetRows() -> = %v, want %v", vc, tt.want)
+
+			}
+		})
+	}
+}
+
+func Test_valueContainer_filter(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	type args struct {
+		filter FilterFn
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    []int
+		wantErr bool
+	}{
+		{"pass", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"},
+			args{FilterFn{Float: func(val float64) bool { return val > 1 }}},
+			[]int{2}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			got, err := vc.filter(tt.args.filter)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("valueContainer.filter() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.filter() = %v, want %v", got, tt.want)
 			}
 		})
 	}

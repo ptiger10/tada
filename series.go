@@ -599,8 +599,10 @@ func filter(containers []*valueContainer, filters map[string]FilterFn) ([]int, e
 		}
 		subIndexes = append(subIndexes, subIndex)
 	}
+	intersection := intersection(subIndexes,
+		reflect.ValueOf(containers[0].slice).Len())
 	// reduce the subindexes to a single index that shares all the values
-	return intersection(subIndexes), nil
+	return intersection, nil
 }
 
 // -- FILTERS

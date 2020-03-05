@@ -301,24 +301,35 @@ func makeBoolMatrix(numCols, numRows int) [][]bool {
 	return ret
 }
 
-func intersection(slices [][]int) []int {
+func intersection(slices [][]int, maxLen int) []int {
+	// if all slices are the max length, then intersection is all index values in order
+	for k := range slices {
+		if len(slices[k]) != maxLen {
+			break
+		}
+		return makeIntRange(0, maxLen)
+	}
+	orderedKeys := make([]int, maxLen)
+	var counter int
 	set := make(map[int]int)
 	for _, slice := range slices {
 		for _, i := range slice {
 			if _, ok := set[i]; !ok {
 				set[i] = 1
+				orderedKeys[counter] = i
+				counter++
 			} else {
 				set[i]++
 			}
 		}
 	}
 	var ret []int
-	orderedKeys := make([]int, 0)
-	for k := range set {
-		orderedKeys = append(orderedKeys, k)
-	}
-	sort.Ints(orderedKeys)
-	for _, key := range orderedKeys {
+	// orderedKeys := make([]int, 0)
+	// for k := range set {
+	// 	orderedKeys = append(orderedKeys, k)
+	// }
+	// sort.Ints(orderedKeys)
+	for _, key := range orderedKeys[:counter] {
 		// this means that the value appeared in every slice
 		if set[key] == len(slices) {
 			ret = append(ret, key)
@@ -741,23 +752,29 @@ func (vc *valueContainer) fillnull(lambda NullFiller) {
 }
 
 func (vc *valueContainer) valid() []int {
-	index := make([]int, 0)
-	for i, isNull := range vc.isNull {
-		if !isNull {
-			index = append(index, i)
+	index := make([]int, len(vc.isNull))
+	// increment counter for every valid row
+	var counter int
+	for i := range vc.isNull {
+		if !vc.isNull[i] {
+			index[counter] = i
+			counter++
 		}
 	}
-	return index
+	return index[:counter]
 }
 
 func (vc *valueContainer) null() []int {
-	index := make([]int, 0)
-	for i, isNull := range vc.isNull {
-		if isNull {
-			index = append(index, i)
+	index := make([]int, len(vc.isNull))
+	// increment counter for every null row
+	var counter int
+	for i := range vc.isNull {
+		if vc.isNull[i] {
+			index[counter] = i
+			counter++
 		}
 	}
-	return index
+	return index[:counter]
 }
 
 func subsetContainerRows(containers []*valueContainer, index []int) error {
@@ -796,6 +813,11 @@ func subsetNulls(nulls []bool, index []int) []bool {
 // If any position is out of range, returns an error
 func (vc *valueContainer) subsetRows(index []int) error {
 	l := reflect.ValueOf(vc.slice).Len()
+	if len(index) == l {
+		if reflect.DeepEqual(index, makeIntRange(0, l)) {
+			return nil
+		}
+	}
 	for _, i := range index {
 		if i >= l {
 			return fmt.Errorf("index out of range (%d > %d)", i, l-1)
@@ -909,60 +931,49 @@ func (vc *valueContainer) iterRow(index int) Element {
 
 func (vc *valueContainer) gt(comparison float64) []int {
 	index, _ := vc.filter(FilterFn{Float: func(v float64) bool {
-		if v > comparison {
-			return true
-		}
-		return false
+		return v > comparison
 	}})
 	return index
 }
 
 func (vc *valueContainer) lt(comparison float64) []int {
 	index, _ := vc.filter(FilterFn{Float: func(v float64) bool {
-		if v < comparison {
-			return true
-		}
-		return false
+		return v < comparison
 	}})
 	return index
 }
 
 func (vc *valueContainer) eq(comparison string) []int {
 	index, _ := vc.filter(FilterFn{String: func(v string) bool {
-		if v == comparison {
-			return true
-		}
-		return false
+		return v == comparison
 	}})
 	return index
 }
 
 func (vc *valueContainer) neq(comparison string) []int {
 	index, _ := vc.filter(FilterFn{String: func(v string) bool {
-		if v != comparison {
-			return true
-		}
-		return false
+		return v != comparison
 	}})
 	return index
 }
 
 func (vc *valueContainer) contains(substr string) []int {
 	index, _ := vc.filter(FilterFn{String: func(v string) bool {
-		if strings.Contains(v, substr) {
-			return true
-		}
-		return false
+		return strings.Contains(v, substr)
 	}})
 	return index
 }
 
 func (vc *valueContainer) before(comparison time.Time) []int {
 	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
-		if v.Before(comparison) {
-			return true
-		}
-		return false
+		return v.Before(comparison)
+	}})
+	return index
+}
+
+func (vc *valueContainer) after(comparison time.Time) []int {
+	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
+		return v.After(comparison)
 	}})
 	return index
 }
@@ -970,16 +981,6 @@ func (vc *valueContainer) before(comparison time.Time) []int {
 func (vc *valueContainer) relabel() {
 	vc.slice = makeIntRange(0, len(vc.isNull))
 	return
-}
-
-func (vc *valueContainer) after(comparison time.Time) []int {
-	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
-		if v.After(comparison) {
-			return true
-		}
-		return false
-	}})
-	return index
 }
 
 func (vc *valueContainer) filter(filter FilterFn) ([]int, error) {

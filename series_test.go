@@ -3279,3 +3279,39 @@ func TestSeries_SwapLabels(t *testing.T) {
 		})
 	}
 }
+
+func Test_filter(t *testing.T) {
+	type args struct {
+		containers []*valueContainer
+		filters    map[string]FilterFn
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []int
+		wantErr bool
+	}{
+		{"pass", args{
+			[]*valueContainer{
+				{slice: []int{1, 0}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
+			map[string]FilterFn{
+				"qux": FilterFn{Float: func(val float64) bool { return val >= 1 }},
+				"bar": FilterFn{String: func(val string) bool { return val == "foo" }},
+			}},
+			[]int{0},
+			false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := filter(tt.args.containers, tt.args.filters)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("filter() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("filter() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

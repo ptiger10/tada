@@ -837,7 +837,7 @@ func (df *DataFrameMutator) DropNull(subset ...string) {
 	for k := range index {
 		subIndexes[k] = df.dataframe.values[k].valid()
 	}
-	allValid := intersection(subIndexes)
+	allValid := intersection(subIndexes, df.dataframe.Len())
 	df.Subset(allValid)
 }
 
