@@ -196,6 +196,10 @@ func (vc *valueContainer) float64() floatValueContainer {
 	return ret
 }
 
+func convertDateTimeToString(v time.Time) string {
+	return v.Format(time.RFC3339)
+}
+
 // if already []string, returns shared values, not new values
 func (vc *valueContainer) string() stringValueContainer {
 	newVals := make([]string, reflect.ValueOf(vc.slice).Len())
@@ -204,80 +208,38 @@ func (vc *valueContainer) string() stringValueContainer {
 	case []string:
 		newVals = vc.slice.([]string)
 
-	case [][]byte:
-		arr := vc.slice.([][]byte)
-		for i := range arr {
-			newVals[i] = string(arr[i])
-		}
 	case []time.Time:
 		arr := vc.slice.([]time.Time)
 		for i := range arr {
-			newVals[i] = arr[i].String()
+			newVals[i] = convertDateTimeToString(arr[i])
 		}
-
-	case []int:
-		arr := vc.slice.([]int)
-		for i := range arr {
-			newVals[i] = strconv.Itoa(arr[i])
-		}
-
-	case []float64, []bool, []interface{},
-		[]uint, []uint8, []uint16, []uint32, []uint64, []int8, []int16, []int32, []int64,
-		[][]string, [][]float64, [][]time.Time,
-		[][]bool, [][]float32,
-		[][]uint, [][]uint16, [][]uint32, [][]uint64,
-		[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
-		d := reflect.ValueOf(vc.slice)
-		for i := 0; i < d.Len(); i++ {
-			newVals[i] = fmt.Sprint(d.Index(i).Interface())
-		}
-	default:
-		for i := range newVals {
-			newVals[i] = ""
-			isNull[i] = true
-		}
-
-	}
-	ret := stringValueContainer{
-		slice:  newVals,
-		isNull: isNull,
-	}
-	return ret
-}
-
-// for use in groupby statements (rounds float64, format datetime)
-func (vc *valueContainer) groupedString() stringValueContainer {
-	newVals := make([]string, reflect.ValueOf(vc.slice).Len())
-
-	isNull := vc.isNull
-	switch vc.slice.(type) {
-	case []string:
-		newVals = vc.slice.([]string)
 
 	case [][]byte:
 		arr := vc.slice.([][]byte)
 		for i := range arr {
 			newVals[i] = string(arr[i])
 		}
-
-	case []time.Time:
-		arr := vc.slice.([]time.Time)
-		for i := range arr {
-			newVals[i] = arr[i].Format(time.RFC3339)
-		}
-
 	case []int:
 		arr := vc.slice.([]int)
 		for i := range arr {
 			newVals[i] = strconv.Itoa(arr[i])
 		}
 
-	case []float64:
-		arr := vc.slice.([]float64)
+	case []interface{}:
+		arr := vc.slice.([]interface{})
 		for i := range arr {
-			newVals[i] = strconv.Itoa(int(arr[i]))
+			switch arr[i].(type) {
+			case string:
+				newVals[i] = arr[i].(string)
+			case time.Time:
+				newVals[i] = convertDateTimeToString(arr[i].(time.Time))
+			default:
+				d := reflect.ValueOf(vc.slice)
+				newVals[i] = fmt.Sprint(d.Index(i).Interface())
+			}
 		}
-	case []bool, []interface{},
+
+	case []float64, []bool,
 		[]uint, []uint8, []uint16, []uint32, []uint64, []int8, []int16, []int32, []int64,
 		[][]string, [][]float64, [][]time.Time,
 		[][]bool, [][]float32,

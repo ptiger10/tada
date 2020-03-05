@@ -1180,7 +1180,7 @@ func concatenateLabelsToStringsGrouped(labels []*valueContainer) []string {
 	labelStrings := make([][]string, len(labels))
 	// coerce every label level referenced in the index to a separate string slice
 	for j := range labels {
-		labelStrings[j] = labels[j].groupedString().slice
+		labelStrings[j] = labels[j].string().slice
 	}
 	ret := make([]string, len(labelStrings[0]))
 	// for each row, combine labels into one concatenated string
