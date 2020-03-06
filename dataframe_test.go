@@ -2330,8 +2330,10 @@ func TestDataFrame_GroupBy(t *testing.T) {
 				df: &DataFrame{
 					values: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}}},
 					labels: []*valueContainer{
-						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a"},
-						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b"},
+						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a",
+							archive: [][]byte{[]byte("0"), []byte("0"), []byte("1"), []byte("2")}},
+						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b",
+							archive: [][]byte{[]byte("foo"), []byte("foo"), []byte("foo"), []byte("bar")}},
 					}},
 			},
 		},

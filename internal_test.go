@@ -574,7 +574,6 @@ func Test_difference(t *testing.T) {
 func Test_reduceContainers(t *testing.T) {
 	type args struct {
 		containers []*valueContainer
-		index      []int
 	}
 	tests := []struct {
 		name                   string
@@ -582,49 +581,40 @@ func Test_reduceContainers(t *testing.T) {
 		wantNewContainers      []*valueContainer
 		wantOriginalRowIndexes [][]int
 		wantOrderedKeys        []string
-		wantOldToNewRowMapping map[int]int
 	}{
 		{name: "single level",
 			args: args{containers: []*valueContainer{
-				{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []string{"bar", "qux", "bar"}, isNull: []bool{false, false, false}, name: "baz"},
-			},
-				index: []int{1}},
+			}},
 			wantNewContainers: []*valueContainer{
 				{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, name: "baz"},
 			},
 			wantOriginalRowIndexes: [][]int{{0, 2}, {1}},
-			wantOrderedKeys:        []string{"bar", "qux"},
-			wantOldToNewRowMapping: map[int]int{0: 0, 1: 1, 2: 0}},
+			wantOrderedKeys:        []string{"bar", "qux"}},
 		{name: "multi level",
 			args: args{containers: []*valueContainer{
 				{slice: []float64{1, 1, 1}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []string{"bar", "qux", "bar"}, isNull: []bool{false, false, false}, name: "baz"},
-			},
-				index: []int{0, 1}},
+			}},
 			wantNewContainers: []*valueContainer{
 				{slice: []float64{1, 1}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, name: "baz"},
 			},
 			wantOriginalRowIndexes: [][]int{{0, 2}, {1}},
-			wantOrderedKeys:        []string{"1|bar", "1|qux"},
-			wantOldToNewRowMapping: map[int]int{0: 0, 1: 1, 2: 0}},
+			wantOrderedKeys:        []string{"1|bar", "1|qux"}},
 		{name: "single level - null",
 			args: args{containers: []*valueContainer{
-				{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []string{"bar", "", "bar"}, isNull: []bool{false, true, false}, name: "baz"},
-			},
-				index: []int{1}},
+			}},
 			wantNewContainers: []*valueContainer{
 				{slice: []string{"bar", ""}, isNull: []bool{false, true}, name: "baz"},
 			},
 			wantOriginalRowIndexes: [][]int{{0, 2}, {1}},
-			wantOrderedKeys:        []string{"bar", ""},
-			wantOldToNewRowMapping: map[int]int{0: 0, 1: 1, 2: 0}},
+			wantOrderedKeys:        []string{"bar", ""}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotNewContainers, gotOriginalRowIndexes, gotOrderedKeys, gotOldToNewRowMapping := reduceContainers(tt.args.containers, tt.args.index)
+			gotNewContainers, gotOriginalRowIndexes, gotOrderedKeys := reduceContainers(tt.args.containers)
 			if !reflect.DeepEqual(gotNewContainers, tt.wantNewContainers) {
 				t.Errorf("reduceContainers() gotNewContainers = %v, want %v", gotNewContainers[0], tt.wantNewContainers[0])
 			}
@@ -634,14 +624,11 @@ func Test_reduceContainers(t *testing.T) {
 			if !reflect.DeepEqual(gotOrderedKeys, tt.wantOrderedKeys) {
 				t.Errorf("reduceContainers() gotOrderedKeys = %v, want %v", gotOrderedKeys, tt.wantOrderedKeys)
 			}
-			if !reflect.DeepEqual(gotOldToNewRowMapping, tt.wantOldToNewRowMapping) {
-				t.Errorf("reduceContainers() gotOldToNewRowMapping = %v, want %v", gotOldToNewRowMapping, tt.wantOldToNewRowMapping)
-			}
 		})
 	}
 }
 
-func Test_reduceContainersLimited(t *testing.T) {
+func Test_reduceContainersForLookup(t *testing.T) {
 	type args struct {
 		containers []*valueContainer
 	}
@@ -659,8 +646,8 @@ func Test_reduceContainersLimited(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := reduceContainersLimited(tt.args.containers); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("reduceContainersLimited() = %v, want %v", got, tt.want)
+			if got := reduceContainersForLookup(tt.args.containers); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("reduceContainersForLookup() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1029,31 +1016,31 @@ func Test_valueContainer_after(t *testing.T) {
 	}
 }
 
-func Test_concatenateLabelsToStrings(t *testing.T) {
-	type args struct {
-		labels []*valueContainer
-	}
-	tests := []struct {
-		name string
-		args args
-		want []string
-	}{
-		{"one level", args{labels: []*valueContainer{
-			{slice: []string{"foo", "bar"}}}},
-			[]string{"foo", "bar"}},
-		{"two levels, two index", args{labels: []*valueContainer{
-			{slice: []string{"foo", "bar"}},
-			{slice: []int{0, 1}}}},
-			[]string{"foo|0", "bar|1"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := concatenateLabelsToStrings(tt.args.labels); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("concatenateLabelsToStrings() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+// func Test_concatenateLabelsToStrings(t *testing.T) {
+// 	type args struct {
+// 		labels []*valueContainer
+// 	}
+// 	tests := []struct {
+// 		name string
+// 		args args
+// 		want []string
+// 	}{
+// 		{"one level", args{labels: []*valueContainer{
+// 			{slice: []string{"foo", "bar"}}}},
+// 			[]string{"foo", "bar"}},
+// 		{"two levels, two index", args{labels: []*valueContainer{
+// 			{slice: []string{"foo", "bar"}},
+// 			{slice: []int{0, 1}}}},
+// 			[]string{"foo|0", "bar|1"}},
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			if got := concatenateLabelsToStrings(tt.args.labels); !reflect.DeepEqual(got, tt.want) {
+// 				t.Errorf("concatenateLabelsToStrings() = %v, want %v", got, tt.want)
+// 			}
+// 		})
+// 	}
+// }
 
 func Test_valueContainer_shift(t *testing.T) {
 	type fields struct {
@@ -1092,48 +1079,6 @@ func Test_valueContainer_shift(t *testing.T) {
 			}
 			if got := vc.shift(tt.args.n); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("vc.shift() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_valueContainer_applyFormat(t *testing.T) {
-	type fields struct {
-		slice  interface{}
-		isNull []bool
-		name   string
-	}
-	type args struct {
-		apply ApplyFormatFn
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   interface{}
-	}{
-		{"float",
-			fields{slice: []float64{.75}, isNull: []bool{false}},
-			args{ApplyFormatFn{Float: func(v float64) string {
-				return strconv.FormatFloat(v, 'f', 1, 64)
-			}}},
-			[]string{"0.8"}},
-		{"datetime",
-			fields{slice: []time.Time{time.Date(2019, 1, 1, 0, 0, 0, 0, time.UTC)}, isNull: []bool{false}},
-			args{ApplyFormatFn{DateTime: func(v time.Time) string {
-				return v.Format("2006-01-02")
-			}}},
-			[]string{"2019-01-01"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			vc := &valueContainer{
-				slice:  tt.fields.slice,
-				isNull: tt.fields.isNull,
-				name:   tt.fields.name,
-			}
-			if got := vc.applyFormat(tt.args.apply); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("valueContainer.applyFormat() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1675,26 +1620,28 @@ func Test_valueContainer_apply(t *testing.T) {
 		name   string
 		fields fields
 		args   args
-		want   interface{}
+		want   *valueContainer
 	}{
 		{"float", fields{
 			slice:  []float64{1, 2},
 			isNull: []bool{false, false},
 			name:   "foo"},
 			args{ApplyFn{Float: func(v float64) float64 { return v * 2 }}},
-			[]float64{2, 4}},
+			&valueContainer{slice: []float64{2, 4}, isNull: []bool{false, false}, name: "foo"}},
 		{"string", fields{
 			slice:  []string{"foo", "bar"},
 			isNull: []bool{false, false},
 			name:   "foo"},
 			args{ApplyFn{String: func(s string) string { return strings.Replace(s, "o", "a", -1) }}},
-			[]string{"faa", "bar"}},
+			&valueContainer{
+				slice: []string{"faa", "bar"}, isNull: []bool{false, false}, name: "foo"}},
 		{"date", fields{
 			slice:  []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
 			isNull: []bool{false},
 			name:   "foo"},
 			args{ApplyFn{DateTime: func(v time.Time) time.Time { return v.AddDate(0, 0, 1) }}},
-			[]time.Time{time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC)}},
+			&valueContainer{slice: []time.Time{time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC)}, isNull: []bool{false}, name: "foo"},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1703,8 +1650,52 @@ func Test_valueContainer_apply(t *testing.T) {
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
 			}
-			if got := vc.apply(tt.args.apply); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("valueContainer.apply() = %v, want %v", got, tt.want)
+			vc.apply(tt.args.apply)
+			if !reflect.DeepEqual(vc, tt.want) {
+				t.Errorf("valueContainer.apply() = %v, want %v", vc, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_applyFormat(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		name   string
+	}
+	type args struct {
+		apply ApplyFormatFn
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *valueContainer
+	}{
+		{"float",
+			fields{slice: []float64{.75}, isNull: []bool{false}},
+			args{ApplyFormatFn{Float: func(v float64) string {
+				return strconv.FormatFloat(v, 'f', 1, 64)
+			}}},
+			&valueContainer{slice: []string{"0.8"}, isNull: []bool{false}}},
+		{"datetime",
+			fields{slice: []time.Time{time.Date(2019, 1, 1, 0, 0, 0, 0, time.UTC)}, isNull: []bool{false}},
+			args{ApplyFormatFn{DateTime: func(v time.Time) string {
+				return v.Format("2006-01-02")
+			}}},
+			&valueContainer{slice: []string{"2019-01-01"}, isNull: []bool{false}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				name:   tt.fields.name,
+			}
+			vc.applyFormat(tt.args.apply)
+			if !reflect.DeepEqual(vc, tt.want) {
+				t.Errorf("valueContainer.applyFormat() = %v, want %v", vc, tt.want)
 			}
 		})
 	}
@@ -3844,45 +3835,51 @@ func Test_makeDataFrameFromMatrices(t *testing.T) {
 		want *DataFrame
 	}{
 		{"pass - 1 header col", args{
-			values: [][][]byte{{[]byte("foo"), []byte("bar")}, {[]byte("baz"), []byte("")}},
+			values: [][][]byte{
+				{[]byte("foo"), []byte("bar")},
+				{[]byte("baz"), nil}},
 			isNull: [][]bool{{false, false}, {false, true}},
 			config: &ReadConfig{NumHeaderRows: 1}},
 			&DataFrame{
 				values: []*valueContainer{
-					{slice: []string{"bar"}, isNull: []bool{false}, name: "foo"},
-					{slice: []string{""}, isNull: []bool{true}, name: "baz"},
+					{slice: [][]byte{[]byte("bar")}, isNull: []bool{false}, name: "foo"},
+					{slice: [][]byte{nil}, isNull: []bool{true}, name: "baz"},
 				},
 				labels: []*valueContainer{
 					{slice: []int{0}, isNull: []bool{false}, name: "*0"},
 				},
 				colLevelNames: []string{"*0"},
 			}},
-		// {"pass - 1 header col, 1 label level", args{
-		// 	values: [][]string{{"foo", "bar"}, {"baz", ""}},
-		// 	isNull: [][]bool{{false, false}, {false, true}},
-		// 	config: &ReadConfig{NumHeaderRows: 1, NumLabelCols: 1}},
-		// 	&DataFrame{
-		// 		values: []*valueContainer{
-		// 			{slice: []string{""}, isNull: []bool{true}, name: "baz"},
-		// 		},
-		// 		labels: []*valueContainer{
-		// 			{slice: []string{"bar"}, isNull: []bool{false}, name: "foo"},
-		// 		},
-		// 		colLevelNames: []string{"*0"},
-		// 	}},
-		// {"pass - 1 label level", args{
-		// 	values: [][]string{{"foo", "bar"}, {"baz", ""}},
-		// 	isNull: [][]bool{{false, false}, {false, true}},
-		// 	config: &ReadConfig{NumLabelCols: 1}},
-		// 	&DataFrame{
-		// 		values: []*valueContainer{
-		// 			{slice: []string{"baz", ""}, isNull: []bool{false, true}, name: "0"},
-		// 		},
-		// 		labels: []*valueContainer{
-		// 			{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
-		// 		},
-		// 		colLevelNames: []string{"*0"},
-		// 	}},
+		{"pass - 1 header col, 1 label level", args{
+			values: [][][]byte{
+				{[]byte("foo"), []byte("bar")},
+				{[]byte("baz"), nil}},
+			isNull: [][]bool{{false, false}, {false, true}},
+			config: &ReadConfig{NumHeaderRows: 1, NumLabelCols: 1}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: [][]byte{nil}, isNull: []bool{true}, name: "baz"},
+				},
+				labels: []*valueContainer{
+					{slice: [][]byte{[]byte("bar")}, isNull: []bool{false}, name: "foo"},
+				},
+				colLevelNames: []string{"*0"},
+			}},
+		{"pass - 1 label level", args{
+			values: [][][]byte{
+				{[]byte("foo"), []byte("bar")},
+				{[]byte("baz"), nil}},
+			isNull: [][]bool{{false, false}, {false, true}},
+			config: &ReadConfig{NumLabelCols: 1}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: [][]byte{[]byte("baz"), nil}, isNull: []bool{false, true}, name: "0"},
+				},
+				labels: []*valueContainer{
+					{slice: [][]byte{[]byte("foo"), []byte("bar")}, isNull: []bool{false, false}, name: "*0"},
+				},
+				colLevelNames: []string{"*0"},
+			}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -4159,12 +4156,78 @@ func Test_makeByteMatrix(t *testing.T) {
 		args args
 		want [][][]byte
 	}{
-		{"pass", args{2, 1}, [][][]byte{{[]byte("")}, {[]byte("")}}},
+		{"pass", args{2, 1}, [][][]byte{{nil}, {nil}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := makeByteMatrix(tt.args.numCols, tt.args.numRows); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("makeByteMatrix() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_concatenateLabelsToStringsBytes(t *testing.T) {
+	type args struct {
+		labels []*valueContainer
+	}
+	tests := []struct {
+		name string
+		args args
+		want []string
+	}{
+		{"one level", args{labels: []*valueContainer{
+			{slice: []string{"foo", "bar"}}}},
+			[]string{"foo", "bar"}},
+		{"two levels, two index", args{labels: []*valueContainer{
+			{slice: []string{"foo", "bar"}},
+			{slice: []int{0, 1}}}},
+			[]string{"foo|0", "bar|1"}},
+		{"two levels, two index, archive", args{labels: []*valueContainer{
+			{slice: []string{"foo", "bar"}},
+			{slice: []int{0, 1}, archive: [][]byte{[]byte("0"), []byte("1")}}}},
+			[]string{"foo|0", "bar|1"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := concatenateLabelsToStringsBytes(tt.args.labels); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("concatenateLabelsToStringsBytes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_filter(t *testing.T) {
+	type args struct {
+		containers []*valueContainer
+		filters    map[string]FilterFn
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []int
+		wantErr bool
+	}{
+		{"pass", args{
+			[]*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
+			map[string]FilterFn{
+				"qux": FilterFn{Float: func(val float64) bool { return val >= 1 }},
+				"bar": FilterFn{String: func(val string) bool { return val == "foo" }},
+			}},
+			[]int{1},
+			false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := filter(tt.args.containers, tt.args.filters)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("filter() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("filter() = %v, want %v", got, tt.want)
 			}
 		})
 	}

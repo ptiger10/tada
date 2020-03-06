@@ -581,30 +581,6 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 	return
 }
 
-func filter(containers []*valueContainer, filters map[string]FilterFn) ([]int, error) {
-	// subIndexes contains the index positions computed across all the filters
-	var subIndexes [][]int
-	for containerName, filter := range filters {
-		err := filter.validate()
-		if err != nil {
-			return nil, fmt.Errorf("filter: %v", err)
-		}
-		index, err := indexOfContainer(containerName, containers)
-		if err != nil {
-			return nil, fmt.Errorf("filter: %v", err)
-		}
-		subIndex, err := containers[index].filter(filter)
-		if err != nil {
-			return nil, fmt.Errorf("filter: %v", err)
-		}
-		subIndexes = append(subIndexes, subIndex)
-	}
-	intersection := intersection(subIndexes,
-		reflect.ValueOf(containers[0].slice).Len())
-	// reduce the subindexes to a single index that shares all the values
-	return intersection, nil
-}
-
 // -- FILTERS
 
 // Filter applies one or more filters to the containers in the Series
@@ -708,7 +684,7 @@ func (s *SeriesMutator) Apply(lambda ApplyFn) {
 		s.series.resetWithError((fmt.Errorf("Apply(): %v", err)))
 		return
 	}
-	s.series.values.slice = s.series.values.apply(lambda)
+	s.series.values.apply(lambda)
 	// set to null if null either prior to or after transformation
 	s.series.values.isNull = isEitherNull(s.series.values.isNull, setNullsFromInterface(s.series.values.slice))
 	return
@@ -728,7 +704,7 @@ func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
 		s.series.resetWithError((fmt.Errorf("ApplyFormat(): %v", err)))
 		return
 	}
-	s.series.values.slice = s.series.values.applyFormat(lambda)
+	s.series.values.applyFormat(lambda)
 	// set to null if null either prior to or after transformation
 	s.series.values.isNull = isEitherNull(s.series.values.isNull, setNullsFromInterface(s.series.values.slice))
 	return
@@ -825,7 +801,8 @@ func (s *Series) GroupBy(names ...string) *GroupedSeries {
 			return groupedSeriesWithError(fmt.Errorf("GroupBy(): %v", err))
 		}
 	}
-	newLabels, rowIndices, orderedKeys, _ := reduceContainers(s.labels, index)
+	containers, _ := subsetContainers(s.labels, index)
+	newLabels, rowIndices, orderedKeys := reduceContainers(containers)
 	return &GroupedSeries{
 		orderedKeys: orderedKeys,
 		rowIndices:  rowIndices,

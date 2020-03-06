@@ -2259,8 +2259,10 @@ func TestSeries_GroupBy(t *testing.T) {
 				series: &Series{
 					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
 					labels: []*valueContainer{
-						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a"},
-						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b"}},
+						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a",
+							archive: [][]byte{[]byte("0"), []byte("0"), []byte("1"), []byte("2")}},
+						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b",
+							archive: [][]byte{[]byte("foo"), []byte("foo"), []byte("foo"), []byte("bar")}}},
 				},
 			}},
 		{"group by specific level", fields{
@@ -3275,42 +3277,6 @@ func TestSeries_SwapLabels(t *testing.T) {
 			}
 			if got := s.SwapLabels(tt.args.i, tt.args.j); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.SwapLabels() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_filter(t *testing.T) {
-	type args struct {
-		containers []*valueContainer
-		filters    map[string]FilterFn
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    []int
-		wantErr bool
-	}{
-		{"pass", args{
-			[]*valueContainer{
-				{slice: []int{1, 0}, isNull: []bool{false, false}, name: "qux"},
-				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
-			map[string]FilterFn{
-				"qux": FilterFn{Float: func(val float64) bool { return val >= 1 }},
-				"bar": FilterFn{String: func(val string) bool { return val == "foo" }},
-			}},
-			[]int{0},
-			false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := filter(tt.args.containers, tt.args.filters)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("filter() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("filter() = %v, want %v", got, tt.want)
 			}
 		})
 	}

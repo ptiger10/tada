@@ -110,6 +110,9 @@ func convertBoolToFloat(val bool) float64 {
 }
 
 func (vc *valueContainer) cast(dtype DType) {
+	if vc.isBytes() {
+		vc.cleanArchive()
+	}
 	switch dtype {
 	case Float:
 		_, ok := vc.slice.([]float64)
@@ -142,6 +145,12 @@ func (vc *valueContainer) float64() floatValueContainer {
 		arr := vc.slice.([]string)
 		for i := range arr {
 			newVals[i], isNull[i] = convertStringToFloat(arr[i], isNull[i])
+		}
+
+	case [][]byte:
+		arr := vc.slice.([][]byte)
+		for i := range arr {
+			newVals[i], isNull[i] = convertStringToFloat(string(arr[i]), isNull[i])
 		}
 
 	case []time.Time:
@@ -282,6 +291,12 @@ func (vc *valueContainer) dateTime() dateTimeValueContainer {
 		for i := range arr {
 			newVals[i], isNull[i] = convertStringToDateTime(arr[i])
 		}
+
+	case [][]byte:
+		arr := vc.slice.([][]byte)
+		for i := range arr {
+			newVals[i], isNull[i] = convertStringToDateTime(string(arr[i]))
+		}
 	case []time.Time:
 		newVals = vc.slice.([]time.Time)
 	case []interface{}:
@@ -308,5 +323,54 @@ func (vc *valueContainer) dateTime() dateTimeValueContainer {
 		isNull: isNull,
 	}
 	return ret
+}
 
+func (vc *valueContainer) cleanArchive() {
+	if !vc.dirty && vc.archive != nil {
+		return
+	}
+	switch vc.slice.(type) {
+	case [][]byte:
+		vc.archive = vc.slice.([][]byte)
+	case []string:
+		arr := vc.slice.([]string)
+		vc.archive = make([][]byte, len(arr))
+		for i := range arr {
+			vc.archive[i] = []byte(arr[i])
+		}
+	case []float64:
+		arr := vc.slice.([]float64)
+		vc.archive = make([][]byte, len(arr))
+		for i := range arr {
+			vc.archive[i] = []byte(fmt.Sprint(arr[i]))
+		}
+	case []int:
+		arr := vc.slice.([]int)
+		vc.archive = make([][]byte, len(arr))
+		for i := range arr {
+			vc.archive[i] = []byte(strconv.Itoa(arr[i]))
+		}
+	case []time.Time:
+		arr := vc.slice.([]time.Time)
+		vc.archive = make([][]byte, len(arr))
+		for i := range arr {
+			vc.archive[i] = []byte(arr[i].String())
+		}
+	default:
+		arr := reflect.ValueOf(vc.slice)
+		vc.archive = make([][]byte, arr.Len())
+		for i := 0; i < arr.Len(); i++ {
+			vc.archive[i] = []byte(fmt.Sprint(arr.Index(i).Interface()))
+		}
+	}
+	vc.dirty = false
+
+}
+
+func (vc *valueContainer) isBytes() bool {
+	switch vc.slice.(type) {
+	case [][]byte, []string:
+		return true
+	}
+	return false
 }

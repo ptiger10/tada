@@ -1288,9 +1288,10 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 	// -- set up helpers and new containers
 
 	// this step isolates the unique values in the promoted column and the rows in the original slice containing those values
-	_, rowIndices, uniqueValuesToPromote, _ := reduceContainers([]*valueContainer{valsToPromote}, []int{0})
+	_, rowIndices, uniqueValuesToPromote := reduceContainers([]*valueContainer{valsToPromote})
 	// this step consolidates duplicate residual labels and maps each original row index to its new row index
-	labels, _, _, oldToNewRowMapping := reduceContainers(df.labels, residualLabelIndex)
+	residualLabels, _ := subsetContainers(df.labels, residualLabelIndex)
+	labels, oldToNewRowMapping := reduceContainersForPromote(residualLabels)
 	// set new column level names
 	retColLevelNames := append([]string{valsToPromote.name}, df.colLevelNames...)
 	// new values will have as many columns as unique values in the column-to-be-stacked * existing columns
@@ -1406,7 +1407,7 @@ func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 		if err != nil {
 			df.dataframe.resetWithError((fmt.Errorf("Apply(): %v", err)))
 		}
-		mergedLabelsAndCols[index].slice = mergedLabelsAndCols[index].apply(lambda)
+		mergedLabelsAndCols[index].apply(lambda)
 		mergedLabelsAndCols[index].isNull = isEitherNull(
 			mergedLabelsAndCols[index].isNull,
 			setNullsFromInterface(mergedLabelsAndCols[index].slice))
@@ -1435,7 +1436,7 @@ func (df *DataFrameMutator) ApplyFormat(lambdas map[string]ApplyFormatFn) {
 		if err != nil {
 			df.dataframe.resetWithError((fmt.Errorf("ApplyFormat(): %v", err)))
 		}
-		mergedLabelsAndCols[index].slice = mergedLabelsAndCols[index].applyFormat(lambda)
+		mergedLabelsAndCols[index].applyFormat(lambda)
 		mergedLabelsAndCols[index].isNull = isEitherNull(
 			mergedLabelsAndCols[index].isNull,
 			setNullsFromInterface(mergedLabelsAndCols[index].slice))
@@ -1553,7 +1554,8 @@ func (df *DataFrame) GroupBy(names ...string) *GroupedDataFrame {
 // expects index to refer to merged labels and columns
 func (df *DataFrame) groupby(index []int) *GroupedDataFrame {
 	mergedLabelsAndCols := append(df.labels, df.values...)
-	newLabels, rowIndices, orderedKeys, _ := reduceContainers(mergedLabelsAndCols, index)
+	containers, _ := subsetContainers(mergedLabelsAndCols, index)
+	newLabels, rowIndices, orderedKeys := reduceContainers(containers)
 	names := make([]string, len(index))
 	for i, pos := range index {
 		names[i] = mergedLabelsAndCols[pos].name

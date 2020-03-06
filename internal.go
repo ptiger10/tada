@@ -286,9 +286,6 @@ func makeByteMatrix(numCols, numRows int) [][][]byte {
 	ret := make([][][]byte, numCols)
 	for k := 0; k < numCols; k++ {
 		ret[k] = make([][]byte, numRows)
-		for i := range ret[k] {
-			ret[k][i] = make([]byte, 0)
-		}
 	}
 	return ret
 }
@@ -1064,51 +1061,51 @@ func (vc *valueContainer) filter(filter FilterFn) ([]int, error) {
 	return index, nil
 }
 
-func (vc *valueContainer) applyFormat(apply ApplyFormatFn) interface{} {
-	var ret interface{}
-	if apply.Float != nil {
-		slice := vc.float64().slice
-		retSlice := make([]string, len(slice))
-		for i := range slice {
-			retSlice[i] = apply.Float(slice[i])
-		}
-		ret = retSlice
-	} else if apply.DateTime != nil {
-		slice := vc.dateTime().slice
-		retSlice := make([]string, len(slice))
-		for i := range slice {
-			retSlice[i] = apply.DateTime(slice[i])
-		}
-		ret = retSlice
-	}
-	return ret
-}
-
-func (vc *valueContainer) apply(apply ApplyFn) interface{} {
-	var ret interface{}
-	if apply.Float != nil {
+func (vc *valueContainer) apply(lambda ApplyFn) {
+	if lambda.Float != nil {
 		slice := vc.float64().slice
 		retSlice := make([]float64, len(slice))
 		for i := range slice {
-			retSlice[i] = apply.Float(slice[i])
+			retSlice[i] = lambda.Float(slice[i])
 		}
-		ret = retSlice
-	} else if apply.String != nil {
+		vc.slice = retSlice
+	} else if lambda.String != nil {
 		slice := vc.string().slice
 		retSlice := make([]string, len(slice))
 		for i := range slice {
-			retSlice[i] = apply.String(slice[i])
+			retSlice[i] = lambda.String(slice[i])
 		}
-		ret = retSlice
-	} else if apply.DateTime != nil {
+		vc.slice = retSlice
+	} else if lambda.DateTime != nil {
 		slice := vc.dateTime().slice
 		retSlice := make([]time.Time, len(slice))
 		for i := range slice {
-			retSlice[i] = apply.DateTime(slice[i])
+			retSlice[i] = lambda.DateTime(slice[i])
 		}
-		ret = retSlice
+		vc.slice = retSlice
 	}
-	return ret
+	return
+}
+
+func (vc *valueContainer) applyFormat(lambda ApplyFormatFn) {
+	if vc.isBytes() {
+		vc.cleanArchive()
+	}
+	if lambda.Float != nil {
+		slice := vc.float64().slice
+		retSlice := make([]string, len(slice))
+		for i := range slice {
+			retSlice[i] = lambda.Float(slice[i])
+		}
+		vc.slice = retSlice
+	} else if lambda.DateTime != nil {
+		slice := vc.dateTime().slice
+		retSlice := make([]string, len(slice))
+		for i := range slice {
+			retSlice[i] = lambda.DateTime(slice[i])
+		}
+		vc.slice = retSlice
+	}
 }
 
 // expects slices to be same-lengthed; if either is true at position x, ret is true at position x
@@ -1213,41 +1210,46 @@ func convertColNamesToIndexPositions(names []string, columns []*valueContainer) 
 	return ret, nil
 }
 
-// concatenateLabelsToStrings reduces all container rows to a single slice of concatenated strings, one per row
-func concatenateLabelsToStrings(labels []*valueContainer) []string {
-	labelStrings := make([][]string, len(labels))
-	// coerce every label level referenced in the index to a separate string slice
-	for j := range labels {
-		labelStrings[j] = labels[j].string().slice
-	}
-	ret := make([]string, len(labelStrings[0]))
-	// for each row, combine labels into one concatenated string
-	for i := 0; i < len(labelStrings[0]); i++ {
-		labelComponents := make([]string, len(labels))
-		for j := range labelStrings {
-			labelComponents[j] = labelStrings[j][i]
-		}
-		concatenatedString := strings.Join(labelComponents, optionLevelSeparator)
-		ret[i] = concatenatedString
-	}
-	// return a single slice of strings
-	return ret
-}
+// // concatenateLabelsToStrings reduces all container rows to a single slice of concatenated strings, one per row
+// func concatenateLabelsToStrings(labels []*valueContainer) []string {
+// 	labelStrings := make([][]string, len(labels))
+// 	// coerce every label level referenced in the index to a separate string slice
+// 	for j := range labels {
+// 		labelStrings[j] = labels[j].string().slice
+// 	}
+// 	ret := make([]string, len(labelStrings[0]))
+// 	// for each row, combine labels into one concatenated string
+// 	for i := 0; i < len(labelStrings[0]); i++ {
+// 		labelComponents := make([]string, len(labels))
+// 		for j := range labelStrings {
+// 			labelComponents[j] = labelStrings[j][i]
+// 		}
+// 		concatenatedString := strings.Join(labelComponents, optionLevelSeparator)
+// 		ret[i] = concatenatedString
+// 	}
+// 	// return a single slice of strings
+// 	return ret
+// }
 
-// concatenateLabelsToStrings reduces all container rows to a single slice of concatenated strings, one per row
+// concatenateLabelsToStringsBytes reduces all container rows to a single slice of concatenated strings, one per row
 func concatenateLabelsToStringsBytes(labels []*valueContainer) []string {
-	labelStrings := make([][]string, len(labels))
-	// coerce every label level referenced in the index to a separate string slice
-	for j := range labels {
-		labelStrings[j] = labels[j].string().slice
+	if len(labels) == 1 {
+		return labels[0].string().slice
 	}
-	ret := make([]string, len(labelStrings[0]))
-	// for each row, combine labels into one concatenated string
-	for i := 0; i < len(labelStrings[0]); i++ {
-		buf := new(bytes.Buffer)
-		b := bufio.NewWriterSize(buf, 512)
-		for j := range labelStrings {
-			b.Write([]byte(labelStrings[j][i]))
+	for j := range labels {
+		labels[j].cleanArchive()
+	}
+	buf := new(bytes.Buffer)
+	numRows := labels[0].len()
+	ret := make([]string, numRows)
+
+	for i := 0; i < numRows; i++ {
+		buf.Reset()
+		for j := range labels {
+			buf.Write(labels[j].archive[i])
+			if j != len(labels)-1 {
+				buf.WriteString(optionLevelSeparator)
+			}
 		}
 		ret[i] = string(buf.Bytes())
 	}
@@ -1261,20 +1263,18 @@ func concatenateLabelsToStringsBytes(labels []*valueContainer) []string {
 // back to the rows in the original containers with the matching label combo
 // 3) a []string of the unique label combinations in order
 // and 4) a map[int]int that maps each original row index to its row index in the new containers
-func reduceContainers(containers []*valueContainer, index []int) (
+func reduceContainers(containers []*valueContainer) (
 	newContainers []*valueContainer,
 	originalRowIndices [][]int,
-	orderedKeys []string,
-	oldToNewRowMapping map[int]int) {
-	subset, _ := subsetContainers(containers, index)
+	orderedKeys []string) {
 	// coerce all label levels to string for use as map keys
-	stringifiedLabels := concatenateLabelsToStrings(subset)
+	stringifiedLabels := concatenateLabelsToStringsBytes(containers)
 	// create receiver for unique labels of same type as original levels
-	newContainers = make([]*valueContainer, len(subset))
-	for j := range subset {
+	newContainers = make([]*valueContainer, len(containers))
+	for j := range containers {
 		newContainers[j] = &valueContainer{
-			slice:  reflect.MakeSlice(reflect.TypeOf(subset[j].slice), 0, 0).Interface(),
-			name:   subset[j].name,
+			slice:  reflect.MakeSlice(reflect.TypeOf(containers[j].slice), 0, 0).Interface(),
+			name:   containers[j].name,
 			isNull: make([]bool, 0),
 		}
 	}
@@ -1282,6 +1282,56 @@ func reduceContainers(containers []*valueContainer, index []int) (
 	uniqueLabelRows := make(map[string][]int)
 	// create receiver for the unique label combos in order
 	orderedKeys = make([]string, 0)
+	// iterate over rows in original containers
+	for i, key := range stringifiedLabels {
+		// check if label combo already exists in set
+		if _, ok := uniqueLabelRows[key]; !ok {
+			// if label combo does not exist:
+			// add int position of the original row to the map
+			uniqueLabelRows[key] = []int{i}
+
+			// write label values to new containers, in order of appearance
+			for j := range containers {
+				src := reflect.ValueOf(containers[j].slice).Index(i)
+				dst := reflect.ValueOf(newContainers[j].slice)
+				newContainers[j].slice = reflect.Append(dst, src).Interface()
+				newContainers[j].isNull = append(newContainers[j].isNull, containers[j].isNull[i])
+			}
+			// add key to list to maintain order in which unique label combos appear
+			orderedKeys = append(orderedKeys, key)
+
+		} else {
+			// if so: add int position of this row
+			uniqueLabelRows[key] = append(uniqueLabelRows[key], i)
+		}
+	}
+	// transfer row indexes in order of new unique label combos
+	originalRowIndices = make([][]int, len(orderedKeys))
+	for i, key := range orderedKeys {
+		originalRowIndices[i] = uniqueLabelRows[key]
+	}
+	return
+}
+
+// returns 1) new grouped labels as []*valueContainer, and
+// 2) a map[int]int that maps each original row index to its row index in the new containers
+func reduceContainersForPromote(containers []*valueContainer) (
+	newContainers []*valueContainer, oldToNewRowMapping map[int]int) {
+	// coerce all label levels to string for use as map keys
+	stringifiedLabels := concatenateLabelsToStringsBytes(containers)
+	// create receiver for unique labels of same type as original levels
+	newContainers = make([]*valueContainer, len(containers))
+	for j := range containers {
+		newContainers[j] = &valueContainer{
+			slice:  reflect.MakeSlice(reflect.TypeOf(containers[j].slice), 0, 0).Interface(),
+			name:   containers[j].name,
+			isNull: make([]bool, 0),
+		}
+	}
+	// create receiver for the original row indexes for each unique label combo
+	uniqueLabelRows := make(map[string][]int)
+	// create receiver for the unique label combos in order
+	var numKeys int
 	// key: original row index, value: new row index for the same unique label combo found at original row index
 	// there will be one key for each row in the original data
 	oldToNewRowMapping = make(map[int]int, len(stringifiedLabels))
@@ -1296,36 +1346,28 @@ func reduceContainers(containers []*valueContainer, index []int) (
 			uniqueLabelRows[key] = []int{i}
 
 			// write label values to new containers, in order of appearance
-			for j := range subset {
-				src := reflect.ValueOf(subset[j].slice).Index(i)
+			for j := range containers {
+				src := reflect.ValueOf(containers[j].slice).Index(i)
 				dst := reflect.ValueOf(newContainers[j].slice)
 				newContainers[j].slice = reflect.Append(dst, src).Interface()
-				newContainers[j].isNull = append(newContainers[j].isNull, subset[j].isNull[i])
+				newContainers[j].isNull = append(newContainers[j].isNull, containers[j].isNull[i])
 			}
 			// count the number of existing ordered keys to identify the new row index of this unique label combo
-			orderedKeyIndex[key] = len(orderedKeys)
+			orderedKeyIndex[key] = numKeys
 			// add key to list to maintain order in which unique label combos appear
-			orderedKeys = append(orderedKeys, key)
+			numKeys++
 
-		} else {
-			// if so: add int position of this row
-			uniqueLabelRows[key] = append(uniqueLabelRows[key], i)
 		}
 		// relate each row index in the old containers to a row in the new containers with deduplicated labels
 		oldToNewRowMapping[i] = orderedKeyIndex[key]
-	}
-	// transfer row indexes in order of new unique label combos
-	originalRowIndices = make([][]int, len(orderedKeys))
-	for i, key := range orderedKeys {
-		originalRowIndices[i] = uniqueLabelRows[key]
 	}
 	return
 }
 
 // similar to reduceContainers, but only returns map of unique label combos and the row index where they first appear
-func reduceContainersLimited(containers []*valueContainer) map[string]int {
+func reduceContainersForLookup(containers []*valueContainer) map[string]int {
 	ret := make(map[string]int)
-	stringifiedLabels := concatenateLabelsToStrings(containers)
+	stringifiedLabels := concatenateLabelsToStringsBytes(containers)
 	for i, key := range stringifiedLabels {
 		if _, ok := ret[key]; !ok {
 			ret[key] = i
@@ -1460,8 +1502,8 @@ func lookupWithAnchor(
 		}
 	}
 
-	toLookup := concatenateLabelsToStrings(subsetLeft)
-	lookupSource := reduceContainersLimited(subsetRight)
+	toLookup := concatenateLabelsToStringsBytes(subsetLeft)
+	lookupSource := reduceContainersForLookup(subsetRight)
 	matches := matchLabelPositions(toLookup, lookupSource)
 	reflectLookup := reflect.ValueOf(lookupValues.slice)
 	isNull := make([]bool, len(matches))
@@ -1501,8 +1543,8 @@ func lookupDataFrameWithAnchor(
 			labels: copyContainers(anchorLabels),
 		}
 	}
-	toLookup := concatenateLabelsToStrings(subsetLeft)
-	lookupSource := reduceContainersLimited(subsetRight)
+	toLookup := concatenateLabelsToStringsBytes(subsetLeft)
+	lookupSource := reduceContainersForLookup(subsetRight)
 	matches := matchLabelPositions(toLookup, lookupSource)
 	// slice of slices
 	var retVals []*valueContainer
@@ -2303,7 +2345,7 @@ func (vc *valueContainer) uniqueIndex() []int {
 
 // returns row positions with unique values only (accounting for all container values)
 func multiUniqueIndex(containers []*valueContainer) []int {
-	stringifiedRows := concatenateLabelsToStrings(containers)
+	stringifiedRows := concatenateLabelsToStringsBytes(containers)
 	m := make(map[string]bool)
 	ret := make([]int, 0)
 	for i, value := range stringifiedRows {
@@ -2632,4 +2674,28 @@ func concatBytes() {
 		b.Flush()
 	}
 	print(string(buf.Len()))
+}
+
+func filter(containers []*valueContainer, filters map[string]FilterFn) ([]int, error) {
+	// subIndexes contains the index positions computed across all the filters
+	var subIndexes [][]int
+	for containerName, filter := range filters {
+		err := filter.validate()
+		if err != nil {
+			return nil, fmt.Errorf("filter: %v", err)
+		}
+		index, err := indexOfContainer(containerName, containers)
+		if err != nil {
+			return nil, fmt.Errorf("filter: %v", err)
+		}
+		subIndex, err := containers[index].filter(filter)
+		if err != nil {
+			return nil, fmt.Errorf("filter: %v", err)
+		}
+		subIndexes = append(subIndexes, subIndex)
+	}
+	intersection := intersection(subIndexes,
+		reflect.ValueOf(containers[0].slice).Len())
+	// reduce the subindexes to a single index that shares all the values
+	return intersection, nil
 }

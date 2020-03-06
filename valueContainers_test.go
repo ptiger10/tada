@@ -542,7 +542,9 @@ func Test_valueContainer_cast(t *testing.T) {
 		{"int to float64", fields{slice: []int{1}, isNull: []bool{false}, name: "foo"},
 			args{Float}, &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 		{"string to string", fields{slice: []string{"foo"}, isNull: []bool{false}, name: "foo"},
-			args{String}, &valueContainer{slice: []string{"foo"}, isNull: []bool{false}, name: "foo"}},
+			args{String}, &valueContainer{
+				archive: [][]byte{[]byte("foo")},
+				slice:   []string{"foo"}, isNull: []bool{false}, name: "foo"}},
 		{"int to string", fields{slice: []int{1}, isNull: []bool{false}, name: "foo"},
 			args{String}, &valueContainer{slice: []string{"1"}, isNull: []bool{false}, name: "foo"}},
 		{"datetime to datetime", fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},

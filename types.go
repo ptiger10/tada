@@ -5,9 +5,11 @@ import (
 )
 
 type valueContainer struct {
-	slice  interface{}
-	isNull []bool
-	name   string
+	slice   interface{}
+	isNull  []bool
+	name    string
+	archive [][]byte
+	dirty   bool
 }
 
 // Series stub
