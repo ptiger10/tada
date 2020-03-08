@@ -10,6 +10,7 @@ import (
 	"math"
 	"math/rand"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -177,7 +178,7 @@ func indexOfContainer(name string, cols []*valueContainer) (int, error) {
 
 func withColumn(cols []*valueContainer, name string, input interface{}, requiredLen int) ([]*valueContainer, error) {
 	switch reflect.TypeOf(input).Kind() {
-	// `input` is string: rename label level
+	// `input` is string? rename label level
 	case reflect.String:
 		lvl, err := indexOfContainer(name, cols)
 		if err != nil {
@@ -194,7 +195,7 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 				"cannot replace items in column %s: length of input does not match existing length (%d != %d)",
 				name, l, requiredLen)
 		}
-		// `input` is supported slice
+		// `input` is supported slice? append or overwrite
 		lvl, err := indexOfContainer(name, cols)
 		if err != nil {
 			// `name` does not already exist: append new label level
@@ -203,7 +204,9 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 			// `name` already exists: overwrite existing label level
 			cols[lvl].slice = input
 			cols[lvl].isNull = isNull
+			cols[lvl].resetCache()
 		}
+		// is Series? append or overwrite
 	case reflect.Ptr:
 		v, ok := input.(*Series)
 		if !ok {
@@ -224,6 +227,7 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 			// `name` already exists: overwrite existing level
 			cols[lvl] = v.values
 			cols[lvl].name = name
+			cols[lvl].resetCache()
 		}
 
 	default:
@@ -722,6 +726,7 @@ func mockString(dtype string) string {
 
 // modifies vc in place
 func (vc *valueContainer) fillnull(lambda NullFiller) {
+	vc.resetCache()
 	v := reflect.ValueOf(vc.slice)
 	zeroVal := reflect.Zero(v.Type().Elem())
 	if lambda.FillForward {
@@ -876,6 +881,7 @@ func (vc *valueContainer) subsetRows(index []int) error {
 
 	vc.slice = subsetInterfaceSlice(vc.slice, index)
 	vc.isNull = subsetNulls(vc.isNull, index)
+	vc.resetCache()
 	return nil
 }
 
@@ -1029,6 +1035,7 @@ func (vc *valueContainer) after(comparison time.Time) []int {
 
 func (vc *valueContainer) relabel() {
 	vc.slice = makeIntRange(0, len(vc.isNull))
+	vc.resetCache()
 	return
 }
 
@@ -1084,13 +1091,11 @@ func (vc *valueContainer) apply(lambda ApplyFn) {
 		}
 		vc.slice = retSlice
 	}
+	vc.resetCache()
 	return
 }
 
 func (vc *valueContainer) applyFormat(lambda ApplyFormatFn) {
-	if vc.isBytes() {
-		vc.cleanArchive()
-	}
 	if lambda.Float != nil {
 		slice := vc.float64().slice
 		retSlice := make([]string, len(slice))
@@ -1106,6 +1111,7 @@ func (vc *valueContainer) applyFormat(lambda ApplyFormatFn) {
 		}
 		vc.slice = retSlice
 	}
+	vc.resetCache()
 }
 
 // expects slices to be same-lengthed; if either is true at position x, ret is true at position x
@@ -1233,11 +1239,15 @@ func convertColNamesToIndexPositions(names []string, columns []*valueContainer) 
 
 // concatenateLabelsToStringsBytes reduces all container rows to a single slice of concatenated strings, one per row
 func concatenateLabelsToStringsBytes(labels []*valueContainer) []string {
-	if len(labels) == 1 {
-		return labels[0].string().slice
-	}
 	for j := range labels {
-		labels[j].cleanArchive()
+		labels[j].setCache()
+	}
+	if len(labels) == 1 {
+		numRows := labels[0].len()
+		ret := make([]string, numRows)
+		for i := 0; i < numRows; i++ {
+			ret[i] = string(labels[0].cache[i])
+		}
 	}
 	buf := new(bytes.Buffer)
 	numRows := labels[0].len()
@@ -1246,7 +1256,7 @@ func concatenateLabelsToStringsBytes(labels []*valueContainer) []string {
 	for i := 0; i < numRows; i++ {
 		buf.Reset()
 		for j := range labels {
-			buf.Write(labels[j].archive[i])
+			buf.Write(labels[j].cache[i])
 			if j != len(labels)-1 {
 				buf.WriteString(optionLevelSeparator)
 			}
@@ -1599,6 +1609,7 @@ func (vc *valueContainer) dropRow(index int) error {
 
 	vc.slice = retVals.Interface()
 	vc.isNull = retIsNull
+	vc.resetCache()
 	return nil
 }
 
@@ -1672,7 +1683,16 @@ func (vc *valueContainer) copy() *valueContainer {
 		slice:  copyInterface(vc.slice),
 		isNull: copyNulls(vc.isNull),
 		name:   vc.name,
+		cache:  copyCache(vc.cache),
 	}
+}
+func copyCache(input [][]byte) [][]byte {
+	if input == nil {
+		return nil
+	}
+	ret := make([][]byte, len(input))
+	copy(ret, input)
+	return ret
 }
 
 func setNullsFromInterface(input interface{}) []bool {
@@ -1740,14 +1760,8 @@ func setNullsFromInterface(input interface{}) []bool {
 		for i := range ret {
 			ret[i] = false
 		}
-	case []Element:
-		vals := input.([]Element)
-		ret = make([]bool, len(vals))
-		for i := range ret {
-			ret[i] = vals[i].IsNull
-		}
 	// nested slices
-	case [][]string, [][]float64, [][]time.Time,
+	case [][]string, [][]float64, [][]time.Time, [][][]byte,
 		[][]bool, [][]float32,
 		[][]uint, [][]uint16, [][]uint32, [][]uint64,
 		[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
@@ -2297,6 +2311,7 @@ func (vc *valueContainer) resample(by Resampler) {
 		retVals[i] = resample(vals[i], by)
 	}
 	vc.slice = retVals
+	vc.resetCache()
 	return
 }
 
@@ -2698,4 +2713,15 @@ func filter(containers []*valueContainer, filters map[string]FilterFn) ([]int, e
 		reflect.ValueOf(containers[0].slice).Len())
 	// reduce the subindexes to a single index that shares all the values
 	return intersection, nil
+}
+
+func removeDefaultNameIndicator(name string) string {
+	return regexp.MustCompile(`^\*`).ReplaceAllString(name, "")
+}
+
+func suppressDefaultName(name string) string {
+	if regexp.MustCompile(`^\*`).MatchString(name) {
+		return ""
+	}
+	return name
 }

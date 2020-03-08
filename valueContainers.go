@@ -111,7 +111,7 @@ func convertBoolToFloat(val bool) float64 {
 
 func (vc *valueContainer) cast(dtype DType) {
 	if vc.isBytes() {
-		vc.cleanArchive()
+		vc.setCache()
 	}
 	switch dtype {
 	case Float:
@@ -325,45 +325,53 @@ func (vc *valueContainer) dateTime() dateTimeValueContainer {
 	return ret
 }
 
-func (vc *valueContainer) cleanArchive() {
-	if !vc.dirty && vc.archive != nil {
+// cache must be reset after any operation that modifies vc.slice
+func (vc *valueContainer) resetCache() {
+	vc.cache = nil
+}
+
+// conditions under which cache is set:
+// - concatenating multiple container levels (groupby, lookup, promote)
+// - casting from string or byte
+// ignores if cache is already set
+func (vc *valueContainer) setCache() {
+	if vc.cache != nil {
 		return
 	}
 	switch vc.slice.(type) {
 	case [][]byte:
-		vc.archive = vc.slice.([][]byte)
+		vc.cache = vc.slice.([][]byte)
 	case []string:
 		arr := vc.slice.([]string)
-		vc.archive = make([][]byte, len(arr))
+		vc.cache = make([][]byte, len(arr))
 		for i := range arr {
-			vc.archive[i] = []byte(arr[i])
+			vc.cache[i] = []byte(arr[i])
 		}
 	case []float64:
 		arr := vc.slice.([]float64)
-		vc.archive = make([][]byte, len(arr))
+		vc.cache = make([][]byte, len(arr))
 		for i := range arr {
-			vc.archive[i] = []byte(fmt.Sprint(arr[i]))
+			vc.cache[i] = []byte(fmt.Sprint(arr[i]))
 		}
 	case []int:
 		arr := vc.slice.([]int)
-		vc.archive = make([][]byte, len(arr))
+		vc.cache = make([][]byte, len(arr))
 		for i := range arr {
-			vc.archive[i] = []byte(strconv.Itoa(arr[i]))
+			vc.cache[i] = []byte(strconv.Itoa(arr[i]))
 		}
 	case []time.Time:
 		arr := vc.slice.([]time.Time)
-		vc.archive = make([][]byte, len(arr))
+		vc.cache = make([][]byte, len(arr))
 		for i := range arr {
-			vc.archive[i] = []byte(arr[i].String())
+			vc.cache[i] = []byte(arr[i].String())
 		}
 	default:
 		arr := reflect.ValueOf(vc.slice)
-		vc.archive = make([][]byte, arr.Len())
+		vc.cache = make([][]byte, arr.Len())
 		for i := 0; i < arr.Len(); i++ {
-			vc.archive[i] = []byte(fmt.Sprint(arr.Index(i).Interface()))
+			vc.cache[i] = []byte(fmt.Sprint(arr.Index(i).Interface()))
 		}
 	}
-	vc.dirty = false
 
 }
 

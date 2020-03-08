@@ -1,3 +1,6 @@
+// tada is a package for test-driven ETL and analytics pipelines.
+// If a column has multiple name levels, its name is stored as a single pipe-delimited string.
+
 package tada
 
 import (
@@ -8,7 +11,6 @@ import (
 	"io"
 	"io/ioutil"
 	"reflect"
-	"regexp"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/ptiger10/tablediff"
@@ -16,28 +18,33 @@ import (
 
 // -- CONSTRUCTORS
 
-// MakeSlicesFromCrossProduct stub
-func MakeSlicesFromCrossProduct(values []interface{}) ([]interface{}, error) {
-	for k := range values {
-		if !isSlice(values[k]) {
+// MakeMultiLevelLabels expects `labels` to be a slice of slices.
+// It returns a product of these slices by repeating each label value n times,
+// where n is the number of unique label values in the other slices.
+//
+// For example, [["foo", "bar"], [1, 2, 3]]
+// returns [["foo", "foo", "foo", "bar", "bar", "bar"], [1, 2, 3, 1, 2, 3]]
+func MakeMultiLevelLabels(labels []interface{}) ([]interface{}, error) {
+	for k := range labels {
+		if !isSlice(labels[k]) {
 			return nil, fmt.Errorf("MakeSlicesFromCrossProduct(): position %d: must be slice", k)
 		}
 	}
 	var numNewRows int
-	for k := range values {
-		v := reflect.ValueOf(values[k])
+	for k := range labels {
+		v := reflect.ValueOf(labels[k])
 		if k == 0 {
 			numNewRows = v.Len()
 		} else {
 			numNewRows *= v.Len()
 		}
 	}
-	ret := make([]interface{}, len(values))
-	for k := range values {
-		v := reflect.ValueOf(values[k])
+	ret := make([]interface{}, len(labels))
+	for k := range labels {
+		v := reflect.ValueOf(labels[k])
 		newValues := reflect.MakeSlice(v.Type(), numNewRows, numNewRows)
 		numRepeats := numNewRows / v.Len()
-		// for first slice, repeat each value individaully
+		// for first slice, repeat each value individually
 		if k == 0 {
 			for i := 0; i < v.Len(); i++ {
 				for j := 0; j < numRepeats; j++ {
@@ -64,9 +71,12 @@ func MakeSlicesFromCrossProduct(values []interface{}) ([]interface{}, error) {
 	return ret, nil
 }
 
-// NewDataFrame stub
-// If supplying `labels` as []interface{}, be sure to use the spread operator (...),
-// or else the labels will not be read properly.
+// NewDataFrame creates a new DataFrame with `slices` (akin to column values)
+// and optional `labels` (akin to named index values).
+// `Slices` must be comprised of slices, and each `label` must be a slice.
+// Acceptable slice types: all variants of []float, []int, & []uint,
+// [][]byte, []string, []bool, []time.Time, []interface{},
+// and 2-dimensional variants of each (e.g., [][]string, [][]float64).
 func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 	if slices == nil && labels == nil {
 		return dataFrameWithError(fmt.Errorf("NewSeries(): `slices` and `labels` cannot both be nil"))
@@ -99,23 +109,24 @@ func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 	return &DataFrame{values: values, labels: retLabels, colLevelNames: []string{"*0"}}
 }
 
-// Copy stub
+// Copy returns a new DataFrame with identical values as the original but no shared objects
+// (i.e., all internals are newly allocated).
 func (df *DataFrame) Copy() *DataFrame {
 	colLevelNames := make([]string, len(df.colLevelNames))
 	copy(colLevelNames, df.colLevelNames)
 
 	return &DataFrame{
-		values: copyContainers(df.values),
-		// values: df.values,
+		values:        copyContainers(df.values),
 		labels:        copyContainers(df.labels),
 		err:           df.err,
 		colLevelNames: colLevelNames,
-		// colLevelNames: df.colLevelNames,
-		name: df.name,
+		name:          df.name,
 	}
 }
 
-// ConcatSeries stub
+// ConcatSeries concatenates multiple Series with identical labels into a single DataFrame.
+// To join Series with different labels, use s.ToDataFrame() + df.Merge() (for simple cases)
+// or df.LookupAdvanced() + df.WithCol() (for advanced cases)
 func ConcatSeries(series ...*Series) (*DataFrame, error) {
 	ret := &DataFrame{colLevelNames: []string{"*0"}}
 	for k, s := range series {
@@ -134,7 +145,8 @@ func ConcatSeries(series ...*Series) (*DataFrame, error) {
 	return ret, nil
 }
 
-// Cast casts the underlying container values (column or label level) to []float64, []string, or []time.Time.
+// Cast casts the underlying container values (column or label level) to []float64, []string, or []time.Time
+// and caches the []byte values of the container (if inexpensive).
 // Use cast to improve performance when calling multiple operations on values.
 func (df *DataFrame) Cast(containerAsType map[string]DType) error {
 	mergedLabelsAndCols := append(df.labels, df.values...)
@@ -148,23 +160,30 @@ func (df *DataFrame) Cast(containerAsType map[string]DType) error {
 	return nil
 }
 
-// ReadCSV stub
-func ReadCSV(csv [][]string, config *ReadConfig) *DataFrame {
-	if len(csv) == 0 {
-		return dataFrameWithError(fmt.Errorf("ReadCSV(): csv must have at least one row"))
+// ReadCSV reads [][]string values into a DataFrame using `config`.
+// The standard csv library NewReader().ReadAll() method returns [][]string (with rows as major dimension),
+// and allows for custom Comment, and LazyQuotes configuration.
+// If `config` is nil, reads in data using defaults:
+// 1 header row, default labels, rows as major dimension, "," as the field delimiter.
+func ReadCSV(data [][]string, config *ReadConfig) *DataFrame {
+	if len(data) == 0 {
+		return dataFrameWithError(fmt.Errorf("ReadCSV(): `data` must have at least one row"))
 	}
-	if len(csv[0]) == 0 {
-		return dataFrameWithError(fmt.Errorf("ReadCSV(): csv must have at least one column"))
+	if len(data[0]) == 0 {
+		return dataFrameWithError(fmt.Errorf("ReadCSV(): `data` must have at least one column"))
 	}
 	config = defaultConfigIfNil(config)
 
 	if config.MajorDimIsCols {
-		return readCSVByCols(csv, config)
+		return readCSVByCols(data, config)
 	}
-	return readCSVByRows(csv, config)
+	return readCSVByRows(data, config)
 }
 
-// ImportCSV stub
+// ImportCSV reads the file at `path` into a Dataframe using `config`.
+// For advanced cases, use the standard csv library NewReader().ReadAll() + tada.ReadCSV().
+// If `config` is nil, reads in data using defaults:
+// 1 header row, default labels, rows as major dimension, "," as the field delimiter.
 func ImportCSV(path string, config *ReadConfig) (*DataFrame, error) {
 	config = defaultConfigIfNil(config)
 	data, err := ioutil.ReadFile(path)
@@ -185,7 +204,10 @@ func ImportCSV(path string, config *ReadConfig) (*DataFrame, error) {
 	return makeDataFrameFromMatrices(retVals, retNulls, config), nil
 }
 
-// ReadInterface stub
+// ReadInterface reads [][]interface{} into  a Dataframe using `config`.
+// Google Sheets, for example, exports data as [][]interface{} with either rows or columns as the major dimension.
+// If `config` is nil, reads in data using defaults:
+// 1 header row, default labels, rows as major dimension, "," as the field delimiter.
 func ReadInterface(input [][]interface{}, config *ReadConfig) *DataFrame {
 	config = defaultConfigIfNil(config)
 
@@ -211,7 +233,7 @@ func ReadInterface(input [][]interface{}, config *ReadConfig) *DataFrame {
 	return readCSVByRows(str, config)
 }
 
-// ReadMatrix stub
+// ReadMatrix reads data satisfying the gonum Matrix interface into a DataFrame.
 func ReadMatrix(mat Matrix) *DataFrame {
 	numRows, numCols := mat.Dims()
 	csv := make([][]string, numCols)
@@ -224,7 +246,8 @@ func ReadMatrix(mat Matrix) *DataFrame {
 	return readCSVByCols(csv, &ReadConfig{})
 }
 
-// ReadStruct stub
+// ReadStruct reads a `slice` of structs into a DataFrame with field names converted to column names,
+// field values converted to column values, and default labels. The structs must all be of the same type.
 func ReadStruct(slice interface{}) (*DataFrame, error) {
 	values, err := readStruct(slice)
 	if err != nil {
@@ -238,18 +261,21 @@ func ReadStruct(slice interface{}) (*DataFrame, error) {
 	}, nil
 }
 
-// ToSeries stub
+// ToSeries converts a single-columned DataFrame to a Series that shares the same underlying values and labels.
 func (df *DataFrame) ToSeries() *Series {
 	if len(df.values) != 1 {
 		return seriesWithError(fmt.Errorf("ToSeries(): DataFrame must have a single column"))
 	}
 	return &Series{
-		values: df.values[0],
-		labels: df.labels,
+		values:     df.values[0],
+		labels:     df.labels,
+		sharedData: true,
 	}
 }
 
-// ToCSV converts a DataFrame to a [][]string with rows as the major dimension
+// ToCSV writes a DataFrame to a [][]string with rows as the major dimension.
+// Null values are replaced with "n/a".
+// If `ignoreLabels` is true, then the DataFrame's labels are not written.
 func (df *DataFrame) ToCSV(ignoreLabels bool) [][]string {
 	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
 	if err != nil {
@@ -267,21 +293,21 @@ func (df *DataFrame) ToCSV(ignoreLabels bool) [][]string {
 	return transposedStringValues
 }
 
-// ExportCSV converts a DataFrame to a [][]string with rows as the major dimension, and writes the output to a csv file.
+// ExportCSV converts a DataFrame to a [][]string with rows as the major dimension,
+// and writes the output to a csv file.
+// Null values are replaced with "n/a".
 func (df *DataFrame) ExportCSV(file string, ignoreLabels bool) error {
-	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
-	if err != nil {
-		return fmt.Errorf("ToCSV(): %v", err)
-	}
+	ret := df.ToCSV(ignoreLabels)
 	var b bytes.Buffer
 	w := csv.NewWriter(&b)
 	// duck error because csv is controlled
-	w.WriteAll(transposedStringValues)
+	w.WriteAll(ret)
 	ioutil.WriteFile(file, b.Bytes(), 0666)
 	return nil
 }
 
 // ToInterface exports a DataFrame to a [][]interface with rows as the major dimension.
+// Null values are not changed, and should be handled explicitly with DropNull() or FillNull().
 func (df *DataFrame) ToInterface(ignoreLabels bool) [][]interface{} {
 	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
 	if err != nil {
@@ -299,33 +325,49 @@ func (df *DataFrame) ToInterface(ignoreLabels bool) [][]interface{} {
 	return ret
 }
 
-// EqualsCSV converts a dataframe to csv, compares it to another csv, and evaluates whether the two match and isolates their differences
+// EqualsCSV converts a dataframe to csv, compares it to another csv,
+// and evaluates whether the two match.
+// If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
 func (df *DataFrame) EqualsCSV(csv [][]string, ignoreLabels bool) (bool, *tablediff.Differences) {
 	compare := df.ToCSV(ignoreLabels)
 	diffs, eq := tablediff.Diff(compare, csv)
 	return eq, diffs
 }
 
-// WriteMockCSV writes a mock csv to `w` modeled after `src`.
+// WriteMockCSV reads `src` using `config` and writes a mock dataset to `w`,
+// with column names and types inferred based on the data in `src`.
+// The number of rows is the mock dataset is equal to `outputRows`.
+// Regardless of the major dimension of `src`, the major dimension of the output is rows.
+// If `config` is nil, reads in data using defaults:
+// 1 header row, default labels, rows as major dimension, "," as the field delimiter.
 func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows int) error {
-	// whether the major dimension of source is rows or columns, the major dimension of the output csv is rows
 	config = defaultConfigIfNil(config)
-	numPreviewRows := 10
+	numSampleRows := 10
 	inferredTypes := make([]map[string]int, 0)
 	dtypes := []string{"float", "int", "string", "datetime", "time", "bool"}
 	var headers [][]string
-	// default: major dimension is rows
+	var rowCount, colCount int
 	if !config.MajorDimIsCols {
-		if len(src) == 0 {
-			return fmt.Errorf("WriteMockCSV(): csv must have at least one row")
-		}
-		if len(src[0]) == 0 {
-			return fmt.Errorf("WriteMockCSV(): csv must have at least one column")
-		}
-		maxRows := len(src) - config.NumHeaderRows
-		if maxRows < numPreviewRows {
-			numPreviewRows = maxRows
-		}
+		rowCount = len(src)
+		colCount = len(src[0])
+	} else {
+		colCount = len(src)
+		rowCount = len(src[0])
+	}
+	if rowCount == 0 {
+		return fmt.Errorf("WriteMockCSV(): csv must have at least one row")
+	}
+	if colCount == 0 {
+		return fmt.Errorf("WriteMockCSV(): csv must have at least one column")
+	}
+	// numSampleRows must not exceed total number of non-header rows in `src`
+	maxRows := rowCount - config.NumHeaderRows
+	if maxRows < numSampleRows {
+		numSampleRows = maxRows
+	}
+
+	// major dimension is rows?
+	if !config.MajorDimIsCols {
 		// copy headers
 		for i := 0; i < config.NumHeaderRows; i++ {
 			headers = append(headers, src[i])
@@ -339,27 +381,19 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 			inferredTypes = append(inferredTypes, emptyMap)
 		}
 
-		// offset preview by header rows
-		preview := src[config.NumHeaderRows : numPreviewRows+config.NumHeaderRows]
-		for i := range preview {
-			for k := range preview[i] {
-				datum := preview[i][k]
-				dtype := inferType(datum)
+		// for each row, infer type column-by-column
+		// offset data sample by header rows
+		dataSample := src[config.NumHeaderRows : numSampleRows+config.NumHeaderRows]
+		for i := range dataSample {
+			for k := range dataSample[i] {
+				value := dataSample[i][k]
+				dtype := inferType(value)
 				inferredTypes[k][dtype]++
 			}
 		}
-		// major dimension is columns
+
+		// major dimension is columns?
 	} else {
-		if len(src) == 0 {
-			return fmt.Errorf("WriteMockCSV(): csv must have at least one column")
-		}
-		if len(src[0]) == 0 {
-			return fmt.Errorf("WriteMockCSV(): csv must have at least one row")
-		}
-		maxRows := len(src[0]) - config.NumHeaderRows
-		if maxRows < numPreviewRows {
-			numPreviewRows = maxRows
-		}
 
 		// prepare one inferredTypes map per column
 		for range src {
@@ -375,17 +409,18 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 		for l := 0; l < config.NumHeaderRows; l++ {
 			headers = append(headers, make([]string, len(src)))
 			for k := range src {
-				// major dimension of output is rows
+				// NB: major dimension of output is rows
 				headers[l][k] = src[k][l]
 			}
 		}
 
-		// iterate over each column
+		// for each column, infer type row-by-row
 		for k := range src {
 			// offset by header rows
-			values := src[k][config.NumHeaderRows : numPreviewRows+config.NumHeaderRows]
-			for i := range values {
-				dtype := inferType(values[i])
+			// infer type of only the sample rows
+			dataSample := src[k][config.NumHeaderRows : numSampleRows+config.NumHeaderRows]
+			for i := range dataSample {
+				dtype := inferType(dataSample[i])
 				inferredTypes[k][dtype]++
 			}
 		}
@@ -399,17 +434,10 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 
 // -- GETTERS
 
-func removeDefaultNameIndicator(name string) string {
-	return regexp.MustCompile(`^\*`).ReplaceAllString(name, "")
-}
-
-func suppressDefaultName(name string) string {
-	if regexp.MustCompile(`^\*`).MatchString(name) {
-		return ""
-	}
-	return name
-}
-
+// String prints the DataFrame in table form, with the number of rows constrained by optionMaxRows,
+// and the number of columns constrained by optionMaxColumns,
+// which may be configured with SetOptionMaxRows(n) and SetOptionMaxColumns(n), respectively.
+// By default, repeated values are merged together, but this behavior may be changed with SetOptionAutoMerge(false).
 func (df *DataFrame) String() string {
 	if df.values == nil {
 		if df.Err() != nil {
@@ -468,13 +496,14 @@ func (df *DataFrame) String() string {
 
 	table.SetHeader(data[0])
 	table.AppendBulk(data[1:])
-	table.SetAutoMergeCells(optionAutoMerge)
+	table.SetAutoMergeCells(optionMergeRepeats)
 
 	table.Render()
 	return string(buf.Bytes())
 }
 
-// At returns the Element at the `row` and `column` index positions. If `row` or `column` is out of range, returns an empty Element.
+// At returns the Element at the `row` and `column` index positions.
+// If `row` or `column` is out of range, returns an empty Element.
 func (df *DataFrame) At(row, column int) Element {
 	if row >= df.Len() {
 		return Element{}
@@ -512,12 +541,12 @@ func listNames(columns []*valueContainer) []string {
 	return ret
 }
 
-// ListColumns returns the name of all the columns in the DataFrame
+// ListColumns returns the name of all the columns in the DataFrame, in order.
 func (df *DataFrame) ListColumns() []string {
 	return listNames(df.values)
 }
 
-// ListLabelNames returns the name and position of all the label levels in the DataFrame
+// ListLabelNames returns the name of all the label levels in the DataFrame, in order.
 func (df *DataFrame) ListLabelNames() []string {
 	return listNames(df.labels)
 }
@@ -533,13 +562,16 @@ func (df *DataFrame) HasCols(colNames ...string) error {
 	return nil
 }
 
-// InPlace returns a DataFrameMutator, which contains most of the same methods as DataFrame but never returns a new DataFrame.
-// If you want to save memory and improve performance and do not need to preserve the original DataFrame, consider using InPlace().
+// InPlace returns a DataFrameMutator, which contains most of the same methods as DataFrame
+// but never returns a new DataFrame.
+// If you want to save memory and improve performance and do not need to preserve the original DataFrame,
+// consider using InPlace().
 func (df *DataFrame) InPlace() *DataFrameMutator {
 	return &DataFrameMutator{dataframe: df}
 }
 
-// Subset returns only the rows specified at the index positions, in the order specified. Returns a new DataFrame.
+// Subset returns only the rows specified at the index positions, in the order specified.
+//Returns a new DataFrame.
 func (df *DataFrame) Subset(index []int) *DataFrame {
 	df = df.Copy()
 	df.InPlace().Subset(index)
@@ -631,20 +663,25 @@ func (df *DataFrameMutator) SubsetCols(index []int) {
 	return
 }
 
-// DeduplicateNames stub
+// DeduplicateNames deduplicates the names of containers (label levels and columns) from left-to-right
+// by appending _n to duplicate names, where n is equal to the number of times that name has already appeared.
+// Returns a new DataFrame.
 func (df *DataFrame) DeduplicateNames() *DataFrame {
 	df = df.Copy()
 	df.InPlace().DeduplicateNames()
 	return df
 }
 
-// DeduplicateNames stub
+// DeduplicateNames deduplicates the names of containers (label levels and columns) from left-to-right
+// by appending _n to duplicate names, where n is equal to the number of times that name has already appeared.
+// Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) DeduplicateNames() {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
 	deduplicateContainerNames(mergedLabelsAndCols)
 }
 
-// IndexOf stub. If `name` does not match any container, -1 is returned.
+// IndexOf returns the index position of the first container with a name matching `name`
+// If `name` does not match any container, -1 is returned.
 // If `columns` is true, only column names will be searched.
 // If `columns` is false, only label level names will be searched.
 func (df *DataFrame) IndexOf(name string, columns bool) int {
@@ -662,9 +699,11 @@ func (df *DataFrame) IndexOf(name string, columns bool) int {
 	return i
 }
 
-// GetLabels returns label levels as slices within an []interface
+// SliceLabels returns label levels as slices within an []interface
 // that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
-func (df *DataFrame) GetLabels() []interface{} {
+// NB: If supplying this output to either of these constructors,
+// be sure to use the spread operator (...), or else the labels will not be read as separate levels.
+func (df *DataFrame) SliceLabels() []interface{} {
 	var ret []interface{}
 	labels := copyContainers(df.labels)
 	for j := range labels {
@@ -673,8 +712,10 @@ func (df *DataFrame) GetLabels() []interface{} {
 	return ret
 }
 
-// SelectLabels finds the first level with matching `name` and returns as a Series with all existing label levels (including itself).
-// If label level name is default (prefixed with *), removes the prefix.
+// SelectLabels finds the first label level with matching `name`
+// and returns the values as a Series.
+// The labels in the Series are shared with the labels in the DataFrame.
+// If label level name is default (prefixed with *), the prefix is removed.
 func (df *DataFrame) SelectLabels(name string) *Series {
 	index, err := indexOfContainer(name, df.labels)
 	if err != nil {
@@ -693,7 +734,8 @@ func (df *DataFrame) SelectLabels(name string) *Series {
 	}
 }
 
-// Col finds the first column with matching `name` and returns as a Series. Similar to SelectLabels, but to select a column instead.
+// Col finds the first column with matching `name` and returns as a Series.
+// Similar to SelectLabels(), but selects column values instead of label values.
 func (df *DataFrame) Col(name string) *Series {
 	index, err := indexOfContainer(name, df.values)
 	if err != nil {
@@ -706,7 +748,7 @@ func (df *DataFrame) Col(name string) *Series {
 	}
 }
 
-// Cols returns all column with matching `names`.
+// Cols returns all columns with matching `names`.
 func (df *DataFrame) Cols(names ...string) *DataFrame {
 	vals := make([]*valueContainer, len(names))
 	for i, name := range names {
@@ -723,8 +765,9 @@ func (df *DataFrame) Cols(names ...string) *DataFrame {
 	}
 }
 
-// Head returns the first `n` rows of the Series. If `n` is greater than the length of the Series, returns the entire Series.
-// In either case, returns a new Series.
+// Head returns the first `n` rows of the DataFrame.
+// If `n` is greater than the length of the DataFrame, returns the entire DataFrame.
+// In either case, returns a new DataFrame.
 func (df *DataFrame) Head(n int) *DataFrame {
 	if df.Len() < n {
 		n = df.Len()
@@ -740,8 +783,9 @@ func (df *DataFrame) Head(n int) *DataFrame {
 	return &DataFrame{values: retVals, labels: retLabels, name: df.name, colLevelNames: df.colLevelNames}
 }
 
-// Tail returns the last `n` rows of the Series. If `n` is greater than the length of the Series, returns the entire Series.
-// In either case, returns a new Series.
+// Tail returns the last `n` rows of the DataFrame.
+// If `n` is greater than the length of the DataFrame, returns the entire DataFrame.
+// In either case, returns a new DataFrame.
 func (df *DataFrame) Tail(n int) *DataFrame {
 	if df.Len() < n {
 		n = df.Len()
@@ -780,18 +824,32 @@ func (df *DataFrame) Range(first, last int) *DataFrame {
 	return &DataFrame{values: retVals, labels: retLabels, name: df.name, colLevelNames: df.colLevelNames}
 }
 
-// FillNull fills all the null values in the specified container name (column or label level) and makes them not-null.
-// By default, applies NullFiller to Series values.
-// Returns a new Series.
+// FillNull fills null values and makes them non-null based on `how`,
+// a map of container names (either column or label names) and tada.NullFiller structs.
+// For each container name in the map, the first field selected (i.e., not left blank)
+// in its NullFiller struct is the strategy used to replace null values in that container.
+// `FillForward` fills null values with the most recent non-null value in the container.
+// `FillBackward` fills null values with the next non-null value in the container.
+// `FillZero` fills null values with the zero value for that container type.
+// `FillFloat` converts the container values to float64 and fills null values with the value supplied.
+// If no field is selected, the container values are converted to float64 and all null values are filled with 0.
+// Returns a new DataFrame.
 func (df *DataFrame) FillNull(how map[string]NullFiller) *DataFrame {
 	df = df.Copy()
 	df.InPlace().FillNull(how)
 	return df
 }
 
-// FillNull fills all the null values and makes them not-null.
-// By default, applies NullFiller to Series values.
-// Modifies the underlying Series.
+// FillNull fills null values and makes them non-null based on `how`.
+// How is a map of container names (either column or label names) and `NullFillers`.
+// For each container name supplied, the first field selected (i.e., not left blank)
+// in the `NullFiller` is the strategy used to replace null values.
+// `FillForward` fills null values with the most recent non-null value in the container.
+// `FillBackward` fills null values with the next non-null value in the container.
+// `FillZero` fills null values with the zero value for that container type.
+// `FillFloat` converts the container values to float64 and fills null values with the value supplied.
+// If no field is selected, the container values are converted to float64 and all null values are filled with 0.
+// Modifies the underlying DataFrame.
 func (df *DataFrameMutator) FillNull(how map[string]NullFiller) {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
 	for name, filler := range how {
@@ -805,7 +863,7 @@ func (df *DataFrameMutator) FillNull(how map[string]NullFiller) {
 	return
 }
 
-// DropNull removes rows with null values.
+// DropNull removes rows with a null value in any column.
 // If `subset` is supplied, removes any rows with null values in any of the specified columns.
 // Returns a new DataFrame.
 func (df *DataFrame) DropNull(subset ...string) *DataFrame {
@@ -814,7 +872,7 @@ func (df *DataFrame) DropNull(subset ...string) *DataFrame {
 	return df
 }
 
-// DropNull removes rows with null values.
+// DropNull removes rows with a null value in any column.
 // If `subset` is supplied, removes any rows with null values in any of the specified columns.
 // Modifies the underlying DataFrame.
 func (df *DataFrameMutator) DropNull(subset ...string) {
@@ -867,7 +925,6 @@ func (df *DataFrame) Null(subset ...string) *DataFrame {
 }
 
 // FilterCols returns the column positions of all columns (excluding labels) that satisfy `lambda`.
-// If a column contains multiple levels, its name is a single pipe-delimited string and may be split within the lambda function.
 func (df *DataFrame) FilterCols(lambda func(string) bool) []int {
 	var ret []int
 	for k := range df.values {
@@ -948,7 +1005,7 @@ func (df *DataFrameMutator) WithCol(name string, input interface{}) {
 	df.dataframe.values = cols
 }
 
-// DropLabels drops the first label level matching `name`
+// DropLabels drops the first label level matching `name`.
 // Returns a new DataFrame.
 func (df *DataFrame) DropLabels(name string) *DataFrame {
 	df.Copy()
@@ -956,7 +1013,7 @@ func (df *DataFrame) DropLabels(name string) *DataFrame {
 	return df
 }
 
-// DropLabels drops the first label level matching `name`
+// DropLabels drops the first label level matching `name`.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) DropLabels(name string) {
 	newCols, err := dropFromContainers(name, df.dataframe.labels)
@@ -968,7 +1025,7 @@ func (df *DataFrameMutator) DropLabels(name string) {
 	return
 }
 
-// DropCol drops the first column matching `name`
+// DropCol drops the first column matching `name`.
 // Returns a new DataFrame.
 func (df *DataFrame) DropCol(name string) *DataFrame {
 	df.Copy()
@@ -976,7 +1033,7 @@ func (df *DataFrame) DropCol(name string) *DataFrame {
 	return df
 }
 
-// DropCol drops the first column matching `name`
+// DropCol drops the first column matching `name`.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) DropCol(name string) {
 	newCols, err := dropFromContainers(name, df.dataframe.values)
@@ -1023,7 +1080,7 @@ func (df *DataFrame) Append(other *DataFrame) *DataFrame {
 
 // Append adds the `other` labels and values as new rows to the DataFrame.
 // If the types of any container do not match, all the values in that container are coerced to string.
-// Returns a new Series.
+// Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Append(other *DataFrame) {
 	if len(other.labels) != len(df.dataframe.labels) {
 		df.dataframe.resetWithError(
@@ -1046,23 +1103,18 @@ func (df *DataFrameMutator) Append(other *DataFrame) {
 	return
 }
 
-// Relabel stub
-func (df *DataFrame) Relabel(levelNames []string) *DataFrame {
+// Relabel resets the DataFrame labels to default labels (e.g., []int from 0 to df.Len()-1, with *0 as name).
+// Returns a new Series.
+func (df *DataFrame) Relabel() *DataFrame {
 	df = df.Copy()
-	df.InPlace().Relabel(levelNames)
+	df.InPlace().Relabel()
 	return df
 }
 
-// Relabel stub
-func (df *DataFrameMutator) Relabel(levelNames []string) {
-	for _, name := range levelNames {
-		lvl, err := indexOfContainer(name, df.dataframe.labels)
-		if err != nil {
-			df.dataframe.resetWithError(fmt.Errorf("Relabel(): %v", err))
-			return
-		}
-		df.dataframe.labels[lvl].relabel()
-	}
+// Relabel resets the DataFrame labels to default labels (e.g., []int from 0 to df.Len()-1, with *0 as name).
+// Modifies the underlying DataFrame in place.
+func (df *DataFrameMutator) Relabel() {
+	df.dataframe.labels = []*valueContainer{makeDefaultLabels(0, df.dataframe.Len(), true)}
 	return
 }
 
@@ -1113,6 +1165,7 @@ func (df *DataFrameMutator) ResetLabels(labelLevels ...int) {
 		labelLevels = makeIntRange(0, df.dataframe.numLevels())
 	}
 	for incrementor, i := range labelLevels {
+		// iteratively subset all label levels except the one to be dropped
 		adjustedIndex := i - incrementor
 		if adjustedIndex >= df.dataframe.numLevels() {
 			df.dataframe.resetWithError(fmt.Errorf(
@@ -1139,7 +1192,7 @@ func (df *DataFrame) SetName(name string) *DataFrame {
 	return df
 }
 
-// Name returns the name of the DataFrame
+// Name returns the name of the DataFrame.
 func (df *DataFrame) Name() string {
 	return df.name
 }
@@ -1169,7 +1222,7 @@ func (df *DataFrame) SetColNames(colNames []string) *DataFrame {
 	return df
 }
 
-// reshape
+// -- RESHAPING
 
 func (df *DataFrame) numColLevels() int {
 	return len(df.colLevelNames)
@@ -1179,7 +1232,8 @@ func (df *DataFrame) numColumns() int {
 	return len(df.values)
 }
 
-// Transpose stub
+// Transpose switches all row values to column values and label names to column names.
+// For example a DataFrame with 2 rows and 1 column has 2 columns and 1 row after transposition.
 func (df *DataFrame) Transpose() *DataFrame {
 	// row values become column values: 2 row x 1 col -> 2 col x 1 row
 	vals := make([][]string, df.Len())
@@ -1254,10 +1308,10 @@ func (df *DataFrame) Transpose() *DataFrame {
 	}
 }
 
-// PromoteToColLevel pivots an existing container (either column or label level) into a new column level.
+// PromoteToColLevel pivots an existing container (either column or label names) into a new column level.
 // If promoting would use either the last column or index level, it returns an error.
-// Adds new columns - each unique value in the stacked column is stacked above each existing column.
-// Can remove rows - returns only one row per unique label combination.
+// Each unique value in the stacked column is stacked above each existing column.
+// Promotion adds new columns and label rows with duplicate values.
 func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 
 	// -- isolate container to promote
@@ -1365,7 +1419,16 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 
 // -- FILTERS
 
-// Filter stub
+// Filter returns the index positions of all rows that satisfy all of the `filters`,
+// which is a map of container names (either column or label names) and tada.FilterFn structs.
+// For each container name in the map, the first field selected (i.e., not left blank)
+// in its FilterFn struct provides the filter logic for that container.
+// Values are converted from their original type to the selected field type.
+// For example, {"foo": FilterFn{Float: lambda}} converts the values in the foo container to float64,
+// applies the true/false lambda function to each row in the container, and records the index positions that return true.
+// Finally, the function returns the intersection of the index positions recorded by all the `filters`.
+// Rows with null values are always excluded from the index.
+// If an error is returned (e.g., because no field is selected in the FilterFn struct), returns []int{-999}.
 func (df *DataFrame) Filter(filters map[string]FilterFn) []int {
 	if len(filters) == 0 {
 		return makeIntRange(0, df.Len())
@@ -1381,9 +1444,14 @@ func (df *DataFrame) Filter(filters map[string]FilterFn) []int {
 
 // -- APPLY
 
-// Apply applies a user-defined `lambda` function to every row in a particular column and coerces all values to match the lambda type.
-// Apply may be applied to any label level or column by specifying the container name as a key in the `lambdas` map.
-// If a value is considered null either prior to or after the lambda function is applied, it is considered null after.
+// Apply applies a user-defined function to every row in a container based on `lambdas`,
+// which is a map of container names (either column or label names) and tada.ApplyFn structs.
+// For each container name in the map, the first field selected (i.e., not left blank)
+// in its ApplyFn struct provides the apply logic for that container.
+// Values are converted from their original type to the selected field type.
+// For example, {"foo": ApplyFn{Float: lambda}} converts the values in the foo container to float64 and
+// applies the lambda function to each row in the container, outputting a new float64 value for each row.
+// If a value is null either before or after the lambda function is applied, it is also null after.
 // Returns a new DataFrame.
 func (df *DataFrame) Apply(lambdas map[string]ApplyFn) *DataFrame {
 	df.Copy()
@@ -1391,10 +1459,14 @@ func (df *DataFrame) Apply(lambdas map[string]ApplyFn) *DataFrame {
 	return df
 }
 
-// Apply applies a user-defined `lambda` function to every row in a particular column and coerces all values to match the lambda type.
-// Apply may be applied to any label level or column by specifying the container name as a key in the `lambdas` map.
-// If a value is considered null either prior to or after the lambda function is applied, it is considered null after.
-// Modifies the underlying DataFrame in place.
+// Apply applies a user-defined function to every row in a container based on `lambdas`,
+// which is a map of container names (either column or label names) and tada.ApplyFn structs.
+// For each container name in the map, the first field selected (i.e., not left blank)
+// in its ApplyFn struct provides the apply logic for that container.
+// Values are converted from their original type to the selected field type.
+// For example, {"foo": ApplyFn{Float: lambda}} converts the values in the foo container to float64 and
+// applies the lambda function to each row in the container, outputting a new float64 value for each row.
+// If a value is null either before or after the lambda function is applied, it is also null after.// Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
 	for containerName, lambda := range lambdas {
@@ -1415,14 +1487,29 @@ func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 	return
 }
 
-// ApplyFormat stub
+// ApplyFormat applies a user-defined formatting function to every row in a container based on `lambdas`,
+// which is a map of container names (either column or label names) and tada.ApplyFormatFn structs.
+// For each container name in the map, the first field selected (i.e., not left blank)
+// in its ApplyFormatFn struct provides the formatting logic for that container.
+// Values are converted from their original type to the selected field type and then to string.
+// For example, {"foo": ApplyFormatFn{Float: lambda}} converts the values in the foo container to float64 and
+// applies the lambda function to each row in the container, outputting a new string value for each row.
+// If a value is null either before or after the lambda function is applied, it is also null after.
+// Returns a new DataFrame.
 func (df *DataFrame) ApplyFormat(lambdas map[string]ApplyFormatFn) *DataFrame {
 	df.Copy()
 	df.InPlace().ApplyFormat(lambdas)
 	return df
 }
 
-// ApplyFormat stub
+// ApplyFormat applies a user-defined formatting function to every row in a container based on `lambdas`,
+// which is a map of container names (either column or label names) and tada.ApplyFormatFn structs.
+// For each container name in the map, the first field selected (i.e., not left blank)
+// in its ApplyFormatFn struct provides the formatting logic for that container.
+// Values are converted from their original type to the selected field type and then to string.
+// For example, {"foo": ApplyFormatFn{Float: lambda}} converts the values in the foo container to float64 and
+// applies the lambda function to each row in the container, outputting a new string value for each row.
+// If a value is null either before or after the lambda function is applied, it is also null after.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) ApplyFormat(lambdas map[string]ApplyFormatFn) {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
@@ -1453,8 +1540,11 @@ func (df *DataFrame) Merge(other *DataFrame) *DataFrame {
 	return df
 }
 
-// Merge adds the columns of the `other` DataFrame where there is label alignment on containers with matching names.
-// Merged containers are deduplicated so that they are unique.
+// Merge looks up the aligned rows in the `other` DataFrame and appends the column values for those rows to `df`.
+// Aligned rows are rows with the same stringified value in containers (either columns or label levels) with the same name.
+// For example if `df` and `other` both have
+// Finally, all container names (columns and label names) are deduplicated after the merge so that they are unique.
+//
 func (df *DataFrameMutator) Merge(other *DataFrame) {
 	lookupDF := df.dataframe.Lookup(other)
 	for k := range lookupDF.values {

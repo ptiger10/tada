@@ -13,7 +13,7 @@ import (
 	"github.com/ptiger10/tablediff"
 )
 
-func TestMakeSlicesFromCrossProduct(t *testing.T) {
+func TestMakeMultiLevelLabels(t *testing.T) {
 	type args struct {
 		values []interface{}
 	}
@@ -41,13 +41,13 @@ func TestMakeSlicesFromCrossProduct(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := MakeSlicesFromCrossProduct(tt.args.values)
+			got, err := MakeMultiLevelLabels(tt.args.values)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("MakeSlicesFromCrossProduct() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("MakeMultiLevelLabels() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("MakeSlicesFromCrossProduct() = %v, want %v", got, tt.want)
+				t.Errorf("MakeMultiLevelLabels() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -205,8 +205,9 @@ func TestDataFrame_ToSeries(t *testing.T) {
 			values: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"}},
 			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}},
 			&Series{
-				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}},
+				values:     &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"},
+				labels:     []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				sharedData: true},
 		},
 		{"fail: two columns", fields{
 			values: []*valueContainer{
@@ -402,11 +403,11 @@ func TestReadCSV(t *testing.T) {
 		{"fail - no rows",
 			args{csv: nil,
 				config: nil},
-			&DataFrame{err: fmt.Errorf("ReadCSV(): csv must have at least one row")}},
+			&DataFrame{err: fmt.Errorf("ReadCSV(): `data` must have at least one row")}},
 		{"fail - no columns",
 			args{csv: [][]string{{}},
 				config: nil},
-			&DataFrame{err: fmt.Errorf("ReadCSV(): csv must have at least one column")}},
+			&DataFrame{err: fmt.Errorf("ReadCSV(): `data` must have at least one column")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1287,37 +1288,22 @@ func TestDataFrame_Relabel(t *testing.T) {
 		err           error
 		colLevelNames []string
 	}
-	type args struct {
-		levelNames []string
-	}
 	tests := []struct {
 		name   string
 		fields fields
-		args   args
 		want   *DataFrame
 	}{
 		{"pass", fields{
 			values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 			labels: []*valueContainer{
-				{slice: []float64{1}, isNull: []bool{false}, name: "*0"},
-				{slice: []float64{1}, isNull: []bool{false}, name: "*1"}},
+				{slice: []float64{1}, isNull: []bool{false}, name: "baz"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "baz"}},
 			colLevelNames: []string{"*0"}},
-			args{[]string{"*0", "*1"}},
 			&DataFrame{
 				values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "*0"},
-					{slice: []int{0}, isNull: []bool{false}, name: "*1"}},
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
-		},
-		{"fail", fields{
-			values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
-			labels: []*valueContainer{
-				{slice: []float64{1}, isNull: []bool{false}, name: "*0"},
-				{slice: []float64{1}, isNull: []bool{false}, name: "*1"}}},
-			args{[]string{"*0", "corge"}},
-			&DataFrame{
-				err: errors.New("Relabel(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -1329,7 +1315,7 @@ func TestDataFrame_Relabel(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.Relabel(tt.args.levelNames); !EqualDataFrames(got, tt.want) {
+			if got := df.Relabel(); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Relabel() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2087,7 +2073,7 @@ func TestDataFrame_Merge(t *testing.T) {
 		args   args
 		want   *DataFrame
 	}{
-		{"matching keys",
+		{"matching label key *0",
 			fields{values: []*valueContainer{
 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
@@ -2101,7 +2087,10 @@ func TestDataFrame_Merge(t *testing.T) {
 					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
 					{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "bar"},
 				},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				labels: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0",
+						cache: [][]byte{[]byte("0"), []byte("1")}},
+				},
 				colLevelNames: []string{"*0"}},
 		},
 	}
@@ -2141,7 +2130,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 		args   args
 		want   *DataFrame
 	}{
-		{"single label level, named keys, left join - longer labels", fields{
+		{"single label level, named keys, left join - other has more labels", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
 			labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
 			name:          "qux",
@@ -2152,11 +2141,14 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 				how:    "left",
 				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
 			&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
-				labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+				labels: []*valueContainer{
+					{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
+						cache: [][]byte{[]byte("bar"), []byte("baz")}},
+				},
 				name:          "qux",
 				colLevelNames: []string{"*0"}},
 		},
-		{"single label level, named keys, left join - shorter labels", fields{
+		{"single label level, named keys, left join - other has fewer labels", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
 			labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
 			name:          "qux",
@@ -2167,7 +2159,10 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 				how:    "left",
 				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
 			&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
-				labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+				labels: []*valueContainer{
+					{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
+						cache: [][]byte{[]byte("bar"), []byte("baz")}},
+				},
 				name:          "qux",
 				colLevelNames: []string{"*0"}},
 		},
@@ -2182,7 +2177,10 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 				how:    "left",
 				leftOn: nil, rightOn: nil},
 			&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
-				labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+				labels: []*valueContainer{
+					{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
+						cache: [][]byte{[]byte("bar"), []byte("baz")}},
+				},
 				name:          "qux",
 				colLevelNames: []string{"*0"}},
 		},
@@ -2331,9 +2329,9 @@ func TestDataFrame_GroupBy(t *testing.T) {
 					values: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}}},
 					labels: []*valueContainer{
 						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a",
-							archive: [][]byte{[]byte("0"), []byte("0"), []byte("1"), []byte("2")}},
+							cache: [][]byte{[]byte("0"), []byte("0"), []byte("1"), []byte("2")}},
 						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b",
-							archive: [][]byte{[]byte("foo"), []byte("foo"), []byte("foo"), []byte("bar")}},
+							cache: [][]byte{[]byte("foo"), []byte("foo"), []byte("foo"), []byte("bar")}},
 					}},
 			},
 		},
@@ -4105,7 +4103,7 @@ func TestDataFrame_SwapLabels(t *testing.T) {
 	}
 }
 
-func TestDataFrame_GetLabels(t *testing.T) {
+func TestDataFrame_SliceLabels(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -4137,8 +4135,8 @@ func TestDataFrame_GetLabels(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.GetLabels(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.GetLabels() = %v, want %v", got, tt.want)
+			if got := df.SliceLabels(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.SliceLabels() = %v, want %v", got, tt.want)
 			}
 		})
 	}

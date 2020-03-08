@@ -228,7 +228,6 @@ func Test_setNullsFromInterface(t *testing.T) {
 		{"string", args{[]string{"foo", ""}}, []bool{false, true}},
 		{"bytes", args{[][]byte{[]byte("foo"), []byte("")}}, []bool{false, true}},
 		{"dateTime", args{[]time.Time{time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC), {}}}, []bool{false, true, true}},
-		{"element", args{[]Element{{0, true}, {1, false}}}, []bool{true, false}},
 		{"interface", args{[]interface{}{
 			int(1), uint(1), float32(1), float64(1), time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), "foo",
 			math.NaN(), "", time.Time{}}},
@@ -272,14 +271,25 @@ func Test_valueContainer_copy(t *testing.T) {
 		slice  interface{}
 		name   string
 		isNull []bool
+		cache  [][]byte
 	}
 	tests := []struct {
 		name   string
 		fields fields
 		want   *valueContainer
 	}{
-		{"pass", fields{slice: []float64{1}, name: "foo", isNull: []bool{false}},
-			&valueContainer{slice: []float64{1}, name: "foo", isNull: []bool{false}}},
+		{"pass", fields{
+			slice:  []float64{1},
+			isNull: []bool{false},
+			name:   "foo",
+			cache:  [][]byte{[]byte("foo")},
+		},
+			&valueContainer{
+				slice:  []float64{1},
+				isNull: []bool{false},
+				name:   "foo",
+				cache:  [][]byte{[]byte("foo")},
+			}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -287,6 +297,7 @@ func Test_valueContainer_copy(t *testing.T) {
 				slice:  tt.fields.slice,
 				name:   tt.fields.name,
 				isNull: tt.fields.isNull,
+				cache:  tt.fields.cache,
 			}
 			got := vc.copy()
 			if !reflect.DeepEqual(got, tt.want) {
@@ -296,13 +307,20 @@ func Test_valueContainer_copy(t *testing.T) {
 			if reflect.DeepEqual(vc, got) {
 				t.Errorf("valueContainer.copy() retained reference to original values")
 			}
+			got = vc.copy()
 			got.name = "qux"
 			if reflect.DeepEqual(vc, got) {
 				t.Errorf("valueContainer.copy() retained reference to original values name")
 			}
+			got = vc.copy()
 			got.isNull[0] = true
 			if reflect.DeepEqual(vc, got) {
 				t.Errorf("valueContainer.copy() retained reference to original isNull")
+			}
+			got = vc.copy()
+			got.cache[0] = []byte("bar")
+			if reflect.DeepEqual(vc, got) {
+				t.Errorf("valueContainer.copy() retained reference to original cache")
 			}
 		})
 	}
@@ -398,7 +416,9 @@ func Test_lookup(t *testing.T) {
 			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}}}, rightOn: []int{0}},
 			want: &Series{
 				values: &valueContainer{slice: []int{10, 0}, isNull: []bool{false, true}, name: "foo"},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}, wantErr: false,
+				labels: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, cache: [][]byte{[]byte("0"), []byte("1")}},
+				}}, wantErr: false,
 		},
 		{name: "right", args: args{
 			how: "right", values1: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -407,7 +427,9 @@ func Test_lookup(t *testing.T) {
 			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}}}, rightOn: []int{0}},
 			want: &Series{
 				values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}},
-				labels: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}}}}, wantErr: false,
+				labels: []*valueContainer{
+					{slice: []int{0, 10}, isNull: []bool{false, false}, cache: [][]byte{[]byte("0"), []byte("10")}},
+				}}, wantErr: false,
 		},
 		{name: "inner", args: args{
 			how: "inner", values1: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -461,8 +483,9 @@ func Test_lookupDataFrame(t *testing.T) {
 			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, name: "quux"}}, rightOn: []int{0}},
 			want: &DataFrame{
 				values: []*valueContainer{{slice: []int{10, 0}, isNull: []bool{false, true}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}},
-				name:   "baz", colLevelNames: []string{"*0"},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux",
+					cache: [][]byte{[]byte("0"), []byte("1")}}},
+				name: "baz", colLevelNames: []string{"*0"},
 			},
 			wantErr: false,
 		},
@@ -474,8 +497,9 @@ func Test_lookupDataFrame(t *testing.T) {
 			labels2: []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "quux"}}, rightOn: []int{0}},
 			want: &DataFrame{
 				values: []*valueContainer{{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}},
-				name:   "baz", colLevelNames: []string{"*0"},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux",
+					cache: [][]byte{[]byte("0"), []byte("1")}}},
+				name: "baz", colLevelNames: []string{"*0"},
 			},
 			wantErr: false,
 		},
@@ -487,8 +511,9 @@ func Test_lookupDataFrame(t *testing.T) {
 			labels2: []*valueContainer{{slice: []int{1, 1}, isNull: []bool{false, false}, name: "quux"}}, rightOn: []int{0}},
 			want: &DataFrame{
 				values: []*valueContainer{{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}},
-				name:   "baz", colLevelNames: []string{"*0"},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux",
+					cache: [][]byte{[]byte("0"), []byte("1")}}},
+				name: "baz", colLevelNames: []string{"*0"},
 			},
 			wantErr: false,
 		},
@@ -503,8 +528,9 @@ func Test_lookupDataFrame(t *testing.T) {
 			excludeRight: []string{"baz"}},
 			want: &DataFrame{
 				values: []*valueContainer{{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}},
-				name:   "baz", colLevelNames: []string{"*0"},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux",
+					cache: [][]byte{[]byte("0"), []byte("1")}}},
+				name: "baz", colLevelNames: []string{"*0"},
 			},
 			wantErr: false,
 		},
@@ -516,8 +542,9 @@ func Test_lookupDataFrame(t *testing.T) {
 			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, name: "quux"}}, rightOn: []int{0}},
 			want: &DataFrame{
 				values: []*valueContainer{{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"}},
-				labels: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, name: "quux"}},
-				name:   "baz", colLevelNames: []string{"*0"},
+				labels: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, name: "quux",
+					cache: [][]byte{[]byte("0"), []byte("10")}}},
+				name: "baz", colLevelNames: []string{"*0"},
 			},
 			wantErr: false,
 		},
@@ -2734,7 +2761,10 @@ func Test_lookupWithAnchor(t *testing.T) {
 			rightOn: []int{0}},
 			&Series{
 				values: &valueContainer{slice: []string{"", "foo"}, isNull: []bool{true, false}, name: "waldo"},
-				labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo",
+						cache: [][]byte{[]byte("0"), []byte("1")},
+					}},
 			}},
 	}
 	for _, tt := range tests {
@@ -3946,28 +3976,7 @@ func TestSeries_combineMath(t *testing.T) {
 			&Series{
 				values: &valueContainer{slice: []float64{3}, isNull: []bool{false}, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
-			},
-		},
-		{"divide by zero", fields{
-			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
-			labels: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
-			}},
-			args{
-				other: &Series{
-					values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
-					labels: []*valueContainer{
-						{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-						{slice: []int{1}, isNull: []bool{false}, name: "qux"}}},
-				ignoreNull: false,
-				fn:         func(v1, v2 float64) float64 { return v1 / v2 }},
-			&Series{
-				values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, name: "foo"},
-				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, name: "bar", cache: [][]byte{[]byte("0")}},
 					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
 			},
 		},
@@ -4002,7 +4011,9 @@ func TestSeries_combineMath(t *testing.T) {
 				err:        tt.fields.err,
 			}
 			if got := s.combineMath(tt.args.other, tt.args.ignoreNull, tt.args.fn); !EqualSeries(got, tt.want) {
-				t.Errorf("Series.combineMath() = %v, want %v", got, tt.want)
+				t.Errorf("Series.combineMath() = %v, want %v", got.labels[1], tt.want.labels[1])
+				t.Errorf(messagediff.PrettyDiff(got, tt.want))
+
 			}
 		})
 	}
@@ -4066,6 +4077,7 @@ func Test_valueContainer_subsetRows(t *testing.T) {
 	type fields struct {
 		slice  interface{}
 		isNull []bool
+		cache  [][]byte
 		name   string
 	}
 	type args struct {
@@ -4081,6 +4093,10 @@ func Test_valueContainer_subsetRows(t *testing.T) {
 		{"pass", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"},
 			args{[]int{1}},
 			&valueContainer{slice: []float64{1}, isNull: []bool{true}, name: "foo"}, false},
+		{"pass - reset cache", fields{slice: []string{"foo", "bar"}, isNull: []bool{false, false},
+			cache: [][]byte{[]byte("foo"), []byte("bar")}, name: "foo"},
+			args{[]int{1}},
+			&valueContainer{slice: []string{"bar"}, isNull: []bool{false}, name: "foo"}, false},
 		{"return existing", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"},
 			args{[]int{0, 1, 2}},
 			&valueContainer{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"}, false},
@@ -4093,6 +4109,7 @@ func Test_valueContainer_subsetRows(t *testing.T) {
 			vc := &valueContainer{
 				slice:  tt.fields.slice,
 				isNull: tt.fields.isNull,
+				cache:  tt.fields.cache,
 				name:   tt.fields.name,
 			}
 			err := vc.subsetRows(tt.args.index)
@@ -4183,9 +4200,9 @@ func Test_concatenateLabelsToStringsBytes(t *testing.T) {
 			{slice: []string{"foo", "bar"}},
 			{slice: []int{0, 1}}}},
 			[]string{"foo|0", "bar|1"}},
-		{"two levels, two index, archive", args{labels: []*valueContainer{
+		{"two levels, two index, cache", args{labels: []*valueContainer{
 			{slice: []string{"foo", "bar"}},
-			{slice: []int{0, 1}, archive: [][]byte{[]byte("0"), []byte("1")}}}},
+			{slice: []int{0, 1}, cache: [][]byte{[]byte("0"), []byte("1")}}}},
 			[]string{"foo|0", "bar|1"}},
 	}
 	for _, tt := range tests {

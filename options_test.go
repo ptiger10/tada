@@ -84,14 +84,14 @@ func TestSetOptionAutoMerge(t *testing.T) {
 		{"pass", args{false}},
 	}
 	for _, tt := range tests {
-		archive := optionAutoMerge
+		archive := optionMergeRepeats
 		t.Run(tt.name, func(t *testing.T) {
-			SetOptionAutoMerge(tt.args.set)
+			SetOptionMergeRepeats(tt.args.set)
 		})
 
-		if got := optionAutoMerge; got != tt.args.set {
+		if got := optionMergeRepeats; got != tt.args.set {
 			t.Errorf("SetOptionAutoMerge() -> %v, want %v", got, tt.args.set)
 		}
-		optionAutoMerge = archive
+		optionMergeRepeats = archive
 	}
 }

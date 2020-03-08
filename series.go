@@ -36,8 +36,8 @@ func NewSeries(slice interface{}, labels ...interface{}) *Series {
 	if err != nil {
 		return seriesWithError(fmt.Errorf("NewSeries(): `labels`: %v", err))
 	}
+	// default labels?
 	if len(retLabels) == 0 {
-		// default labels
 		defaultLabels := makeDefaultLabels(0, reflect.ValueOf(slice).Len(), true)
 		retLabels = append(retLabels, defaultLabels)
 	}
@@ -71,7 +71,8 @@ func (s *Series) ToDataFrame() *DataFrame {
 	}
 }
 
-// EqualsCSV converts a Series to csv, compares it to another csv, and evaluates whether the two match and isolates their differences
+// EqualsCSV converts a Series to csv, compares it to another csv,
+// and evaluates whether the two match and isolates their differences.
 func (s *Series) EqualsCSV(csv [][]string, ignoreLabels bool) (bool, *tablediff.Differences) {
 	compare, _ := s.ToCSV(ignoreLabels)
 	diffs, eq := tablediff.Diff(compare, csv)
@@ -171,6 +172,7 @@ func (s *Series) SelectLabels(name string) *Series {
 		slice:  values.slice,
 		isNull: values.isNull,
 		name:   removeDefaultNameIndicator(values.name),
+		cache:  values.cache,
 	}
 	return &Series{
 		values:     retValues,
@@ -276,6 +278,7 @@ func (s *Series) Tail(n int) *Series {
 	for j := range s.labels {
 		retLabels[j] = s.labels[j].tail(n)
 	}
+
 	return &Series{values: retVals, labels: retLabels}
 }
 
@@ -359,6 +362,7 @@ func (s *SeriesMutator) Shift(n int) {
 		n = s.series.Len()
 	}
 	s.series.values = s.series.values.shift(n)
+	s.series.values.resetCache()
 }
 
 // -- SETTERS
@@ -613,10 +617,12 @@ func (s *Series) Filter(filters map[string]FilterFn) []int {
 // To do: check for bad filter
 func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{}) *Series {
 	ret := make([]interface{}, s.Len())
+	// []int of positions where all filters are true
 	index := s.Filter(filters)
 	for _, i := range index {
 		ret[i] = ifTrue
 	}
+	// []int of positions where any filters is not true
 	inverseIndex := difference(makeIntRange(0, s.Len()), index)
 	for _, i := range inverseIndex {
 		ret[i] = ifFalse
@@ -1040,9 +1046,9 @@ func (s *Series) GetValues() interface{} {
 	return ret.slice
 }
 
-// GetLabels returns label levels as slices within an []interface
+// SliceLabels returns label levels as slices within an []interface
 // that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
-func (s *Series) GetLabels() []interface{} {
+func (s *Series) SliceLabels() []interface{} {
 	var ret []interface{}
 	labels := copyContainers(s.labels)
 	for j := range labels {
@@ -1062,6 +1068,7 @@ func (s *Series) ValueCounts() map[string]int {
 }
 
 // Unique returns the first appearance of all non-null values in the Series.
+// Returns a new Series.
 func (s *Series) Unique(valuesOnly bool) *Series {
 	var index []int
 	if valuesOnly {

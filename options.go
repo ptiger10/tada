@@ -6,7 +6,7 @@ var optionLevelSeparator = "|"
 var optionLevelSeparatorBytes = []byte{'|'}
 var optionMaxRows = 50
 var optionMaxColumns = 20
-var optionAutoMerge = true
+var optionMergeRepeats = true
 var optionWarnings = true
 var optionNullStrings = map[string]bool{"NaN": true, "n/a": true, "N/A": true, "": true, "nil": true}
 var optionPrefix = "*"
@@ -30,9 +30,9 @@ func SetOptionMaxColumns(n int) {
 	optionMaxColumns = n
 }
 
-// SetOptionAutoMerge stub
-func SetOptionAutoMerge(set bool) {
-	optionAutoMerge = set
+// SetOptionMergeRepeats stub
+func SetOptionMergeRepeats(set bool) {
+	optionMergeRepeats = set
 }
 
 // DisableWarnings stub
