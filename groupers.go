@@ -7,146 +7,6 @@ import (
 	"time"
 )
 
-// -- SPECIAL REDUCE FUNCTIONS
-
-func groupedInterfaceReduceFunc(
-	slice interface{},
-	name string,
-	aligned bool,
-	rowIndices [][]int,
-	fn func(slice interface{}) interface{}) (*valueContainer, error) {
-
-	// default: return length is equal to the number of groups
-	retLength := len(rowIndices)
-	v := reflect.ValueOf(slice)
-	if aligned {
-		// if aligned: return length is overwritten to equal the length of original data
-		retLength = v.Len()
-	}
-	// must deduce output type
-	sampleRows := subsetInterfaceSlice(slice, rowIndices[0])
-	sampleOutput := fn(sampleRows)
-
-	retVals := reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(sampleOutput)), retLength, retLength)
-	for i, rowIndex := range rowIndices {
-		subsetRows := subsetInterfaceSlice(slice, rowIndex)
-		output := fn(subsetRows)
-
-		src := reflect.ValueOf(output)
-		if !aligned {
-			// default: write each output once and in sequential order into retVals
-			dst := retVals.Index(i)
-			dst.Set(src)
-		} else {
-			// if aligned: write each output multiple times and out of order into retVals
-			for _, index := range rowIndex {
-				dst := retVals.Index(index)
-				dst.Set(src)
-			}
-		}
-	}
-	ret, err := makeValueContainerFromInterface(retVals.Interface(), name)
-	if err != nil {
-		return nil, fmt.Errorf("interface{} output: %v", err)
-	}
-	return ret, nil
-}
-
-// transforms each original Series row and maintains their order, regardless of whether groupedSeries is aligned
-func groupedInterfaceTransformFunc(
-	slice interface{},
-	name string,
-	rowIndices [][]int,
-	fn func(slice interface{}) interface{}) (*valueContainer, error) {
-
-	// default: return length is equal to the number of groups
-	retLength := reflect.ValueOf(slice).Len()
-
-	// must deduce output type
-	sampleRows := subsetInterfaceSlice(slice, rowIndices[0])
-	sampleOutput := fn(sampleRows)
-	if !isSlice(sampleOutput) {
-		return nil, fmt.Errorf("group 0: output must be slice (%v != slice)",
-			reflect.TypeOf(sampleOutput).Kind())
-	}
-
-	retVals := reflect.MakeSlice(reflect.TypeOf(sampleOutput), retLength, retLength)
-	for i, rowIndex := range rowIndices {
-		subsetRows := subsetInterfaceSlice(slice, rowIndex)
-		output := fn(subsetRows)
-
-		if !isSlice(output) {
-			return nil, fmt.Errorf("group %d: output must be slice (%v != slice)",
-				i, reflect.TypeOf(output).Kind())
-		}
-		if reflect.ValueOf(output).Len() != reflect.ValueOf(subsetRows).Len() {
-			return nil, fmt.Errorf("group %d: length of output slice must match length of input slice "+
-				"(%d != %d)", i, reflect.ValueOf(output).Len(), reflect.ValueOf(subsetRows).Len())
-		}
-		// write each output multiple times and out of order into retVals
-		for incrementor, index := range rowIndex {
-			src := reflect.ValueOf(output).Index(incrementor)
-			dst := retVals.Index(index)
-			dst.Set(src)
-		}
-	}
-	ret, err := makeValueContainerFromInterface(retVals.Interface(), name)
-	if err != nil {
-		return nil, fmt.Errorf("interface{} output: %v", err)
-	}
-	return ret, nil
-}
-
-func groupedIndexReduceFunc(
-	vals interface{},
-	nulls []bool,
-	name string,
-	aligned bool,
-	index int,
-	rowIndices [][]int) *valueContainer {
-	// default: return length is equal to the number of groups
-	retLength := len(rowIndices)
-	v := reflect.ValueOf(vals)
-	if aligned {
-		// if aligned: return length is overwritten to equal the length of original data
-		retLength = v.Len()
-	}
-
-	retVals := reflect.MakeSlice(v.Type(), retLength, retLength)
-	retNulls := make([]bool, retLength)
-	for i, rowIndex := range rowIndices {
-		// modify index if negative
-		modifiedIndex := index
-		if index < 0 {
-			// if original index is negative, try to index from right-to-left
-			modifiedIndex = len(rowIndex) + index
-		}
-		if modifiedIndex >= len(rowIndex) || modifiedIndex < 0 {
-			retNulls[i] = true
-			continue
-		}
-		// look up the row position contained at `modifiedIndex`
-		toLookup := rowIndex[modifiedIndex]
-		output, isNull := v.Index(toLookup), nulls[toLookup]
-		if !aligned {
-			// default: write each output once and in sequential order
-			retVals.Index(i).Set(output)
-			retNulls[i] = isNull
-		} else {
-			// if aligned: write each output multiple times and out of order
-			for _, i := range rowIndex {
-				retVals.Index(i).Set(output)
-				retNulls[modifiedIndex] = isNull
-			}
-		}
-	}
-	return &valueContainer{
-		slice:  retVals.Interface(),
-		isNull: retNulls,
-		name:   name,
-	}
-}
-
 // -- GROUPED SERIES
 
 // Err returns the underlying error, if any.
@@ -162,7 +22,7 @@ func (g *GroupedSeries) String() string {
 	return "Groups: " + strings.Join(groups, ",")
 }
 
-// GetGroup returns the grouped values of the `group` key as a new Series.
+// GetGroup returns the grouped rows sharing the same `group` key as a new Series.
 func (g *GroupedSeries) GetGroup(group string) *Series {
 	for m, key := range g.orderedKeys {
 		if key == group {
@@ -488,7 +348,7 @@ func (g *GroupedDataFrame) indexReduceFunc(name string, cols []string, index int
 	}
 }
 
-// GetGroup returns the grouped values of the `group` key as a new DataFrame.
+// GetGroup returns the grouped rows sharing the same `group` key as a new DataFrame.
 func (g *GroupedDataFrame) GetGroup(group string) *DataFrame {
 	for m, key := range g.orderedKeys {
 		if key == group {
@@ -604,7 +464,8 @@ func (g *GroupedDataFrame) Reduce(name string, cols []string, lambda GroupReduce
 	return dataFrameWithError(fmt.Errorf("Reduce(): no lambda function provided"))
 }
 
-// HavingCount stub
+// HavingCount removes any groups from `g` that do not satisfy the boolean function supplied in `lambda`.
+// For each group, the input into `lambda` is the total number of values in the group (null or not-null).
 func (g *GroupedDataFrame) HavingCount(lambda func(int) bool) *GroupedDataFrame {
 	indexToKeep := make([]int, 0)
 	retRowIndices := make([][]int, 0)
@@ -656,4 +517,144 @@ func (g *GroupedDataFrame) GetLabels() []interface{} {
 // Len returns the number of group labels.
 func (g *GroupedDataFrame) Len() int {
 	return len(g.rowIndices)
+}
+
+// -- SPECIAL REDUCE FUNCTIONS
+
+func groupedInterfaceReduceFunc(
+	slice interface{},
+	name string,
+	aligned bool,
+	rowIndices [][]int,
+	fn func(slice interface{}) interface{}) (*valueContainer, error) {
+
+	// default: return length is equal to the number of groups
+	retLength := len(rowIndices)
+	v := reflect.ValueOf(slice)
+	if aligned {
+		// if aligned: return length is overwritten to equal the length of original data
+		retLength = v.Len()
+	}
+	// must deduce output type
+	sampleRows := subsetInterfaceSlice(slice, rowIndices[0])
+	sampleOutput := fn(sampleRows)
+
+	retVals := reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(sampleOutput)), retLength, retLength)
+	for i, rowIndex := range rowIndices {
+		subsetRows := subsetInterfaceSlice(slice, rowIndex)
+		output := fn(subsetRows)
+
+		src := reflect.ValueOf(output)
+		if !aligned {
+			// default: write each output once and in sequential order into retVals
+			dst := retVals.Index(i)
+			dst.Set(src)
+		} else {
+			// if aligned: write each output multiple times and out of order into retVals
+			for _, index := range rowIndex {
+				dst := retVals.Index(index)
+				dst.Set(src)
+			}
+		}
+	}
+	ret, err := makeValueContainerFromInterface(retVals.Interface(), name)
+	if err != nil {
+		return nil, fmt.Errorf("interface{} output: %v", err)
+	}
+	return ret, nil
+}
+
+// transforms each original Series row and maintains their order, regardless of whether groupedSeries is aligned
+func groupedInterfaceTransformFunc(
+	slice interface{},
+	name string,
+	rowIndices [][]int,
+	fn func(slice interface{}) interface{}) (*valueContainer, error) {
+
+	// default: return length is equal to the number of groups
+	retLength := reflect.ValueOf(slice).Len()
+
+	// must deduce output type
+	sampleRows := subsetInterfaceSlice(slice, rowIndices[0])
+	sampleOutput := fn(sampleRows)
+	if !isSlice(sampleOutput) {
+		return nil, fmt.Errorf("group 0: output must be slice (%v != slice)",
+			reflect.TypeOf(sampleOutput).Kind())
+	}
+
+	retVals := reflect.MakeSlice(reflect.TypeOf(sampleOutput), retLength, retLength)
+	for i, rowIndex := range rowIndices {
+		subsetRows := subsetInterfaceSlice(slice, rowIndex)
+		output := fn(subsetRows)
+
+		if !isSlice(output) {
+			return nil, fmt.Errorf("group %d: output must be slice (%v != slice)",
+				i, reflect.TypeOf(output).Kind())
+		}
+		if reflect.ValueOf(output).Len() != reflect.ValueOf(subsetRows).Len() {
+			return nil, fmt.Errorf("group %d: length of output slice must match length of input slice "+
+				"(%d != %d)", i, reflect.ValueOf(output).Len(), reflect.ValueOf(subsetRows).Len())
+		}
+		// write each output multiple times and out of order into retVals
+		for incrementor, index := range rowIndex {
+			src := reflect.ValueOf(output).Index(incrementor)
+			dst := retVals.Index(index)
+			dst.Set(src)
+		}
+	}
+	ret, err := makeValueContainerFromInterface(retVals.Interface(), name)
+	if err != nil {
+		return nil, fmt.Errorf("interface{} output: %v", err)
+	}
+	return ret, nil
+}
+
+func groupedIndexReduceFunc(
+	vals interface{},
+	nulls []bool,
+	name string,
+	aligned bool,
+	index int,
+	rowIndices [][]int) *valueContainer {
+	// default: return length is equal to the number of groups
+	retLength := len(rowIndices)
+	v := reflect.ValueOf(vals)
+	if aligned {
+		// if aligned: return length is overwritten to equal the length of original data
+		retLength = v.Len()
+	}
+
+	retVals := reflect.MakeSlice(v.Type(), retLength, retLength)
+	retNulls := make([]bool, retLength)
+	for i, rowIndex := range rowIndices {
+		// modify index if negative
+		modifiedIndex := index
+		if index < 0 {
+			// if original index is negative, try to index from right-to-left
+			modifiedIndex = len(rowIndex) + index
+		}
+		if modifiedIndex >= len(rowIndex) || modifiedIndex < 0 {
+			retNulls[i] = true
+			continue
+		}
+		// look up the row position contained at `modifiedIndex`
+		toLookup := rowIndex[modifiedIndex]
+		output, isNull := v.Index(toLookup), nulls[toLookup]
+		if !aligned {
+			// default: write each output once and in sequential order
+			retVals.Index(i).Set(output)
+			retNulls[i] = isNull
+		} else {
+			// if aligned: write each output multiple times and out of order
+			for _, i := range rowIndex {
+				retVals.Index(i).Set(output)
+				retNulls[modifiedIndex] = isNull
+			}
+		}
+	}
+	return &valueContainer{
+		slice:  retVals.Interface(),
+		isNull: retNulls,
+		name:   name,
+	}
 }

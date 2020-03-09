@@ -873,13 +873,9 @@ func TestSeries_Relabel(t *testing.T) {
 		labels []*valueContainer
 		err    error
 	}
-	type args struct {
-		levelNames []string
-	}
 	tests := []struct {
 		name   string
 		fields fields
-		args   args
 		want   *Series
 	}{
 		{"pass", fields{
@@ -887,21 +883,11 @@ func TestSeries_Relabel(t *testing.T) {
 			labels: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "*0"},
 				{slice: []float64{1}, isNull: []bool{false}, name: "*1"}}},
-			args{[]string{"*0", "*1"}},
 			&Series{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 				labels: []*valueContainer{
 					{slice: []int{0}, isNull: []bool{false}, name: "*0"},
 					{slice: []int{0}, isNull: []bool{false}, name: "*1"}}},
-		},
-		{"fail", fields{
-			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
-			labels: []*valueContainer{
-				{slice: []float64{1}, isNull: []bool{false}, name: "*0"},
-				{slice: []float64{1}, isNull: []bool{false}, name: "*1"}}},
-			args{[]string{"*0", "corge"}},
-			&Series{
-				err: errors.New("Relabel(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -911,7 +897,7 @@ func TestSeries_Relabel(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Relabel(tt.args.levelNames); !EqualSeries(got, tt.want) {
+			if got := s.Relabel(); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Relabel() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2468,10 +2454,8 @@ func TestSeries_Cut(t *testing.T) {
 		err    error
 	}
 	type args struct {
-		bins    []float64
-		andLess bool
-		andMore bool
-		labels  []string
+		bins   []float64
+		config *Cutter
 	}
 	tests := []struct {
 		name   string
@@ -2483,7 +2467,7 @@ func TestSeries_Cut(t *testing.T) {
 			values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{
-				bins: []float64{1, 2}, andLess: false, andMore: true, labels: nil},
+				bins: []float64{1, 2}, config: &Cutter{AndLess: false, AndMore: true, Labels: nil}},
 			&Series{
 				values: &valueContainer{slice: []string{"", "1-2", ">2"}, isNull: []bool{true, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
@@ -2491,7 +2475,7 @@ func TestSeries_Cut(t *testing.T) {
 			values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{
-				bins: []float64{1, 2}, andLess: false, andMore: false, labels: []string{"foo", "bar"}},
+				bins: []float64{1, 2}, config: &Cutter{AndLess: false, AndMore: false, Labels: []string{"foo", "bar"}}},
 			&Series{
 				err: errors.New("Cut(): number of bin edges (+ includeLess + includeMore), must be one more than number of supplied labels: (2 + 0 + 0) != (2 + 1)")}},
 	}
@@ -2502,7 +2486,7 @@ func TestSeries_Cut(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Cut(tt.args.bins, tt.args.andLess, tt.args.andMore, tt.args.labels); !EqualSeries(got, tt.want) {
+			if got := s.Cut(tt.args.bins, tt.args.config); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Cut() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3015,50 +2999,6 @@ func TestSeries_ValueCounts(t *testing.T) {
 	}
 }
 
-func TestSeries_ValueIsNull(t *testing.T) {
-	type fields struct {
-		values     *valueContainer
-		labels     []*valueContainer
-		sharedData bool
-		err        error
-	}
-	type args struct {
-		i int
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   bool
-	}{
-		{"false", fields{
-			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
-			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
-			args{0}, false},
-		{"true", fields{
-			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
-			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
-			args{1}, true},
-		{"out of bounds", fields{
-			values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"},
-			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}},
-			args{2}, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values:     tt.fields.values,
-				labels:     tt.fields.labels,
-				sharedData: tt.fields.sharedData,
-				err:        tt.fields.err,
-			}
-			if got := s.ValueIsNull(tt.args.i); got != tt.want {
-				t.Errorf("Series.ValueIsNull() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestSeries_ListLabelNames(t *testing.T) {
 	type fields struct {
 		values     *valueContainer
@@ -3320,6 +3260,46 @@ func TestSeries_SwapLabels(t *testing.T) {
 			}
 			if got := s.SwapLabels(tt.args.i, tt.args.j); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.SwapLabels() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Percentile(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass",
+			fields{
+				values: &valueContainer{slice: []float64{0, 1, 2}, isNull: []bool{true, false, false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"},
+				},
+			},
+			&Series{
+				values: &valueContainer{slice: []float64{0, 0, .5}, isNull: []bool{true, false, false}, name: "percentile"},
+				labels: []*valueContainer{
+					{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"},
+				}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.Percentile(); !EqualSeries(got, tt.want) {
+				t.Errorf("Series.Percentile() = %v, want %v", got, tt.want)
 			}
 		})
 	}

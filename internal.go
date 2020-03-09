@@ -1033,12 +1033,6 @@ func (vc *valueContainer) after(comparison time.Time) []int {
 	return index
 }
 
-func (vc *valueContainer) relabel() {
-	vc.slice = makeIntRange(0, len(vc.isNull))
-	vc.resetCache()
-	return
-}
-
 func (vc *valueContainer) filter(filter FilterFn) ([]int, error) {
 	var index []int
 	if filter.Float != nil {
@@ -2240,27 +2234,14 @@ func (vc *floatValueContainer) percentile() []float64 {
 
 // exclusive definition: what % of all values are below this value
 // -999 for null values
-func percentile(vals []float64, isNull []bool, index []int) []float64 {
-	// copy all existing values at index positions
-	newVals := make([]float64, len(index))
-	newIsNull := make([]bool, len(index))
-	for i := range index {
-		newVals[i] = vals[i]
-		newIsNull[i] = isNull[i]
-	}
-	floats := &floatValueContainer{slice: newVals, index: makeIntRange(0, len(index)), isNull: newIsNull}
-
-	return floats.percentile()
-}
-
-// percentile cut
 func (vc *valueContainer) pcut(bins []float64, labels []string) ([]string, error) {
 	for i, edge := range bins {
 		if edge < 0 || edge > 1 {
 			return nil, fmt.Errorf("all bin edges must be between 0 and 1 (%v at edge %d", edge, i)
 		}
 	}
-	pctile := percentile(vc.float64().slice, vc.isNull, makeIntRange(0, len(vc.isNull)))
+	floats := vc.float64()
+	pctile := floats.percentile()
 	leftInclusive := true
 	rightExclusive := true
 	return cut(pctile, vc.isNull, bins, leftInclusive, rightExclusive, false, false, labels)
@@ -2281,13 +2262,13 @@ func withinWindow(root time.Time, other time.Time, d time.Duration) bool {
 
 func resample(t time.Time, by Resampler) time.Time {
 	if by.ByYear {
-		return time.Date(t.Year(), 1, 1, 0, 0, 0, 0, by.Location)
+		return time.Date(t.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
 	} else if by.ByMonth {
-		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, by.Location)
+		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)
 	} else if by.ByDay {
-		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, by.Location)
+		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 	} else if by.ByWeek {
-		day := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, by.Location)
+		day := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
 		daysSinceStartOfWeek := day.Weekday() - by.StartOfWeek
 		if daysSinceStartOfWeek >= 0 {
 			// subtract days back to beginning of week
@@ -2300,13 +2281,9 @@ func resample(t time.Time, by Resampler) time.Time {
 	}
 }
 
-// default timezone: UTC
 func (vc *valueContainer) resample(by Resampler) {
 	vals := vc.dateTime().slice
 	retVals := make([]time.Time, len(vals))
-	if by.Location == nil {
-		by.Location = time.UTC
-	}
 	for i := range vals {
 		retVals[i] = resample(vals[i], by)
 	}

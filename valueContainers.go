@@ -27,7 +27,6 @@ func (vc *valueContainer) genericType() genericTypeContainer {
 	return genericTypeContainer{}
 }
 
-// Less stub
 func (vc floatValueContainer) Less(i, j int) bool {
 	if vc.slice[i] < vc.slice[j] {
 		return true
@@ -35,19 +34,16 @@ func (vc floatValueContainer) Less(i, j int) bool {
 	return false
 }
 
-// Len stub
 func (vc floatValueContainer) Len() int {
 	return len(vc.slice)
 }
 
-// Swap stub
 func (vc floatValueContainer) Swap(i, j int) {
 	vc.slice[i], vc.slice[j] = vc.slice[j], vc.slice[i]
 	vc.isNull[i], vc.isNull[j] = vc.isNull[j], vc.isNull[i]
 	vc.index[i], vc.index[j] = vc.index[j], vc.index[i]
 }
 
-// Less stub
 func (vc stringValueContainer) Less(i, j int) bool {
 	if vc.slice[i] < vc.slice[j] {
 		return true
@@ -55,19 +51,16 @@ func (vc stringValueContainer) Less(i, j int) bool {
 	return false
 }
 
-// Len stub
 func (vc stringValueContainer) Len() int {
 	return len(vc.slice)
 }
 
-// Swap stub
 func (vc stringValueContainer) Swap(i, j int) {
 	vc.slice[i], vc.slice[j] = vc.slice[j], vc.slice[i]
 	vc.isNull[i], vc.isNull[j] = vc.isNull[j], vc.isNull[i]
 	vc.index[i], vc.index[j] = vc.index[j], vc.index[i]
 }
 
-// Less stub
 func (vc dateTimeValueContainer) Less(i, j int) bool {
 	if vc.slice[i].Before(vc.slice[j]) {
 		return true
@@ -75,12 +68,10 @@ func (vc dateTimeValueContainer) Less(i, j int) bool {
 	return false
 }
 
-// Len stub
 func (vc dateTimeValueContainer) Len() int {
 	return len(vc.slice)
 }
 
-// Swap stub
 func (vc dateTimeValueContainer) Swap(i, j int) {
 	vc.slice[i], vc.slice[j] = vc.slice[j], vc.slice[i]
 	vc.isNull[i], vc.isNull[j] = vc.isNull[j], vc.isNull[i]

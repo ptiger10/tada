@@ -1334,33 +1334,6 @@ func Test_findColWithName(t *testing.T) {
 	}
 }
 
-func Test_percentile(t *testing.T) {
-	type args struct {
-		vals   []float64
-		isNull []bool
-		index  []int
-	}
-	tests := []struct {
-		name string
-		args args
-		want []float64
-	}{
-		{"no null", args{vals: []float64{1, 2, 3, 6}, isNull: []bool{false, false, false, false}, index: []int{0, 1, 2, 3}},
-			[]float64{0, .25, .5, .75}},
-		{"repeats", args{vals: []float64{1, 2, 2, 4}, isNull: []bool{false, false, false, false}, index: []int{0, 1, 2, 3}},
-			[]float64{0, .25, .25, .75}},
-		{"null", args{vals: []float64{0, 1, 2, 3, 4}, isNull: []bool{true, false, false, false, false},
-			index: []int{0, 1, 2, 3, 4}}, []float64{-999, 0, .25, .5, .75}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := percentile(tt.args.vals, tt.args.isNull, tt.args.index); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("percentile() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_valueContainer_pcut(t *testing.T) {
 	type fields struct {
 		slice  interface{}
@@ -2497,42 +2470,6 @@ func Test_withinWindow(t *testing.T) {
 	}
 }
 
-func Test_valueContainer_relabel(t *testing.T) {
-	type fields struct {
-		slice  interface{}
-		isNull []bool
-		name   string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   *valueContainer
-	}{
-		{"pass", fields{
-			slice:  []float64{2, 3, 0},
-			isNull: []bool{false, false, true},
-			name:   "foo",
-		}, &valueContainer{
-			slice:  []int{0, 1, 2},
-			isNull: []bool{false, false, true},
-			name:   "foo",
-		}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			vc := &valueContainer{
-				slice:  tt.fields.slice,
-				isNull: tt.fields.isNull,
-				name:   tt.fields.name,
-			}
-			vc.relabel()
-			if !reflect.DeepEqual(vc, tt.want) {
-				t.Errorf("relabel() -> %v, want %v", vc, tt.want)
-			}
-		})
-	}
-}
-
 func Test_valueContainer_fillnull(t *testing.T) {
 	type fields struct {
 		slice  interface{}
@@ -2631,17 +2568,17 @@ func Test_resample(t *testing.T) {
 		args args
 		want time.Time
 	}{
-		{"year", args{d, Resampler{ByYear: true, Location: time.UTC}}, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
-		{"month", args{d, Resampler{ByMonth: true, Location: time.UTC}}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC)},
-		{"day", args{d, Resampler{ByDay: true, Location: time.UTC}}, time.Date(2020, 2, 2, 0, 0, 0, 0, time.UTC)},
-		{"week (Sunday)", args{d, Resampler{ByWeek: true, Location: time.UTC}},
+		{"year", args{d, Resampler{ByYear: true}}, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
+		{"month", args{d, Resampler{ByMonth: true}}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC)},
+		{"day", args{d, Resampler{ByDay: true}}, time.Date(2020, 2, 2, 0, 0, 0, 0, time.UTC)},
+		{"week (Sunday)", args{d, Resampler{ByWeek: true}},
 			time.Date(2020, 2, 2, 0, 0, 0, 0, time.UTC)},
-		{"week (Monday)", args{d, Resampler{ByWeek: true, StartOfWeek: time.Monday, Location: time.UTC}},
+		{"week (Monday)", args{d, Resampler{ByWeek: true, StartOfWeek: time.Monday}},
 			time.Date(2020, 1, 27, 0, 0, 0, 0, time.UTC)},
-		{"hour", args{d, Resampler{ByDuration: time.Hour, Location: time.UTC}}, time.Date(2020, 2, 2, 12, 0, 0, 0, time.UTC)},
-		{"minute", args{d, Resampler{ByDuration: time.Minute, Location: time.UTC}}, time.Date(2020, 2, 2, 12, 30, 0, 0, time.UTC)},
-		{"second", args{d, Resampler{ByDuration: time.Second, Location: time.UTC}}, time.Date(2020, 2, 2, 12, 30, 45, 0, time.UTC)},
-		{"default", args{d, Resampler{Location: time.UTC}}, time.Date(2020, 2, 2, 12, 30, 45, 100, time.UTC)},
+		{"hour", args{d, Resampler{ByDuration: time.Hour}}, time.Date(2020, 2, 2, 12, 0, 0, 0, time.UTC)},
+		{"minute", args{d, Resampler{ByDuration: time.Minute}}, time.Date(2020, 2, 2, 12, 30, 0, 0, time.UTC)},
+		{"second", args{d, Resampler{ByDuration: time.Second}}, time.Date(2020, 2, 2, 12, 30, 45, 0, time.UTC)},
+		{"no change", args{d, Resampler{}}, time.Date(2020, 2, 2, 12, 30, 45, 100, time.UTC)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -4248,6 +4185,36 @@ func Test_filter(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("filter() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_floatValueContainer_percentile(t *testing.T) {
+	type fields struct {
+		slice  []float64
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   []float64
+	}{
+		{"pass",
+			fields{[]float64{1, 2, 3, 4, 5, 6, 7, 8, 10, 9}, []bool{false, false, false, false, false, false, false, false, false, false},
+				[]int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}},
+			[]float64{0, .1, .2, .3, .4, .5, .6, .7, .9, .8}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &floatValueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				index:  tt.fields.index,
+			}
+			if got := vc.percentile(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("floatValueContainer.percentile() = %v, want %v", got, tt.want)
 			}
 		})
 	}

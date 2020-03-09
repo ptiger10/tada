@@ -939,13 +939,13 @@ func (df *DataFrame) FilterCols(lambda func(string) bool) []int {
 
 // WithLabels resolves as follows:
 //
-// If a scalar string is supplied as `input` and a column of labels exists that matches `name`: rename the level to match `input`
+// If a scalar string is supplied as `input` and a label level exists that matches `name`: rename the level to match `input`.
+// In this case, `name` must already exist.
 //
-// If a slice is supplied as `input` and a column of labels exists that matches `name`: replace the values at this level to match `input`
+// If a slice is supplied as `input` and a label level exists that matches `name`: replace the values at this level to match `input`.
+// If a slice is supplied as `input` and a label level does not exist that matches `name`: append a new level named `name` and values matching `input`.
+// If `input` is a slice, it must be the same length as the underlying DataFrame.
 //
-// If a slice is supplied as `input` and a column of labels does not exist that matches `name`: append a new level with a name matching `name` and values matching `input`
-//
-// Error conditions: supplying slice of unsupported type, supplying slice with a different length than the underlying DataFrame, or supplying scalar string and `name` that does not match an existing label level.
 // In all cases, returns a new DataFrame.
 func (df *DataFrame) WithLabels(name string, input interface{}) *DataFrame {
 	df.Copy()
@@ -955,13 +955,13 @@ func (df *DataFrame) WithLabels(name string, input interface{}) *DataFrame {
 
 // WithLabels resolves as follows:
 //
-// If a scalar string is supplied as `input` and a column of labels exists that matches `name`: rename the level to match `input`
+// If a scalar string is supplied as `input` and a label level exists that matches `name`: rename the level to match `input`.
+// In this case, `name` must already exist.
 //
-// If a slice is supplied as `input` and a column of labels exists that matches `name`: replace the values at this level to match `input`
+// If a slice is supplied as `input` and a label level exists that matches `name`: replace the values at this level to match `input`.
+// If a slice is supplied as `input` and a label level does not exist that matches `name`: append a new level named `name` and values matching `input`.
+// If `input` is a slice, it must be the same length as the underlying DataFrame.
 //
-// If a slice is supplied as `input` and a column of labels does not exist that matches `name`: append a new level with a name matching `name` and values matching `input`
-//
-// Error conditions: supplying slice of unsupported type, supplying slice with a different length than the underlying DataFrame, or supplying scalar string and `name` that does not match an existing label level.
 // In all cases, modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) WithLabels(name string, input interface{}) {
 	labels, err := withColumn(df.dataframe.labels, name, input, df.dataframe.Len())
@@ -973,13 +973,13 @@ func (df *DataFrameMutator) WithLabels(name string, input interface{}) {
 
 // WithCol resolves as follows:
 //
-// If a scalar string is supplied as `input` and a column exists that matches `name`: rename the column to match `input`
+// If a scalar string is supplied as `input` and a column exists that matches `name`: rename the column to match `input`.
+// In this case, `name` must already exist.
 //
-// If a slice is supplied as `input` and a column exists that matches `name`: replace the values at this column to match `input`
+// If a slice is supplied as `input` and a column exists that matches `name`: replace the values at this column to match `input`.
+// If a slice is supplied as `input` and a column does not exist that matches `name`: append a new column named `name` and values matching `input`.
+// If `input` is a slice, it must be the same length as the underlying DataFrame.
 //
-// If a slice is supplied as `input` and a column does not exist that matches `name`: append a new column with a name matching `name` and values matching `input`
-//
-// Error conditions: supplying slice of unsupported type, supplying slice with a different length than the underlying DataFrame, or supplying scalar string and `name` that does not match an existing label level.
 // In all cases, returns a new DataFrame.
 func (df *DataFrame) WithCol(name string, input interface{}) *DataFrame {
 	df.Copy()
@@ -989,13 +989,13 @@ func (df *DataFrame) WithCol(name string, input interface{}) *DataFrame {
 
 // WithCol resolves as follows:
 //
-// If a scalar string is supplied as `input` and a column exists that matches `name`: rename the column to match `input`
+// If a scalar string is supplied as `input` and a column exists that matches `name`: rename the column to match `input`.
+// In this case, `name` must already exist.
 //
-// If a slice is supplied as `input` and a column exists that matches `name`: replace the values at this column to match `input`
+// If a slice is supplied as `input` and a column exists that matches `name`: replace the values at this column to match `input`.
+// If a slice is supplied as `input` and a column does not exist that matches `name`: append a new column named `name` and values matching `input`.
+// If `input` is a slice, it must be the same length as the underlying DataFrame.
 //
-// If a slice is supplied as `input` and a column does not exist that matches `name`: append a new column with a name matching `name` and values matching `input`
-//
-// Error conditions: supplying slice of unsupported type, supplying slice with a different length than the underlying DataFrame, or supplying scalar string and `name` that does not match an existing label level.
 // In all cases, modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) WithCol(name string, input interface{}) {
 	cols, err := withColumn(df.dataframe.values, name, input, df.dataframe.Len())
@@ -1685,7 +1685,9 @@ func (df *DataFrame) LookupAdvanced(other *DataFrame, how string, leftOn []strin
 
 // -- SORTERS
 
-// Sort sorts the DataFrame `by` the container(s) supplied in one or more tada.Sorters.
+// Sort sorts the values `by` zero or more Sorter specifications.
+// If no Sorter is supplied, does not sort.
+// If no DType is supplied for a Sorter, sorts as float64.
 // Returns a new DataFrame.
 func (df *DataFrame) Sort(by ...Sorter) *DataFrame {
 	df.Copy()
@@ -1693,7 +1695,9 @@ func (df *DataFrame) Sort(by ...Sorter) *DataFrame {
 	return df
 }
 
-// Sort sorts the DataFrame `by` the container(s) supplied in one or more tada.Sorters.
+// Sort sorts the values `by` zero or more Sorter specifications.
+// If no Sorter is supplied, does not sort.
+// If no DType is supplied for a Sorter, sorts as float64.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Sort(by ...Sorter) {
 	if len(by) == 0 {

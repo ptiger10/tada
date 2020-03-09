@@ -150,7 +150,8 @@ func (s *Series) Cast(containerAsType map[string]DType) error {
 	return nil
 }
 
-// IndexOf stub. If name does not match any container, -1 is returned
+// IndexOf returns the index position of the first container with a name matching `name`
+// If `name` does not match any container, -1 is returned.
 func (s *Series) IndexOf(name string) int {
 	i, err := indexOfContainer(name, s.labels)
 	if err != nil {
@@ -317,14 +318,6 @@ func (s *SeriesMutator) FillNull(how NullFiller) {
 	return
 }
 
-// ValueIsNull returns whether the value at row `i` is null. If `i` is out of range, returns true.
-func (s *Series) ValueIsNull(i int) bool {
-	if i >= s.Len() {
-		return true
-	}
-	return s.values.isNull[i]
-}
-
 // DropNull returns all the rows with non-null values.
 // Returns a new Series.
 func (s *Series) DropNull() *Series {
@@ -382,13 +375,13 @@ func (s *Series) InPlace() *SeriesMutator {
 
 // WithLabels resolves as follows:
 //
-// If a scalar string is supplied as `input` and a column of labels exists that matches `name`: rename the level to match `input`
+// If a scalar string is supplied as `input` and a label level exists that matches `name`: rename the level to match `input`.
+// In this case, `name` must already exist.
 //
-// If a slice is supplied as `input` and a column of labels exists that matches `name`: replace the values at this level to match `input`
+// If a slice is supplied as `input` and a label level exists that matches `name`: replace the values at this level to match `input`.
+// If a slice is supplied as `input` and a label level does not exist that matches `name`: append a new level named `name` and values matching `input`.
+// If `input` is a slice, it must be the same length as the underlying Series.
 //
-// If a slice is supplied as `input` and a column of labels does not exist that matches `name`: append a new level with a name matching `name` and values matching `input`
-//
-// Error conditions: supplying slice of unsupported type, supplying slice with a different length than the underlying Series, or supplying scalar string and `name` that does not match an existing label level.
 // In all cases, returns a new Series.
 func (s *Series) WithLabels(name string, input interface{}) *Series {
 	s.Copy()
@@ -398,13 +391,13 @@ func (s *Series) WithLabels(name string, input interface{}) *Series {
 
 // WithLabels resolves as follows:
 //
-// If a scalar string is supplied as `input` and a column of labels exists that matches `name`: rename the level to match `input`
+// If a scalar string is supplied as `input` and a label level exists that matches `name`: rename the level to match `input`.
+// In this case, `name` must already exist.
 //
-// If a slice is supplied as `input` and a column of labels exists that matches `name`: replace the values at this level to match `input`
+// If a slice is supplied as `input` and a label level exists that matches `name`: replace the values at this level to match `input`.
+// If a slice is supplied as `input` and a label level does not exist that matches `name`: append a new level named `name` and values matching `input`.
+// If `input` is a slice, it must be the same length as the underlying Series.
 //
-// If a slice is supplied as `input` and a column of labels does not exist that matches `name`: append a new level with a name matching `name` and values matching `input`
-//
-// Error conditions: supplying slice of unsupported type, supplying slice with a different length than the underlying Series, or supplying scalar string and `name` that does not match an existing label level.
 // In all cases, modifies the underlying Series in place.
 func (s *SeriesMutator) WithLabels(name string, input interface{}) {
 	labels, err := withColumn(s.series.labels, name, input, s.series.Len())
@@ -415,14 +408,18 @@ func (s *SeriesMutator) WithLabels(name string, input interface{}) {
 	s.series.labels = labels
 }
 
-// WithValues stub
+// WithValues replaces the Series values with `input`.
+// `input` must be a supported slice type of the same length as the original Series.
+// Returns a new Series.
 func (s *Series) WithValues(input interface{}) *Series {
 	s.Copy()
 	s.InPlace().WithValues(input)
 	return s
 }
 
-// WithValues stub
+// WithValues replaces the Series values with `input`.
+// `input` must be a supported slice type of the same length as the original Series.
+// Modifies the underlying Series.
 func (s *SeriesMutator) WithValues(input interface{}) {
 	// synthesize a collection of valueContainers, ensuring that name already exists
 	vals, err := withColumn([]*valueContainer{s.series.values}, s.series.values.name, input, s.series.Len())
@@ -507,23 +504,18 @@ func (s *Series) SetName(name string) *Series {
 	return s
 }
 
-// Relabel stub
-func (s *Series) Relabel(levelNames []string) *Series {
+// Relabel resets the Series labels to default labels (e.g., []int from 0 to df.Len()-1, with *0 as name).
+// Returns a new Series.
+func (s *Series) Relabel() *Series {
 	s = s.Copy()
-	s.InPlace().Relabel(levelNames)
+	s.InPlace().Relabel()
 	return s
 }
 
-// Relabel stub
-func (s *SeriesMutator) Relabel(levelNames []string) {
-	for _, name := range levelNames {
-		lvl, err := indexOfContainer(name, s.series.labels)
-		if err != nil {
-			s.series.resetWithError(fmt.Errorf("Relabel(): %v", err))
-			return
-		}
-		s.series.labels[lvl].relabel()
-	}
+// Relabel resets the Series labels to default labels (e.g., []int from 0 to df.Len()-1, with *0 as name).
+// Modifies the underlying Series in place.
+func (s *SeriesMutator) Relabel() {
+	s.series.labels = []*valueContainer{makeDefaultLabels(0, s.series.Len(), true)}
 	return
 }
 
@@ -553,8 +545,8 @@ func (s *Series) Name() string {
 
 // Sort sorts the values `by` zero or more Sorter specifications.
 // If no Sorter is supplied, sorts by Series values (as float64) in ascending order.
-// If a Sorter is supplied without a ColName or name matching the Series name, sorts by Series values.
-// If no DType is supplied, sorts as float64.
+// If a Sorter is supplied without a `Name` or with a name matching the Series name, sorts by Series values.
+// If no DType is supplied in a Sorter, sorts as float64.
 // Returns a new Series.
 func (s *Series) Sort(by ...Sorter) *Series {
 	s.Copy()
@@ -562,7 +554,11 @@ func (s *Series) Sort(by ...Sorter) *Series {
 	return s
 }
 
-// Sort stub
+// Sort sorts the values `by` zero or more Sorter specifications.
+// If no Sorter is supplied, sorts by Series values (as float64) in ascending order.
+// If a Sorter is supplied without a `Name` or with a name matching the Series name, sorts by Series values.
+// If no DType is supplied in a Sorter, sorts as float64.
+// Modifies the underlying Series in place.
 func (s *SeriesMutator) Sort(by ...Sorter) {
 	// default for handling no Sorters: values as float in ascending order
 	if len(by) == 0 {
@@ -613,9 +609,11 @@ func (s *Series) Filter(filters map[string]FilterFn) []int {
 	return ret
 }
 
-// Where stub
-// To do: check for bad filter
+// Where iterates over the values in `s` and evaluates whether all `filters` are true.
+// If yes, returns `ifTrue` at that row position.
+// If not, returns `ifFalse` at that row position.
 func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{}) *Series {
+	// to do: check for bad filter
 	ret := make([]interface{}, s.Len())
 	// []int of positions where all filters are true
 	index := s.Filter(filters)
@@ -674,15 +672,25 @@ func (s *Series) After(comparison time.Time) []int {
 
 // -- APPLY
 
-// Apply stub
+// Apply applies a user-defined function to every row in the Series based on `lambda`.
+// The first field selected (i.e., not left blank) in the ApplyFn struct provides the apply logic.
+// Values are converted from their original type to the selected field type.
+// For example, {ApplyFn{Float: lambda}} converts the Series values to float64 and
+// applies the lambda function to each row in the container, outputting a new float64 value for each row.
+// If a value is null either before or after the lambda function is applied, it is also null after.
+// Returns a new Series.
 func (s *Series) Apply(lambda ApplyFn) *Series {
 	s.Copy()
 	s.InPlace().Apply(lambda)
 	return s
 }
 
-// Apply applies a user-defined `lambda` function to every row in the Series and coerces all values to match the lambda type.
-// Apply may be applied to a level of labels (if no column is specified, the main Series values are used).
+// Apply applies a user-defined function to every row in the Series based on `lambda`.
+// The first field selected (i.e., not left blank) in the ApplyFn struct provides the apply logic.
+// Values are converted from their original type to the selected field type.
+// For example, {ApplyFn{Float: lambda}} converts the Series values to float64 and
+// applies the lambda function to each row in the container, outputting a new float64 value for each row.
+// If a value is null either before or after the lambda function is applied, it is also null after.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Apply(lambda ApplyFn) {
 	err := lambda.validate()
@@ -696,14 +704,26 @@ func (s *SeriesMutator) Apply(lambda ApplyFn) {
 	return
 }
 
-// ApplyFormat stub
+// ApplyFormat applies a user-defined formatting function to every row in the Series based on `lambda`.
+// The first field selected (i.e., not left blank) in the ApplyFormatFn struct provides the formatting logic.
+// Values are converted from their original type to the selected field type and then to string.
+// For example, {ApplyFn{Float: lambda}} converts the Series values to float64 and
+// applies the lambda function to each row in the container, outputting a new string value for each row.
+// If a value is null either before or after the lambda function is applied, it is also null after.
+// Returns a new Series.
 func (s *Series) ApplyFormat(lambda ApplyFormatFn) *Series {
 	s.Copy()
 	s.InPlace().ApplyFormat(lambda)
 	return s
 }
 
-// ApplyFormat stub
+// ApplyFormat applies a user-defined formatting function to every row in the Series based on `lambda`.
+// The first field selected (i.e., not left blank) in the ApplyFormatFn struct provides the formatting logic.
+// Values are converted from their original type to the selected field type and then to string.
+// For example, {ApplyFn{Float: lambda}} converts the Series values to float64 and
+// applies the lambda function to each row in the container, outputting a new string value for each row.
+// If a value is null either before or after the lambda function is applied, it is also null after.
+// Modifies the underlying Series in place.
 func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
 	err := lambda.validate()
 	if err != nil {
@@ -1014,20 +1034,22 @@ func (s *Series) alignedMath(alignedFunction func([]float64, []bool, []int) []fl
 	return retVals
 }
 
-// Resample stub
+// Resample coerces the Series values to time.Time and truncates them `by` the logic supplied in tada.Resampler.
+// Returns a new Series.
 func (s *Series) Resample(by Resampler) *Series {
 	s = s.Copy()
 	s.InPlace().Resample(by)
 	return s
 }
 
-// Resample stub
+// Resample coerces the Series values to time.Time and truncates them `by` the logic supplied in tada.Resampler.
+// Modifies the underlying Series in place.
 func (s *SeriesMutator) Resample(by Resampler) {
 	s.series.values.resample(by)
 	return
 }
 
-// CumSum returns the cumulative sum at each row position
+// CumSum coerces the Series values to float64 and returns the cumulative sum at each row position.
 func (s *Series) CumSum() *Series {
 	isNull := make([]bool, s.Len())
 	for i := range isNull {
@@ -1043,7 +1065,8 @@ func (s *Series) CumSum() *Series {
 	}
 }
 
-// Rank stub
+// Rank coerces the Series values to float64 and returns the rank of each (in ascending order - where 1 is the rank of the lowest value).
+// Rows with the same value share the same rank.
 func (s *Series) Rank() *Series {
 	slice := s.alignedMath(rank)
 	isNull := make([]bool, s.Len())
@@ -1064,9 +1087,17 @@ func (s *Series) Rank() *Series {
 	}
 }
 
-// Cut stub
-func (s *Series) Cut(bins []float64, andLess, andMore bool, labels []string) *Series {
-	retSlice, err := s.values.cut(bins, andLess, andMore, labels)
+// Cut coerces the Series values to float64 and categorizes each row based on which `bin` interval it falls within.
+// `bins` should be a slice of sequential edges that form intervals (left inclusive, right exclusive).
+// For example, [1, 3, 5] represents the intervals 1-3 (excluding 3), and 3-5 (excluding 5).
+// If these bins were supplied for a Series with values [2, 3, 5], the returned Series would have values ["1-3", "3-5", ""].
+// For default behavior, supply nil as `config`.
+// To categorize values below or above the bin range, or to supply custom labels, supply a tada.Cutter as `config`.
+func (s *Series) Cut(bins []float64, config *Cutter) *Series {
+	if config == nil {
+		config = &Cutter{}
+	}
+	retSlice, err := s.values.cut(bins, config.AndLess, config.AndMore, config.Labels)
 	if err != nil {
 		return seriesWithError(fmt.Errorf("Cut(): %v", err))
 	}
@@ -1081,7 +1112,31 @@ func (s *Series) Cut(bins []float64, andLess, andMore bool, labels []string) *Se
 	}
 }
 
-// PercentileCut stub
+// Percentile coerces the Series values to float64 returns the percentile rank of each value (i.e., the % of values in the Series that are below it).
+func (s *Series) Percentile() *Series {
+	floats := s.values.float64()
+	floats.index = makeIntRange(0, s.Len())
+	retVals := floats.percentile()
+	retNulls := make([]bool, len(retVals))
+	for i := range retNulls {
+		if retVals[i] == -999 {
+			retNulls[i] = true
+			retVals[i] = 0
+		}
+	}
+	return &Series{
+		values: &valueContainer{slice: retVals, isNull: retNulls, name: "percentile"},
+		labels: copyContainers(s.labels),
+	}
+}
+
+// PercentileCut coerces the Series values to float64 and categorizes each value based on which percentile `bin` interval it falls within.
+// `bins` should be a slice of sequential percentile edges (between 0 and 1) that form intervals (left inclusive, right exclusive).
+// For example, [0, .5, 1] represents the percentile intervals 0-50% (excluding 50%) and 50%-100%.
+// If these bins were supplied for a Series with values [1, 1000], the returned Series would have values [0-.5, .5-1],
+// because 1 is in the bottom 50% of values and 1000 is in the top 50% of values.
+// If `labels` is not nil, then category names correspond to labels, and the number of labels must be one less than the number of bin values.
+// Otherwise, category names are auto-generated from the range of the bin intervals.
 func (s *Series) PercentileCut(bins []float64, labels []string) *Series {
 	retSlice, err := s.values.pcut(bins, labels)
 	if err != nil {
@@ -1151,7 +1206,7 @@ func (s *Series) DType() string {
 	return s.values.dtype()
 }
 
-// ValueCounts stub
+// ValueCounts counts the number of appearances of each stringified value in the Series.
 func (s *Series) ValueCounts() map[string]int {
 	return s.values.valueCounts()
 }
