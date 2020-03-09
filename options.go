@@ -15,32 +15,37 @@ var optionDateTimeFormats = []string{
 	time.RFC3339, time.RFC3339Nano, time.RFC822}
 var randSeed = time.Now().Unix()
 
-// SetOptionLevelSeparator stub
+// SetOptionLevelSeparator changes the separator used in group names and multi-level column names `sep`
+// (default: "|").
 func SetOptionLevelSeparator(sep string) {
 	optionLevelSeparator = sep
+	optionLevelSeparatorBytes = []byte(sep)
 }
 
-// SetOptionMaxRows stub
+// SetOptionMaxRows changes the max number of rows displayed when printing a Series or DataFrame to `n`
+// (default: 50).
 func SetOptionMaxRows(n int) {
 	optionMaxRows = n
 }
 
-// SetOptionMaxColumns stub
+// SetOptionMaxColumns changes the max number of columns displayed when printing a Series or DataFrame to `n`
+// (default: 20).
 func SetOptionMaxColumns(n int) {
 	optionMaxColumns = n
 }
 
-// SetOptionMergeRepeats stub
+// SetOptionMergeRepeats sets whether or not to merge repeated values in the same container when printing a Series or Dataframe
+// (default: true).
 func SetOptionMergeRepeats(set bool) {
 	optionMergeRepeats = set
 }
 
-// DisableWarnings stub
+// DisableWarnings prevents tada from writing warning messages to the default log writer.
 func DisableWarnings() {
 	optionWarnings = false
 }
 
-// EnableWarnings stub
+// EnableWarnings allows tada to write warning messages to the default log writer.
 func EnableWarnings() {
 	optionWarnings = true
 }

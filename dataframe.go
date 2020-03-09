@@ -1533,18 +1533,64 @@ func (df *DataFrameMutator) ApplyFormat(lambdas map[string]ApplyFormatFn) {
 
 // -- MERGERS
 
-// Merge stub
+// Merge performs a left join of `other` onto `df` using containers with matching names as keys.
+// To perform a different type of join or specify the matching keys,
+// use df.LookupAdvanced() to isolate values in `other`, and append them with df.WithCol().
+//
+// Merge identifies the row alignment between `df` and `other` and appends aligned values as new columns on `df`.
+// Rows are aligned when
+// 1) one or more containers (either column or label level) in `other` share the same name as one or more containers in `df`,
+// and 2) the stringified values in the `other` containers match the values in the `df` containers.
+// For the following dataframes:
+//
+// `df`    	`other`
+// FOO BAR	FOO QUX
+// bar 0	baz corge
+// baz 1	qux waldo
+//
+// Row 1 in `df` is "aligned" with row 0 in `other`, because those are the rows in which
+// both share the same value ("baz") in a container with the same name ("foo").
+// After merging, the result will be:
+//
+// `df`
+// FOO BAR QUX
+// bar 0   n/a
+// baz 1   corge
+//
+// Finally, all container names (columns and label names) are deduplicated after the merge so that they are unique.
+// Returns a new DataFrame.
 func (df *DataFrame) Merge(other *DataFrame) *DataFrame {
 	df.Copy()
 	df.InPlace().Merge(other)
 	return df
 }
 
-// Merge looks up the aligned rows in the `other` DataFrame and appends the column values for those rows to `df`.
-// Aligned rows are rows with the same stringified value in containers (either columns or label levels) with the same name.
-// For example if `df` and `other` both have
-// Finally, all container names (columns and label names) are deduplicated after the merge so that they are unique.
+// Merge performs a left join of `other` onto `df` using containers with matching names as keys.
+// To perform a different type of join or specify the matching keys,
+// use df.LookupAdvanced() to isolate values in `other`, and append them with df.WithCol().
 //
+// Merge identifies the row alignment between `df` and `other` and appends aligned values as new columns on `df`.
+// Rows are aligned when:
+// 1) one or more containers (either column or label level) in `other` share the same name as one or more containers in `df`,
+// and 2) the stringified values in the `other` containers match the values in the `df` containers.
+// For the following dataframes:
+//
+// `df`    	`other`
+// FOO BAR	FOO QUX
+// bar 0	baz corge
+// baz 1	qux waldo
+//
+// Row 1 in `df` is "aligned" with row 0 in `other`, because those are the rows in which
+// both share the same value ("baz") in a container with the same name ("foo").
+// After merging, the result will be:
+//
+// `df`
+// FOO BAR QUX
+// bar 0   n/a
+// baz 1   corge
+//
+// Finally, all container names (columns and label names) are deduplicated after the merge so that they are unique.
+// Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Merge(other *DataFrame) {
 	lookupDF := df.dataframe.Lookup(other)
 	for k := range lookupDF.values {
@@ -1553,12 +1599,56 @@ func (df *DataFrameMutator) Merge(other *DataFrame) {
 	df.DeduplicateNames()
 }
 
-// Lookup stub
+// Lookup performs the lookup portion of a left join of `other` onto `df` using containers with matching names as keys.
+// To perform a different type of lookup or specify the matching keys, use df.LookupAdvanced().
+//
+// Lookup identifies the row alignment between `df` and `other` and returns the aligned values.
+// Rows are aligned when:
+// 1) one or more containers (either column or label level) in `other` share the same name as one or more containers in `df`,
+// and 2) the stringified values in the `other` containers match the values in the `df` containers.
+// For the following dataframes:
+//
+// `df`    	`other`
+// FOO BAR	FOO QUX
+// bar 0	baz corge
+// baz 1	qux waldo
+//
+// Row 1 in `df` is "aligned" with row 0 in `other`, because those are the rows in which
+// both share the same value ("baz") in a container with the same name ("foo").
+// The result of a lookup will be:
+//
+// FOO BAR
+// bar n/a
+// baz corge
+//
+// Returns a new DataFrame.
 func (df *DataFrame) Lookup(other *DataFrame) *DataFrame {
 	return df.LookupAdvanced(other, "left", nil, nil)
 }
 
-// LookupAdvanced stub
+// LookupAdvanced performs the lookup portion of a join of `other` onto `df` matching on the container keys specified.
+//
+// LookupAdvanced identifies the row alignment between `df` and `other` and returns the aligned values.
+// Rows are aligned when:
+// 1) one or more containers (either column or label level) in `other` share the same name as one or more containers in `df`,
+// and 2) the stringified values in the `other` containers match the values in the `df` containers.
+// For the following dataframes:
+//
+// `df`    	`other`
+// FOO BAR	FRED QUX
+// bar 0	baz  corge
+// baz 1	qux  waldo
+//
+// In LookupAdvanced(other, "left", ["foo"], ["fred"]),
+// row 1 in `df` is "aligned" with row 0 in `other`, because those are the rows in which
+// both share the same value ("baz") in the keyed containers.
+// The result of this lookup will be:
+//
+// FOO BAR
+// bar n/a
+// baz corge
+//
+// Returns a new DataFrame.
 func (df *DataFrame) LookupAdvanced(other *DataFrame, how string, leftOn []string, rightOn []string) *DataFrame {
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	otherMergedLabelsAndCols := append(other.labels, other.values...)
@@ -1595,14 +1685,16 @@ func (df *DataFrame) LookupAdvanced(other *DataFrame, how string, leftOn []strin
 
 // -- SORTERS
 
-// Sort stub
+// Sort sorts the DataFrame `by` the container(s) supplied in one or more tada.Sorters.
+// Returns a new DataFrame.
 func (df *DataFrame) Sort(by ...Sorter) *DataFrame {
 	df.Copy()
 	df.InPlace().Sort(by...)
 	return df
 }
 
-// Sort stub
+// Sort sorts the DataFrame `by` the container(s) supplied in one or more tada.Sorters.
+// Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Sort(by ...Sorter) {
 	if len(by) == 0 {
 		df.dataframe.resetWithError(fmt.Errorf(
@@ -1610,8 +1702,8 @@ func (df *DataFrameMutator) Sort(by ...Sorter) {
 		return
 	}
 
-	// original index
 	mergedLabelsAndValues := append(df.dataframe.labels, df.dataframe.values...)
+	// sortContainers iteratively updates the index
 	newIndex, err := sortContainers(mergedLabelsAndValues, by)
 	if err != nil {
 		df.dataframe.resetWithError(fmt.Errorf("Sort(): %v", err))
@@ -1623,8 +1715,8 @@ func (df *DataFrameMutator) Sort(by ...Sorter) {
 
 // -- GROUPERS
 
-// GroupBy stub
-// includes label levels and columns
+// GroupBy groups the DataFrame rows that share the same stringified value
+// in the container(s) (columns or labels) specified by `names`.
 func (df *DataFrame) GroupBy(names ...string) *GroupedDataFrame {
 	var index []int
 	var err error
@@ -1658,7 +1750,12 @@ func (df *DataFrame) groupby(index []int) *GroupedDataFrame {
 	}
 }
 
-// PivotTable stub
+// PivotTable creates a spreadsheet-style pivot table as a DataFrame by
+// grouping rows using the unique values in `labels`,
+// reducing the values in `values` using an `aggFunc` aggregation function, then
+// promoting the unique values in `columns` to be new columns.
+// `labels`, `columns`, and `values` should all refer to existing container names (either columns or labels).
+// Supported `aggFunc`s: sum, mean, median, std, count, min, max.
 func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFrame {
 
 	mergedLabelsAndCols := append(df.labels, df.values...)
@@ -1685,6 +1782,12 @@ func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFr
 		ret = grouper.Median(values)
 	case "std":
 		ret = grouper.Std(values)
+	case "count":
+		ret = grouper.Count(values)
+	case "min":
+		ret = grouper.Min(values)
+	case "max":
+		ret = grouper.Max(values)
 	default:
 		return dataFrameWithError(fmt.Errorf("PivotTable(): `aggFunc`: unsupported (%v)", aggFunc))
 	}
@@ -1693,7 +1796,7 @@ func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFr
 	return ret
 }
 
-// inplace
+// dropColLevel drops a column level inplace by changing the name in every column container
 func (df *DataFrame) dropColLevel(level int) *DataFrame {
 	df.colLevelNames = append(df.colLevelNames[:level], df.colLevelNames[level+1:]...)
 	for k := range df.values {
@@ -1755,32 +1858,32 @@ func (df *DataFrame) Sum() *Series {
 	return df.math("sum", sum)
 }
 
-// Mean stub
+// Mean coerces the values in each column to float64 and calculates the mean of each column.
 func (df *DataFrame) Mean() *Series {
 	return df.math("mean", mean)
 }
 
-// Median stub
+// Median coerces the values in each column to float64 and calculates the median of each column.
 func (df *DataFrame) Median() *Series {
 	return df.math("median", median)
 }
 
-// Std stub
+// Std coerces the values in each column to float64 and calculates the standard deviation of each column.
 func (df *DataFrame) Std() *Series {
 	return df.math("std", std)
 }
 
-// Count stub
+// Count counts the number of non-null values in each column.
 func (df *DataFrame) Count() *Series {
 	return df.math("count", count)
 }
 
-// Min stub
+// Min coerces the values in each column to float64 and returns the minimum non-null value in each column.
 func (df *DataFrame) Min() *Series {
 	return df.math("min", min)
 }
 
-// Max stub
+// Max coerces the values in each column to float64 and returns the maximum non-null value in each column.
 func (df *DataFrame) Max() *Series {
 	return df.math("max", max)
 }

@@ -718,12 +718,56 @@ func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
 
 // -- MERGERS
 
-// Lookup stub
+// Lookup performs the lookup portion of a left join of `other` onto `s` using containers with matching names as keys.
+// To perform a different type of lookup or specify the matching keys, use s.LookupAdvanced().
+//
+// Lookup identifies the row alignment between `s` and `other` and returns the aligned values.
+// Rows are aligned when:
+// 1) one or more containers (either column or label level) in `other` share the same name as one or more containers in `s`,
+// and 2) the stringified values in the `other` containers match the values in the `s` containers.
+// For the following dataframes:
+//
+// `s`    	`other`
+// FOO BAR	FOO QUX
+// bar 0	baz corge
+// baz 1	qux waldo
+//
+// Row 1 in `s` is "aligned" with row 0 in `other`, because those are the rows in which
+// both share the same value ("baz") in a container with the same name ("foo").
+// The result of a lookup will be:
+//
+// FOO BAR
+// bar n/a
+// baz corge
+//
+// Returns a new DataFrame.
 func (s *Series) Lookup(other *Series) *Series {
 	return s.LookupAdvanced(other, "left", nil, nil)
 }
 
-// LookupAdvanced stub
+// LookupAdvanced performs the lookup portion of a join of `other` onto `s` matching on the container keys specified.
+//
+// LookupAdvanced identifies the row alignment between `s` and `other` and returns the aligned values.
+// Rows are aligned when:
+// 1) one or more containers (either values or label level) in `other` share the same name as one or more containers in `s`,
+// and 2) the stringified values in the `other` containers match the values in the `s` containers.
+// For the following dataframes:
+//
+// `s`    	`other`
+// FOO BAR	FRED QUX
+// bar 0	baz  corge
+// baz 1	qux  waldo
+//
+// In LookupAdvanced(other, "left", ["foo"], ["fred"]),
+// row 1 in `s` is "aligned" with row 0 in `other`, because those are the rows in which
+// both share the same value ("baz") in the keyed containers.
+// The result of this lookup will be:
+//
+// FOO BAR
+// bar n/a
+// baz corge
+//
+// Returns a new Series.
 func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, rightOn []string) *Series {
 	var leftKeys, rightKeys []int
 	var err error
@@ -752,12 +796,41 @@ func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, righ
 	return ret
 }
 
-// Merge stub
+// Merge converts `s` and `other` to dataframes. and then performs a left join of `other` onto `df` using containers with matching names as keys.
+// To perform a different type of join or specify the matching keys,
+// use s.ToDataFrame() + df.LookupAdvanced() to isolate values in `other`, and append them with df.WithCol().
+//
+// Merge identifies the row alignment between `s` and `other` and appends aligned values as new columns on `s`.
+// Rows are aligned when:
+// 1) one or more containers (either column or label level) in `other` share the same name as one or more containers in `s`,
+// and 2) the stringified values in the `other` containers match the values in the `s` containers.
+// For the following dataframes:
+//
+// `s`    	`other`
+// FOO BAR	FOO QUX
+// bar 0	baz corge
+// baz 1	qux waldo
+//
+// Row 1 in `s` is "aligned" with row 0 in `other`, because those are the rows in which
+// both share the same value ("baz") in a container with the same name ("foo").
+// After merging, the result will be:
+//
+// `s`
+// FOO BAR QUX
+// bar 0   n/a
+// baz 1   corge
+//
+// Finally, all container names (columns and label names) are deduplicated after the merge so that they are unique.
+// Returns a new DataFrame.
 func (s *Series) Merge(other *Series) *DataFrame {
 	return s.ToDataFrame().Merge(other.ToDataFrame())
 }
 
-// Add stub
+// Add coerces `other` and `s` to float64 values, aligns `other` with `s`, and adds the values in aligned rows,
+// using the labels in `s` as an anchor.
+// If `ignoreNulls` is true, then missing or null values are treated as 0.
+// Otherwise, if a row in `s` does not align with any row in `other`,
+// or if row does align but either value is null, then the resulting value is null.
 func (s *Series) Add(other *Series, ignoreNulls bool) *Series {
 	fn := func(v1 float64, v2 float64) float64 {
 		return v1 + v2
@@ -765,7 +838,12 @@ func (s *Series) Add(other *Series, ignoreNulls bool) *Series {
 	return s.combineMath(other, ignoreNulls, fn)
 }
 
-// Subtract stub
+// Subtract coerces `other` and `s` to float64 values, aligns `other` with `s`,
+// and subtracts the aligned values of `other` from `s`,
+// using the labels in `s` as an anchor.
+// If `ignoreNulls` is true, then missing or null values are treated as 0.
+// Otherwise, if a row in `s` does not align with any row in `other`,
+// or if row does align but either value is null, then the resulting value is null.
 func (s *Series) Subtract(other *Series, ignoreNulls bool) *Series {
 	fn := func(v1 float64, v2 float64) float64 {
 		return v1 - v2
@@ -773,7 +851,11 @@ func (s *Series) Subtract(other *Series, ignoreNulls bool) *Series {
 	return s.combineMath(other, ignoreNulls, fn)
 }
 
-// Multiply stub
+// Multiply coerces `other` and `s` to float64 values, aligns `other` with `s`, and multiplies the values in aligned rows,
+// using the labels in `s` as an anchor.
+// If `ignoreNulls` is true, then missing or null values are treated as 0.
+// Otherwise, if a row in `s` does not align with any row in `other`,
+// or if row does align but either value is null, then the resulting value is null.
 func (s *Series) Multiply(other *Series, ignoreNulls bool) *Series {
 	fn := func(v1 float64, v2 float64) float64 {
 		return v1 * v2
@@ -781,7 +863,13 @@ func (s *Series) Multiply(other *Series, ignoreNulls bool) *Series {
 	return s.combineMath(other, ignoreNulls, fn)
 }
 
-// Divide stub
+// Divide coerces `other` and `s` to float64 values, aligns `other` with `s`,
+// and divides the aligned values of `s` by `s`,
+// using the labels in `s` as an anchor.
+// Dividing by 0 always returns a null value.
+// If `ignoreNulls` is true, then missing or null values are treated as 0.
+// Otherwise, if a row in `s` does not align with any row in `other`,
+// or if row does align but either value is null, then the resulting value is null.
 func (s *Series) Divide(other *Series, ignoreNulls bool) *Series {
 	fn := func(v1 float64, v2 float64) float64 {
 		defer func() {
@@ -794,7 +882,8 @@ func (s *Series) Divide(other *Series, ignoreNulls bool) *Series {
 
 // -- GROUPERS
 
-// GroupBy stub
+// GroupBy groups the Series rows that share the same stringified value
+// in the container(s) (columns or labels) specified by `names`.
 func (s *Series) GroupBy(names ...string) *GroupedSeries {
 	var index []int
 	var err error
@@ -839,55 +928,55 @@ func (s *Series) IterRows() []map[string]Element {
 
 // -- MATH
 
-// Sum stub
+// Sum coerces the Series values float64 and sums them.
 func (s *Series) Sum() float64 {
 	return s.floatFunc(sum)
 }
 
-// Mean stub
+// Mean coerces the Series values to float64 and calculates the mean.
 func (s *Series) Mean() float64 {
 	return s.floatFunc(mean)
 }
 
-// Median stub
+// Median coerces the Series values to float64 and calculates the median.
 func (s *Series) Median() float64 {
 	return s.floatFunc(median)
 }
 
-// Std stub
+// Std coerces the Series values to float64 and calculates the standard deviation.
 func (s *Series) Std() float64 {
 	return s.floatFunc(std)
 }
 
-// Count stub
+// Count counts the number of non-null Series values.
 func (s *Series) Count() int {
 	count := s.floatFunc(count)
 	return int(count)
 }
 
-// NUnique stub
+// NUnique counts the number of unique, non-null Series values.
 func (s *Series) NUnique() int {
 	unique := s.stringFunc(nunique)
 	i, _ := strconv.Atoi(unique)
 	return i
 }
 
-// Min stub
+// Min coerces the Series values to float64 and calculates the minimum.
 func (s *Series) Min() float64 {
 	return s.floatFunc(min)
 }
 
-// Max stub
+// Max coerces the Series values to float64 and calculates the maximum.
 func (s *Series) Max() float64 {
 	return s.floatFunc(max)
 }
 
-// Earliest stub
+// Earliest coerces the Series values to time.Time and calculates the earliest timestamp.
 func (s *Series) Earliest() time.Time {
 	return s.timeFunc(earliest)
 }
 
-// Latest stub
+// Latest coerces the Series values to time.Time and calculates the latest timestamp.
 func (s *Series) Latest() time.Time {
 	return s.timeFunc(latest)
 }

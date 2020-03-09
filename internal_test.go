@@ -2316,6 +2316,9 @@ func Test_count(t *testing.T) {
 		{"at least one valid", args{
 			[]float64{1, 2, 3}, []bool{false, false, false}, []int{0, 1, 2}},
 			3, false},
+		{"one null", args{
+			[]float64{0, 2, 3}, []bool{true, false, false}, []int{0, 1, 2}},
+			2, false},
 		{"all null", args{
 			[]float64{1, 2, 3}, []bool{true, true, true}, []int{0, 1, 2}},
 			0, true},

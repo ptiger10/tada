@@ -1591,10 +1591,10 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
 			labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
 			args{
-				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
-					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
+				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "qux"},
+					labels: []*valueContainer{{name: "bar", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "left",
-				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
+				leftOn: []string{"foo"}, rightOn: []string{"bar"}},
 			&Series{values: &valueContainer{slice: []float64{30, 0}, isNull: []bool{false, true}},
 				labels: []*valueContainer{
 					{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
@@ -2199,7 +2199,8 @@ func TestSeries_Count(t *testing.T) {
 		fields fields
 		want   int
 	}{
-		{"pass", fields{values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}}}, 2},
+		{"count float", fields{values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}}}, 2},
+		{"count string", fields{values: &valueContainer{slice: []string{"foo", "bar"}, isNull: []bool{false, false}}}, 2},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

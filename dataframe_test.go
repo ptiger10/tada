@@ -2488,76 +2488,6 @@ func TestDataFrame_PromoteToColLevel(t *testing.T) {
 	}
 }
 
-// func TestDataFrame_UnstackColLevel(t *testing.T) {
-// 	type fields struct {
-// 		labels        []*valueContainer
-// 		values        []*valueContainer
-// 		name          string
-// 		err           error
-// 		colLevelNames []string
-// 	}
-// 	type args struct {
-// 		level int
-// 	}
-// 	tests := []struct {
-// 		name   string
-// 		fields fields
-// 		args   args
-// 		want   *DataFrame
-// 	}{
-// 		{"unstack column", fields{
-// 			values: []*valueContainer{
-// 				{slice: []string{"a", "b", "", ""}, isNull: []bool{false, false, true, true}, name: "2018|foo"},
-// 				{slice: []string{"", "", "c", "d"}, isNull: []bool{true, true, false, false}, name: "2019|foo"}},
-// 			labels: []*valueContainer{
-// 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
-// 			},
-// 			colLevelNames: []string{"year", "*0"},
-// 		}, args{0},
-// 			&DataFrame{
-// 				values: []*valueContainer{
-// 					{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false}, name: "foo"}},
-// 				labels: []*valueContainer{
-// 					{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
-// 					{slice: []string{"2018", "2018", "2019", "2019"}, isNull: []bool{false, false, false, false}, name: "year"},
-// 				},
-// 				colLevelNames: []string{"*0"},
-// 			}},
-// 		{"unstack column", fields{
-// 			values: []*valueContainer{
-// 				{slice: []string{"a", "b", "", ""}, isNull: []bool{false, false, true, true}, name: "2018|foo"},
-// 				{slice: []string{"", "", "c", "d"}, isNull: []bool{true, true, false, false}, name: "2019|foo"}},
-// 			labels: []*valueContainer{
-// 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
-// 			},
-// 			colLevelNames: []string{"year", "bar"},
-// 		}, args{1},
-// 			&DataFrame{
-// 				values: []*valueContainer{
-// 					{slice: []string{"a", "b", "", ""}, isNull: []bool{false, false, false, false}, name: "2018"},
-// 					{slice: []string{"", "", "c", "d"}, isNull: []bool{false, false}, name: "2019"}},
-// 				labels: []*valueContainer{
-// 					{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
-// 					{slice: []string{"foo", "foo", "foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
-// 				colLevelNames: []string{"*0"}},
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			df := &DataFrame{
-// 				labels:        tt.fields.labels,
-// 				values:        tt.fields.values,
-// 				name:          tt.fields.name,
-// 				err:           tt.fields.err,
-// 				colLevelNames: tt.fields.colLevelNames,
-// 			}
-// 			if got := df.UnstackColLevel(tt.args.level); !EqualDataFrames(got, tt.want) {
-// 				t.Errorf("DataFrame.UnstackColLevel() = %v, want %v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
-
 func TestDataFrame_PivotTable(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
@@ -2646,6 +2576,57 @@ func TestDataFrame_PivotTable(t *testing.T) {
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
 				name:          "std"}},
+		{"count", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
+				{slice: []float64{2018, 2018, 2019, 2019}, isNull: []bool{false, false, false, false}, name: "year"},
+				{slice: []string{"A", "B", "B", "B"}, isNull: []bool{false, false, false, false}, name: "type"}},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+			args{labels: "type", columns: "year", values: "amount", aggFn: "count"},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{1, 1}, isNull: []bool{false, false}, name: "2018"},
+				{slice: []float64{0, 2}, isNull: []bool{true, false}, name: "2019"},
+			},
+				labels: []*valueContainer{
+					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
+				colLevelNames: []string{"year"},
+				name:          "count"}},
+		{"min", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
+				{slice: []float64{2018, 2018, 2019, 2019}, isNull: []bool{false, false, false, false}, name: "year"},
+				{slice: []string{"A", "B", "B", "B"}, isNull: []bool{false, false, false, false}, name: "type"}},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+			args{labels: "type", columns: "year", values: "amount", aggFn: "min"},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "2018"},
+				{slice: []float64{0, 3}, isNull: []bool{true, false}, name: "2019"},
+			},
+				labels: []*valueContainer{
+					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
+				colLevelNames: []string{"year"},
+				name:          "min"}},
+		{"max", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
+				{slice: []float64{2018, 2018, 2019, 2019}, isNull: []bool{false, false, false, false}, name: "year"},
+				{slice: []string{"A", "B", "B", "B"}, isNull: []bool{false, false, false, false}, name: "type"}},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+			args{labels: "type", columns: "year", values: "amount", aggFn: "max"},
+			&DataFrame{values: []*valueContainer{
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "2018"},
+				{slice: []float64{0, 4}, isNull: []bool{true, false}, name: "2019"},
+			},
+				labels: []*valueContainer{
+					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
+				colLevelNames: []string{"year"},
+				name:          "max"}},
 		{"fail - no matching index level", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
