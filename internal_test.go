@@ -387,7 +387,8 @@ func Test_intersection(t *testing.T) {
 		want []int
 	}{
 		{"1 match", args{[][]int{{0, 1}, {1, 2}}, 3}, []int{1}},
-		{"all matches", args{[][]int{{1, 0}, {0, 1}}, 2}, []int{0, 1}},
+		{"all max length", args{[][]int{{1, 0}, {0, 1}}, 2}, []int{0, 1}},
+		{"no matches", args{[][]int{{0, 1, 2}, {3}}, 3}, []int{}},
 		{"only one slice", args{[][]int{{0, 1}}, 3}, []int{0, 1}},
 	}
 	for _, tt := range tests {
@@ -4462,6 +4463,88 @@ func Test_subsetInterfaceSlice(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := subsetInterfaceSlice(tt.args.slice, tt.args.index); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("subsetInterfaceSlice() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_dataFrameEqualsDistinct(t *testing.T) {
+	vc := &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}
+	vcs := []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}}
+	colLevelNames := []string{"*0"}
+	type args struct {
+		a *DataFrame
+		b *DataFrame
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"distinct", args{
+			&DataFrame{
+				values:        []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
+				labels:        []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
+				name:          "foo",
+				colLevelNames: []string{"*0"},
+			},
+			&DataFrame{values: []*valueContainer{vc}, labels: []*valueContainer{vc}, name: "foo", colLevelNames: colLevelNames}},
+			true,
+		},
+		{"not distinct - value containers", args{
+			&DataFrame{
+				values: vcs,
+				labels: []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
+				name:   "foo", colLevelNames: []string{"*0"}},
+			&DataFrame{values: vcs, labels: []*valueContainer{vc}, name: "foo", colLevelNames: colLevelNames}},
+			false,
+		},
+		{"not distinct - values", args{
+			&DataFrame{
+				values: []*valueContainer{vc},
+				labels: []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
+				name:   "foo", colLevelNames: []string{"*0"}},
+			&DataFrame{values: []*valueContainer{vc}, labels: []*valueContainer{vc}, name: "foo", colLevelNames: colLevelNames}},
+			false,
+		},
+		{"not distinct - label containers", args{
+			&DataFrame{
+				values: []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
+				labels: vcs,
+				name:   "foo", colLevelNames: []string{"*0"}},
+			&DataFrame{values: []*valueContainer{vc}, labels: vcs, name: "foo", colLevelNames: colLevelNames}},
+			false,
+		},
+		{"not distinct - labels", args{
+			&DataFrame{
+				values: []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
+				labels: []*valueContainer{vc}, name: "foo", colLevelNames: []string{"*0"}},
+			&DataFrame{values: []*valueContainer{vc}, labels: []*valueContainer{vc}, name: "foo", colLevelNames: colLevelNames}},
+			false,
+		},
+		{"not distinct - col level names", args{
+			&DataFrame{
+				values:        []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
+				labels:        []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
+				name:          "foo",
+				colLevelNames: colLevelNames},
+			&DataFrame{values: []*valueContainer{vc}, labels: []*valueContainer{vc}, name: "foo", colLevelNames: colLevelNames}},
+			false,
+		},
+		{"not equal", args{
+			&DataFrame{
+				values:        []*valueContainer{{slice: []float64{4, 5, 6}, isNull: []bool{false, false, false}}},
+				labels:        []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
+				name:          "foo",
+				colLevelNames: colLevelNames},
+			&DataFrame{values: []*valueContainer{vc}, labels: []*valueContainer{vc}, name: "foo", colLevelNames: colLevelNames}},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := dataFrameEqualsDistinct(tt.args.a, tt.args.b); got != tt.want {
+				t.Errorf("dataFrameEqualsDistinct() = %v, want %v", got, tt.want)
 			}
 		})
 	}

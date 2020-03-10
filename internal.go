@@ -328,13 +328,17 @@ func intersection(slices [][]int, maxLen int) []int {
 	}
 
 	// all slices are the max length? intersection should be all the index values in sequential order
+	allMaxLength := true
 	for k := range slices {
 		if len(slices[k]) != maxLen {
-			break
+			allMaxLength = false
 		}
+	}
+	if allMaxLength {
 		return makeIntRange(0, maxLen)
 	}
-	orderedKeys := make([]int, maxLen)
+
+	orderedKeys := make([]int, maxLen*len(slices))
 	var counter int
 	set := make(map[int]int, maxLen)
 	for _, slice := range slices {
@@ -2465,20 +2469,23 @@ func dataFrameEqualsDistinct(a, b *DataFrame) bool {
 	if !EqualDataFrames(a, b) {
 		return false
 	}
+	if reflect.ValueOf(a.labels).Pointer() == reflect.ValueOf(b.labels).Pointer() {
+		return false
+	}
 	for j := range a.labels {
 		if a.labels[j] == b.labels[j] {
 			return false
 		}
 	}
+	if reflect.ValueOf(a.values).Pointer() == reflect.ValueOf(b.values).Pointer() {
+		return false
+	}
 	for k := range a.values {
-		// fmt.Printf("%p\n", a.values[k].isNull)
-		// fmt.Printf("%p\n", b.values[k].isNull)
 		if a.values[k] == b.values[k] {
 			return false
 		}
 	}
-	fmt.Printf("%p - %p\n", &a.colLevelNames, &b.colLevelNames)
-	if &a.colLevelNames == &b.colLevelNames {
+	if reflect.ValueOf(a.colLevelNames).Pointer() == reflect.ValueOf(b.colLevelNames).Pointer() {
 		return false
 	}
 	return true

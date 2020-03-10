@@ -272,24 +272,9 @@ func TestDataFrame_Copy(t *testing.T) {
 			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Copy() = %v, want %v", got, tt.want)
 			}
-			got.values[0].isNull[0] = true
-			if EqualDataFrames(got, df) {
-				t.Errorf("DataFrame.Copy() = retained reference to original values")
-			}
-			got = df.Copy()
-			got.err = errors.New("foo")
-			if EqualDataFrames(got, df) {
-				t.Errorf("DataFrame.Copy() retained reference to original error")
-			}
-			got = df.Copy()
-			got.name = "qux"
-			if EqualDataFrames(got, df) {
-				t.Errorf("DataFrame.Copy() retained reference to original name")
-			}
-			got = df.Copy()
-			got.colLevelNames[0] = "*1"
-			if EqualDataFrames(got, df) {
-				t.Errorf("DataFrame.Copy() retained reference to original col level names")
+			gotDistinct := got.Copy()
+			if !dataFrameEqualsDistinct(gotDistinct, got) {
+				t.Errorf("DataFrame.Copy() retained reference to original")
 			}
 		})
 	}

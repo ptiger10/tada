@@ -115,13 +115,15 @@ func (df *DataFrame) Copy() *DataFrame {
 	colLevelNames := make([]string, len(df.colLevelNames))
 	copy(colLevelNames, df.colLevelNames)
 
-	return &DataFrame{
+	ret := &DataFrame{
 		values:        copyContainers(df.values),
 		labels:        copyContainers(df.labels),
 		err:           df.err,
 		colLevelNames: colLevelNames,
 		name:          df.name,
 	}
+
+	return ret
 }
 
 // ConcatSeries concatenates multiple Series with identical labels into a single DataFrame.
