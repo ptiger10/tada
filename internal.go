@@ -1886,7 +1886,7 @@ func std(vals []float64, isNull []bool, index []int) (float64, bool) {
 
 // count counts the non-null values at the `index` positions in `vals`.
 // Compatible with Grouped calculations as well as Series
-func count(vals []float64, isNull []bool, index []int) (float64, bool) {
+func count(isNull []bool, index []int) (int, bool) {
 	var counter int
 	var atLeastOneValid bool
 	for _, i := range index {
@@ -1898,7 +1898,7 @@ func count(vals []float64, isNull []bool, index []int) (float64, bool) {
 	if !atLeastOneValid {
 		return 0, true
 	}
-	return float64(counter), false
+	return counter, false
 }
 
 func nunique(vals []string, isNull []bool, index []int) (string, bool) {
@@ -2240,7 +2240,9 @@ func (vc *valueContainer) pcut(bins []float64, labels []string) ([]string, error
 			return nil, fmt.Errorf("all bin edges must be between 0 and 1 (%v at edge %d", edge, i)
 		}
 	}
-	floats := vc.float64()
+	// copy to avoid sorting the underlying values
+	floats := vc.copy().float64()
+	floats.index = makeIntRange(0, vc.len())
 	pctile := floats.percentile()
 	leftInclusive := true
 	rightExclusive := true

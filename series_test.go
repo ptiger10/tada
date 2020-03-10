@@ -886,8 +886,7 @@ func TestSeries_Relabel(t *testing.T) {
 			&Series{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "*0"},
-					{slice: []int{0}, isNull: []bool{false}, name: "*1"}}},
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"}}},
 		},
 	}
 	for _, tt := range tests {

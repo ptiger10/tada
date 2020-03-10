@@ -140,9 +140,55 @@ func (g *GroupedSeries) Std() *Series {
 	return g.float64ReduceFunc("std", std)
 }
 
+func groupedCountReduceFunc(name string, nulls []bool, aligned bool, rowIndices [][]int) *valueContainer {
+	retLength := len(rowIndices)
+	if aligned {
+		// if aligned: return length is overwritten to equal the length of original data
+		retLength = len(nulls)
+	}
+	retVals := make([]int, retLength)
+	retNulls := make([]bool, retLength)
+	for i, rowIndex := range rowIndices {
+		output, isNull := count(nulls, rowIndex)
+		if !aligned {
+			// default: write each output once and in sequential order into retVals
+			retVals[i] = output
+			retNulls[i] = isNull
+		} else {
+			// if aligned: write each output multiple times and out of order into retVals
+			for _, index := range rowIndex {
+				retVals[index] = output
+				retNulls[index] = isNull
+			}
+		}
+	}
+	return &valueContainer{
+		slice:  retVals,
+		isNull: retNulls,
+		name:   name,
+	}
+}
+
 // Count returns the number of non-null values in each group.
 func (g *GroupedSeries) Count() *Series {
-	return g.float64ReduceFunc("count", count)
+	var sharedData bool
+	name := "count"
+	if g.aligned {
+		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
+	}
+	retVals := groupedCountReduceFunc(name, g.series.values.isNull, g.aligned, g.rowIndices)
+
+	retLabels := g.labels
+	if g.aligned {
+		// if aligned: all labels
+		retLabels = g.series.labels
+		sharedData = true
+	}
+	return &Series{
+		values:     retVals,
+		labels:     retLabels,
+		sharedData: sharedData,
+	}
 }
 
 // Min coerces values to float64 and calculates the minimum of each group.
@@ -390,7 +436,25 @@ func (g *GroupedDataFrame) Max(colNames ...string) *DataFrame {
 
 // Count returns the number of non-null values in each group for the columns in `colNames`.
 func (g *GroupedDataFrame) Count(colNames ...string) *DataFrame {
-	return g.float64ReduceFunc("count", colNames, count)
+	cols := colNames
+	if len(cols) == 0 {
+		cols = make([]string, len(g.df.values))
+		for k := range cols {
+			cols[k] = g.df.values[k].name
+		}
+	}
+	retVals := make([]*valueContainer, len(cols))
+	for k := range retVals {
+		retVals[k] = groupedCountReduceFunc(
+			cols[k], g.df.values[k].isNull, false, g.rowIndices)
+	}
+
+	return &DataFrame{
+		values:        retVals,
+		labels:        g.labels,
+		colLevelNames: []string{"*0"},
+		name:          "count",
+	}
 }
 
 // NUnique returns the number of unique, non-null values in each group for the columns in `colNames`.

@@ -298,6 +298,9 @@ func (df *DataFrame) ToCSV(ignoreLabels bool) [][]string {
 // Null values are replaced with "n/a".
 func (df *DataFrame) ExportCSV(file string, ignoreLabels bool) error {
 	ret := df.ToCSV(ignoreLabels)
+	if len(ret) == 0 {
+		return fmt.Errorf("ExportCSV(): `df` cannot be empty")
+	}
 	var b bytes.Buffer
 	w := csv.NewWriter(&b)
 	// duck error because csv is controlled
@@ -347,6 +350,9 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 	dtypes := []string{"float", "int", "string", "datetime", "time", "bool"}
 	var headers [][]string
 	var rowCount, colCount int
+	if len(src) == 0 {
+		return fmt.Errorf("WriteMockCSV(): `src` cannot be empty")
+	}
 	if !config.MajorDimIsCols {
 		rowCount = len(src)
 		colCount = len(src[0])
@@ -355,10 +361,10 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 		rowCount = len(src[0])
 	}
 	if rowCount == 0 {
-		return fmt.Errorf("WriteMockCSV(): csv must have at least one row")
+		return fmt.Errorf("WriteMockCSV(): `src` must have at least one row")
 	}
 	if colCount == 0 {
-		return fmt.Errorf("WriteMockCSV(): csv must have at least one column")
+		return fmt.Errorf("WriteMockCSV(): `src` must have at least one column")
 	}
 	// numSampleRows must not exceed total number of non-header rows in `src`
 	maxRows := rowCount - config.NumHeaderRows
@@ -1879,7 +1885,23 @@ func (df *DataFrame) Std() *Series {
 
 // Count counts the number of non-null values in each column.
 func (df *DataFrame) Count() *Series {
-	return df.math("count", count)
+	retVals := make([]int, len(df.values))
+	retNulls := make([]bool, len(df.values))
+	labels := make([]string, len(df.values))
+	labelNulls := make([]bool, len(df.values))
+
+	for k := range df.values {
+		retVals[k], retNulls[k] = count(
+			df.values[k].isNull,
+			makeIntRange(0, df.Len()))
+
+		labels[k] = df.values[k].name
+		labelNulls[k] = false
+	}
+	return &Series{
+		values: &valueContainer{slice: retVals, isNull: retNulls, name: "count"},
+		labels: []*valueContainer{{slice: labels, isNull: labelNulls, name: "*0"}},
+	}
 }
 
 // Min coerces the values in each column to float64 and returns the minimum non-null value in each column.

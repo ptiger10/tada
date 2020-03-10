@@ -970,8 +970,8 @@ func (s *Series) Std() float64 {
 
 // Count counts the number of non-null Series values.
 func (s *Series) Count() int {
-	count := s.floatFunc(count)
-	return int(count)
+	output, _ := count(s.values.isNull, makeIntRange(0, s.Len()))
+	return output
 }
 
 // NUnique counts the number of unique, non-null Series values.

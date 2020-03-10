@@ -1959,7 +1959,7 @@ func TestDataFrame_Count(t *testing.T) {
 			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "baz"}},
 		},
 			&Series{
-				values: &valueContainer{slice: []float64{2, 2}, isNull: []bool{false, false}, name: "count"},
+				values: &valueContainer{slice: []int{2, 2}, isNull: []bool{false, false}, name: "count"},
 				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
 			}},
 	}
@@ -2586,8 +2586,8 @@ func TestDataFrame_PivotTable(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{labels: "type", columns: "year", values: "amount", aggFn: "count"},
 			&DataFrame{values: []*valueContainer{
-				{slice: []float64{1, 1}, isNull: []bool{false, false}, name: "2018"},
-				{slice: []float64{0, 2}, isNull: []bool{true, false}, name: "2019"},
+				{slice: []int{1, 1}, isNull: []bool{false, false}, name: "2018"},
+				{slice: []int{0, 2}, isNull: []bool{true, false}, name: "2019"},
 			},
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},

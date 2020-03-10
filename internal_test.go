@@ -2276,29 +2276,28 @@ func Test_std(t *testing.T) {
 
 func Test_count(t *testing.T) {
 	type args struct {
-		vals   []float64
 		isNull []bool
 		index  []int
 	}
 	tests := []struct {
 		name  string
 		args  args
-		want  float64
+		want  int
 		want1 bool
 	}{
 		{"at least one valid", args{
-			[]float64{1, 2, 3}, []bool{false, false, false}, []int{0, 1, 2}},
+			[]bool{false, false, false}, []int{0, 1, 2}},
 			3, false},
 		{"one null", args{
-			[]float64{0, 2, 3}, []bool{true, false, false}, []int{0, 1, 2}},
+			[]bool{true, false, false}, []int{0, 1, 2}},
 			2, false},
 		{"all null", args{
-			[]float64{1, 2, 3}, []bool{true, true, true}, []int{0, 1, 2}},
+			[]bool{true, true, true}, []int{0, 1, 2}},
 			0, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := count(tt.args.vals, tt.args.isNull, tt.args.index)
+			got, got1 := count(tt.args.isNull, tt.args.index)
 			if got != tt.want {
 				t.Errorf("count() got = %v, want %v", got, tt.want)
 			}

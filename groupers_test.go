@@ -916,7 +916,7 @@ func TestGroupedSeries_Count(t *testing.T) {
 				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			want: &Series{values: &valueContainer{slice: []float64{2, 2}, isNull: []bool{false, false}, name: "count"},
+			want: &Series{values: &valueContainer{slice: []int{2, 2}, isNull: []bool{false, false}, name: "count"},
 				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}}}},
 		{
 			name: "single level - aligned",
@@ -932,7 +932,7 @@ func TestGroupedSeries_Count(t *testing.T) {
 			want: &Series{
 				sharedData: true,
 				values: &valueContainer{
-					slice: []float64{2, 2, 2, 2}, isNull: []bool{false, false, false, false}, name: "qux_count"},
+					slice: []int{2, 2, 2, 2}, isNull: []bool{false, false, false, false}, name: "qux_count"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -2076,8 +2076,8 @@ func TestGroupedDataFrame_Count(t *testing.T) {
 			args: args{nil},
 			want: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{2, 2}, isNull: []bool{false, false}, name: "corge"},
-					{slice: []float64{2, 2}, isNull: []bool{false, false}, name: "waldo"},
+					{slice: []int{2, 2}, isNull: []bool{false, false}, name: "corge"},
+					{slice: []int{2, 2}, isNull: []bool{false, false}, name: "waldo"},
 				},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "baz"}},
