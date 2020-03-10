@@ -1,7 +1,10 @@
 package tada
 
 import (
+	"bytes"
 	"errors"
+	"log"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -113,6 +116,12 @@ func TestSeries_Cast(t *testing.T) {
 			&Series{
 				values: &valueContainer{slice: []float64{1}, name: "foo", isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}}},
+		{"fail", fields{
+			values: &valueContainer{slice: []int{1}, name: "foo", isNull: []bool{false}},
+			labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}},
+			args{map[string]DType{"corge": Float}},
+			&Series{
+				err: errors.New("Cast(): `name` (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1056,6 +1065,16 @@ func TestSeries_DropLabels(t *testing.T) {
 			&Series{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "foo"}}}},
+		{"fail",
+			fields{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
+				labels: []*valueContainer{
+					{slice: []string{"foo"}, isNull: []bool{false}, name: "foo"},
+					{slice: []string{"bar"}, isNull: []bool{false}, name: "bar"},
+				}},
+			args{"corge"},
+			&Series{
+				err: errors.New("DropLabels(): `name` (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3302,4 +3321,87 @@ func TestSeries_Percentile(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSeries_NUnique(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   int
+	}{
+		{"pass",
+			fields{
+				values: &valueContainer{slice: []float64{0, 1, 2, 2}, isNull: []bool{true, false, false, false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "qux"},
+				},
+			},
+			2},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.NUnique(); got != tt.want {
+				t.Errorf("Series.NUnique() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_InPlace(t *testing.T) {
+	EnableWarnings()
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		wantLog bool
+	}{
+		{"log", fields{
+			values: &valueContainer{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"},
+			},
+			sharedData: true,
+		}, true},
+		{"do not log", fields{
+			values: &valueContainer{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"},
+			},
+			sharedData: false,
+		}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			b := new(bytes.Buffer)
+			log.SetOutput(b)
+			s.InPlace()
+			if (b.String() != "") != tt.wantLog {
+				t.Errorf("Series.InPlace() got log message %v, want %v", b.String(), tt.wantLog)
+			}
+		})
+	}
+	log.SetOutput(os.Stdout)
 }

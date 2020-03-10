@@ -886,6 +886,7 @@ func (vc *valueContainer) subsetRows(index []int) error {
 }
 
 // subsetContainers returns a new set of valueContainers containing only the columns specified by index.
+// Has different behavior from subsetRows becauseto avoid needing ot copy containers again for lookup and groupby
 // If any position is out of range, returns error
 func subsetContainers(containers []*valueContainer, index []int) ([]*valueContainer, error) {
 	retLabels := make([]*valueContainer, len(index))
@@ -1210,27 +1211,6 @@ func convertColNamesToIndexPositions(names []string, columns []*valueContainer) 
 	return ret, nil
 }
 
-// // concatenateLabelsToStrings reduces all container rows to a single slice of concatenated strings, one per row
-// func concatenateLabelsToStrings(labels []*valueContainer) []string {
-// 	labelStrings := make([][]string, len(labels))
-// 	// coerce every label level referenced in the index to a separate string slice
-// 	for j := range labels {
-// 		labelStrings[j] = labels[j].string().slice
-// 	}
-// 	ret := make([]string, len(labelStrings[0]))
-// 	// for each row, combine labels into one concatenated string
-// 	for i := 0; i < len(labelStrings[0]); i++ {
-// 		labelComponents := make([]string, len(labels))
-// 		for j := range labelStrings {
-// 			labelComponents[j] = labelStrings[j][i]
-// 		}
-// 		concatenatedString := strings.Join(labelComponents, optionLevelSeparator)
-// 		ret[i] = concatenatedString
-// 	}
-// 	// return a single slice of strings
-// 	return ret
-// }
-
 // concatenateLabelsToStringsBytes reduces all container rows to a single slice of concatenated strings, one per row
 func concatenateLabelsToStringsBytes(labels []*valueContainer) []string {
 	for j := range labels {
@@ -1392,8 +1372,8 @@ func joinLevelsIntoLabel(levels []string) string {
 	return strings.Join(levels, optionLevelSeparator)
 }
 
-// if labels1[i] is in labels2, ret[i] = labels2[labels1[i]], else ret[i] = -1
-// records the index position of the first match only
+// if labels1[i] is in labels2, ret[i] = the row position in labels2 that first matches labels[i].
+// if no match, ret[i] = -1
 func matchLabelPositions(labels1 []string, labels2 map[string]int) []int {
 	ret := make([]int, len(labels1))
 	for i, key := range labels1 {
@@ -1473,17 +1453,20 @@ func lookupDataFrame(how string,
 	mergedLabelsCols2 := append(labels2, values2...)
 	switch how {
 	case "left":
-		return lookupDataFrameWithAnchor(name, colLevelNames,
-			mergedLabelsCols1, labels1, leftOn,
-			values2, mergedLabelsCols2, rightOn, excludeRight), nil
+		return lookupDataFrameWithAnchor(name, colLevelNames, labels1,
+			mergedLabelsCols1, leftOn,
+			mergedLabelsCols2, rightOn,
+			values2, excludeRight), nil
 	case "right":
-		return lookupDataFrameWithAnchor(name, colLevelNames,
-			mergedLabelsCols2, labels2, rightOn,
-			values1, mergedLabelsCols1, leftOn, excludeLeft), nil
+		return lookupDataFrameWithAnchor(name, colLevelNames, labels2,
+			mergedLabelsCols2, rightOn,
+			mergedLabelsCols1, leftOn,
+			values1, excludeLeft), nil
 	case "inner":
-		df := lookupDataFrameWithAnchor(name, colLevelNames,
-			mergedLabelsCols1, labels1, leftOn,
-			values2, mergedLabelsCols2, rightOn, excludeRight)
+		df := lookupDataFrameWithAnchor(name, colLevelNames, labels1,
+			mergedLabelsCols1, leftOn,
+			mergedLabelsCols2, rightOn,
+			values2, excludeRight)
 		df = df.DropNull()
 		return df, nil
 	default:
@@ -1491,18 +1474,20 @@ func lookupDataFrame(how string,
 	}
 }
 
-// cuts labels by leftOn and rightOn, anchors to labels in anchorLabels, finds matches in lookupLabels
-// looks up values in lookupValues, converts to Series and preserves the name supplied
+// lookupWithAnchor subsets `sourceLabels` by leftOn and `lookupLabels` by rightOn,
+// and finds aligned rows between the containers.
+// for every aligned row, looks up the value in `lookupValues`.
+// returns a Series that is anchored on `sourceLabels` and is named `name`.
 func lookupWithAnchor(
-	name string, anchorLabels []*valueContainer, leftOn []int,
+	name string, sourceLabels []*valueContainer, leftOn []int,
 	lookupValues *valueContainer, lookupLabels []*valueContainer, rightOn []int) *Series {
 
-	subsetLeft, _ := subsetContainers(anchorLabels, leftOn)
+	subsetLeft, _ := subsetContainers(sourceLabels, leftOn)
 	subsetRight, _ := subsetContainers(lookupLabels, rightOn)
 	if reflect.DeepEqual(subsetLeft, subsetRight) {
 		return &Series{
 			values: lookupValues.copy(),
-			labels: copyContainers(anchorLabels),
+			labels: copyContainers(sourceLabels),
 		}
 	}
 
@@ -1527,36 +1512,42 @@ func lookupWithAnchor(
 	}
 	return &Series{
 		values: &valueContainer{slice: vals.Interface(), isNull: isNull, name: name},
-		labels: copyContainers(anchorLabels),
+		labels: copyContainers(sourceLabels),
 	}
 }
 
-// cuts labels by leftOn and rightOn, anchors to labels in labels1, finds matches in labels2
-// looks up values in every column in values2 (excluding colNames matching `except`),
-// preserves the column names from values2, converts to dataframe with `name`
+// lookupDataFrameWithAnchor subsets `sourceContainers` by leftOn and `lookupContainers` by rightOn,
+// and finds aligned rows between the containers.
+// for every aligned row, looks up the value in every column in `lookupColumns` (excluding colNames within `exclude`).
+// returns a dataframe that is anchored on `originalLabels`, preserves the column names from `lookupColumns`,
+// preserves the original column level names, and is named `name`.
 func lookupDataFrameWithAnchor(
-	name string, colLevelNames []string,
-	anchorLabels []*valueContainer, originalLabels []*valueContainer, leftOn []int,
-	lookupColumns []*valueContainer, lookupLabels []*valueContainer, rightOn []int, exclude []string) *DataFrame {
+	name string, colLevelNames []string, originalLabels []*valueContainer,
+	sourceContainers []*valueContainer, leftOn []int,
+	lookupContainers []*valueContainer, rightOn []int,
+	lookupColumns []*valueContainer, exclude []string) *DataFrame {
 
-	subsetLeft, _ := subsetContainers(anchorLabels, leftOn)
-	subsetRight, _ := subsetContainers(lookupLabels, rightOn)
+	subsetLeft, _ := subsetContainers(sourceContainers, leftOn)
+	subsetRight, _ := subsetContainers(lookupContainers, rightOn)
 	if reflect.DeepEqual(subsetLeft, subsetRight) {
 		return &DataFrame{
-			values: copyContainers(lookupColumns),
-			labels: copyContainers(anchorLabels),
+			values:        copyContainers(lookupColumns),
+			labels:        copyContainers(sourceContainers),
+			name:          name,
+			colLevelNames: colLevelNames,
 		}
 	}
 	toLookup := concatenateLabelsToStringsBytes(subsetLeft)
 	lookupSource := reduceContainersForLookup(subsetRight)
+	// list of aligned rows
 	matches := matchLabelPositions(toLookup, lookupSource)
 	// slice of slices
 	var retVals []*valueContainer
 	for k := range lookupColumns {
 		var skip bool
-		for _, exclusion := range exclude {
+		for _, colToExclude := range exclude {
 			// skip any column whose name is also used in the lookup
-			if lookupColumns[k].name == exclusion {
+			if lookupColumns[k].name == colToExclude {
 				skip = true
 			}
 		}
@@ -1886,7 +1877,7 @@ func std(vals []float64, isNull []bool, index []int) (float64, bool) {
 
 // count counts the non-null values at the `index` positions in `vals`.
 // Compatible with Grouped calculations as well as Series
-func count(isNull []bool, index []int) (int, bool) {
+func count(vals interface{}, isNull []bool, index []int) (int, bool) {
 	var counter int
 	var atLeastOneValid bool
 	for _, i := range index {
@@ -1901,40 +1892,24 @@ func count(isNull []bool, index []int) (int, bool) {
 	return counter, false
 }
 
-func nunique(vals []string, isNull []bool, index []int) (string, bool) {
+func nunique(vals interface{}, isNull []bool, index []int) (int, bool) {
 	m := make(map[string]bool)
 	var atLeastOneValid bool
+	v := reflect.ValueOf(vals)
 	for _, i := range index {
 		if !isNull[i] {
-			if _, ok := m[vals[i]]; !ok {
-				m[vals[i]] = true
+			key := v.Index(i).Interface()
+			stringifiedKey := fmt.Sprint(key)
+			if _, ok := m[stringifiedKey]; !ok {
+				m[stringifiedKey] = true
 			}
 			atLeastOneValid = true
 		}
 	}
 	if !atLeastOneValid {
-		return "", true
+		return 0, true
 	}
-	return strconv.Itoa(len(m)), false
-}
-
-func uniqueList(vals []string, isNull []bool, index []int) ([]string, bool) {
-	m := make(map[string]bool)
-	ret := make([]string, 0)
-	var atLeastOneValid bool
-	for _, i := range index {
-		if !isNull[i] {
-			if _, ok := m[vals[i]]; !ok {
-				m[vals[i]] = true
-				ret = append(ret, vals[i])
-			}
-			atLeastOneValid = true
-		}
-	}
-	if !atLeastOneValid {
-		return []string{}, true
-	}
-	return ret, false
+	return len(m), false
 }
 
 // min returns the min of the non-null values at the `index` positions in `vals`.
@@ -2324,20 +2299,21 @@ func deduplicateContainerNames(containers []*valueContainer) {
 	}
 }
 
+// returns the first row position each value appears
 func (vc *valueContainer) uniqueIndex() []int {
 	m := make(map[string]bool)
 	ret := make([]int, 0)
-	stringifiedVals := vc.string().slice
-	for i, value := range stringifiedVals {
-		if _, ok := m[value]; !ok {
-			m[value] = true
+	vc.setCache()
+	for i, value := range vc.cache {
+		if _, ok := m[string(value)]; !ok {
+			m[string(value)] = true
 			ret = append(ret, i)
 		}
 	}
 	return ret
 }
 
-// returns row positions with unique values only (accounting for all container values)
+// returns the first row position each combination of values appears (accounting for all container values)
 func multiUniqueIndex(containers []*valueContainer) []int {
 	stringifiedRows := concatenateLabelsToStringsBytes(containers)
 	m := make(map[string]bool)
@@ -2534,7 +2510,8 @@ func extractCSVDimensions(b []byte, comma rune) (numRows, numCols int, err error
 	return numRows, numCols, nil
 }
 
-// major dimension: column
+// major dimension of input: rows
+// major dimension of output: columns
 // trims leading whitespace
 // supports custom comma but not comments
 func readCSVBytes(r io.Reader, dstVals [][][]byte, dstNulls [][]bool, comma rune) error {
@@ -2570,7 +2547,8 @@ func readCSVBytes(r io.Reader, dstVals [][][]byte, dstNulls [][]bool, comma rune
 			if i >= 0 {
 				field = field[:i]
 			} else {
-				// comma not found? use the remaining line up until the end, which may or may not be \n
+				// comma not found?
+				// use the remaining line up until the end, which may or may not be \n
 				field = field[:len(field)-lengthLineEnd(field)]
 			}
 			if fieldCount >= len(dstVals) {
@@ -2578,7 +2556,7 @@ func readCSVBytes(r io.Reader, dstVals [][][]byte, dstNulls [][]bool, comma rune
 					rowNumber, len(dstVals))
 			}
 			// write fields into column-oriented receiver
-
+			// if enclosed in quotation marks, strip the quotations
 			dstVals[columnNumber][rowNumber] = stripQuotationMarks(field)
 			if isNullString(string(field)) {
 				dstNulls[columnNumber][rowNumber] = true
@@ -2657,17 +2635,6 @@ func makeDataFrameFromMatrices(values [][][]byte, isNull [][]bool, config *ReadC
 		labels:        labels,
 		colLevelNames: colLevelNames,
 	}
-}
-
-func concatBytes() {
-	buf := new(bytes.Buffer)
-	b := bufio.NewWriterSize(buf, 512)
-	for _, by := range [][]byte{[]byte("foo"), []byte("bar")} {
-		fmt.Println(by)
-		b.Write(by)
-		b.Flush()
-	}
-	print(string(buf.Len()))
 }
 
 func filter(containers []*valueContainer, filters map[string]FilterFn) ([]int, error) {

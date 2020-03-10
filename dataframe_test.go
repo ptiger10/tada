@@ -3626,7 +3626,7 @@ func TestDataFrame_DropCol(t *testing.T) {
 		args   args
 		want   *DataFrame
 	}{
-		{"normal", fields{values: []*valueContainer{
+		{"pass", fields{values: []*valueContainer{
 			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
 			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
 		},
@@ -3639,6 +3639,16 @@ func TestDataFrame_DropCol(t *testing.T) {
 				},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
+		},
+		{"fail", fields{values: []*valueContainer{
+			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
+			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
+		},
+			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+			args{"corge"},
+			&DataFrame{
+				err: errors.New("DropCol(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -3674,9 +3684,10 @@ func TestDataFrame_DropLabels(t *testing.T) {
 		args   args
 		want   *DataFrame
 	}{
-		{"normal", fields{values: []*valueContainer{
-			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
-		},
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
+			},
 			labels: []*valueContainer{
 				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"},
 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
@@ -3689,6 +3700,19 @@ func TestDataFrame_DropLabels(t *testing.T) {
 				},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
+		},
+		{"fail", fields{
+			values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
+			},
+			labels: []*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"},
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
+			},
+			colLevelNames: []string{"*0"}},
+			args{"corge"},
+			&DataFrame{
+				err: errors.New("DropLabels(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -4118,6 +4142,47 @@ func TestDataFrame_SliceLabels(t *testing.T) {
 			}
 			if got := df.SliceLabels(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.SliceLabels() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_NUnique(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 1}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "bar"},
+			},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "baz"}},
+		},
+			&Series{
+				values: &valueContainer{slice: []int{1, 2}, isNull: []bool{false, false}, name: "nunique"},
+				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.NUnique(); !EqualSeries(got, tt.want) {
+				t.Errorf("DataFrame.NUnique() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -95,6 +95,27 @@ func (g *GroupedSeries) indexReduceFunc(name string, index int) *Series {
 	}
 }
 
+// for each group, returns a count
+func (g *GroupedSeries) countReduceFunc(name string, fn func(interface{}, []bool, []int) (int, bool)) *Series {
+	var sharedData bool
+	if g.aligned {
+		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
+	}
+	retVals := groupedCountReduceFunc(name, g.series.values.slice, g.series.values.isNull, g.aligned, g.rowIndices, fn)
+
+	retLabels := g.labels
+	if g.aligned {
+		// if aligned: all labels
+		retLabels = g.series.labels
+		sharedData = true
+	}
+	return &Series{
+		values:     retVals,
+		labels:     retLabels,
+		sharedData: sharedData,
+	}
+}
+
 // Reduce iterates over the groups in `g` and reduces each group of values into a single value
 // using the function supplied in `lambda`.
 // Reduce returns a new Series named `name` where each reduced group is represented by a single row.
@@ -140,55 +161,14 @@ func (g *GroupedSeries) Std() *Series {
 	return g.float64ReduceFunc("std", std)
 }
 
-func groupedCountReduceFunc(name string, nulls []bool, aligned bool, rowIndices [][]int) *valueContainer {
-	retLength := len(rowIndices)
-	if aligned {
-		// if aligned: return length is overwritten to equal the length of original data
-		retLength = len(nulls)
-	}
-	retVals := make([]int, retLength)
-	retNulls := make([]bool, retLength)
-	for i, rowIndex := range rowIndices {
-		output, isNull := count(nulls, rowIndex)
-		if !aligned {
-			// default: write each output once and in sequential order into retVals
-			retVals[i] = output
-			retNulls[i] = isNull
-		} else {
-			// if aligned: write each output multiple times and out of order into retVals
-			for _, index := range rowIndex {
-				retVals[index] = output
-				retNulls[index] = isNull
-			}
-		}
-	}
-	return &valueContainer{
-		slice:  retVals,
-		isNull: retNulls,
-		name:   name,
-	}
-}
-
 // Count returns the number of non-null values in each group.
 func (g *GroupedSeries) Count() *Series {
-	var sharedData bool
-	name := "count"
-	if g.aligned {
-		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
-	}
-	retVals := groupedCountReduceFunc(name, g.series.values.isNull, g.aligned, g.rowIndices)
+	return g.countReduceFunc("count", count)
+}
 
-	retLabels := g.labels
-	if g.aligned {
-		// if aligned: all labels
-		retLabels = g.series.labels
-		sharedData = true
-	}
-	return &Series{
-		values:     retVals,
-		labels:     retLabels,
-		sharedData: sharedData,
-	}
+// NUnique returns the number of unique values in each group.
+func (g *GroupedSeries) NUnique() *Series {
+	return g.countReduceFunc("nunique", nunique)
 }
 
 // Min coerces values to float64 and calculates the minimum of each group.
@@ -199,11 +179,6 @@ func (g *GroupedSeries) Min() *Series {
 // Max coerces values to float64 and calculates the maximum of each group.
 func (g *GroupedSeries) Max() *Series {
 	return g.float64ReduceFunc("max", max)
-}
-
-// NUnique returns the number of unique values in each group.
-func (g *GroupedSeries) NUnique() *Series {
-	return g.stringReduceFunc("nunique", nunique)
 }
 
 // Earliest coerces the Series values to time.Time and calculates the earliest timestamp in each group.
@@ -394,6 +369,52 @@ func (g *GroupedDataFrame) indexReduceFunc(name string, cols []string, index int
 	}
 }
 
+func (g *GroupedDataFrame) interfaceReduceFunc(name string, cols []string, fn func(interface{}) interface{}) (*DataFrame, error) {
+	if len(cols) == 0 {
+		cols = make([]string, len(g.df.values))
+		for k := range cols {
+			cols[k] = g.df.values[k].name
+		}
+	}
+	var err error
+	retVals := make([]*valueContainer, len(cols))
+	for k := range retVals {
+		retVals[k], err = groupedInterfaceReduceFunc(
+			g.df.values[k].slice, cols[k], false, g.rowIndices, fn)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &DataFrame{
+		values:        retVals,
+		labels:        g.labels,
+		colLevelNames: []string{"*0"},
+		name:          name,
+	}, nil
+}
+
+func (g *GroupedDataFrame) countReduceFunc(name string, cols []string, fn func(interface{}, []bool, []int) (int, bool)) *DataFrame {
+	if len(cols) == 0 {
+		cols = make([]string, len(g.df.values))
+		for k := range cols {
+			cols[k] = g.df.values[k].name
+		}
+	}
+	retVals := make([]*valueContainer, len(cols))
+	for k := range retVals {
+		retVals[k] = groupedCountReduceFunc(
+			cols[k], g.df.values[k].slice, g.df.values[k].isNull, false, g.rowIndices, fn)
+	}
+
+	return &DataFrame{
+		values:        retVals,
+		labels:        g.labels,
+		colLevelNames: []string{"*0"},
+		name:          name,
+	}
+}
+
 // GetGroup returns the grouped rows sharing the same `group` key as a new DataFrame.
 func (g *GroupedDataFrame) GetGroup(group string) *DataFrame {
 	for m, key := range g.orderedKeys {
@@ -436,30 +457,12 @@ func (g *GroupedDataFrame) Max(colNames ...string) *DataFrame {
 
 // Count returns the number of non-null values in each group for the columns in `colNames`.
 func (g *GroupedDataFrame) Count(colNames ...string) *DataFrame {
-	cols := colNames
-	if len(cols) == 0 {
-		cols = make([]string, len(g.df.values))
-		for k := range cols {
-			cols[k] = g.df.values[k].name
-		}
-	}
-	retVals := make([]*valueContainer, len(cols))
-	for k := range retVals {
-		retVals[k] = groupedCountReduceFunc(
-			cols[k], g.df.values[k].isNull, false, g.rowIndices)
-	}
-
-	return &DataFrame{
-		values:        retVals,
-		labels:        g.labels,
-		colLevelNames: []string{"*0"},
-		name:          "count",
-	}
+	return g.countReduceFunc("count", colNames, count)
 }
 
 // NUnique returns the number of unique, non-null values in each group for the columns in `colNames`.
 func (g *GroupedDataFrame) NUnique(colNames ...string) *DataFrame {
-	return g.stringReduceFunc("nunique", colNames, nunique)
+	return g.countReduceFunc("nunique", colNames, nunique)
 }
 
 // Earliest coerces the column values in `colNames` to time.Time and calculates the earliest timestamp of each group.
@@ -523,7 +526,11 @@ func (g *GroupedDataFrame) Reduce(name string, cols []string, lambda GroupReduce
 		fn := convertSimplifiedDateTimeReduceFunc(lambda.DateTime)
 		return g.dateTimeReduceFunc(name, cols, fn)
 	} else if lambda.Interface != nil {
-
+		newDataFrame, err := g.interfaceReduceFunc(name, cols, lambda.Interface)
+		if err != nil {
+			return dataFrameWithError(fmt.Errorf("GroupedDataFrame.Reduce(): %v", err))
+		}
+		return newDataFrame
 	}
 	return dataFrameWithError(fmt.Errorf("Reduce(): no lambda function provided"))
 }
@@ -718,6 +725,36 @@ func groupedIndexReduceFunc(
 	}
 	return &valueContainer{
 		slice:  retVals.Interface(),
+		isNull: retNulls,
+		name:   name,
+	}
+}
+
+func groupedCountReduceFunc(name string, slice interface{}, nulls []bool, aligned bool, rowIndices [][]int,
+	fn func(interface{}, []bool, []int) (int, bool)) *valueContainer {
+	retLength := len(rowIndices)
+	if aligned {
+		// if aligned: return length is overwritten to equal the length of original data
+		retLength = len(nulls)
+	}
+	retVals := make([]int, retLength)
+	retNulls := make([]bool, retLength)
+	for i, rowIndex := range rowIndices {
+		output, isNull := fn(slice, nulls, rowIndex)
+		if !aligned {
+			// default: write each output once and in sequential order into retVals
+			retVals[i] = output
+			retNulls[i] = isNull
+		} else {
+			// if aligned: write each output multiple times and out of order into retVals
+			for _, index := range rowIndex {
+				retVals[index] = output
+				retNulls[index] = isNull
+			}
+		}
+	}
+	return &valueContainer{
+		slice:  retVals,
 		isNull: retNulls,
 		name:   name,
 	}

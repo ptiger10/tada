@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"reflect"
-	"strconv"
 	"time"
 
 	"github.com/ptiger10/tablediff"
@@ -97,10 +96,8 @@ func (s *Series) ToCSV(ignoreLabels bool) ([][]string, error) {
 // -- GETTERS
 
 func (s *Series) String() string {
-	if s.values == nil {
-		if s.Err() != nil {
-			return s.Err().Error()
-		}
+	if s.err != nil {
+		return fmt.Sprintf("Error: %v", s.err)
 	}
 	return s.ToDataFrame().String()
 }
@@ -135,7 +132,7 @@ func (s *Series) numLevels() int {
 // Cast casts the underlying container values (either label levels or Series values)
 // to []float64, []string, or []time.Time. To apply to Series values, supply empty string name ("") or the Series name.
 // Use cast to improve performance when calling multiple operations on values.
-func (s *Series) Cast(containerAsType map[string]DType) error {
+func (s *Series) Cast(containerAsType map[string]DType) {
 	mergedLabelsAndValues := append(s.labels, s.values)
 	for name, dtype := range containerAsType {
 		if name == "" {
@@ -143,11 +140,12 @@ func (s *Series) Cast(containerAsType map[string]DType) error {
 		}
 		index, err := indexOfContainer(name, mergedLabelsAndValues)
 		if err != nil {
-			return fmt.Errorf("Cast(): %v", err)
+			s.resetWithError(fmt.Errorf("Cast(): %v", err))
+			return
 		}
 		mergedLabelsAndValues[index].cast(dtype)
 	}
-	return nil
+	return
 }
 
 // IndexOf returns the index position of the first container with a name matching `name`
@@ -970,15 +968,14 @@ func (s *Series) Std() float64 {
 
 // Count counts the number of non-null Series values.
 func (s *Series) Count() int {
-	output, _ := count(s.values.isNull, makeIntRange(0, s.Len()))
+	output, _ := count(s.values.slice, s.values.isNull, makeIntRange(0, s.Len()))
 	return output
 }
 
 // NUnique counts the number of unique, non-null Series values.
 func (s *Series) NUnique() int {
-	unique := s.stringFunc(nunique)
-	i, _ := strconv.Atoi(unique)
-	return i
+	output, _ := nunique(s.values.slice, s.values.isNull, makeIntRange(0, s.Len()))
+	return output
 }
 
 // Min coerces the Series values to float64 and calculates the minimum.

@@ -1292,7 +1292,7 @@ func Test_rank(t *testing.T) {
 	}
 }
 
-func Test_findColWithName(t *testing.T) {
+func Test_indexOfContainer(t *testing.T) {
 	type args struct {
 		name string
 		cols []*valueContainer
@@ -1591,8 +1591,8 @@ func Test_inferType(t *testing.T) {
 		args args
 		want string
 	}{
-		// {"float", args{"1.5"}, "float"},
-		// {"int", args{"1"}, "int"},
+		{"float", args{"1.5"}, "float"},
+		{"int", args{"1"}, "int"},
 		{"string", args{"foo"}, "string"},
 		{"datetime", args{"2020-01-01 03:00:00 +0000 UTC"}, "datetime"},
 		{"date", args{"2020-01-01"}, "date"},
@@ -2297,7 +2297,7 @@ func Test_count(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := count(tt.args.isNull, tt.args.index)
+			got, got1 := count(nil, tt.args.isNull, tt.args.index)
 			if got != tt.want {
 				t.Errorf("count() got = %v, want %v", got, tt.want)
 			}
@@ -2621,18 +2621,18 @@ func Test_valueContainer_valueCounts(t *testing.T) {
 
 func Test_nunique(t *testing.T) {
 	type args struct {
-		vals   []string
+		vals   interface{}
 		isNull []bool
 		index  []int
 	}
 	tests := []struct {
 		name  string
 		args  args
-		want  string
+		want  int
 		want1 bool
 	}{
-		{"pass", args{[]string{"foo", "foo", "bar", ""}, []bool{false, false, false, true}, []int{0, 1, 2, 3}}, "2", false},
-		{"fail", args{[]string{"", "", "", ""}, []bool{true, true, true, true}, []int{0, 1, 2, 3}}, "", true},
+		{"pass", args{[]string{"foo", "foo", "bar", ""}, []bool{false, false, false, true}, []int{0, 1, 2, 3}}, 2, false},
+		{"fail", args{[]string{"", "", "", ""}, []bool{true, true, true, true}, []int{0, 1, 2, 3}}, 0, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2681,23 +2681,23 @@ func Test_deduplicateContainerNames(t *testing.T) {
 
 func Test_lookupWithAnchor(t *testing.T) {
 	type args struct {
-		name    string
-		labels1 []*valueContainer
-		leftOn  []int
-		values2 *valueContainer
-		labels2 []*valueContainer
-		rightOn []int
+		name         string
+		sourceLabels []*valueContainer
+		leftOn       []int
+		lookupValues *valueContainer
+		lookupLabels []*valueContainer
+		rightOn      []int
 	}
 	tests := []struct {
 		name string
 		args args
 		want *Series
 	}{
-		{"pass", args{name: "waldo", labels1: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
-			leftOn:  []int{0},
-			values2: &valueContainer{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "qux"},
-			labels2: []*valueContainer{{slice: []float64{1, 0, 2}, isNull: []bool{false, false, false}, name: "foo"}},
-			rightOn: []int{0}},
+		{"pass", args{name: "waldo", sourceLabels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+			leftOn:       []int{0},
+			lookupValues: &valueContainer{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "qux"},
+			lookupLabels: []*valueContainer{{slice: []float64{1, 0, 2}, isNull: []bool{false, false, false}, name: "foo"}},
+			rightOn:      []int{0}},
 			&Series{
 				values: &valueContainer{slice: []string{"", "foo"}, isNull: []bool{true, false}, name: "waldo"},
 				labels: []*valueContainer{
@@ -2709,7 +2709,7 @@ func Test_lookupWithAnchor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := lookupWithAnchor(
-				tt.args.name, tt.args.labels1, tt.args.leftOn, tt.args.values2, tt.args.labels2, tt.args.rightOn); !EqualSeries(got, tt.want) {
+				tt.args.name, tt.args.sourceLabels, tt.args.leftOn, tt.args.lookupValues, tt.args.lookupLabels, tt.args.rightOn); !EqualSeries(got, tt.want) {
 				t.Errorf("lookupWithAnchor() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2718,66 +2718,78 @@ func Test_lookupWithAnchor(t *testing.T) {
 
 func Test_lookupDataFrameWithAnchor(t *testing.T) {
 	type args struct {
-		name           string
-		colLevelNames  []string
-		anchorLabels   []*valueContainer
-		originalLabels []*valueContainer
-		leftOn         []int
-		lookupColumns  []*valueContainer
-		lookupLabels   []*valueContainer
-		rightOn        []int
-		exclude        []string
+		name             string
+		colLevelNames    []string
+		originalLabels   []*valueContainer
+		sourceContainers []*valueContainer
+		leftOn           []int
+		lookupContainers []*valueContainer
+		rightOn          []int
+		lookupColumns    []*valueContainer
+		exclude          []string
 	}
 	tests := []struct {
 		name string
 		args args
 		want *DataFrame
 	}{
-		{"pass", args{name: "waldo", colLevelNames: []string{"*0"},
-			anchorLabels: []*valueContainer{
-				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
-			},
+		{"no exclusion", args{name: "waldo", colLevelNames: []string{"*0"},
 			originalLabels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
-			leftOn:         []int{0},
+			sourceContainers: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"},
+			},
+			leftOn: []int{0},
+			lookupContainers: []*valueContainer{
+				{slice: []float64{1, 0, 2}, isNull: []bool{false, false, false}, name: "c"}},
+			rightOn: []int{0},
 			lookupColumns: []*valueContainer{
 				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "a"},
-				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "b"}},
-			lookupLabels: []*valueContainer{
-				{slice: []float64{1, 0, 2}, isNull: []bool{false, false, false}, name: "c"},
-				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "a"},
-				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "b"}},
-			rightOn: []int{0},
-			exclude: []string{"c"}},
-
+				{slice: []string{"bar", "qux", "baz"}, isNull: []bool{false, false, false}, name: "b"}}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []string{"", "foo"}, isNull: []bool{true, false}, name: "a"},
+					{slice: []string{"qux", "bar"}, isNull: []bool{false, false}, name: "b"},
+				},
+				labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+				name:   "waldo", colLevelNames: []string{"*0"},
+			}},
+		{"exclusion", args{name: "waldo", colLevelNames: []string{"*0"},
+			originalLabels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+			sourceContainers: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
+			},
+			leftOn: []int{0},
+			lookupContainers: []*valueContainer{
+				{slice: []float64{1, 0, 2}, isNull: []bool{false, true, false}, name: "a"}},
+			rightOn: []int{0},
+			lookupColumns: []*valueContainer{
+				{slice: []float64{1, 0, 2}, isNull: []bool{false, true, false}, name: "a"},
+				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "b"}},
+			exclude: []string{"a"}},
+			&DataFrame{
+				values: []*valueContainer{
 					{slice: []string{"", "foo"}, isNull: []bool{true, false}, name: "b"},
 				},
 				labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
 				name:   "waldo", colLevelNames: []string{"*0"},
 			}},
-		{"exclude", args{name: "waldo", colLevelNames: []string{"*0"},
-			anchorLabels: []*valueContainer{
-				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
-			},
+		{"equal labels", args{name: "waldo", colLevelNames: []string{"*0"},
 			originalLabels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
-			leftOn:         []int{0},
+			sourceContainers: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"},
+			},
+			leftOn: []int{0},
+			lookupContainers: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+			rightOn: []int{0},
 			lookupColumns: []*valueContainer{
-				{slice: []float64{1, 0, 2}, isNull: []bool{false, true, false}, name: "a"},
-				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "b"}},
-			lookupLabels: []*valueContainer{
-				{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "c"},
-				{slice: []float64{1, 0, 2}, isNull: []bool{false, true, false}, name: "a"},
-				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "b"}},
-			rightOn: []int{1},
-			exclude: []string{"a"}},
-
+				{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "a"},
+				{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, name: "b"}}},
 			&DataFrame{
 				values: []*valueContainer{
-					{slice: []string{"", "foo"}, isNull: []bool{true, false}, name: "b"},
+					{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "a"},
+					{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, name: "b"},
 				},
 				labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
 				name:   "waldo", colLevelNames: []string{"*0"},
@@ -2786,9 +2798,10 @@ func Test_lookupDataFrameWithAnchor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := lookupDataFrameWithAnchor(
-				tt.args.name, tt.args.colLevelNames, tt.args.anchorLabels,
-				tt.args.originalLabels, tt.args.leftOn, tt.args.lookupColumns, tt.args.lookupLabels,
-				tt.args.rightOn, tt.args.exclude); !EqualDataFrames(got, tt.want) {
+				tt.args.name, tt.args.colLevelNames, tt.args.originalLabels,
+				tt.args.sourceContainers, tt.args.leftOn,
+				tt.args.lookupContainers, tt.args.rightOn,
+				tt.args.lookupColumns, tt.args.exclude); !EqualDataFrames(got, tt.want) {
 				t.Errorf("lookupDataFrameWithAnchor() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3940,6 +3953,69 @@ func TestSeries_combineMath(t *testing.T) {
 					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
 			},
 		},
+		{"left nulls - do not ignore null", fields{
+			values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+			}},
+			args{
+				other: &Series{
+					values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+						{slice: []int{1}, isNull: []bool{false}, name: "qux"}}},
+				ignoreNull: false,
+				fn:         func(v1, v2 float64) float64 { return v1 + v2 }},
+			&Series{
+				values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
+			},
+		},
+		{"left nulls - ignore null", fields{
+			values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+			}},
+			args{
+				other: &Series{
+					values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+						{slice: []int{1}, isNull: []bool{false}, name: "qux"}}},
+				ignoreNull: true,
+				fn:         func(v1, v2 float64) float64 { return v1 + v2 }},
+			&Series{
+				values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
+			},
+		},
+		{"right nulls - ignore null", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+			}},
+			args{
+				other: &Series{
+					values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+						{slice: []int{1}, isNull: []bool{false}, name: "qux"}}},
+				ignoreNull: true,
+				fn:         func(v1, v2 float64) float64 { return v1 + v2 }},
+			&Series{
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -4082,6 +4158,9 @@ func Test_valueContainer_filter(t *testing.T) {
 		{"pass", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"},
 			args{FilterFn{Float: func(val float64) bool { return val > 1 }}},
 			[]int{2}, false},
+		{"fail", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"},
+			args{FilterFn{}},
+			nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -4174,6 +4253,15 @@ func Test_filter(t *testing.T) {
 			}},
 			[]int{1},
 			false},
+		{"fail", args{
+			[]*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
+			map[string]FilterFn{
+				"corge": FilterFn{Float: func(val float64) bool { return val >= 1 }},
+			}},
+			nil,
+			true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -4214,6 +4302,119 @@ func Test_floatValueContainer_percentile(t *testing.T) {
 			}
 			if got := vc.percentile(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("floatValueContainer.percentile() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_subsetContainerRows(t *testing.T) {
+	type args struct {
+		containers []*valueContainer
+		index      []int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*valueContainer
+		wantErr bool
+	}{
+		{"pass",
+			args{
+				containers: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "bar"}},
+				index: []int{0}},
+			[]*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "qux"},
+				{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+			false},
+		{"fail - out of range",
+			args{
+				containers: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "bar"}},
+				index: []int{2}},
+			[]*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "bar"}},
+			true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := subsetContainerRows(tt.args.containers, tt.args.index)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("subsetContainerRows() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(tt.args.containers, tt.want) {
+				t.Errorf("subsetContainerRows() -> %v, want %v", tt.args.containers, tt.want)
+			}
+		})
+	}
+}
+
+func Test_subsetContainers(t *testing.T) {
+	type args struct {
+		containers []*valueContainer
+		index      []int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*valueContainer
+		wantErr bool
+	}{
+		{"pass",
+			args{
+				containers: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "bar"}},
+				index: []int{0}},
+			[]*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}},
+			false},
+		{"fail - out of range",
+			args{
+				containers: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "bar"}},
+				index: []int{2}},
+			nil,
+			true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := subsetContainers(tt.args.containers, tt.args.index)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("subsetContainers() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("subsetContainers() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_subsetInterfaceSlice(t *testing.T) {
+	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+	type args struct {
+		slice interface{}
+		index []int
+	}
+	tests := []struct {
+		name string
+		args args
+		want interface{}
+	}{
+		{"float64", args{[]float64{1, 2}, []int{0}}, []float64{1}},
+		{"string", args{[]string{"foo", "bar"}, []int{0}}, []string{"foo"}},
+		{"time", args{[]time.Time{d, d.AddDate(0, 0, 1)}, []int{0}}, []time.Time{d}},
+		{"int", args{[]int{1, 2}, []int{0}}, []int{1}},
+		{"other", args{[]uint{1, 2}, []int{0}}, []uint{1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := subsetInterfaceSlice(tt.args.slice, tt.args.index); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("subsetInterfaceSlice() = %v, want %v", got, tt.want)
 			}
 		})
 	}

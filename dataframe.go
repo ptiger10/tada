@@ -445,10 +445,8 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 // which may be configured with SetOptionMaxRows(n) and SetOptionMaxColumns(n), respectively.
 // By default, repeated values are merged together, but this behavior may be changed with SetOptionAutoMerge(false).
 func (df *DataFrame) String() string {
-	if df.values == nil {
-		if df.Err() != nil {
-			return df.Err().Error()
-		}
+	if df.err != nil {
+		return fmt.Sprintf("Error: %v", df.err)
 	}
 	var data [][]string
 	if df.Len() <= optionMaxRows {
@@ -1024,7 +1022,7 @@ func (df *DataFrame) DropLabels(name string) *DataFrame {
 func (df *DataFrameMutator) DropLabels(name string) {
 	newCols, err := dropFromContainers(name, df.dataframe.labels)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("DropCol(): %v", err))
+		df.dataframe.resetWithError(fmt.Errorf("DropLabels(): %v", err))
 		return
 	}
 	df.dataframe.labels = newCols
@@ -1840,26 +1838,49 @@ func (df *DataFrame) IterRows() []map[string]Element {
 	return ret
 }
 
+// -- COUNT
+
+func (df *DataFrame) count(name string, countFunction func(interface{}, []bool, []int) (int, bool)) *Series {
+	retVals := make([]int, len(df.values))
+	retNulls := make([]bool, len(df.values))
+	labels := make([]string, len(df.values))
+	labelNulls := make([]bool, len(df.values))
+
+	for k := range df.values {
+		retVals[k], retNulls[k] = countFunction(
+			df.values[k].slice,
+			df.values[k].isNull,
+			makeIntRange(0, df.Len()))
+
+		labels[k] = df.values[k].name
+		labelNulls[k] = false
+	}
+	return &Series{
+		values: &valueContainer{slice: retVals, isNull: retNulls, name: name},
+		labels: []*valueContainer{{slice: labels, isNull: labelNulls, name: "*0"}},
+	}
+}
+
 // -- MATH
 
 func (df *DataFrame) math(name string, mathFunction func([]float64, []bool, []int) (float64, bool)) *Series {
 	retVals := make([]float64, len(df.values))
-	retIsNull := make([]bool, len(df.values))
+	retNulls := make([]bool, len(df.values))
 	labels := make([]string, len(df.values))
-	labelsIsNull := make([]bool, len(df.values))
+	labelNulls := make([]bool, len(df.values))
 
 	for k := range df.values {
-		retVals[k], retIsNull[k] = mathFunction(
+		retVals[k], retNulls[k] = mathFunction(
 			df.values[k].float64().slice,
 			df.values[k].isNull,
 			makeIntRange(0, df.Len()))
 
 		labels[k] = df.values[k].name
-		labelsIsNull[k] = false
+		labelNulls[k] = false
 	}
 	return &Series{
-		values: &valueContainer{slice: retVals, isNull: retIsNull, name: name},
-		labels: []*valueContainer{{slice: labels, isNull: labelsIsNull, name: "*0"}},
+		values: &valueContainer{slice: retVals, isNull: retNulls, name: name},
+		labels: []*valueContainer{{slice: labels, isNull: labelNulls, name: "*0"}},
 	}
 }
 
@@ -1885,23 +1906,12 @@ func (df *DataFrame) Std() *Series {
 
 // Count counts the number of non-null values in each column.
 func (df *DataFrame) Count() *Series {
-	retVals := make([]int, len(df.values))
-	retNulls := make([]bool, len(df.values))
-	labels := make([]string, len(df.values))
-	labelNulls := make([]bool, len(df.values))
+	return df.count("count", count)
+}
 
-	for k := range df.values {
-		retVals[k], retNulls[k] = count(
-			df.values[k].isNull,
-			makeIntRange(0, df.Len()))
-
-		labels[k] = df.values[k].name
-		labelNulls[k] = false
-	}
-	return &Series{
-		values: &valueContainer{slice: retVals, isNull: retNulls, name: "count"},
-		labels: []*valueContainer{{slice: labels, isNull: labelNulls, name: "*0"}},
-	}
+// NUnique counts the number of unique non-null values in each column.
+func (df *DataFrame) NUnique() *Series {
+	return df.count("nunique", nunique)
 }
 
 // Min coerces the values in each column to float64 and returns the minimum non-null value in each column.
