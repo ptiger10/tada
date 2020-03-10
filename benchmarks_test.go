@@ -90,36 +90,9 @@ func Benchmark_ReadCSV(b *testing.B) {
 // 	for i := 0; i < b.N; i++ {
 // 		vc.string()
 // 	}
-// }
-
-// func Benchmark_concatenateStringLabels(b *testing.B) {
-// 	n := 100000
-// 	f := make([]float64, n)
-// 	for i := range f {
-// 		f[i] = rand.Float64()
-// 	}
-// 	i := make([]int, n)
-// 	for a := range i {
-// 		i[a] = rand.Int()
-// 	}
-// 	d := make([]time.Time, n)
-// 	for i := range d {
-// 		d[i] = time.Date(rand.Int(), 1, 1, 0, 0, 0, 0, time.UTC)
-// 	}
-// 	s := make([]string, n)
-// 	for i := range s {
-// 		s[i] = "foo"
-// 	}
-// 	vcs := []*valueContainer{
-// 		&valueContainer{slice: s},
-// 	}
-// 	for i := 0; i < b.N; i++ {
-// 		concatenateLabelsToStrings(vcs)
-// 	}
-// }
 
 func Benchmark_concatenateStringLabelsBytes(b *testing.B) {
-	n := 100000
+	n := 1000000
 	f := make([]float64, n)
 	for i := range f {
 		f[i] = rand.Float64()
@@ -137,8 +110,8 @@ func Benchmark_concatenateStringLabelsBytes(b *testing.B) {
 		s[i] = "foo"
 	}
 
-	vc := &valueContainer{slice: s}
-	// vc.cleanArchive()
+	vc := &valueContainer{slice: d}
+	vc.resetCache()
 	vcs := []*valueContainer{
 		vc,
 	}
