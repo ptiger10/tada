@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"log"
 	"math"
 	"os"
 	"reflect"
@@ -19,6 +20,31 @@ func TestMain(m *testing.M) {
 	DisableWarnings()
 	code := m.Run()
 	os.Exit(code)
+}
+
+func Test_errorWarning(t *testing.T) {
+	EnableWarnings()
+	type args struct {
+		err error
+	}
+	tests := []struct {
+		name string
+		args args
+	}{
+		{"pass", args{errors.New("foo")}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b := new(bytes.Buffer)
+			log.SetOutput(b)
+			errorWarning(tt.args.err)
+			if b.String() == "" {
+				t.Errorf("errorWarning() logged , want error")
+			}
+		})
+	}
+	log.SetOutput(os.Stdout)
+	DisableWarnings()
 }
 
 func TestDataFrame_resetWithError(t *testing.T) {
@@ -1577,6 +1603,27 @@ func Test_mockCSVFromDTypes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := mockCSVFromDTypes(tt.args.dtypes, tt.args.numMockRows); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("mockCSVFromDTypes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_mockString(t *testing.T) {
+	type args struct {
+		dtype   string
+		nullPct float64
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{"pass", args{"string", .99999999}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := mockString(tt.args.dtype, tt.args.nullPct); got != tt.want {
+				t.Errorf("mockString() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -3764,13 +3811,11 @@ func Test_readCSVBytes(t *testing.T) {
 			args: args{
 				r: bytes.NewBuffer([]byte(b5)),
 				dstVals: [][][]byte{
-					{[]byte("")},
-					{[]byte("")}},
+					{[]byte(""), []byte("")}},
 				dstNulls: [][]bool{{false, false}},
 				comma:    ','},
 			wantVals: [][][]byte{
-				{[]byte("foo")},
-				{[]byte("")}},
+				{[]byte("foo"), []byte("bar")}},
 			wantNulls: [][]bool{{false, false}},
 			wantErr:   true,
 		},
@@ -4158,9 +4203,6 @@ func Test_valueContainer_filter(t *testing.T) {
 		{"pass", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"},
 			args{FilterFn{Float: func(val float64) bool { return val > 1 }}},
 			[]int{2}, false},
-		{"fail", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"},
-			args{FilterFn{}},
-			nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -4169,11 +4211,7 @@ func Test_valueContainer_filter(t *testing.T) {
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
 			}
-			got, err := vc.filter(tt.args.filter)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("valueContainer.filter() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got := vc.filter(tt.args.filter)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("valueContainer.filter() = %v, want %v", got, tt.want)
 			}
@@ -4253,12 +4291,21 @@ func Test_filter(t *testing.T) {
 			}},
 			[]int{1},
 			false},
-		{"fail", args{
+		{"fail - bad container name", args{
 			[]*valueContainer{
 				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
 				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
 			map[string]FilterFn{
 				"corge": FilterFn{Float: func(val float64) bool { return val >= 1 }},
+			}},
+			nil,
+			true},
+		{"fail - no function", args{
+			[]*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
+			map[string]FilterFn{
+				"qux": FilterFn{},
 			}},
 			nil,
 			true},

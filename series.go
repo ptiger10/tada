@@ -1085,11 +1085,12 @@ func (s *Series) Rank() *Series {
 }
 
 // Cut coerces the Series values to float64 and categorizes each row based on which `bin` interval it falls within.
-// `bins` should be a slice of sequential edges that form intervals (left inclusive, right exclusive).
-// For example, [1, 3, 5] represents the intervals 1-3 (excluding 3), and 3-5 (excluding 5).
-// If these bins were supplied for a Series with values [2, 3, 5], the returned Series would have values ["1-3", "3-5", ""].
+// `bins` should be a slice of sequential edges that form intervals (left exclusive, right inclusive).
+// For example, [1, 3, 5] represents the intervals 1-3 (excluding 1, including 3), and 3-5 (excluding 3, including 5).
+// If these bins were supplied for a Series with values [3, 4], the returned Series would have values ["1-3", "3-5"].
 // For default behavior, supply nil as `config`.
 // To categorize values below or above the bin range, or to supply custom labels, supply a tada.Cutter as `config`.
+// If custom labels are supplied, the length must be 1 less than the total number of bin edges.
 func (s *Series) Cut(bins []float64, config *Cutter) *Series {
 	if config == nil {
 		config = &Cutter{}

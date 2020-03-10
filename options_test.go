@@ -1,6 +1,7 @@
 package tada
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -84,7 +85,7 @@ func TestSetOptionAutoMerge(t *testing.T) {
 		{"pass", args{false}},
 	}
 	for _, tt := range tests {
-		archive := optionMergeRepeats
+		cache := optionMergeRepeats
 		t.Run(tt.name, func(t *testing.T) {
 			SetOptionMergeRepeats(tt.args.set)
 		})
@@ -92,6 +93,30 @@ func TestSetOptionAutoMerge(t *testing.T) {
 		if got := optionMergeRepeats; got != tt.args.set {
 			t.Errorf("SetOptionAutoMerge() -> %v, want %v", got, tt.args.set)
 		}
-		optionMergeRepeats = archive
+		optionMergeRepeats = cache
 	}
+}
+
+func TestSetOptionAddTimeFormat(t *testing.T) {
+	cache := make([]string, len(optionDateTimeFormats))
+	copy(cache, optionDateTimeFormats)
+	type args struct {
+		format string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []string
+	}{
+		{"pass", args{"foo"}, append(cache, "foo")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			SetOptionAddTimeFormat(tt.args.format)
+			if !reflect.DeepEqual(optionDateTimeFormats, tt.want) {
+				t.Errorf("SetOptionAddTimeFormat() -> %v, want %v", optionDateTimeFormats, tt.want)
+			}
+		})
+	}
+	optionDateTimeFormats = cache
 }

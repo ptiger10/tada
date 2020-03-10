@@ -690,13 +690,13 @@ func mockCSVFromDTypes(dtypes []map[string]int, numMockRows int) [][]string {
 	for i := range ret {
 		ret[i] = make([]string, len(dtypes))
 		for k := range ret[i] {
-			ret[i][k] = mockString(dominantDTypes[k])
+			ret[i][k] = mockString(dominantDTypes[k], .1)
 		}
 	}
 	return ret
 }
 
-func mockString(dtype string) string {
+func mockString(dtype string, nullPct float64) string {
 	var options []string
 	switch dtype {
 	// overwrite the options based on the dtype
@@ -715,7 +715,6 @@ func mockString(dtype string) string {
 	case "bool":
 		options = []string{"true", "false"}
 	}
-	nullPct := .1
 	f := rand.Float64()
 	if f < nullPct {
 		return ""
@@ -986,55 +985,56 @@ func (vc *valueContainer) iterRow(index int) Element {
 }
 
 func (vc *valueContainer) gt(comparison float64) []int {
-	index, _ := vc.filter(FilterFn{Float: func(v float64) bool {
+	index := vc.filter(FilterFn{Float: func(v float64) bool {
 		return v > comparison
 	}})
 	return index
 }
 
 func (vc *valueContainer) lt(comparison float64) []int {
-	index, _ := vc.filter(FilterFn{Float: func(v float64) bool {
+	index := vc.filter(FilterFn{Float: func(v float64) bool {
 		return v < comparison
 	}})
 	return index
 }
 
 func (vc *valueContainer) eq(comparison string) []int {
-	index, _ := vc.filter(FilterFn{String: func(v string) bool {
+	index := vc.filter(FilterFn{String: func(v string) bool {
 		return v == comparison
 	}})
 	return index
 }
 
 func (vc *valueContainer) neq(comparison string) []int {
-	index, _ := vc.filter(FilterFn{String: func(v string) bool {
+	index := vc.filter(FilterFn{String: func(v string) bool {
 		return v != comparison
 	}})
 	return index
 }
 
 func (vc *valueContainer) contains(substr string) []int {
-	index, _ := vc.filter(FilterFn{String: func(v string) bool {
+	index := vc.filter(FilterFn{String: func(v string) bool {
 		return strings.Contains(v, substr)
 	}})
 	return index
 }
 
 func (vc *valueContainer) before(comparison time.Time) []int {
-	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
+	index := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
 		return v.Before(comparison)
 	}})
 	return index
 }
 
 func (vc *valueContainer) after(comparison time.Time) []int {
-	index, _ := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
+	index := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
 		return v.After(comparison)
 	}})
 	return index
 }
 
-func (vc *valueContainer) filter(filter FilterFn) ([]int, error) {
+// call filter.validate() first
+func (vc *valueContainer) filter(filter FilterFn) []int {
 	var index []int
 	if filter.Float != nil {
 		slice := vc.float64().slice
@@ -1057,10 +1057,8 @@ func (vc *valueContainer) filter(filter FilterFn) ([]int, error) {
 				index = append(index, i)
 			}
 		}
-	} else {
-		return nil, fmt.Errorf("no filter function provided")
 	}
-	return index, nil
+	return index
 }
 
 func (vc *valueContainer) apply(lambda ApplyFn) {
@@ -2113,6 +2111,7 @@ func cut(vals []float64, isNull []bool,
 	return ret, nil
 }
 
+// by default: leftExclusive, rightInclusive
 func (vc *valueContainer) cut(bins []float64, includeLess, includeMore bool, labels []string) ([]string, error) {
 	leftInclusive := false
 	rightExclusive := false
@@ -2645,14 +2644,11 @@ func filter(containers []*valueContainer, filters map[string]FilterFn) ([]int, e
 		if err != nil {
 			return nil, fmt.Errorf("filter: %v", err)
 		}
-		index, err := indexOfContainer(containerName, containers)
+		position, err := indexOfContainer(containerName, containers)
 		if err != nil {
 			return nil, fmt.Errorf("filter: %v", err)
 		}
-		subIndex, err := containers[index].filter(filter)
-		if err != nil {
-			return nil, fmt.Errorf("filter: %v", err)
-		}
+		subIndex := containers[position].filter(filter)
 		subIndexes = append(subIndexes, subIndex)
 	}
 	intersection := intersection(subIndexes,

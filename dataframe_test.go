@@ -575,6 +575,18 @@ func TestDataFrame_Head(t *testing.T) {
 				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "0"}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				name:   "baz"}},
+		{"overwrite n", fields{
+			values: []*valueContainer{
+				{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "0"}},
+			labels: []*valueContainer{
+				{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"},
+			},
+			name: "baz"},
+			args{5},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "0"}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+				name:   "baz"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

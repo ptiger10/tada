@@ -2489,6 +2489,14 @@ func TestSeries_Cut(t *testing.T) {
 			&Series{
 				values: &valueContainer{slice: []string{"", "1-2", ">2"}, isNull: []bool{true, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
+		{"pass - nil cutter", fields{
+			values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{
+				bins: []float64{1, 2}, config: nil},
+			&Series{
+				values: &valueContainer{slice: []string{"", "1-2", ""}, isNull: []bool{true, false, true}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
 		{"fail - too many labels", fields{
 			values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
@@ -3404,4 +3412,42 @@ func TestSeries_InPlace(t *testing.T) {
 		})
 	}
 	log.SetOutput(os.Stdout)
+}
+
+func TestSeries_stringFunc(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		stringFunction func([]string, []bool, []int) (string, bool)
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   string
+	}{
+		{"pass",
+			fields{
+				values: &valueContainer{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{func([]string, []bool, []int) (string, bool) { return "foo", false }},
+			"foo"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.stringFunc(tt.args.stringFunction); got != tt.want {
+				t.Errorf("Series.stringFunc() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
