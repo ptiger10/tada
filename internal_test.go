@@ -1660,6 +1660,7 @@ func Test_valueContainer_apply(t *testing.T) {
 		slice  interface{}
 		isNull []bool
 		name   string
+		cache  [][]byte
 	}
 	type args struct {
 		apply ApplyFn
@@ -1674,6 +1675,12 @@ func Test_valueContainer_apply(t *testing.T) {
 			slice:  []float64{1, 2},
 			isNull: []bool{false, false},
 			name:   "foo"},
+			args{ApplyFn{Float: func(v float64) float64 { return v * 2 }}},
+			&valueContainer{slice: []float64{2, 4}, isNull: []bool{false, false}, name: "foo"}},
+		{"float - reset cache", fields{
+			slice:  []float64{1, 2},
+			isNull: []bool{false, false},
+			name:   "foo", cache: [][]byte{[]byte("1"), []byte("2")}},
 			args{ApplyFn{Float: func(v float64) float64 { return v * 2 }}},
 			&valueContainer{slice: []float64{2, 4}, isNull: []bool{false, false}, name: "foo"}},
 		{"string", fields{
@@ -1697,6 +1704,7 @@ func Test_valueContainer_apply(t *testing.T) {
 				slice:  tt.fields.slice,
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
+				cache:  tt.fields.cache,
 			}
 			vc.apply(tt.args.apply)
 			if !reflect.DeepEqual(vc, tt.want) {
@@ -1711,6 +1719,7 @@ func Test_valueContainer_applyFormat(t *testing.T) {
 		slice  interface{}
 		isNull []bool
 		name   string
+		cache  [][]byte
 	}
 	type args struct {
 		apply ApplyFormatFn
@@ -1723,6 +1732,12 @@ func Test_valueContainer_applyFormat(t *testing.T) {
 	}{
 		{"float",
 			fields{slice: []float64{.75}, isNull: []bool{false}},
+			args{ApplyFormatFn{Float: func(v float64) string {
+				return strconv.FormatFloat(v, 'f', 1, 64)
+			}}},
+			&valueContainer{slice: []string{"0.8"}, isNull: []bool{false}}},
+		{"float - reset cache",
+			fields{slice: []float64{.75}, isNull: []bool{false}, cache: [][]byte{[]byte(".75")}},
 			args{ApplyFormatFn{Float: func(v float64) string {
 				return strconv.FormatFloat(v, 'f', 1, 64)
 			}}},
@@ -1740,6 +1755,7 @@ func Test_valueContainer_applyFormat(t *testing.T) {
 				slice:  tt.fields.slice,
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
+				cache:  tt.fields.cache,
 			}
 			vc.applyFormat(tt.args.apply)
 			if !reflect.DeepEqual(vc, tt.want) {
@@ -1772,9 +1788,10 @@ func Test_withColumn(t *testing.T) {
 				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
 			}, false,
 		},
-		{"overwrite", args{
+		{"overwrite - reset cache", args{
 			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo",
+					cache: [][]byte{[]byte("1"), []byte("2")}},
 				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
 			}, name: "foo", input: []int{3, 4}, requiredLen: 2},
 			[]*valueContainer{
@@ -1795,7 +1812,8 @@ func Test_withColumn(t *testing.T) {
 		},
 		{"overwrite Series", args{
 			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo",
+					cache: [][]byte{[]byte("1"), []byte("2")}},
 				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
 			}, name: "foo", input: &Series{values: &valueContainer{
 				slice: []float64{3, 4}, isNull: []bool{false, false},
@@ -2522,6 +2540,7 @@ func Test_valueContainer_fillnull(t *testing.T) {
 		slice  interface{}
 		isNull []bool
 		name   string
+		cache  [][]byte
 	}
 	type args struct {
 		lambda NullFiller
@@ -2548,6 +2567,13 @@ func Test_valueContainer_fillnull(t *testing.T) {
 			args{NullFiller{FillFloat: 0}},
 			&valueContainer{slice: []float64{0, 1, 0, 2, 0}, isNull: []bool{false, false, false, false, false}},
 		},
+		{"reset cache - fill zero",
+			fields{
+				slice: []string{"", "foo"}, isNull: []bool{true, false},
+				cache: [][]byte{[]byte(""), []byte("foo")}},
+			args{NullFiller{FillZero: true}},
+			&valueContainer{slice: []string{"", "foo"}, isNull: []bool{false, false}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2555,6 +2581,7 @@ func Test_valueContainer_fillnull(t *testing.T) {
 				slice:  tt.fields.slice,
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
+				cache:  tt.fields.cache,
 			}
 			vc.fillnull(tt.args.lambda)
 			if !reflect.DeepEqual(vc, tt.want) {
@@ -2570,6 +2597,7 @@ func Test_valueContainer_resample(t *testing.T) {
 		slice  interface{}
 		isNull []bool
 		name   string
+		cache  [][]byte
 	}
 	type args struct {
 		by Resampler
@@ -2580,7 +2608,9 @@ func Test_valueContainer_resample(t *testing.T) {
 		args   args
 		want   *valueContainer
 	}{
-		{"year", fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},
+		{"year - reset cache",
+			fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo",
+				cache: [][]byte{[]byte("2020-02-02 12:30:45 +0000 UTC")}},
 			args{Resampler{ByYear: true}},
 			&valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
 				isNull: []bool{false}, name: "foo"}},
@@ -2595,6 +2625,7 @@ func Test_valueContainer_resample(t *testing.T) {
 				slice:  tt.fields.slice,
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
+				cache:  tt.fields.cache,
 			}
 			vc.resample(tt.args.by)
 			if !reflect.DeepEqual(vc, tt.want) {
@@ -4545,6 +4576,55 @@ func Test_dataFrameEqualsDistinct(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := dataFrameEqualsDistinct(tt.args.a, tt.args.b); got != tt.want {
 				t.Errorf("dataFrameEqualsDistinct() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_dropRow(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		cache  [][]byte
+		name   string
+	}
+	type args struct {
+		index int
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *valueContainer
+		wantErr bool
+	}{
+		{"pass - reset cache", fields{slice: []int{0, 1}, isNull: []bool{false, false},
+			name: "qux", cache: [][]byte{[]byte("0"), []byte("1")}},
+			args{0},
+			&valueContainer{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+			false,
+		},
+		{"fail", fields{slice: []int{0, 1}, isNull: []bool{false, false},
+			name: "qux", cache: [][]byte{[]byte("foo")}},
+			args{10},
+			&valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux",
+				cache: [][]byte{[]byte("foo")}},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				cache:  tt.fields.cache,
+				name:   tt.fields.name,
+			}
+			if err := vc.dropRow(tt.args.index); (err != nil) != tt.wantErr {
+				t.Errorf("valueContainer.dropRow() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(vc, tt.want) {
+				t.Errorf("valueContainer.dropRow() -> %v, want %v", vc, tt.want)
 			}
 		})
 	}

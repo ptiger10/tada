@@ -353,7 +353,6 @@ func (s *SeriesMutator) Shift(n int) {
 		n = s.series.Len()
 	}
 	s.series.values = s.series.values.shift(n)
-	s.series.values.resetCache()
 }
 
 // -- SETTERS
