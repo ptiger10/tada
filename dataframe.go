@@ -705,7 +705,7 @@ func (df *DataFrame) IndexOf(name string, columns bool) int {
 	return i
 }
 
-// SliceLabels returns label levels as slices within an []interface
+// SliceLabels returns label levels as interface{} slices within an []interface
 // that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
 // NB: If supplying this output to either of these constructors,
 // be sure to use the spread operator (...), or else the labels will not be read as separate levels.

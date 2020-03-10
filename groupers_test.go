@@ -3082,7 +3082,7 @@ func TestGroupedSeries_Nth(t *testing.T) {
 	}
 }
 
-func TestGroupedSeries_GetLabels(t *testing.T) {
+func TestGroupedSeries_SliceLabels(t *testing.T) {
 	type fields struct {
 		orderedKeys []string
 		rowIndices  [][]int
@@ -3125,14 +3125,14 @@ func TestGroupedSeries_GetLabels(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.GetLabels(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GroupedSeries.GetLabels() = %v, want %v", got, tt.want)
+			if got := g.SliceLabels(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedSeries.SliceLabels() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestGroupedDataFrame_GetLabels(t *testing.T) {
+func TestGroupedDataFrame_SliceLabels(t *testing.T) {
 	type fields struct {
 		orderedKeys []string
 		rowIndices  [][]int
@@ -3171,8 +3171,8 @@ func TestGroupedDataFrame_GetLabels(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.GetLabels(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("GroupedDataFrame.GetLabels() = %v, want %v", got, tt.want)
+			if got := g.SliceLabels(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GroupedDataFrame.SliceLabels() = %v, want %v", got, tt.want)
 			}
 		})
 	}

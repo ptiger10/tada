@@ -1190,7 +1190,7 @@ func (s *Series) GetValues() interface{} {
 	return ret.slice
 }
 
-// SliceLabels returns label levels as slices within an []interface
+// SliceLabels returns label levels as interface{} slices within an []interface
 // that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
 func (s *Series) SliceLabels() []interface{} {
 	var ret []interface{}
