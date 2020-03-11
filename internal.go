@@ -988,59 +988,59 @@ func (vc *valueContainer) iterRow(index int) Element {
 		IsNull: vc.isNull[index]}
 }
 
-func (vc *valueContainer) gt(comparison float64) []int {
-	index := vc.filter(FilterFn{Float: func(v float64) bool {
-		return v > comparison
-	}})
-	return index
-}
-
-func (vc *valueContainer) lt(comparison float64) []int {
-	index := vc.filter(FilterFn{Float: func(v float64) bool {
-		return v < comparison
-	}})
-	return index
-}
-
-func (vc *valueContainer) eq(comparison string) []int {
-	index := vc.filter(FilterFn{String: func(v string) bool {
-		return v == comparison
-	}})
-	return index
-}
-
-func (vc *valueContainer) neq(comparison string) []int {
-	index := vc.filter(FilterFn{String: func(v string) bool {
-		return v != comparison
-	}})
-	return index
-}
-
-func (vc *valueContainer) contains(substr string) []int {
-	index := vc.filter(FilterFn{String: func(v string) bool {
-		return strings.Contains(v, substr)
-	}})
-	return index
-}
-
-func (vc *valueContainer) before(comparison time.Time) []int {
-	index := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
-		return v.Before(comparison)
-	}})
-	return index
-}
-
-func (vc *valueContainer) after(comparison time.Time) []int {
-	index := vc.filter(FilterFn{DateTime: func(v time.Time) bool {
-		return v.After(comparison)
-	}})
-	return index
-}
-
 // call filter.validate() first
 func (vc *valueContainer) filter(filter FilterFn) []int {
 	var index []int
-	if filter.Float != nil {
+	if filter.GreaterThan != 0 {
+		slice := vc.float64().slice
+		for i := range slice {
+			if slice[i] > filter.GreaterThan && !vc.isNull[i] {
+				index = append(index, i)
+			}
+		}
+	} else if filter.LessThan != 0 {
+		slice := vc.float64().slice
+		for i := range slice {
+			if slice[i] < filter.LessThan && !vc.isNull[i] {
+				index = append(index, i)
+			}
+		}
+	} else if filter.Equals != "" {
+		slice := vc.string().slice
+		for i := range slice {
+			if slice[i] == filter.Equals && !vc.isNull[i] {
+				index = append(index, i)
+			}
+		}
+	} else if filter.NotEquals != "" {
+		slice := vc.string().slice
+		for i := range slice {
+			if slice[i] != filter.NotEquals && !vc.isNull[i] {
+				index = append(index, i)
+			}
+		}
+	} else if filter.Contains != "" {
+		slice := vc.string().slice
+		for i := range slice {
+			if strings.Contains(slice[i], filter.Contains) && !vc.isNull[i] {
+				index = append(index, i)
+			}
+		}
+	} else if filter.Before != (time.Time{}) {
+		slice := vc.dateTime().slice
+		for i := range slice {
+			if slice[i].Before(filter.Before) && !vc.isNull[i] {
+				index = append(index, i)
+			}
+		}
+	} else if filter.After != (time.Time{}) {
+		slice := vc.dateTime().slice
+		for i := range slice {
+			if slice[i].After(filter.After) && !vc.isNull[i] {
+				index = append(index, i)
+			}
+		}
+	} else if filter.Float != nil {
 		slice := vc.float64().slice
 		for i := range slice {
 			if filter.Float(slice[i]) && !vc.isNull[i] {
@@ -2004,12 +2004,11 @@ func cumsum(vals []float64, isNull []bool, index []int) []float64 {
 }
 
 func (filter FilterFn) validate() error {
-	if filter.Float == nil {
-		if filter.String == nil {
-			if filter.DateTime == nil {
-				return fmt.Errorf("no filter function provided")
-			}
-		}
+	if filter.GreaterThan == 0 && filter.LessThan == 0 &&
+		filter.Equals == "" && filter.NotEquals == "" && filter.Contains == "" &&
+		filter.Before == (time.Time{}) && filter.After == (time.Time{}) &&
+		filter.Float == nil && filter.String == nil && filter.DateTime == nil {
+		return fmt.Errorf("no filter function provided")
 	}
 	return nil
 }
@@ -2649,11 +2648,11 @@ func filter(containers []*valueContainer, filters map[string]FilterFn) ([]int, e
 	for containerName, filter := range filters {
 		err := filter.validate()
 		if err != nil {
-			return nil, fmt.Errorf("filter: %v", err)
+			return nil, err
 		}
 		position, err := indexOfContainer(containerName, containers)
 		if err != nil {
-			return nil, fmt.Errorf("filter: %v", err)
+			return nil, err
 		}
 		subIndex := containers[position].filter(filter)
 		subIndexes = append(subIndexes, subIndex)

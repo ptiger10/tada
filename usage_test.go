@@ -1,11 +1,20 @@
 package tada
 
+import (
+	"testing"
+)
+
 // func TestUsage(t *testing.T) {
 // 	df := NewDataFrame(
 // 		[]interface{}{[]float64{1, 2, 3}, []string{"foo", "foo", "baz"}}).
 // 		SetColNames([]string{"qux", "quux"})
 // 	fmt.Println(df.Sum())
 // }
+
+func TestFilter(t *testing.T) {
+	s := NewSeries([]float64{1, 2, 3})
+	s.Filter(map[string]FilterFn{"": {LessThan: 2}})
+}
 
 // func TestMockCSV(t *testing.T) {
 // 	c := [][]string{{"qux", "corge", "waldo"},

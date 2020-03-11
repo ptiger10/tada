@@ -6,7 +6,6 @@ package tada
 import (
 	"bytes"
 	"encoding/csv"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -587,10 +586,6 @@ func (df *DataFrame) Subset(index []int) *DataFrame {
 // Subset returns only the rows specified at the index positions, in the order specified.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Subset(index []int) {
-	if reflect.DeepEqual(index, []int{-999}) {
-		df.dataframe.resetWithError(errors.New(
-			"Subset(): invalid filter (every filter must have at least one filter function; if ColName is supplied, it must be valid)"))
-	}
 	for k := range df.dataframe.values {
 		err := df.dataframe.values[k].subsetRows(index)
 		if err != nil {
@@ -1317,7 +1312,7 @@ func (df *DataFrame) Transpose() *DataFrame {
 // PromoteToColLevel pivots an existing container (either column or label names) into a new column level.
 // If promoting would use either the last column or index level, it returns an error.
 // Each unique value in the stacked column is stacked above each existing column.
-// Promotion adds new columns and label rows with duplicate values.
+// Promotion can add new columns and remove label rows with duplicate values.
 func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 
 	// -- isolate container to promote
@@ -1342,6 +1337,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 		residualLabelIndex = excludeFromIndex(len(df.labels), index)
 	}
 	// adjust for label/value merging
+	// colIndex >= 1 means a column has been selected
 	colIndex := index - len(df.labels)
 	valsToPromote := mergedLabelsAndCols[index]
 
@@ -1402,7 +1398,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 		}
 	}
 
-	// -- transfer values and to final form
+	// -- transfer values into final form
 
 	// if a column was selected for promotion, drop all new columns that are a derivative of the original
 	if colIndex >= 0 {
@@ -1425,27 +1421,45 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 
 // -- FILTERS
 
-// Filter returns the index positions of all rows that satisfy all of the `filters`,
+// Filter returns all rows that satisfy all of the `filters`,
 // which is a map of container names (either column or label names) and tada.FilterFn structs.
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container.
 // Values are converted from their original type to the selected field type.
 // For example, {"foo": FilterFn{Float: lambda}} converts the values in the foo container to float64,
-// applies the true/false lambda function to each row in the container, and records the index positions that return true.
-// Finally, the function returns the intersection of the index positions recorded by all the `filters`.
-// Rows with null values are always excluded from the index.
-// If an error is returned (e.g., because no field is selected in the FilterFn struct), returns []int{-999}.
-func (df *DataFrame) Filter(filters map[string]FilterFn) []int {
+// applies the true/false lambda function to each row in the container, and returns the rows that return true.
+// Rows with null values are always excluded from the filtered data.
+// If no filter is provided, returns a new copy of the DataFrame.
+// Returns a new DataFrame.
+func (df *DataFrame) Filter(filters map[string]FilterFn) *DataFrame {
+	df.Copy()
+	df.InPlace().Filter(filters)
+	return df
+}
+
+// Filter returns all rows that satisfy all of the `filters`,
+// which is a map of container names (either column or label names) and tada.FilterFn structs.
+// For each container name in the map, the first field selected (i.e., not left blank)
+// in its FilterFn struct provides the filter logic for that container.
+// Values are converted from their original type to the selected field type.
+// For example, {"foo": FilterFn{Float: lambda}} converts the values in the foo container to float64,
+// applies the true/false lambda function to each row in the container, and returns the rows that return true.
+// Rows with null values are always excluded from the filtered data.
+// If no filter is provided, does nothing.
+// Modifies the underlying DataFrame in place.
+func (df *DataFrameMutator) Filter(filters map[string]FilterFn) {
 	if len(filters) == 0 {
-		return makeIntRange(0, df.Len())
+		return
 	}
 
-	mergedLabelsAndCols := append(df.labels, df.values...)
-	ret, err := filter(mergedLabelsAndCols, filters)
+	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
+	index, err := filter(mergedLabelsAndCols, filters)
 	if err != nil {
-		return []int{-999}
+		df.dataframe.resetWithError(fmt.Errorf("Filter(): %v", err))
+		return
 	}
-	return ret
+	df.Subset(index)
+	return
 }
 
 // -- APPLY
@@ -1473,6 +1487,7 @@ func (df *DataFrame) Apply(lambdas map[string]ApplyFn) *DataFrame {
 // For example, {"foo": ApplyFn{Float: lambda}} converts the values in the foo container to float64 and
 // applies the lambda function to each row in the container, outputting a new float64 value for each row.
 // If a value is null either before or after the lambda function is applied, it is also null after.// Modifies the underlying DataFrame in place.
+// Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
 	for containerName, lambda := range lambdas {
@@ -1694,6 +1709,7 @@ func (df *DataFrame) LookupAdvanced(other *DataFrame, how string, leftOn []strin
 // Sort sorts the values `by` zero or more Sorter specifications.
 // If no Sorter is supplied, does not sort.
 // If no DType is supplied for a Sorter, sorts as float64.
+// DType is only used for the process of sorting. Once it has been sorted, data retains its original type.
 // Returns a new DataFrame.
 func (df *DataFrame) Sort(by ...Sorter) *DataFrame {
 	df.Copy()

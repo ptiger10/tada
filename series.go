@@ -1,7 +1,6 @@
 package tada
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"reflect"
@@ -191,11 +190,6 @@ func (s *Series) Subset(index []int) *Series {
 // Subset returns only the rows specified at the index positions, in the order specified.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Subset(index []int) {
-	if reflect.DeepEqual(index, []int{-999}) {
-		s.series.resetWithError(errors.New(
-			"Subset(): likely invalid filter (every filter must have at least one filter function; if ColName is supplied, it must be valid)"))
-		return
-	}
 	err := s.series.values.subsetRows(index)
 	if err != nil {
 		s.series.resetWithError(fmt.Errorf("Subset(): %v", err))
@@ -544,6 +538,7 @@ func (s *Series) Name() string {
 // If no Sorter is supplied, sorts by Series values (as float64) in ascending order.
 // If a Sorter is supplied without a `Name` or with a name matching the Series name, sorts by Series values.
 // If no DType is supplied in a Sorter, sorts as float64.
+// DType is only used for the process of sorting. Once it has been sorted, data retains its original type.
 // Returns a new Series.
 func (s *Series) Sort(by ...Sorter) *Series {
 	s.Copy()
@@ -580,40 +575,66 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 
 // -- FILTERS
 
-// Filter applies one or more filters to the containers in the Series
-// and returns the intersection of the row positions that satisfy all filters.
-// Filter may be applied to any label level by supplying the label name as a key in the `filter` map.
+// Filter returns all rows that satisfy all of the `filters`,
+// which is a map of container names (either column or label names) and tada.FilterFn structs.
 // Filter may be applied to the Series values by supplying as key either the Series name or an empty string ("").
-// If no filter is provided, returns a list of all index positions in the Series.
-// In event of error, returns []int{-999}
-func (s *Series) Filter(filters map[string]FilterFn) []int {
+// For each container name in the map, the first field selected (i.e., not left blank)
+// in its FilterFn struct provides the filter logic for that container.
+// Values are converted from their original type to the selected field type.
+// For example, {"foo": FilterFn{Float: lambda}} converts the values in the foo container to float64,
+// applies the true/false lambda function to each row in the container, and returns the rows that return true.
+// Rows with null values are always excluded from the filtered data.
+// If no filter is provided, returns a new copy of the Series.
+// Returns a new Series.
+func (s *Series) Filter(filters map[string]FilterFn) *Series {
+	s.Copy()
+	s.InPlace().Filter(filters)
+	return s
+}
+
+// Filter returns all rows that satisfy all of the `filters`,
+// which is a map of container names (either column or label names) and tada.FilterFn structs.
+// Filter may be applied to the Series values by supplying as key either the Series name or an empty string ("").
+// For each container name in the map, the first field selected (i.e., not left blank)
+// in its FilterFn struct provides the filter logic for that container.
+// Values are converted from their original type to the selected field type.
+// For example, {"foo": FilterFn{Float: lambda}} converts the values in the foo container to float64,
+// applies the true/false lambda function to each row in the container, and returns the rows that return true.
+// Rows with null values are always excluded from the filtered data.
+// If no filter is provided, does nothing.
+// Modifies the underlying Series in place.
+func (s *SeriesMutator) Filter(filters map[string]FilterFn) {
 	if len(filters) == 0 {
-		return makeIntRange(0, s.Len())
+		return
 	}
-	// replace "" with values
+	// replace "" with values container name
 	for k, v := range filters {
 		if k == "" {
-			filters[s.values.name] = v
+			filters[s.series.values.name] = v
 			delete(filters, k)
 		}
 	}
 
-	mergedLabelsAndValues := append(s.labels, s.values)
-	ret, err := filter(mergedLabelsAndValues, filters)
+	mergedLabelsAndValues := append(s.series.labels, s.series.values)
+	index, err := filter(mergedLabelsAndValues, filters)
 	if err != nil {
-		return []int{-999}
+		s.series.resetWithError(fmt.Errorf("Filter(): %v", err))
+		return
 	}
-	return ret
+	s.Subset(index)
 }
 
 // Where iterates over the values in `s` and evaluates whether all `filters` are true.
 // If yes, returns `ifTrue` at that row position.
 // If not, returns `ifFalse` at that row position.
 func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{}) *Series {
-	// to do: check for bad filter
 	ret := make([]interface{}, s.Len())
 	// []int of positions where all filters are true
-	index := s.Filter(filters)
+	mergedLabelsAndValues := append(s.labels, s.values)
+	index, err := filter(mergedLabelsAndValues, filters)
+	if err != nil {
+		return seriesWithError(fmt.Errorf("Where(): %v", err))
+	}
 	for _, i := range index {
 		ret[i] = ifTrue
 	}
@@ -625,46 +646,11 @@ func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{})
 	return &Series{
 		values: &valueContainer{
 			slice:  ret,
-			isNull: s.values.isNull,
+			isNull: copyNulls(s.values.isNull),
 			name:   s.values.name,
 		},
-		labels: s.labels,
+		labels: copyContainers(s.labels),
 	}
-}
-
-// GT coerces Series values to float64 and returns each row position with a non-null value greater than `comparison`.
-func (s *Series) GT(comparison float64) []int {
-	return s.values.gt(comparison)
-}
-
-// LT coerces Series values to float64 and returns each row position with a non-null value less than `comparison`.
-func (s *Series) LT(comparison float64) []int {
-	return s.values.lt(comparison)
-}
-
-// EQ coerces Series values to string and returns each row position with a non-null value equal to `comparison`.
-func (s *Series) EQ(comparison string) []int {
-	return s.values.eq(comparison)
-}
-
-// NEQ coerces Series values to string and returns each row position with a non-null value not equal to `comparison`.
-func (s *Series) NEQ(comparison string) []int {
-	return s.values.neq(comparison)
-}
-
-// Contains coerces Series values to string and returns each row position with a non-null value containing `comparison`.
-func (s *Series) Contains(substr string) []int {
-	return s.values.contains(substr)
-}
-
-// Before coerces Series values to time.Time and returns each row position with a non-null value before `comparison`.
-func (s *Series) Before(comparison time.Time) []int {
-	return s.values.before(comparison)
-}
-
-// After coerces Series values to time.Time and returns each row position with a non-null value after `comparison`.
-func (s *Series) After(comparison time.Time) []int {
-	return s.values.after(comparison)
 }
 
 // -- APPLY

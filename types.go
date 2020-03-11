@@ -130,9 +130,16 @@ type NullFiller struct {
 // Only the first field selected (i.e., not left nil) is used - any others are ignored.
 // Values are coerced to the type specified in the field (e.g., DateTime -> time.Time) before the filter function is evaluated.
 type FilterFn struct {
-	Float    func(val float64) bool
-	String   func(val string) bool
-	DateTime func(val time.Time) bool
+	GreaterThan float64
+	LessThan    float64
+	Equals      string
+	NotEquals   string
+	Contains    string
+	Before      time.Time
+	After       time.Time
+	Float       func(val float64) bool
+	String      func(val string) bool
+	DateTime    func(val time.Time) bool
 }
 
 // An ApplyFn supplies logic to the Apply() function.

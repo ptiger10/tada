@@ -844,258 +844,6 @@ func Test_makeStringMatrix(t *testing.T) {
 	}
 }
 
-func Test_valueContainer_gt(t *testing.T) {
-	type fields struct {
-		slice  interface{}
-		name   string
-		isNull []bool
-	}
-	type args struct {
-		comparison float64
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   []int
-	}{
-		{"pass", fields{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
-			args{2}, []int{2}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			vc := &valueContainer{
-				slice:  tt.fields.slice,
-				name:   tt.fields.name,
-				isNull: tt.fields.isNull,
-			}
-			if got := vc.gt(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("valueContainer.gt() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_valueContainer_lt(t *testing.T) {
-	type fields struct {
-		slice  interface{}
-		name   string
-		isNull []bool
-	}
-	type args struct {
-		comparison float64
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   []int
-	}{
-		{"pass", fields{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
-			args{2}, []int{0}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			vc := &valueContainer{
-				slice:  tt.fields.slice,
-				name:   tt.fields.name,
-				isNull: tt.fields.isNull,
-			}
-			if got := vc.lt(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("valueContainer.lt() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_valueContainer_eq(t *testing.T) {
-	type fields struct {
-		slice  interface{}
-		name   string
-		isNull []bool
-	}
-	type args struct {
-		comparison string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   []int
-	}{
-		{"pass", fields{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
-			args{"foo"}, []int{0}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			vc := &valueContainer{
-				slice:  tt.fields.slice,
-				name:   tt.fields.name,
-				isNull: tt.fields.isNull,
-			}
-			if got := vc.eq(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("valueContainer.eq() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_valueContainer_neq(t *testing.T) {
-	type fields struct {
-		slice  interface{}
-		name   string
-		isNull []bool
-	}
-	type args struct {
-		comparison string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   []int
-	}{
-		{"pass", fields{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
-			args{"foo"}, []int{1, 2}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			vc := &valueContainer{
-				slice:  tt.fields.slice,
-				name:   tt.fields.name,
-				isNull: tt.fields.isNull,
-			}
-			if got := vc.neq(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("valueContainer.neq() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_valueContainer_contains(t *testing.T) {
-	type fields struct {
-		slice  interface{}
-		name   string
-		isNull []bool
-	}
-	type args struct {
-		substr string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   []int
-	}{
-		{"pass", fields{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
-			args{"ba"}, []int{1, 2}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			vc := &valueContainer{
-				slice:  tt.fields.slice,
-				name:   tt.fields.name,
-				isNull: tt.fields.isNull,
-			}
-			if got := vc.contains(tt.args.substr); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("valueContainer.contains() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_valueContainer_before(t *testing.T) {
-	date := time.Date(2019, 1, 1, 1, 0, 0, 0, time.UTC)
-	type fields struct {
-		slice  interface{}
-		name   string
-		isNull []bool
-	}
-	type args struct {
-		comparison time.Time
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   []int
-	}{
-		{"pass", fields{slice: []time.Time{date, date.AddDate(0, 0, 1), date.AddDate(0, 0, 2)}, isNull: []bool{false, false, false}},
-			args{date.AddDate(0, 0, 1)}, []int{0}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			vc := &valueContainer{
-				slice:  tt.fields.slice,
-				name:   tt.fields.name,
-				isNull: tt.fields.isNull,
-			}
-			if got := vc.before(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("valueContainer.before() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_valueContainer_after(t *testing.T) {
-	date := time.Date(2019, 1, 1, 1, 0, 0, 0, time.UTC)
-	type fields struct {
-		slice  interface{}
-		name   string
-		isNull []bool
-	}
-	type args struct {
-		comparison time.Time
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   []int
-	}{
-		{"pass", fields{slice: []time.Time{date, date.AddDate(0, 0, 1), date.AddDate(0, 0, 2)}, isNull: []bool{false, false, false}},
-			args{date.AddDate(0, 0, 1)}, []int{2}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			vc := &valueContainer{
-				slice:  tt.fields.slice,
-				name:   tt.fields.name,
-				isNull: tt.fields.isNull,
-			}
-			if got := vc.after(tt.args.comparison); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("valueContainer.after() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-// func Test_concatenateLabelsToStrings(t *testing.T) {
-// 	type args struct {
-// 		labels []*valueContainer
-// 	}
-// 	tests := []struct {
-// 		name string
-// 		args args
-// 		want []string
-// 	}{
-// 		{"one level", args{labels: []*valueContainer{
-// 			{slice: []string{"foo", "bar"}}}},
-// 			[]string{"foo", "bar"}},
-// 		{"two levels, two index", args{labels: []*valueContainer{
-// 			{slice: []string{"foo", "bar"}},
-// 			{slice: []int{0, 1}}}},
-// 			[]string{"foo|0", "bar|1"}},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			if got := concatenateLabelsToStrings(tt.args.labels); !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("concatenateLabelsToStrings() = %v, want %v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
-
 func Test_valueContainer_shift(t *testing.T) {
 	type fields struct {
 		slice  interface{}
@@ -4217,6 +3965,7 @@ func Test_valueContainer_subsetRows(t *testing.T) {
 }
 
 func Test_valueContainer_filter(t *testing.T) {
+	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	type fields struct {
 		slice  interface{}
 		isNull []bool
@@ -4226,15 +3975,41 @@ func Test_valueContainer_filter(t *testing.T) {
 		filter FilterFn
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    []int
-		wantErr bool
+		name   string
+		fields fields
+		args   args
+		want   []int
 	}{
-		{"pass", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"},
+		{"GreaterThan", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+			args{FilterFn{GreaterThan: 1}},
+			[]int{2}},
+		{"LessThan", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+			args{FilterFn{LessThan: 1}},
+			[]int{0}},
+		{"Equals", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+			args{FilterFn{Equals: "2"}},
+			[]int{2}},
+		{"Not Equals", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+			args{FilterFn{NotEquals: "2"}},
+			[]int{0, 1}},
+		{"Contains", fields{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "foo"},
+			args{FilterFn{Contains: "b"}},
+			[]int{1, 2}},
+		{"Before", fields{slice: []time.Time{d.AddDate(0, 0, -1), d, d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false}, name: "foo"},
+			args{FilterFn{Before: d}},
+			[]int{0}},
+		{"After", fields{slice: []time.Time{d.AddDate(0, 0, -1), d, d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false}, name: "foo"},
+			args{FilterFn{After: d}},
+			[]int{2}},
+		{"Float", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 			args{FilterFn{Float: func(val float64) bool { return val > 1 }}},
-			[]int{2}, false},
+			[]int{2}},
+		{"String", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+			args{FilterFn{String: func(val string) bool { return val == "2" }}},
+			[]int{2}},
+		{"DateTime", fields{slice: []time.Time{d.AddDate(0, 0, -1), d, d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false}, name: "foo"},
+			args{FilterFn{DateTime: func(val time.Time) bool { return val.Before(d) }}},
+			[]int{0}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
