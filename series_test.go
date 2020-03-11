@@ -2940,7 +2940,7 @@ func TestSeries_DType(t *testing.T) {
 	}
 }
 
-func TestSeries_IndexOfLabels(t *testing.T) {
+func TestSeries_IndexOfLabel(t *testing.T) {
 	type fields struct {
 		values     *valueContainer
 		labels     []*valueContainer
@@ -2975,8 +2975,8 @@ func TestSeries_IndexOfLabels(t *testing.T) {
 				sharedData: tt.fields.sharedData,
 				err:        tt.fields.err,
 			}
-			if got := s.IndexOfLabels(tt.args.name); got != tt.want {
-				t.Errorf("Series.IndexOfLabels() = %v, want %v", got, tt.want)
+			if got := s.IndexOfLabel(tt.args.name); got != tt.want {
+				t.Errorf("Series.IndexOfLabel() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -3296,6 +3296,44 @@ func TestSeries_XS(t *testing.T) {
 			}
 			if got := s.XS(tt.args.filters); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.XS() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_NameOfLabel(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		n int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   string
+	}{
+		{"pass",
+			fields{
+				values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
+			args{0},
+			"qux"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.NameOfLabel(tt.args.n); got != tt.want {
+				t.Errorf("Series.NameOfLabel() = %v, want %v", got, tt.want)
 			}
 		})
 	}

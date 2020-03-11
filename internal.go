@@ -166,6 +166,15 @@ func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels
 	return leftKeys, rightKeys
 }
 
+// nameOfContainer returns the name of the container at index position `n`.
+// If n is out of range, returns "-out of range-"
+func nameOfContainer(containers []*valueContainer, n int) string {
+	if n >= len(containers) {
+		return "-out of range-"
+	}
+	return containers[n].name
+}
+
 // indexOfContainer returns the position of the first level within `cols` with a name matching `name`, or an error if no level matches
 func indexOfContainer(name string, containers []*valueContainer) (int, error) {
 	for j := range containers {

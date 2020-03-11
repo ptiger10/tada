@@ -492,6 +492,7 @@ func (df *DataFrame) String() string {
 				rightHalf...)
 		}
 	}
+	// write to table
 	var buf bytes.Buffer
 	table := tablewriter.NewWriter(&buf)
 	// optional caption
@@ -679,6 +680,18 @@ func (df *DataFrame) DeduplicateNames() *DataFrame {
 func (df *DataFrameMutator) DeduplicateNames() {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
 	deduplicateContainerNames(mergedLabelsAndCols)
+}
+
+// NameOfLabel returns the name of the label level at index position `n`.
+// If n is out of range, returns "-out of range-"
+func (df *DataFrame) NameOfLabel(n int) string {
+	return nameOfContainer(df.labels, n)
+}
+
+// NameOfColumn returns the name of the column at index position `n`.
+// If n is out of range, returns "-out of range-"
+func (df *DataFrame) NameOfColumn(n int) string {
+	return nameOfContainer(df.values, n)
 }
 
 // IndexOfContainer returns the index position of the first container with a name matching `name`.

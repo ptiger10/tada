@@ -147,9 +147,15 @@ func (s *Series) Cast(containerAsType map[string]DType) {
 	return
 }
 
-// IndexOfLabels returns the index position of the first label level with a name matching `name`.
+// NameOfLabel returns the name of the label level at index position `n`.
+// If n is out of range, returns "-out of range-"
+func (s *Series) NameOfLabel(n int) string {
+	return nameOfContainer(s.labels, n)
+}
+
+// IndexOfLabel returns the index position of the first label level with a name matching `name`.
 // If `name` does not match any container, -1 is returned.
-func (s *Series) IndexOfLabels(name string) int {
+func (s *Series) IndexOfLabel(name string) int {
 	i, err := indexOfContainer(name, s.labels)
 	if err != nil {
 		return -1

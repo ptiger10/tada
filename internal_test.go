@@ -4491,3 +4491,37 @@ func Test_xs(t *testing.T) {
 		})
 	}
 }
+
+func Test_nameOfContainer(t *testing.T) {
+	type args struct {
+		containers []*valueContainer
+		n          int
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{"pass",
+			args{
+				[]*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "foo"}},
+				0},
+			"qux"},
+		{"fail",
+			args{
+				[]*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "foo"}},
+				10},
+			"-out of range-"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := nameOfContainer(tt.args.containers, tt.args.n); got != tt.want {
+				t.Errorf("nameOfContainer() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
