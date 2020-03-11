@@ -248,17 +248,12 @@ func (vc *valueContainer) string() stringValueContainer {
 		for i := 0; i < d.Len(); i++ {
 			newVals[i] = fmt.Sprint(d.Index(i).Interface())
 		}
-	default:
-		for i := range newVals {
-			newVals[i] = ""
-			isNull[i] = true
-		}
-
 	}
 	ret := stringValueContainer{
 		slice:  newVals,
 		isNull: isNull,
 	}
+	vc.setCacheFromString(ret.slice)
 	return ret
 }
 
@@ -324,6 +319,7 @@ func (vc *valueContainer) resetCache() {
 // conditions under which cache is set:
 // - concatenating multiple container levels (groupby, lookup, promote)
 // - casting from string or byte
+// - calling vc.tostring()
 // ignores if cache is already set
 func (vc *valueContainer) setCache() {
 	if vc.cache != nil {
@@ -333,11 +329,7 @@ func (vc *valueContainer) setCache() {
 	case [][]byte:
 		vc.cache = vc.slice.([][]byte)
 	case []string:
-		arr := vc.slice.([]string)
-		vc.cache = make([][]byte, len(arr))
-		for i := range arr {
-			vc.cache[i] = []byte(arr[i])
-		}
+		vc.setCacheFromString(vc.slice.([]string))
 	case []float64:
 		arr := vc.slice.([]float64)
 		vc.cache = make([][]byte, len(arr))
@@ -363,7 +355,17 @@ func (vc *valueContainer) setCache() {
 			vc.cache[i] = []byte(fmt.Sprint(arr.Index(i).Interface()))
 		}
 	}
+}
 
+func (vc *valueContainer) setCacheFromString(arr []string) {
+	if vc.cache != nil {
+		return
+	}
+	vc.cache = make([][]byte, len(arr))
+	for i := range arr {
+		vc.cache[i] = []byte(arr[i])
+	}
+	return
 }
 
 func (vc *valueContainer) isBytes() bool {

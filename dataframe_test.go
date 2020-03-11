@@ -135,7 +135,7 @@ func TestDataFrame_Cast(t *testing.T) {
 		want    *DataFrame
 		wantErr bool
 	}{
-		{"pass", fields{
+		{"pass - set cache", fields{
 			values: []*valueContainer{
 				{slice: []int{1}, isNull: []bool{false}, name: "foo"},
 				{slice: []int{1}, isNull: []bool{false}, name: "bar"}},
@@ -146,7 +146,7 @@ func TestDataFrame_Cast(t *testing.T) {
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
-					{slice: []string{"1"}, isNull: []bool{false}, name: "bar"}},
+					{slice: []string{"1"}, isNull: []bool{false}, name: "bar", cache: [][]byte{[]byte("1")}}},
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "qux"},

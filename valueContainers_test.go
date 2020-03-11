@@ -1,6 +1,7 @@
 package tada
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -414,30 +415,47 @@ func Test_valueContainer_string(t *testing.T) {
 		name   string
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		want   stringValueContainer
+		name      string
+		fields    fields
+		want      stringValueContainer
+		wantCache [][]byte
 	}{
 		{"[]float64", fields{slice: []float64{1}, isNull: []bool{false}},
-			stringValueContainer{slice: []string{"1"}, isNull: []bool{false}}},
+			stringValueContainer{slice: []string{"1"}, isNull: []bool{false}},
+			[][]byte{[]byte("1")},
+		},
 		{"[]string", fields{slice: []string{"", "foo", "3.5"}, isNull: []bool{true, false, false}},
-			stringValueContainer{slice: []string{"", "foo", "3.5"}, isNull: []bool{true, false, false}}},
+			stringValueContainer{slice: []string{"", "foo", "3.5"}, isNull: []bool{true, false, false}},
+			[][]byte{[]byte(""), []byte("foo"), []byte("3.5")},
+		},
 		{"[]time.Time", fields{slice: []time.Time{{}, d}, isNull: []bool{true, false}},
-			stringValueContainer{slice: []string{"0001-01-01T00:00:00Z", "2020-01-01T00:00:00Z"}, isNull: []bool{true, false}}},
+			stringValueContainer{slice: []string{"0001-01-01T00:00:00Z", "2020-01-01T00:00:00Z"}, isNull: []bool{true, false}},
+			[][]byte{[]byte("0001-01-01T00:00:00Z"), []byte("2020-01-01T00:00:00Z")},
+		},
 		{"[]bool", fields{slice: []bool{false, true, false}, isNull: []bool{false, false, true}},
-			stringValueContainer{slice: []string{"false", "true", "false"}, isNull: []bool{false, false, true}}},
+			stringValueContainer{slice: []string{"false", "true", "false"}, isNull: []bool{false, false, true}},
+			[][]byte{[]byte("false"), []byte("true"), []byte("false")},
+		},
 		{"[]interface", fields{slice: []interface{}{"3.5", float64(1), int(1), uint(1), d, false}, isNull: []bool{false, false, false, false, false, false}},
-			stringValueContainer{slice: []string{"3.5", "1", "1", "1", "2020-01-01T00:00:00Z", "false"}, isNull: []bool{false, false, false, false, false, false}}},
+			stringValueContainer{slice: []string{"3.5", "1", "1", "1", "2020-01-01T00:00:00Z", "false"}, isNull: []bool{false, false, false, false, false, false}},
+			[][]byte{[]byte("3.5"), []byte("1"), []byte("1"), []byte("1"), []byte("2020-01-01T00:00:00Z"), []byte("false")},
+		},
 		{"[]int", fields{slice: []int{1}, isNull: []bool{false}},
-			stringValueContainer{slice: []string{"1"}, isNull: []bool{false}}},
+			stringValueContainer{slice: []string{"1"}, isNull: []bool{false}},
+			[][]byte{[]byte("1")},
+		},
 		{"[][]byte", fields{slice: [][]byte{{100, 100}, {105, 105}}, isNull: []bool{false, false}},
-			stringValueContainer{slice: []string{"dd", "ii"}, isNull: []bool{false, false}}},
+			stringValueContainer{slice: []string{"dd", "ii"}, isNull: []bool{false, false}},
+			[][]byte{{100, 100}, {105, 105}},
+		},
 		{"[][]string", fields{slice: [][]string{{"foo", "bar"}, {""}}, isNull: []bool{false, true}},
-			stringValueContainer{slice: []string{"[foo bar]", "[]"}, isNull: []bool{false, true}}},
+			stringValueContainer{slice: []string{"[foo bar]", "[]"}, isNull: []bool{false, true}},
+			[][]byte{[]byte("[foo bar]"), []byte("[]")},
+		},
 		{"[][]float64", fields{slice: [][]float64{{1, 2}, {0}}, isNull: []bool{false, true}},
-			stringValueContainer{slice: []string{"[1 2]", "[0]"}, isNull: []bool{false, true}}},
-		{"unsupported", fields{slice: []complex64{1, 2}, isNull: []bool{false, false}},
-			stringValueContainer{slice: []string{"", ""}, isNull: []bool{true, true}}},
+			stringValueContainer{slice: []string{"[1 2]", "[0]"}, isNull: []bool{false, true}},
+			[][]byte{[]byte("[1 2]"), []byte("[0]")},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -448,6 +466,12 @@ func Test_valueContainer_string(t *testing.T) {
 			}
 			if got := vc.string(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("valueContainer.str() = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(vc.cache, tt.wantCache) {
+				t.Errorf("valueContainer.str() cache -> %v, want %v", vc.cache, tt.wantCache)
+				for i := range vc.cache {
+					fmt.Println(string(vc.cache[i]))
+				}
 			}
 		})
 	}
@@ -551,8 +575,8 @@ func Test_valueContainer_cast(t *testing.T) {
 			args{String}, &valueContainer{
 				cache: [][]byte{[]byte("foo")},
 				slice: []string{"foo"}, isNull: []bool{false}, name: "foo"}},
-		{"int to string", fields{slice: []int{1}, isNull: []bool{false}, name: "foo"},
-			args{String}, &valueContainer{slice: []string{"1"}, isNull: []bool{false}, name: "foo"}},
+		{"int to string - set cache", fields{slice: []int{1}, isNull: []bool{false}, name: "foo"},
+			args{String}, &valueContainer{slice: []string{"1"}, isNull: []bool{false}, name: "foo", cache: [][]byte{[]byte("1")}}},
 		{"datetime to datetime", fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},
 			args{DateTime}, &valueContainer{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"}},
 		{"int to datetime", fields{slice: []int{1}, isNull: []bool{false}, name: "foo"},
