@@ -2880,7 +2880,7 @@ func TestWriteMockCSV(t *testing.T) {
 	}
 }
 
-func TestDataFrame_ListColumns(t *testing.T) {
+func TestDataFrame_ListColumnNames(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -2908,8 +2908,8 @@ func TestDataFrame_ListColumns(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.ListColumns(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.ListColumns() = %v, want %v", got, tt.want)
+			if got := df.ListColumnNames(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.ListColumnNames() = %v, want %v", got, tt.want)
 			}
 		})
 	}

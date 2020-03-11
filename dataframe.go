@@ -547,8 +547,8 @@ func listNames(columns []*valueContainer) []string {
 	return ret
 }
 
-// ListColumns returns the name of all the columns in the DataFrame, in order.
-func (df *DataFrame) ListColumns() []string {
+// ListColumnNames returns the name of all the columns in the DataFrame, in order.
+func (df *DataFrame) ListColumnNames() []string {
 	return listNames(df.values)
 }
 
