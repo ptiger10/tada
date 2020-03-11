@@ -147,14 +147,54 @@ func (s *Series) Cast(containerAsType map[string]DType) {
 	return
 }
 
-// IndexOf returns the index position of the first container with a name matching `name`
+// IndexOfLabels returns the index position of the first label level with a name matching `name`.
 // If `name` does not match any container, -1 is returned.
-func (s *Series) IndexOf(name string) int {
+func (s *Series) IndexOfLabels(name string) int {
 	i, err := indexOfContainer(name, s.labels)
 	if err != nil {
 		return -1
 	}
 	return i
+}
+
+// IndexOfRows returns the index positions of the rows with stringified value matching `value`
+// in the container named `name`.
+// To search Series values, supply either the Series name or an empty string ("") as `name`.
+func (s *Series) IndexOfRows(name string, value interface{}) []int {
+	mergedLabelsAndValues := append(s.labels, s.values)
+	i, err := indexOfContainer(name, mergedLabelsAndValues)
+	if err != nil {
+		errorWarning(fmt.Errorf("IndexOfRows(): %v", err))
+		return nil
+	}
+	return mergedLabelsAndValues[i].indexOfRows(value)
+}
+
+// XS returns a cross section of the rows in the Series satisfying all `filters`,
+// which is a map of of container names (either the Series name or label name) to interface{} values.
+// A filter is satisfied for a given row value if the stringified value in that container matches the stringified interface{} value.
+// XS may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
+// Returns a new Series.
+func (s *Series) XS(filters map[string]interface{}) *Series {
+	s = s.Copy()
+	s.InPlace().XS(filters)
+	return s
+}
+
+// XS returns a cross section of the rows in the Series satisfying all `filters`,
+// which is a map of of container names (either the Series name or label name) to interface{} values.
+// A filter is satisfied for a given row value if the stringified value in that container matches the stringified interface{} value.
+// XS may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
+// Modifies the underlying Series in place.
+func (s *SeriesMutator) XS(filters map[string]interface{}) {
+	mergedLabelsAndValues := append(s.series.labels, s.series.values)
+	index, err := xs(mergedLabelsAndValues, filters)
+	if err != nil {
+		s.series.resetWithError(fmt.Errorf("XS(): %v", err))
+		return
+	}
+	s.Subset(index)
+	return
 }
 
 // SelectLabels finds the first level with matching `name` and returns as a Series with all existing label levels (including itself).
@@ -576,15 +616,18 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 // -- FILTERS
 
 // Filter returns all rows that satisfy all of the `filters`,
-// which is a map of container names (either column or label names) and tada.FilterFn structs.
-// Filter may be applied to the Series values by supplying as key either the Series name or an empty string ("").
+// which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
+// Filter may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container.
-// Values are converted from their original type to the selected field type.
+// Supplying a zero-value for a field is equivalent to leaving it blank (e.g., GreaterThan: 0).
+//
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
 // For example, {"foo": FilterFn{Float: lambda}} converts the values in the foo container to float64,
-// applies the true/false lambda function to each row in the container, and returns the rows that return true.
+// applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
 // If no filter is provided, returns a new copy of the Series.
+// For equality filtering on one or more containers, see also s.XS().
 // Returns a new Series.
 func (s *Series) Filter(filters map[string]FilterFn) *Series {
 	s.Copy()
@@ -593,15 +636,18 @@ func (s *Series) Filter(filters map[string]FilterFn) *Series {
 }
 
 // Filter returns all rows that satisfy all of the `filters`,
-// which is a map of container names (either column or label names) and tada.FilterFn structs.
-// Filter may be applied to the Series values by supplying as key either the Series name or an empty string ("").
+// which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
+// Filter may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
 // For each container name in the map, the first field selected (i.e., not left blank)
-// in its FilterFn struct provides the filter logic for that container.
-// Values are converted from their original type to the selected field type.
+// in its FilterFn struct provides the filter logic for that container
+// Supplying a zero-value for a field is equivalent to leaving it blank (e.g., GreaterThan: 0).
+//
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
 // For example, {"foo": FilterFn{Float: lambda}} converts the values in the foo container to float64,
-// applies the true/false lambda function to each row in the container, and returns the rows that return true.
+// applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
 // If no filter is provided, does nothing.
+// For equality filtering on one or more containers, see also s.XS().
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Filter(filters map[string]FilterFn) {
 	if len(filters) == 0 {
@@ -823,7 +869,7 @@ func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, righ
 // bar 0   n/a
 // baz 1   corge
 //
-// Finally, all container names (columns and label names) are deduplicated after the merge so that they are unique.
+// Finally, all container names (either the Series name or label name) are deduplicated after the merge so that they are unique.
 // Returns a new DataFrame.
 func (s *Series) Merge(other *Series) *DataFrame {
 	return s.ToDataFrame().Merge(other.ToDataFrame())

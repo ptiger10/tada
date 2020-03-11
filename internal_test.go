@@ -3986,12 +3986,6 @@ func Test_valueContainer_filter(t *testing.T) {
 		{"LessThan", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 			args{FilterFn{LessThan: 1}},
 			[]int{0}},
-		{"Equals", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
-			args{FilterFn{Equals: "2"}},
-			[]int{2}},
-		{"Not Equals", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
-			args{FilterFn{NotEquals: "2"}},
-			[]int{0, 1}},
 		{"Contains", fields{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "foo"},
 			args{FilterFn{Contains: "b"}},
 			[]int{1, 2}},
@@ -4010,6 +4004,9 @@ func Test_valueContainer_filter(t *testing.T) {
 		{"DateTime", fields{slice: []time.Time{d.AddDate(0, 0, -1), d, d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false}, name: "foo"},
 			args{FilterFn{DateTime: func(val time.Time) bool { return val.Before(d) }}},
 			[]int{0}},
+		{"Interface", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+			args{FilterFn{Interface: func(val interface{}) bool { return val.(float64) == 2 }}},
+			[]int{2}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -4400,6 +4397,96 @@ func Test_valueContainer_dropRow(t *testing.T) {
 			}
 			if !reflect.DeepEqual(vc, tt.want) {
 				t.Errorf("valueContainer.dropRow() -> %v, want %v", vc, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_indexOfRows(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		cache  [][]byte
+		name   string
+	}
+	type args struct {
+		value interface{}
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"pass",
+			// returns position only of non-null values
+			fields{slice: []float64{1, 2, 3, 2, 2}, isNull: []bool{false, false, false, true, false}},
+			args{2},
+			[]int{1, 4},
+		},
+		{"no matches",
+			fields{slice: []float64{1, 2, 3, 2, 2}, isNull: []bool{false, false, false, true, false}},
+			args{5},
+			[]int{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				cache:  tt.fields.cache,
+				name:   tt.fields.name,
+			}
+			if got := vc.indexOfRows(tt.args.value); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.indexOfRows() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_xs(t *testing.T) {
+	type args struct {
+		containers []*valueContainer
+		values     map[string]interface{}
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []int
+		wantErr bool
+	}{
+		{"pass",
+			args{[]*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "foo"}},
+				map[string]interface{}{"qux": 1, "foo": "bar"}},
+			[]int{1}, false,
+		},
+		{"pass - no matches",
+			args{[]*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "foo"}},
+				map[string]interface{}{"qux": 0, "foo": "bar"}},
+			[]int{}, false,
+		},
+		{"fail",
+			args{[]*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "foo"}},
+				map[string]interface{}{"corge": 1, "foo": "bar"}},
+			nil, true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := xs(tt.args.containers, tt.args.values)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("xs() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("xs() = %v, want %v", got, tt.want)
 			}
 		})
 	}

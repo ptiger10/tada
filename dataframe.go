@@ -681,11 +681,11 @@ func (df *DataFrameMutator) DeduplicateNames() {
 	deduplicateContainerNames(mergedLabelsAndCols)
 }
 
-// IndexOf returns the index position of the first container with a name matching `name`
+// IndexOfContainer returns the index position of the first container with a name matching `name`.
 // If `name` does not match any container, -1 is returned.
 // If `columns` is true, only column names will be searched.
 // If `columns` is false, only label level names will be searched.
-func (df *DataFrame) IndexOf(name string, columns bool) int {
+func (df *DataFrame) IndexOfContainer(name string, columns bool) int {
 	var i int
 	var err error
 	if !columns {
@@ -700,6 +700,19 @@ func (df *DataFrame) IndexOf(name string, columns bool) int {
 	return i
 }
 
+// IndexOfRows returns the index positions of the rows with stringified value matching `value`
+// in the container named `name`.
+// To search Series values, supply either the Series name or an empty string ("") as `name`.
+func (df *DataFrame) IndexOfRows(name string, value interface{}) []int {
+	mergedLabelsAndColumns := append(df.labels, df.values...)
+	i, err := indexOfContainer(name, mergedLabelsAndColumns)
+	if err != nil {
+		errorWarning(fmt.Errorf("IndexOfRows(): %v", err))
+		return nil
+	}
+	return mergedLabelsAndColumns[i].indexOfRows(value)
+}
+
 // SliceLabels returns label levels as interface{} slices within an []interface
 // that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
 // NB: If supplying this output to either of these constructors,
@@ -711,6 +724,31 @@ func (df *DataFrame) SliceLabels() []interface{} {
 		ret = append(ret, labels[j].slice)
 	}
 	return ret
+}
+
+// XS returns a cross section of the rows in the DataFrame satisfying all `filters`,
+// which is a map of of container names (either column or label names) to interface{} values.
+// A filter is satisfied for a given row value if the stringified value in that container matches the stringified interface{} value.
+// Returns a new DataFrame.
+func (df *DataFrame) XS(filters map[string]interface{}) *DataFrame {
+	df = df.Copy()
+	df.InPlace().XS(filters)
+	return df
+}
+
+// XS returns a cross section of the rows in the DataFrame satisfying all `filters`,
+// which is a map of of container names (either column or label names) to interface{} values.
+// A filter is satisfied for a given row value if the stringified value in that container matches the stringified interface{} value.
+// Modifies the underlying DataFrame in place.
+func (df *DataFrameMutator) XS(filters map[string]interface{}) {
+	mergedLabelsAndColumns := append(df.dataframe.labels, df.dataframe.values...)
+	index, err := xs(mergedLabelsAndColumns, filters)
+	if err != nil {
+		df.dataframe.resetWithError(fmt.Errorf("XS(): %v", err))
+		return
+	}
+	df.Subset(index)
+	return
 }
 
 // SelectLabels finds the first label level with matching `name`
@@ -1425,11 +1463,14 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 // which is a map of container names (either column or label names) and tada.FilterFn structs.
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container.
-// Values are converted from their original type to the selected field type.
+// Supplying a zero-value for a field is equivalent to leaving it blank (e.g., GreaterThan: 0).
+//
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
 // For example, {"foo": FilterFn{Float: lambda}} converts the values in the foo container to float64,
-// applies the true/false lambda function to each row in the container, and returns the rows that return true.
+// applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
 // If no filter is provided, returns a new copy of the DataFrame.
+// For equality filtering on one or more containers, see also df.XS().
 // Returns a new DataFrame.
 func (df *DataFrame) Filter(filters map[string]FilterFn) *DataFrame {
 	df.Copy()
@@ -1441,11 +1482,14 @@ func (df *DataFrame) Filter(filters map[string]FilterFn) *DataFrame {
 // which is a map of container names (either column or label names) and tada.FilterFn structs.
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container.
-// Values are converted from their original type to the selected field type.
+// Supplying a zero-value for a field is equivalent to leaving it blank (e.g., GreaterThan: 0).
+//
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
 // For example, {"foo": FilterFn{Float: lambda}} converts the values in the foo container to float64,
-// applies the true/false lambda function to each row in the container, and returns the rows that return true.
+// applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
 // If no filter is provided, does nothing.
+// For equality filtering on one or more containers, see also df.XS().
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Filter(filters map[string]FilterFn) {
 	if len(filters) == 0 {

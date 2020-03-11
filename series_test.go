@@ -2192,21 +2192,22 @@ func TestSeries_Where(t *testing.T) {
 				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{map[string]FilterFn{"qux": {Float: func(v float64) bool {
-				if v > 1 {
-					return true
-				}
-				return false
+				return v > 1
 			}},
 				"": {String: func(v string) bool {
-					if strings.Contains(v, "ba") {
-						return true
-					}
-					return false
+					return strings.Contains(v, "ba")
 				}},
 			}, "yes", 0},
 			&Series{
 				values: &valueContainer{slice: []interface{}{0, 0, "yes"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
+		{"fail",
+			fields{
+				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{map[string]FilterFn{"corge": {Float: func(v float64) bool { return true }}}, "yes", 0},
+			&Series{
+				err: errors.New("Where(): `name` (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2939,7 +2940,7 @@ func TestSeries_DType(t *testing.T) {
 	}
 }
 
-func TestSeries_IndexOf(t *testing.T) {
+func TestSeries_IndexOfLabels(t *testing.T) {
 	type fields struct {
 		values     *valueContainer
 		labels     []*valueContainer
@@ -2974,8 +2975,51 @@ func TestSeries_IndexOf(t *testing.T) {
 				sharedData: tt.fields.sharedData,
 				err:        tt.fields.err,
 			}
-			if got := s.IndexOf(tt.args.name); got != tt.want {
-				t.Errorf("Series.IndexOf() = %v, want %v", got, tt.want)
+			if got := s.IndexOfLabels(tt.args.name); got != tt.want {
+				t.Errorf("Series.IndexOfLabels() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_IndexOfRows(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		name  string
+		value interface{}
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"pass", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
+			args{"foo", 1}, []int{0},
+		},
+		{"fail", fields{
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
+			args{"corge", 1}, nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.IndexOfRows(tt.args.name, tt.args.value); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.IndexOfRows() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -3169,6 +3213,7 @@ func TestSeries_InPlace(t *testing.T) {
 		})
 	}
 	log.SetOutput(os.Stdout)
+	DisableWarnings()
 }
 
 func TestSeries_stringFunc(t *testing.T) {
@@ -3204,6 +3249,53 @@ func TestSeries_stringFunc(t *testing.T) {
 			}
 			if got := s.stringFunc(tt.args.stringFunction); got != tt.want {
 				t.Errorf("Series.stringFunc() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_XS(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		filters map[string]interface{}
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"pass", fields{
+			values: &valueContainer{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{map[string]interface{}{"foo": 0}},
+			&Series{
+				values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
+		},
+		{"fail", fields{
+			values: &valueContainer{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{map[string]interface{}{"corge": 0}},
+			&Series{
+				err: errors.New("XS(): `name` (corge) not found")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.XS(tt.args.filters); !EqualSeries(got, tt.want) {
+				t.Errorf("Series.XS() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -3330,6 +3330,60 @@ func TestDataFrame_Err(t *testing.T) {
 	}
 }
 
+func TestDataFrame_XS(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		filters map[string]interface{}
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"pass",
+			fields{
+				values:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{map[string]interface{}{"foo": "a"}},
+			&DataFrame{
+				values:        []*valueContainer{{slice: []string{"a"}, isNull: []bool{false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+		},
+		{"fail",
+			fields{
+				values:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{map[string]interface{}{"corge": "a"}},
+			&DataFrame{
+				err: fmt.Errorf("XS(): `name` (corge) not found")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.XS(tt.args.filters); !EqualDataFrames(got, tt.want) {
+				t.Errorf("DataFrame.XS() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestDataFrame_SelectLabels(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
@@ -3994,7 +4048,7 @@ func TestDataFrame_At(t *testing.T) {
 	}
 }
 
-func TestDataFrame_IndexOf(t *testing.T) {
+func TestDataFrame_IndexOfContainer(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -4012,7 +4066,7 @@ func TestDataFrame_IndexOf(t *testing.T) {
 		args   args
 		want   int
 	}{
-		{"pass - index", fields{
+		{"pass - search labels", fields{
 			values: []*valueContainer{
 				{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
 			},
@@ -4020,7 +4074,7 @@ func TestDataFrame_IndexOf(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{"qux", false},
 			0},
-		{"pass - columns", fields{
+		{"pass - search columns", fields{
 			values: []*valueContainer{
 				{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
 			},
@@ -4046,8 +4100,59 @@ func TestDataFrame_IndexOf(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.IndexOf(tt.args.name, tt.args.columns); got != tt.want {
-				t.Errorf("DataFrame.IndexOf() = %v, want %v", got, tt.want)
+			if got := df.IndexOfContainer(tt.args.name, tt.args.columns); got != tt.want {
+				t.Errorf("DataFrame.IndexOfContainer() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_IndexOfRows(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		name  string
+		value interface{}
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"pass - search column", fields{
+			values: []*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+			},
+			labels:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "qux"}},
+			colLevelNames: []string{"*0"}},
+			args{"foo", 1},
+			[]int{1}},
+		{"fail", fields{
+			values: []*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+			},
+			labels:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "qux"}},
+			colLevelNames: []string{"*0"}},
+			args{"corge", 1},
+			nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.IndexOfRows(tt.args.name, tt.args.value); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.IndexOfRows() = %v, want %v", got, tt.want)
 			}
 		})
 	}

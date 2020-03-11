@@ -167,13 +167,27 @@ func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels
 }
 
 // indexOfContainer returns the position of the first level within `cols` with a name matching `name`, or an error if no level matches
-func indexOfContainer(name string, cols []*valueContainer) (int, error) {
-	for j := range cols {
-		if strings.ToLower(cols[j].name) == strings.ToLower(name) {
+func indexOfContainer(name string, containers []*valueContainer) (int, error) {
+	for j := range containers {
+		if strings.ToLower(containers[j].name) == strings.ToLower(name) {
 			return j, nil
 		}
 	}
 	return 0, fmt.Errorf("`name` (%v) not found", name)
+}
+
+func (vc *valueContainer) indexOfRows(value interface{}) []int {
+	vals := vc.string().slice
+	stringifiedValue := fmt.Sprint(value)
+	ret := make([]int, len(vals))
+	var counter int
+	for i := range vals {
+		ret[counter] = i
+		if !vc.isNull[i] && vals[i] == stringifiedValue {
+			counter++
+		}
+	}
+	return ret[:counter]
 }
 
 func withColumn(cols []*valueContainer, name string, input interface{}, requiredLen int) ([]*valueContainer, error) {
@@ -1005,20 +1019,6 @@ func (vc *valueContainer) filter(filter FilterFn) []int {
 				index = append(index, i)
 			}
 		}
-	} else if filter.Equals != "" {
-		slice := vc.string().slice
-		for i := range slice {
-			if slice[i] == filter.Equals && !vc.isNull[i] {
-				index = append(index, i)
-			}
-		}
-	} else if filter.NotEquals != "" {
-		slice := vc.string().slice
-		for i := range slice {
-			if slice[i] != filter.NotEquals && !vc.isNull[i] {
-				index = append(index, i)
-			}
-		}
 	} else if filter.Contains != "" {
 		slice := vc.string().slice
 		for i := range slice {
@@ -1058,6 +1058,14 @@ func (vc *valueContainer) filter(filter FilterFn) []int {
 		slice := vc.dateTime().slice
 		for i := range slice {
 			if filter.DateTime(slice[i]) && !vc.isNull[i] {
+				index = append(index, i)
+			}
+		}
+	} else if filter.Interface != nil {
+		v := reflect.ValueOf(vc.slice)
+		for i := 0; i < v.Len(); i++ {
+			val := v.Index(i).Interface()
+			if filter.Interface(val) && !vc.isNull[i] {
 				index = append(index, i)
 			}
 		}
@@ -2005,9 +2013,10 @@ func cumsum(vals []float64, isNull []bool, index []int) []float64 {
 
 func (filter FilterFn) validate() error {
 	if filter.GreaterThan == 0 && filter.LessThan == 0 &&
-		filter.Equals == "" && filter.NotEquals == "" && filter.Contains == "" &&
+		filter.Contains == "" &&
 		filter.Before == (time.Time{}) && filter.After == (time.Time{}) &&
-		filter.Float == nil && filter.String == nil && filter.DateTime == nil {
+		filter.Float == nil && filter.String == nil &&
+		filter.DateTime == nil && filter.Interface == nil {
 		return fmt.Errorf("no filter function provided")
 	}
 	return nil
@@ -2672,4 +2681,20 @@ func suppressDefaultName(name string) string {
 		return ""
 	}
 	return name
+}
+
+func xs(containers []*valueContainer, values map[string]interface{}) ([]int, error) {
+	subIndexes := make([][]int, len(values))
+	var incrementor int
+	for k, v := range values {
+		i, err := indexOfContainer(k, containers)
+		if err != nil {
+			return nil, err
+		}
+		subIndex := containers[i].indexOfRows(v)
+		subIndexes[incrementor] = subIndex
+		incrementor++
+	}
+	index := intersection(subIndexes, containers[0].len())
+	return index, nil
 }
