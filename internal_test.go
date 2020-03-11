@@ -12,8 +12,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/d4l3k/messagediff"
 )
 
 func TestMain(m *testing.M) {
@@ -87,7 +85,6 @@ func TestDataFrame_resetWithError(t *testing.T) {
 			}
 			if df.resetWithError(tt.args.err); !EqualDataFrames(df, tt.want) {
 				t.Errorf("df.resetWithError() = %v, want %v", df.err, tt.want.err)
-				t.Errorf(messagediff.PrettyDiff(df, tt.want))
 			}
 		})
 	}
@@ -142,7 +139,6 @@ func Test_makeValueContainerFromInterface(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("makeValueContainerFromInterface() = %#v, want %#v", got.slice, tt.want.slice)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -185,7 +181,6 @@ func Test_makeValueContainersFromInterfaces(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("makeValueContainersFromInterfaces() = %v, want %v", got[0], tt.want[0])
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -1787,7 +1782,6 @@ func Test_readCSVByRows(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := readCSVByRows(tt.args.csv, tt.args.config); !EqualDataFrames(got, tt.want) {
 				t.Errorf("readCSVByRows() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -3692,7 +3686,6 @@ func Test_makeDataFrameFromMatrices(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := makeDataFrameFromMatrices(tt.args.values, tt.args.isNull, tt.args.config); !EqualDataFrames(got, tt.want) {
 				t.Errorf("makeDataFrameFromMatrices() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -3852,7 +3845,6 @@ func TestSeries_combineMath(t *testing.T) {
 			}
 			if got := s.combineMath(tt.args.other, tt.args.ignoreNull, tt.args.fn); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.combineMath() = %v, want %v", got.labels[1], tt.want.labels[1])
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 
 			}
 		})

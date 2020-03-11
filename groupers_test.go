@@ -7,8 +7,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/d4l3k/messagediff"
 )
 
 func TestGroupedSeries_Err(t *testing.T) {
@@ -525,7 +523,6 @@ func TestGroupedSeries_stringReduceFunc(t *testing.T) {
 			}
 			if got := g.stringReduceFunc(tt.args.name, tt.args.fn); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.stringReduceFunc() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -2587,7 +2584,6 @@ func TestSeries_RollingN(t *testing.T) {
 			}
 			if got := s.RollingN(tt.args.n); !equalGroupedSeries(got, tt.want) {
 				t.Errorf("Series.RollingN() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -3467,7 +3463,6 @@ func TestGroupedSeries_NUnique(t *testing.T) {
 			}
 			if got := g.NUnique(); !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.NUnique() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}

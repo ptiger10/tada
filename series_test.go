@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/d4l3k/messagediff"
 	"github.com/ptiger10/tablediff"
 )
 
@@ -755,7 +754,6 @@ func TestSeries_WithLabels(t *testing.T) {
 			}
 			if got := s.WithLabels(tt.args.name, tt.args.arg); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.WithLabels() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -1443,7 +1441,6 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 			}
 			if got := s.LookupAdvanced(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.LookupAdvanced() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -2108,7 +2105,6 @@ func TestSeries_GroupBy(t *testing.T) {
 			}
 			if got := s.GroupBy(tt.args.names...); !equalGroupedSeries(got, tt.want) {
 				t.Errorf("Series.GroupBy() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -2164,7 +2160,6 @@ func TestSeries_Shift(t *testing.T) {
 			}
 			if got := s.Shift(tt.args.n); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Shift() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/d4l3k/messagediff"
 	"github.com/ptiger10/tablediff"
 )
 
@@ -111,7 +110,6 @@ func TestNewDataFrame(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := NewDataFrame(tt.args.slices, tt.args.labels...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("NewDataFrame() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -389,7 +387,6 @@ func TestReadCSV(t *testing.T) {
 			got := ReadCSV(tt.args.csv, tt.args.config)
 			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("ReadCSV() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -573,7 +570,6 @@ func TestDataFrame_Head(t *testing.T) {
 			}
 			if got := df.Head(tt.args.n); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Head() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -1143,7 +1139,6 @@ func TestDataFrame_SetLabels(t *testing.T) {
 			}
 			if got := df.SetLabels(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.SetLabels() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -2262,7 +2257,6 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 			}
 			if got := df.LookupAdvanced(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.LookupAdvanced() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 
 			}
 		})
@@ -2307,7 +2301,6 @@ func TestDataFrame_Transpose(t *testing.T) {
 			}
 			if got := df.Transpose(); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Transpose() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -2375,7 +2368,6 @@ func TestDataFrame_GroupBy(t *testing.T) {
 			}
 			if got := df.GroupBy(tt.args.names...); !equalGroupedDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.GroupBy() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 
 			}
 		})
@@ -2500,7 +2492,6 @@ func TestDataFrame_PromoteToColLevel(t *testing.T) {
 			}
 			if got := df.PromoteToColLevel(tt.args.name); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.PromoteToColLevel() = %v, want %v", got.err, tt.want.err)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -2701,7 +2692,6 @@ func TestDataFrame_PivotTable(t *testing.T) {
 			}
 			if got := df.PivotTable(tt.args.labels, tt.args.columns, tt.args.values, tt.args.aggFn); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.PivotTable() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
@@ -2783,7 +2773,6 @@ func TestReadMatrix(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := ReadMatrix(tt.args.mat); !EqualDataFrames(got, tt.want) {
 				t.Errorf("ReadMatrix() = %v, want %v", got, tt.want)
-				t.Errorf(messagediff.PrettyDiff(got, tt.want))
 			}
 		})
 	}
