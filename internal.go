@@ -1235,12 +1235,14 @@ func concatenateLabelsToStringsBytes(labels []*valueContainer) []string {
 	for j := range labels {
 		labels[j].setCache()
 	}
+	// is only label?
 	if len(labels) == 1 {
 		numRows := labels[0].len()
 		ret := make([]string, numRows)
 		for i := 0; i < numRows; i++ {
 			ret[i] = string(labels[0].cache[i])
 		}
+		return ret
 	}
 	buf := new(bytes.Buffer)
 	numRows := labels[0].len()
