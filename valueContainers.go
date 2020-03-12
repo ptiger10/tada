@@ -105,7 +105,7 @@ func (vc *valueContainer) cast(dtype DType) {
 		vc.setCache()
 	}
 	switch dtype {
-	case Float:
+	case Float64:
 		_, ok := vc.slice.([]float64)
 		if !ok {
 			vc.slice = vc.float64().slice

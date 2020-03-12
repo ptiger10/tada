@@ -1182,16 +1182,16 @@ func Test_valueContainer_sort(t *testing.T) {
 	}{
 		{"float - no nulls",
 			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, false, false}, name: "foo"},
-			args{dtype: Float, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
+			args{dtype: Float64, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
 		{"float - convert from string",
 			fields{slice: []string{"3", "1", "0", "2"}, isNull: []bool{false, false, false, false}, name: "foo"},
-			args{dtype: Float, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
+			args{dtype: Float64, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
 		{"float - no nulls - descending",
 			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, false, false}, name: "foo"},
-			args{dtype: Float, ascending: false, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
+			args{dtype: Float64, ascending: false, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
 		{"float - nulls",
 			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, true, false}, name: "foo"},
-			args{dtype: Float, ascending: true, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
+			args{dtype: Float64, ascending: true, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
 		{"strings - no nulls",
 			fields{slice: []string{"foo", "bar", "a", "baz"}, isNull: []bool{false, false, false, false}, name: "foo"},
 			args{dtype: String, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
@@ -1418,13 +1418,13 @@ func Test_valueContainer_apply(t *testing.T) {
 			slice:  []float64{1, 2},
 			isNull: []bool{false, false},
 			name:   "foo"},
-			args{ApplyFn{Float: func(v float64) float64 { return v * 2 }}},
+			args{ApplyFn{Float64: func(v float64) float64 { return v * 2 }}},
 			&valueContainer{slice: []float64{2, 4}, isNull: []bool{false, false}, name: "foo"}},
 		{"float - reset cache", fields{
 			slice:  []float64{1, 2},
 			isNull: []bool{false, false},
 			name:   "foo", cache: [][]byte{[]byte("1"), []byte("2")}},
-			args{ApplyFn{Float: func(v float64) float64 { return v * 2 }}},
+			args{ApplyFn{Float64: func(v float64) float64 { return v * 2 }}},
 			&valueContainer{slice: []float64{2, 4}, isNull: []bool{false, false}, name: "foo"}},
 		{"string", fields{
 			slice:  []string{"foo", "bar"},
@@ -1475,13 +1475,13 @@ func Test_valueContainer_applyFormat(t *testing.T) {
 	}{
 		{"float",
 			fields{slice: []float64{.75}, isNull: []bool{false}},
-			args{ApplyFormatFn{Float: func(v float64) string {
+			args{ApplyFormatFn{Float64: func(v float64) string {
 				return strconv.FormatFloat(v, 'f', 1, 64)
 			}}},
 			&valueContainer{slice: []string{"0.8"}, isNull: []bool{false}}},
 		{"float - reset cache",
 			fields{slice: []float64{.75}, isNull: []bool{false}, cache: [][]byte{[]byte(".75")}},
-			args{ApplyFormatFn{Float: func(v float64) string {
+			args{ApplyFormatFn{Float64: func(v float64) string {
 				return strconv.FormatFloat(v, 'f', 1, 64)
 			}}},
 			&valueContainer{slice: []string{"0.8"}, isNull: []bool{false}}},
@@ -3987,8 +3987,8 @@ func Test_valueContainer_filter(t *testing.T) {
 		{"After", fields{slice: []time.Time{d.AddDate(0, 0, -1), d, d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false}, name: "foo"},
 			args{FilterFn{After: d}},
 			[]int{2}},
-		{"Float", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
-			args{FilterFn{Float: func(val float64) bool { return val > 1 }}},
+		{"Float64", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+			args{FilterFn{Float64: func(val float64) bool { return val > 1 }}},
 			[]int{2}},
 		{"String", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 			args{FilterFn{String: func(val string) bool { return val == "2" }}},
@@ -4082,7 +4082,7 @@ func Test_filter(t *testing.T) {
 				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
 				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
 			map[string]FilterFn{
-				"qux": FilterFn{Float: func(val float64) bool { return val >= 1 }},
+				"qux": FilterFn{Float64: func(val float64) bool { return val >= 1 }},
 				"bar": FilterFn{String: func(val string) bool { return val == "foo" }},
 			}},
 			[]int{1},
@@ -4092,7 +4092,7 @@ func Test_filter(t *testing.T) {
 				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
 				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
 			map[string]FilterFn{
-				"corge": FilterFn{Float: func(val float64) bool { return val >= 1 }},
+				"corge": FilterFn{Float64: func(val float64) bool { return val >= 1 }},
 			}},
 			nil,
 			true},

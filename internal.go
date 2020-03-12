@@ -1049,10 +1049,10 @@ func (vc *valueContainer) filter(filter FilterFn) []int {
 				index = append(index, i)
 			}
 		}
-	} else if filter.Float != nil {
+	} else if filter.Float64 != nil {
 		slice := vc.float64().slice
 		for i := range slice {
-			if filter.Float(slice[i]) && !vc.isNull[i] {
+			if filter.Float64(slice[i]) && !vc.isNull[i] {
 				index = append(index, i)
 			}
 		}
@@ -1083,11 +1083,11 @@ func (vc *valueContainer) filter(filter FilterFn) []int {
 }
 
 func (vc *valueContainer) apply(lambda ApplyFn) {
-	if lambda.Float != nil {
+	if lambda.Float64 != nil {
 		slice := vc.float64().slice
 		retSlice := make([]float64, len(slice))
 		for i := range slice {
-			retSlice[i] = lambda.Float(slice[i])
+			retSlice[i] = lambda.Float64(slice[i])
 		}
 		vc.slice = retSlice
 	} else if lambda.String != nil {
@@ -1110,11 +1110,11 @@ func (vc *valueContainer) apply(lambda ApplyFn) {
 }
 
 func (vc *valueContainer) applyFormat(lambda ApplyFormatFn) {
-	if lambda.Float != nil {
+	if lambda.Float64 != nil {
 		slice := vc.float64().slice
 		retSlice := make([]string, len(slice))
 		for i := range slice {
-			retSlice[i] = lambda.Float(slice[i])
+			retSlice[i] = lambda.Float64(slice[i])
 		}
 		vc.slice = retSlice
 	} else if lambda.DateTime != nil {
@@ -1148,7 +1148,7 @@ func (vc *valueContainer) sort(dtype DType, ascending bool, index []int) []int {
 	var sortedIsNull []bool
 	var sortedIndex []int
 	switch dtype {
-	case Float:
+	case Float64:
 		d := vc.float64()
 		d.index = index
 		srt = d
@@ -2024,7 +2024,7 @@ func (filter FilterFn) validate() error {
 	if filter.GreaterThan == 0 && filter.LessThan == 0 &&
 		filter.Contains == "" &&
 		filter.Before == (time.Time{}) && filter.After == (time.Time{}) &&
-		filter.Float == nil && filter.String == nil &&
+		filter.Float64 == nil && filter.String == nil &&
 		filter.DateTime == nil && filter.Interface == nil {
 		return fmt.Errorf("no filter function provided")
 	}
@@ -2032,7 +2032,7 @@ func (filter FilterFn) validate() error {
 }
 
 func (lambda ApplyFn) validate() error {
-	if lambda.Float == nil {
+	if lambda.Float64 == nil {
 		if lambda.String == nil {
 			if lambda.DateTime == nil {
 				return fmt.Errorf("no apply function provided")
@@ -2043,7 +2043,7 @@ func (lambda ApplyFn) validate() error {
 }
 
 func (lambda ApplyFormatFn) validate() error {
-	if lambda.Float == nil {
+	if lambda.Float64 == nil {
 		if lambda.DateTime == nil {
 			return fmt.Errorf("no apply function provided")
 		}

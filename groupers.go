@@ -122,8 +122,8 @@ func (g *GroupedSeries) countReduceFunc(name string, fn func(interface{}, []bool
 // The reduction `lambda` function is the first field selected (i.e., not left blank) in the GroupReduceFn.
 func (g *GroupedSeries) Reduce(name string, lambda GroupReduceFn) *Series {
 	// remove all nulls before running each set of values through custom user function
-	if lambda.Float != nil {
-		fn := convertSimplifiedFloat64ReduceFunc(lambda.Float)
+	if lambda.Float64 != nil {
+		fn := convertSimplifiedFloat64ReduceFunc(lambda.Float64)
 		return g.float64ReduceFunc(name, fn)
 	} else if lambda.String != nil {
 		fn := convertSimplifiedStringReduceFunc(lambda.String)
@@ -516,8 +516,8 @@ func (g *GroupedDataFrame) Col(colName string) *GroupedSeries {
 // The reduction `lambda` function is the first field selected (i.e., not left blank) in the GroupReduceFn.
 func (g *GroupedDataFrame) Reduce(name string, cols []string, lambda GroupReduceFn) *DataFrame {
 	// remove all nulls before running each set of values through custom user function
-	if lambda.Float != nil {
-		fn := convertSimplifiedFloat64ReduceFunc(lambda.Float)
+	if lambda.Float64 != nil {
+		fn := convertSimplifiedFloat64ReduceFunc(lambda.Float64)
 		return g.float64ReduceFunc(name, cols, fn)
 	} else if lambda.String != nil {
 		fn := convertSimplifiedStringReduceFunc(lambda.String)

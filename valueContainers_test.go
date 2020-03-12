@@ -568,9 +568,9 @@ func Test_valueContainer_cast(t *testing.T) {
 		want   *valueContainer
 	}{
 		{"float64 to float64", fields{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
-			args{Float}, &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			args{Float64}, &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 		{"int to float64", fields{slice: []int{1}, isNull: []bool{false}, name: "foo"},
-			args{Float}, &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			args{Float64}, &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 		{"string to string", fields{slice: []string{"foo"}, isNull: []bool{false}, name: "foo"},
 			args{String}, &valueContainer{
 				cache: [][]byte{[]byte("foo")},

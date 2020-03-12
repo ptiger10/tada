@@ -1479,7 +1479,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 // Supplying a zero-value for a field is equivalent to leaving it blank (e.g., GreaterThan: 0).
 //
 // Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
-// For example, {"foo": FilterFn{Float: lambda}} converts the values in the foo container to float64,
+// For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
 // If no filter is provided, returns a new copy of the DataFrame.
@@ -1498,7 +1498,7 @@ func (df *DataFrame) Filter(filters map[string]FilterFn) *DataFrame {
 // Supplying a zero-value for a field is equivalent to leaving it blank (e.g., GreaterThan: 0).
 //
 // Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
-// For example, {"foo": FilterFn{Float: lambda}} converts the values in the foo container to float64,
+// For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
 // If no filter is provided, does nothing.
@@ -1526,7 +1526,7 @@ func (df *DataFrameMutator) Filter(filters map[string]FilterFn) {
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its ApplyFn struct provides the apply logic for that container.
 // Values are converted from their original type to the selected field type.
-// For example, {"foo": ApplyFn{Float: lambda}} converts the values in the foo container to float64 and
+// For example, {"foo": ApplyFn{Float64: lambda}} converts the values in the foo container to float64 and
 // applies the lambda function to each row in the container, outputting a new float64 value for each row.
 // If a value is null either before or after the lambda function is applied, it is also null after.
 // Returns a new DataFrame.
@@ -1541,7 +1541,7 @@ func (df *DataFrame) Apply(lambdas map[string]ApplyFn) *DataFrame {
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its ApplyFn struct provides the apply logic for that container.
 // Values are converted from their original type to the selected field type.
-// For example, {"foo": ApplyFn{Float: lambda}} converts the values in the foo container to float64 and
+// For example, {"foo": ApplyFn{Float64: lambda}} converts the values in the foo container to float64 and
 // applies the lambda function to each row in the container, outputting a new float64 value for each row.
 // If a value is null either before or after the lambda function is applied, it is also null after.// Modifies the underlying DataFrame in place.
 // Modifies the underlying DataFrame in place.
@@ -1570,7 +1570,7 @@ func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its ApplyFormatFn struct provides the formatting logic for that container.
 // Values are converted from their original type to the selected field type and then to string.
-// For example, {"foo": ApplyFormatFn{Float: lambda}} converts the values in the foo container to float64 and
+// For example, {"foo": ApplyFormatFn{Float64: lambda}} converts the values in the foo container to float64 and
 // applies the lambda function to each row in the container, outputting a new string value for each row.
 // If a value is null either before or after the lambda function is applied, it is also null after.
 // Returns a new DataFrame.
@@ -1585,7 +1585,7 @@ func (df *DataFrame) ApplyFormat(lambdas map[string]ApplyFormatFn) *DataFrame {
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its ApplyFormatFn struct provides the formatting logic for that container.
 // Values are converted from their original type to the selected field type and then to string.
-// For example, {"foo": ApplyFormatFn{Float: lambda}} converts the values in the foo container to float64 and
+// For example, {"foo": ApplyFormatFn{Float64: lambda}} converts the values in the foo container to float64 and
 // applies the lambda function to each row in the container, outputting a new string value for each row.
 // If a value is null either before or after the lambda function is applied, it is also null after.
 // Modifies the underlying DataFrame in place.

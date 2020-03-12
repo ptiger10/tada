@@ -1301,7 +1301,7 @@ func TestGroupedSeries_Reduce(t *testing.T) {
 				values: &valueContainer{slice: []float64{1, 2, 0, 0}, isNull: []bool{false, false, true, true}, name: "qux"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			args{"custom", GroupReduceFn{Float: func(vals []float64) float64 {
+			args{"custom", GroupReduceFn{Float64: func(vals []float64) float64 {
 				var sum float64
 				for i := range vals {
 					sum += vals[i]
@@ -1442,7 +1442,7 @@ func TestGroupedDataFrame_Reduce(t *testing.T) {
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "foo"}},
-			args{"custom", []string{"qux"}, GroupReduceFn{Float: func(vals []float64) float64 {
+			args{"custom", []string{"qux"}, GroupReduceFn{Float64: func(vals []float64) float64 {
 				var sum float64
 				for i := range vals {
 					sum += vals[i]

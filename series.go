@@ -598,9 +598,9 @@ func (s *Series) Sort(by ...Sorter) *Series {
 // If no DType is supplied in a Sorter, sorts as float64.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Sort(by ...Sorter) {
-	// default for handling no Sorters: values as float in ascending order
+	// default for handling no Sorters: values as Float64 in ascending order
 	if len(by) == 0 {
-		by = []Sorter{{Name: s.series.values.name, DType: Float, Descending: false}}
+		by = []Sorter{{Name: s.series.values.name, DType: Float64, Descending: false}}
 	}
 	// replace "" with values
 	for i := range by {
@@ -629,7 +629,7 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 // Supplying a zero-value for a field is equivalent to leaving it blank (e.g., GreaterThan: 0).
 //
 // Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
-// For example, {"foo": FilterFn{Float: lambda}} converts the values in the foo container to float64,
+// For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
 // If no filter is provided, returns a new copy of the Series.
@@ -649,7 +649,7 @@ func (s *Series) Filter(filters map[string]FilterFn) *Series {
 // Supplying a zero-value for a field is equivalent to leaving it blank (e.g., GreaterThan: 0).
 //
 // Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
-// For example, {"foo": FilterFn{Float: lambda}} converts the values in the foo container to float64,
+// For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
 // If no filter is provided, does nothing.
@@ -710,7 +710,7 @@ func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{})
 // Apply applies a user-defined function to every row in the Series based on `lambda`.
 // The first field selected (i.e., not left blank) in the ApplyFn struct provides the apply logic.
 // Values are converted from their original type to the selected field type.
-// For example, {ApplyFn{Float: lambda}} converts the Series values to float64 and
+// For example, {ApplyFn{Float64: lambda}} converts the Series values to float64 and
 // applies the lambda function to each row in the container, outputting a new float64 value for each row.
 // If a value is null either before or after the lambda function is applied, it is also null after.
 // Returns a new Series.
@@ -723,7 +723,7 @@ func (s *Series) Apply(lambda ApplyFn) *Series {
 // Apply applies a user-defined function to every row in the Series based on `lambda`.
 // The first field selected (i.e., not left blank) in the ApplyFn struct provides the apply logic.
 // Values are converted from their original type to the selected field type.
-// For example, {ApplyFn{Float: lambda}} converts the Series values to float64 and
+// For example, {ApplyFn{Float64: lambda}} converts the Series values to float64 and
 // applies the lambda function to each row in the container, outputting a new float64 value for each row.
 // If a value is null either before or after the lambda function is applied, it is also null after.
 // Modifies the underlying Series in place.
@@ -742,7 +742,7 @@ func (s *SeriesMutator) Apply(lambda ApplyFn) {
 // ApplyFormat applies a user-defined formatting function to every row in the Series based on `lambda`.
 // The first field selected (i.e., not left blank) in the ApplyFormatFn struct provides the formatting logic.
 // Values are converted from their original type to the selected field type and then to string.
-// For example, {ApplyFn{Float: lambda}} converts the Series values to float64 and
+// For example, {ApplyFn{Float64: lambda}} converts the Series values to float64 and
 // applies the lambda function to each row in the container, outputting a new string value for each row.
 // If a value is null either before or after the lambda function is applied, it is also null after.
 // Returns a new Series.
@@ -755,7 +755,7 @@ func (s *Series) ApplyFormat(lambda ApplyFormatFn) *Series {
 // ApplyFormat applies a user-defined formatting function to every row in the Series based on `lambda`.
 // The first field selected (i.e., not left blank) in the ApplyFormatFn struct provides the formatting logic.
 // Values are converted from their original type to the selected field type and then to string.
-// For example, {ApplyFn{Float: lambda}} converts the Series values to float64 and
+// For example, {ApplyFn{Float64: lambda}} converts the Series values to float64 and
 // applies the lambda function to each row in the container, outputting a new string value for each row.
 // If a value is null either before or after the lambda function is applied, it is also null after.
 // Modifies the underlying Series in place.

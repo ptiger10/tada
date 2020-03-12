@@ -111,14 +111,14 @@ func TestSeries_Cast(t *testing.T) {
 		{"pass", fields{
 			values: &valueContainer{slice: []int{1}, name: "foo", isNull: []bool{false}},
 			labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}},
-			args{map[string]DType{"": Float}},
+			args{map[string]DType{"": Float64}},
 			&Series{
 				values: &valueContainer{slice: []float64{1}, name: "foo", isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}}},
 		{"fail", fields{
 			values: &valueContainer{slice: []int{1}, name: "foo", isNull: []bool{false}},
 			labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}},
-			args{map[string]DType{"corge": Float}},
+			args{map[string]DType{"corge": Float64}},
 			&Series{
 				err: errors.New("Cast(): `name` (corge) not found")}},
 	}
@@ -1142,7 +1142,7 @@ func TestSeries_Sort(t *testing.T) {
 		args   args
 		want   *Series
 	}{
-		{"sort values as float by default",
+		{"sort values as Float64 by default",
 			fields{
 				values: &valueContainer{slice: []float64{3, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
@@ -1203,22 +1203,22 @@ func TestSeries_Filter(t *testing.T) {
 		args   args
 		want   *Series
 	}{
-		{"float filter - default",
+		{"Float64 filter - default",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{map[string]FilterFn{"": {Float: func(val float64) bool {
+			args{map[string]FilterFn{"": {Float64: func(val float64) bool {
 				return val > 1
 			}}}},
 			&Series{
 				values: &valueContainer{slice: []float64{3}, isNull: []bool{false}, name: "foo"},
 				labels: []*valueContainer{{name: "*0", slice: []int{2}, isNull: []bool{false}}}},
 		},
-		{"float filter - no matches",
+		{"Float64 filter - no matches",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{map[string]FilterFn{"": {Float: func(val float64) bool {
+			args{map[string]FilterFn{"": {Float64: func(val float64) bool {
 				return val > 5
 			}}}},
 			&Series{
@@ -1226,12 +1226,12 @@ func TestSeries_Filter(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []int{}, isNull: []bool{}, name: "*0"}}},
 		},
-		{"float and string intersection",
+		{"Float64 and string intersection",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
 				labels: []*valueContainer{{name: "*0", slice: []string{"bar", "foo", "baz"}, isNull: []bool{false, false, false}}}},
 			args{map[string]FilterFn{
-				"foo": {Float: func(val float64) bool {
+				"foo": {Float64: func(val float64) bool {
 					if val > 1 {
 						return true
 					}
@@ -1267,7 +1267,7 @@ func TestSeries_Filter(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{map[string]FilterFn{"corge": {Float: func(float64) bool { return true }}}},
+			args{map[string]FilterFn{"corge": {Float64: func(float64) bool { return true }}}},
 			&Series{err: errors.New("Filter(): `name` (corge) not found")},
 		},
 	}
@@ -1514,7 +1514,7 @@ func TestSeries_Apply(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFn{Float: func(v float64) float64 { return v * 2 }}},
+			args{ApplyFn{Float64: func(v float64) float64 { return v * 2 }}},
 			&Series{
 				values: &valueContainer{slice: []float64{0, 2}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
@@ -1522,7 +1522,7 @@ func TestSeries_Apply(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{true, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFn{Float: func(v float64) float64 { return v * 2 }}},
+			args{ApplyFn{Float64: func(v float64) float64 { return v * 2 }}},
 			&Series{
 				values: &valueContainer{slice: []float64{0, 2}, isNull: []bool{true, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}}},
@@ -1567,7 +1567,7 @@ func TestSeries_ApplyFormat(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, .25}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFormatFn{Float: func(v float64) string { return strconv.FormatFloat(v, 'f', 1, 64) }}},
+			args{ApplyFormatFn{Float64: func(v float64) string { return strconv.FormatFloat(v, 'f', 1, 64) }}},
 			&Series{
 				values: &valueContainer{slice: []string{"0.0", "0.2"}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
@@ -1957,7 +1957,7 @@ func TestSeries_Count(t *testing.T) {
 		fields fields
 		want   int
 	}{
-		{"count float", fields{values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}}}, 2},
+		{"count Float64", fields{values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}}}, 2},
 		{"count string", fields{values: &valueContainer{slice: []string{"foo", "bar"}, isNull: []bool{false, false}}}, 2},
 	}
 	for _, tt := range tests {
@@ -2186,7 +2186,7 @@ func TestSeries_Where(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
-			args{map[string]FilterFn{"qux": {Float: func(v float64) bool {
+			args{map[string]FilterFn{"qux": {Float64: func(v float64) bool {
 				return v > 1
 			}},
 				"": {String: func(v string) bool {
@@ -2200,7 +2200,7 @@ func TestSeries_Where(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
-			args{map[string]FilterFn{"corge": {Float: func(v float64) bool { return true }}}, "yes", 0},
+			args{map[string]FilterFn{"corge": {Float64: func(v float64) bool { return true }}}, "yes", 0},
 			&Series{
 				err: errors.New("Where(): `name` (corge) not found")}},
 	}

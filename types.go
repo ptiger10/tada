@@ -136,7 +136,7 @@ type FilterFn struct {
 	Contains    string
 	Before      time.Time
 	After       time.Time
-	Float       func(val float64) bool
+	Float64     func(val float64) bool
 	String      func(val string) bool
 	DateTime    func(val time.Time) bool
 	Interface   func(val interface{}) bool
@@ -146,7 +146,7 @@ type FilterFn struct {
 // Only the first field selected (i.e., not left nil) is used - any others are ignored.
 // Values are coerced to the type specified in the field (e.g., DateTime -> time.Time) before the apply function is evaluated.
 type ApplyFn struct {
-	Float    func(val float64) float64
+	Float64  func(val float64) float64
 	String   func(val string) string
 	DateTime func(val time.Time) time.Time
 }
@@ -158,7 +158,7 @@ type ApplyFn struct {
 // Otherwise, values are coerced to the type specified in the field (e.g., DateTime -> time.Time) before the reduce function is evaluated.
 //
 type GroupReduceFn struct {
-	Float     func(slice []float64) float64
+	Float64   func(slice []float64) float64
 	String    func(slice []string) string
 	DateTime  func(slice []time.Time) time.Time
 	Interface func(slice interface{}) interface{}
@@ -168,7 +168,7 @@ type GroupReduceFn struct {
 // Only the first field selected (i.e., not left nil) is used - any others are ignored.
 // Values are coerced to the type specified in the field (e.g., DateTime -> time.Time) before the formatting function is evaluated.
 type ApplyFormatFn struct {
-	Float    func(val float64) string
+	Float64  func(val float64) string
 	DateTime func(val time.Time) string
 }
 
@@ -176,8 +176,8 @@ type ApplyFormatFn struct {
 type DType int
 
 const (
-	// Float -> float64
-	Float DType = iota
+	// Float64 -> float64
+	Float64 DType = iota
 	// String -> string
 	String
 	// DateTime -> time.Time

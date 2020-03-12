@@ -140,7 +140,7 @@ func TestDataFrame_Cast(t *testing.T) {
 			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			colLevelNames: []string{"*0"},
 			name:          "qux"},
-			args{map[string]DType{"foo": Float, "bar": String}},
+			args{map[string]DType{"foo": Float64, "bar": String}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
@@ -157,7 +157,7 @@ func TestDataFrame_Cast(t *testing.T) {
 			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			colLevelNames: []string{"*0"},
 			name:          "qux"},
-			args{map[string]DType{"corge": Float}},
+			args{map[string]DType{"corge": Float64}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []int{1}, isNull: []bool{false}, name: "foo"},
@@ -1472,7 +1472,7 @@ func TestDataFrame_Filter(t *testing.T) {
 				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, false, false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
 			args{map[string]FilterFn{
-				"foo": {Float: func(val float64) bool {
+				"foo": {Float64: func(val float64) bool {
 					if val > 1 {
 						return true
 					}
@@ -1497,7 +1497,7 @@ func TestDataFrame_Filter(t *testing.T) {
 				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, false, false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
 			args{map[string]FilterFn{
-				"foo": {Float: func(val float64) bool {
+				"foo": {Float64: func(val float64) bool {
 					return val >= 10
 				}},
 			}},
@@ -1531,7 +1531,7 @@ func TestDataFrame_Filter(t *testing.T) {
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{map[string]FilterFn{"corge": {Float: func(float64) bool { return true }}}},
+			args{map[string]FilterFn{"corge": {Float64: func(float64) bool { return true }}}},
 			&DataFrame{err: fmt.Errorf("Filter(): `name` (corge) not found")}},
 	}
 	for _, tt := range tests {
@@ -1571,7 +1571,7 @@ func TestDataFrame_Apply(t *testing.T) {
 				{slice: []int{1}, isNull: []bool{false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			name:   "baz"},
-			args{map[string]ApplyFn{"foo": {Float: func(v float64) float64 {
+			args{map[string]ApplyFn{"foo": {Float64: func(v float64) float64 {
 				return v + 1
 			}}}},
 			&DataFrame{
@@ -1597,7 +1597,7 @@ func TestDataFrame_Apply(t *testing.T) {
 				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			name:   "baz"},
-			args{map[string]ApplyFn{"corge": {Float: func(float64) float64 { return 0 }}}},
+			args{map[string]ApplyFn{"corge": {Float64: func(float64) float64 { return 0 }}}},
 			&DataFrame{
 				err: fmt.Errorf("Apply(): `name` (corge) not found")},
 		},
@@ -1642,7 +1642,7 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 			labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
 			name:          "baz",
 			colLevelNames: []string{"*0"}},
-			args{map[string]ApplyFormatFn{"foo": {Float: func(v float64) string {
+			args{map[string]ApplyFormatFn{"foo": {Float64: func(v float64) string {
 				return strconv.FormatFloat(v, 'f', 1, 64)
 			}}}},
 			&DataFrame{
@@ -1670,7 +1670,7 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			name:   "baz"},
-			args{map[string]ApplyFormatFn{"corge": {Float: func(float64) string { return "" }}}},
+			args{map[string]ApplyFormatFn{"corge": {Float64: func(float64) string { return "" }}}},
 			&DataFrame{
 				err: fmt.Errorf("ApplyFormat(): `name` (corge) not found")},
 		},
