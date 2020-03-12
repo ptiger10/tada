@@ -1,0 +1,13 @@
+Tada (github.com/ptiger10/tada) vs Pandas (github.com/pandas-dev/pandas) speed comparison
++---+-------------------------------+------------+-----------+-----------------+-------+
+| # |          DESCRIPTION          |  DATASET   | TADA (GO) | PANDAS (PYTHON) |   Δ   |
++---+-------------------------------+------------+-----------+-----------------+-------+
+| 0 | read csv                      | 100k-1col  | 13.9ms    | 16.5ms          | 1.19x |
+| 1 | sum rows                      | 100k-1col  | 10.0ms    | 899.6μs         | 0.09x |
+| 2 | sum rows*                     | 100k-1col  | 559.1μs   | 700.5μs         | 1.25x |
+| 3 | sum rows*                     | 100k-10col | 7.0ms     | 9.2ms           | 1.30x |
+| 4 | group by 1 col then sum rows* | 100k-2col  | 11.7ms    | 6.3ms           | 0.54x |
++---+-------------------------------+------------+-----------+-----------------+-------+
+Wed, 11 Mar 2020 20:38:16 PDT
+Mac OS X 10.13.6, tada beta, go v1.12, pandas v1.0.1, python v3.7.3
+*with tada type casting and/or caching prior to test
