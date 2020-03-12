@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/d4l3k/messagediff"
 	"github.com/ptiger10/tablediff"
 )
 
@@ -173,7 +172,6 @@ func TestDataFrame_Cast(t *testing.T) {
 			df.Cast(tt.args.colAsType)
 			if !EqualDataFrames(df, tt.want) {
 				t.Errorf("DataFrame.Cast() -> %v, want %v", df, tt.want)
-				fmt.Println(messagediff.PrettyDiff(df, tt.want))
 			}
 		})
 	}
