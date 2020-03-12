@@ -3,7 +3,6 @@ package tada
 import "time"
 
 var optionLevelSeparator = "|"
-var optionLevelSeparatorBytes = []byte{'|'}
 var optionMaxRows = 50
 var optionMaxColumns = 20
 var optionMergeRepeats = true
@@ -19,7 +18,6 @@ var randSeed = time.Now().Unix()
 // (default: "|").
 func SetOptionLevelSeparator(sep string) {
 	optionLevelSeparator = sep
-	optionLevelSeparatorBytes = []byte(sep)
 }
 
 // SetOptionMaxRows changes the max number of rows displayed when printing a Series or DataFrame to `n`

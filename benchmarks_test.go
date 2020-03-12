@@ -110,8 +110,8 @@ func Benchmark_concatenateStringLabelsBytes(b *testing.B) {
 		s[i] = "foo"
 	}
 
-	vc := &valueContainer{slice: d}
-	vc.resetCache()
+	vc := &valueContainer{slice: s}
+	vc.setCache()
 	vcs := []*valueContainer{
 		vc,
 	}

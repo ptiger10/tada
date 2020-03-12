@@ -327,14 +327,18 @@ func (vc *valueContainer) setCache() {
 	}
 	switch vc.slice.(type) {
 	case [][]byte:
-		vc.cache = vc.slice.([][]byte)
+		arr := vc.slice.([][]byte)
+		vc.newCache = make([]string, len(arr))
+		for i := range arr {
+			vc.newCache[i] = string(arr[i])
+		}
 	case []string:
-		vc.setCacheFromString(vc.slice.([]string))
+		vc.newCache = vc.slice.([]string)
 	case []float64:
 		arr := vc.slice.([]float64)
-		vc.cache = make([][]byte, len(arr))
+		vc.newCache = make([]string, len(arr))
 		for i := range arr {
-			vc.cache[i] = []byte(fmt.Sprint(arr[i]))
+			vc.newCache[i] = fmt.Sprint(arr[i])
 		}
 	case []int:
 		arr := vc.slice.([]int)

@@ -196,7 +196,7 @@ func ImportCSV(path string, config *ReadConfig) (*DataFrame, error) {
 	if numRows == 0 {
 		return nil, fmt.Errorf("ImportCSV(): must have at least one row")
 	}
-	retVals := makeByteMatrix(numCols, numRows)
+	retVals := makeStringMatrix(numCols, numRows)
 	retNulls := makeBoolMatrix(numCols, numRows)
 	r := bytes.NewReader(data)
 	err = readCSVBytes(r, retVals, retNulls, config.Delimiter)

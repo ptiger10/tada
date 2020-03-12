@@ -1240,23 +1240,23 @@ func concatenateLabelsToStringsBytes(labels []*valueContainer) []string {
 		numRows := labels[0].len()
 		ret := make([]string, numRows)
 		for i := 0; i < numRows; i++ {
-			ret[i] = string(labels[0].cache[i])
+			ret[i] = labels[0].newCache[i]
 		}
 		return ret
 	}
-	buf := new(bytes.Buffer)
+	b := strings.Builder{}
 	numRows := labels[0].len()
 	ret := make([]string, numRows)
 
 	for i := 0; i < numRows; i++ {
-		buf.Reset()
+		b.Reset()
 		for j := range labels {
-			buf.Write(labels[j].cache[i])
+			b.WriteString(labels[j].newCache[i])
 			if j != len(labels)-1 {
-				buf.WriteString(optionLevelSeparator)
+				b.WriteString(optionLevelSeparator)
 			}
 		}
-		ret[i] = string(buf.Bytes())
+		ret[i] = b.String()
 	}
 	// return a single slice of strings
 	return ret
@@ -2539,7 +2539,7 @@ func extractCSVDimensions(b []byte, comma rune) (numRows, numCols int, err error
 // major dimension of output: columns
 // trims leading whitespace
 // supports custom comma but not comments
-func readCSVBytes(r io.Reader, dstVals [][][]byte, dstNulls [][]bool, comma rune) error {
+func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune) error {
 	br := bufio.NewReaderSize(r, 1024)
 	commaLen := utf8.RuneLen(comma)
 	lengthLineEnd := func(b []byte) int {
@@ -2587,7 +2587,7 @@ func readCSVBytes(r io.Reader, dstVals [][][]byte, dstNulls [][]bool, comma rune
 			}
 			// write fields into column-oriented receiver
 			// if enclosed in quotation marks, strip the quotations
-			dstVals[columnNumber][rowNumber] = stripQuotationMarks(field)
+			dstVals[columnNumber][rowNumber] = string(stripQuotationMarks(field))
 			if isNullString(string(field)) {
 				dstNulls[columnNumber][rowNumber] = true
 			}
@@ -2611,7 +2611,7 @@ func readCSVBytes(r io.Reader, dstVals [][][]byte, dstNulls [][]bool, comma rune
 }
 
 // major dimension: columns
-func makeDataFrameFromMatrices(values [][][]byte, isNull [][]bool, config *ReadConfig) *DataFrame {
+func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *ReadConfig) *DataFrame {
 	numCols := len(values) - config.NumLabelCols
 	numRows := len(values[0]) - config.NumHeaderRows
 	labelNames := make([]string, config.NumLabelCols)
@@ -2619,14 +2619,14 @@ func makeDataFrameFromMatrices(values [][][]byte, isNull [][]bool, config *ReadC
 	for j := 0; j < config.NumLabelCols; j++ {
 		// write label headers, no offset
 		labelNames[j] = string(
-			bytes.Join(values[j][:config.NumHeaderRows], optionLevelSeparatorBytes))
+			strings.Join(values[j][:config.NumHeaderRows], optionLevelSeparator))
 	}
 
 	colNames := make([]string, numCols)
 	for k := 0; k < numCols; k++ {
 		// write column headers, offset by label levels
 		colNames[k] = string(
-			bytes.Join(values[k+config.NumLabelCols][:config.NumHeaderRows], optionLevelSeparatorBytes))
+			strings.Join(values[k+config.NumLabelCols][:config.NumHeaderRows], optionLevelSeparator))
 	}
 
 	// remove headers
@@ -2634,13 +2634,13 @@ func makeDataFrameFromMatrices(values [][][]byte, isNull [][]bool, config *ReadC
 		values[container] = values[container][config.NumHeaderRows:]
 		isNull[container] = isNull[container][config.NumHeaderRows:]
 	}
-	labels := copyBytesIntoValueContainers(
+	labels := copyStringsIntoValueContainers(
 		values[:config.NumLabelCols],
 		isNull[:config.NumLabelCols],
 		labelNames,
 	)
 
-	columns := copyBytesIntoValueContainers(
+	columns := copyStringsIntoValueContainers(
 		values[config.NumLabelCols:],
 		isNull[config.NumLabelCols:],
 		colNames,
