@@ -3,6 +3,7 @@ package tada
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"math"
@@ -3492,13 +3493,16 @@ func Test_extractCSVDimensions(t *testing.T) {
 }
 
 func Test_readCSVBytes(t *testing.T) {
-	b0 := "\"foo\",\"bar\"\n\"qux\",\"quz\""
+	b0 := "\"foo\",\"bar\"\n\"qux\",\"quz\"\n"
 	b1 := "foo,bar,baz\nqux,quux,quz\n"
 	b2 := "foo, bar\nqux, quz\n"
 	b3 := ",foo\n"
 	b4 := "foo,bar\nqux,quz"
-	b5 := "foo\nbar,baz\n"
-	b6 := "foo,bar\nbaz\n"
+	b5 := "foo\nbaz\r\n"
+	b6 := "foo\nbaz\r"
+
+	f0 := "foo\nbar,baz\n"
+	f1 := "foo,bar\nbaz\n"
 	type args struct {
 		r        io.Reader
 		dstVals  [][][]byte
@@ -3584,9 +3588,33 @@ func Test_readCSVBytes(t *testing.T) {
 			wantNulls: [][]bool{{false, false}, {false, false}},
 			wantErr:   false,
 		},
-		{name: "too many fields",
+		{name: "pass with \r\n",
 			args: args{
 				r: bytes.NewBuffer([]byte(b5)),
+				dstVals: [][][]byte{
+					{[]byte(""), []byte("")}},
+				dstNulls: [][]bool{{false, false}},
+				comma:    ','},
+			wantVals: [][][]byte{
+				{[]byte("foo"), []byte("baz")}},
+			wantNulls: [][]bool{{false, false}},
+			wantErr:   false,
+		},
+		{name: "pass with final \r",
+			args: args{
+				r: bytes.NewBuffer([]byte(b6)),
+				dstVals: [][][]byte{
+					{[]byte(""), []byte("")}},
+				dstNulls: [][]bool{{false, false}},
+				comma:    ','},
+			wantVals: [][][]byte{
+				{[]byte("foo"), []byte("baz")}},
+			wantNulls: [][]bool{{false, false}},
+			wantErr:   false,
+		},
+		{name: "fail - too many fields",
+			args: args{
+				r: bytes.NewBuffer([]byte(f0)),
 				dstVals: [][][]byte{
 					{[]byte(""), []byte("")}},
 				dstNulls: [][]bool{{false, false}},
@@ -3596,9 +3624,9 @@ func Test_readCSVBytes(t *testing.T) {
 			wantNulls: [][]bool{{false, false}},
 			wantErr:   true,
 		},
-		{name: "too few fields",
+		{name: "fail - too few fields",
 			args: args{
-				r: bytes.NewBuffer([]byte(b6)),
+				r: bytes.NewBuffer([]byte(f1)),
 				dstVals: [][][]byte{
 					{[]byte(""), []byte("")},
 					{[]byte(""), []byte("")}},
@@ -3618,7 +3646,12 @@ func Test_readCSVBytes(t *testing.T) {
 				t.Errorf("readCSVBytes() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !reflect.DeepEqual(tt.args.dstVals, tt.wantVals) {
-				t.Errorf("readCSVBytes() -> dstVals = %v, wantVals %v", tt.args.dstVals, tt.wantVals)
+				t.Errorf("readCSVBytes() -> dstVals = %#v, wantVals %#v", tt.args.dstVals, tt.wantVals)
+				for i := range tt.args.dstVals {
+					for j := range tt.args.dstVals[i] {
+						fmt.Println(string(tt.args.dstVals[i][j]))
+					}
+				}
 			}
 			if !reflect.DeepEqual(tt.args.dstNulls, tt.wantNulls) {
 				t.Errorf("readCSVBytes() -> dstNulls = %v, wantNulls %v", tt.args.dstNulls, tt.wantNulls)

@@ -2541,7 +2541,7 @@ func readCSVBytes(r io.Reader, dstVals [][][]byte, dstNulls [][]bool, comma rune
 	br := bufio.NewReaderSize(r, 1024)
 	commaLen := utf8.RuneLen(comma)
 	lengthLineEnd := func(b []byte) int {
-		if b[len(b)-1] == '\n' {
+		if b[len(b)-1] == '\n' || b[len(b)-1] == '\r' {
 			return 1
 		}
 		return 0
@@ -2559,11 +2559,16 @@ func readCSVBytes(r io.Reader, dstVals [][][]byte, dstNulls [][]bool, comma rune
 		if len(line) == 0 && err == io.EOF {
 			return nil
 		}
+		// Normalize \r\n to \n on all input lines.
+		if n := len(line); n >= 2 && line[n-2] == '\r' && line[n-1] == '\n' {
+			line[n-2] = '\n'
+			line = line[:n-1]
+		}
+
 		var columnNumber int
 		var fieldCount int
 		for {
 			// iterate over fields in each row
-			// trim leading whitespace
 			line = bytes.TrimLeftFunc(line, unicode.IsSpace)
 			i := bytes.IndexRune(line, comma)
 			field := line
