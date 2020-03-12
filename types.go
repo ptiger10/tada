@@ -17,11 +17,10 @@ import (
 )
 
 type valueContainer struct {
-	slice    interface{}
-	isNull   []bool
-	cache    [][]byte
-	newCache []string
-	name     string
+	slice  interface{}
+	isNull []bool
+	cache  []string
+	name   string
 }
 
 // A Series is a single column of data with one or more levels of aligned labels.

@@ -293,7 +293,7 @@ func Test_valueContainer_copy(t *testing.T) {
 		slice  interface{}
 		name   string
 		isNull []bool
-		cache  [][]byte
+		cache  []string
 	}
 	tests := []struct {
 		name   string
@@ -304,13 +304,13 @@ func Test_valueContainer_copy(t *testing.T) {
 			slice:  []float64{1},
 			isNull: []bool{false},
 			name:   "foo",
-			cache:  [][]byte{[]byte("foo")},
+			cache:  []string{"foo"},
 		},
 			&valueContainer{
 				slice:  []float64{1},
 				isNull: []bool{false},
 				name:   "foo",
-				cache:  [][]byte{[]byte("foo")},
+				cache:  []string{"foo"},
 			}},
 	}
 	for _, tt := range tests {
@@ -340,7 +340,7 @@ func Test_valueContainer_copy(t *testing.T) {
 				t.Errorf("valueContainer.copy() retained reference to original isNull")
 			}
 			got = vc.copy()
-			got.cache[0] = []byte("bar")
+			got.cache[0] = "bar"
 			if reflect.DeepEqual(vc, got) {
 				t.Errorf("valueContainer.copy() retained reference to original cache")
 			}
@@ -440,7 +440,7 @@ func Test_lookup(t *testing.T) {
 			want: &Series{
 				values: &valueContainer{slice: []int{10, 0}, isNull: []bool{false, true}, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0, 1}, isNull: []bool{false, false}, cache: [][]byte{[]byte("0"), []byte("1")}},
+					{slice: []int{0, 1}, isNull: []bool{false, false}, cache: []string{"0", "1"}},
 				}}, wantErr: false,
 		},
 		{name: "right", args: args{
@@ -451,7 +451,7 @@ func Test_lookup(t *testing.T) {
 			want: &Series{
 				values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}},
 				labels: []*valueContainer{
-					{slice: []int{0, 10}, isNull: []bool{false, false}, cache: [][]byte{[]byte("0"), []byte("10")}},
+					{slice: []int{0, 10}, isNull: []bool{false, false}, cache: []string{"0", "10"}},
 				}}, wantErr: false,
 		},
 		{name: "inner", args: args{
@@ -507,7 +507,7 @@ func Test_lookupDataFrame(t *testing.T) {
 			want: &DataFrame{
 				values: []*valueContainer{{slice: []int{10, 0}, isNull: []bool{false, true}, name: "bar"}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux",
-					cache: [][]byte{[]byte("0"), []byte("1")}}},
+					cache: []string{"0", "1"}}},
 				name: "baz", colLevelNames: []string{"*0"},
 			},
 			wantErr: false,
@@ -521,7 +521,7 @@ func Test_lookupDataFrame(t *testing.T) {
 			want: &DataFrame{
 				values: []*valueContainer{{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "bar"}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux",
-					cache: [][]byte{[]byte("0"), []byte("1")}}},
+					cache: []string{"0", "1"}}},
 				name: "baz", colLevelNames: []string{"*0"},
 			},
 			wantErr: false,
@@ -535,7 +535,7 @@ func Test_lookupDataFrame(t *testing.T) {
 			want: &DataFrame{
 				values: []*valueContainer{{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "bar"}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux",
-					cache: [][]byte{[]byte("0"), []byte("1")}}},
+					cache: []string{"0", "1"}}},
 				name: "baz", colLevelNames: []string{"*0"},
 			},
 			wantErr: false,
@@ -552,7 +552,7 @@ func Test_lookupDataFrame(t *testing.T) {
 			want: &DataFrame{
 				values: []*valueContainer{{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "bar"}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux",
-					cache: [][]byte{[]byte("0"), []byte("1")}}},
+					cache: []string{"0", "1"}}},
 				name: "baz", colLevelNames: []string{"*0"},
 			},
 			wantErr: false,
@@ -566,7 +566,7 @@ func Test_lookupDataFrame(t *testing.T) {
 			want: &DataFrame{
 				values: []*valueContainer{{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"}},
 				labels: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, name: "quux",
-					cache: [][]byte{[]byte("0"), []byte("10")}}},
+					cache: []string{"0", "10"}}},
 				name: "baz", colLevelNames: []string{"*0"},
 			},
 			wantErr: false,
@@ -1407,7 +1407,7 @@ func Test_valueContainer_apply(t *testing.T) {
 		slice  interface{}
 		isNull []bool
 		name   string
-		cache  [][]byte
+		cache  []string
 	}
 	type args struct {
 		apply ApplyFn
@@ -1427,7 +1427,7 @@ func Test_valueContainer_apply(t *testing.T) {
 		{"float - reset cache", fields{
 			slice:  []float64{1, 2},
 			isNull: []bool{false, false},
-			name:   "foo", cache: [][]byte{[]byte("1"), []byte("2")}},
+			name:   "foo", cache: []string{"1", "2"}},
 			args{ApplyFn{Float64: func(v float64) float64 { return v * 2 }}},
 			&valueContainer{slice: []float64{2, 4}, isNull: []bool{false, false}, name: "foo"}},
 		{"string", fields{
@@ -1466,7 +1466,7 @@ func Test_valueContainer_applyFormat(t *testing.T) {
 		slice  interface{}
 		isNull []bool
 		name   string
-		cache  [][]byte
+		cache  []string
 	}
 	type args struct {
 		apply ApplyFormatFn
@@ -1484,7 +1484,7 @@ func Test_valueContainer_applyFormat(t *testing.T) {
 			}}},
 			&valueContainer{slice: []string{"0.8"}, isNull: []bool{false}}},
 		{"float - reset cache",
-			fields{slice: []float64{.75}, isNull: []bool{false}, cache: [][]byte{[]byte(".75")}},
+			fields{slice: []float64{.75}, isNull: []bool{false}, cache: []string{".75"}},
 			args{ApplyFormatFn{Float64: func(v float64) string {
 				return strconv.FormatFloat(v, 'f', 1, 64)
 			}}},
@@ -1538,7 +1538,7 @@ func Test_withColumn(t *testing.T) {
 		{"overwrite - reset cache", args{
 			cols: []*valueContainer{
 				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo",
-					cache: [][]byte{[]byte("1"), []byte("2")}},
+					cache: []string{"1", "2"}},
 				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
 			}, name: "foo", input: []int{3, 4}, requiredLen: 2},
 			[]*valueContainer{
@@ -1560,7 +1560,7 @@ func Test_withColumn(t *testing.T) {
 		{"overwrite Series", args{
 			cols: []*valueContainer{
 				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo",
-					cache: [][]byte{[]byte("1"), []byte("2")}},
+					cache: []string{"1", "2"}},
 				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
 			}, name: "foo", input: &Series{values: &valueContainer{
 				slice: []float64{3, 4}, isNull: []bool{false, false},
@@ -2286,7 +2286,7 @@ func Test_valueContainer_fillnull(t *testing.T) {
 		slice  interface{}
 		isNull []bool
 		name   string
-		cache  [][]byte
+		cache  []string
 	}
 	type args struct {
 		lambda NullFiller
@@ -2316,7 +2316,7 @@ func Test_valueContainer_fillnull(t *testing.T) {
 		{"reset cache - fill zero",
 			fields{
 				slice: []string{"", "foo"}, isNull: []bool{true, false},
-				cache: [][]byte{[]byte(""), []byte("foo")}},
+				cache: []string{"", "foo"}},
 			args{NullFiller{FillZero: true}},
 			&valueContainer{slice: []string{"", "foo"}, isNull: []bool{false, false}},
 		},
@@ -2343,7 +2343,7 @@ func Test_valueContainer_resample(t *testing.T) {
 		slice  interface{}
 		isNull []bool
 		name   string
-		cache  [][]byte
+		cache  []string
 	}
 	type args struct {
 		by Resampler
@@ -2356,7 +2356,7 @@ func Test_valueContainer_resample(t *testing.T) {
 	}{
 		{"year - reset cache",
 			fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo",
-				cache: [][]byte{[]byte("2020-02-02 12:30:45 +0000 UTC")}},
+				cache: []string{"2020-02-02 12:30:45 +0000 UTC"}},
 			args{Resampler{ByYear: true}},
 			&valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
 				isNull: []bool{false}, name: "foo"}},
@@ -2527,7 +2527,7 @@ func Test_lookupWithAnchor(t *testing.T) {
 				values: &valueContainer{slice: []string{"", "foo"}, isNull: []bool{true, false}, name: "waldo"},
 				labels: []*valueContainer{
 					{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo",
-						cache: [][]byte{[]byte("0"), []byte("1")},
+						cache: []string{"0", "1"},
 					}},
 			}},
 	}
@@ -3494,15 +3494,15 @@ func Test_extractCSVDimensions(t *testing.T) {
 
 func Test_readCSVBytes(t *testing.T) {
 	b0 := "\"foo\",\"bar\"\n\"qux\",\"quz\"\n"
-	// b1 := "foo,bar,baz\nqux,quux,quz\n"
-	// b2 := "foo, bar\nqux, quz\n"
-	// b3 := ",foo\n"
-	// b4 := "foo,bar\nqux,quz"
-	// b5 := "foo\nbaz\r\n"
-	// b6 := "foo\nbaz\r"
+	b1 := "foo,bar,baz\nqux,quux,quz\n"
+	b2 := "foo, bar\nqux, quz\n"
+	b3 := ",foo\n"
+	b4 := "foo,bar\nqux,quz"
+	b5 := "foo\nbaz\r\n"
+	b6 := "foo\nbaz\r"
 
-	// f0 := "foo\nbar,baz\n"
-	// f1 := "foo,bar\nbaz\n"
+	f0 := "foo\nbar,baz\n"
+	f1 := "foo,bar\nbaz\n"
 	type args struct {
 		r        io.Reader
 		dstVals  [][]string
@@ -3512,7 +3512,7 @@ func Test_readCSVBytes(t *testing.T) {
 	tests := []struct {
 		name      string
 		args      args
-		wantVals  [][][]byte
+		wantVals  [][]string
 		wantNulls [][]bool
 		wantErr   bool
 	}{
@@ -3524,120 +3524,120 @@ func Test_readCSVBytes(t *testing.T) {
 					{"", ""}},
 				dstNulls: [][]bool{{false, false}, {false, false}},
 				comma:    ','},
-			wantVals: [][][]byte{
-				{[]byte("foo"), []byte("qux")},
-				{[]byte("bar"), []byte("quz")}},
+			wantVals: [][]string{
+				{"foo", "qux"},
+				{"bar", "quz"}},
 			wantNulls: [][]bool{{false, false}, {false, false}},
 			wantErr:   false,
 		},
-		// {name: "pass normal",
-		// 	args: args{
-		// 		r: bytes.NewBuffer([]byte(b1)),
-		// 		dstVals: [][][]byte{
-		// 			{[]byte(""), []byte("")},
-		// 			{[]byte(""), []byte("")},
-		// 			{[]byte(""), []byte("")}},
-		// 		dstNulls: [][]bool{{false, false}, {false, false}, {false, false}},
-		// 		comma:    ','},
-		// 	wantVals: [][][]byte{
-		// 		{[]byte("foo"), []byte("qux")},
-		// 		{[]byte("bar"), []byte("quux")},
-		// 		{[]byte("baz"), []byte("quz")}},
-		// 	wantNulls: [][]bool{{false, false}, {false, false}, {false, false}},
-		// 	wantErr:   false,
-		// },
-		// {name: "pass with leading whitespace",
-		// 	args: args{
-		// 		r: bytes.NewBuffer([]byte(b2)),
-		// 		dstVals: [][][]byte{
-		// 			{[]byte(""), []byte("")},
-		// 			{[]byte(""), []byte("")}},
-		// 		dstNulls: [][]bool{{false, false}, {false, false}},
-		// 		comma:    ','},
-		// 	wantVals: [][][]byte{
-		// 		{[]byte("foo"), []byte("qux")},
-		// 		{[]byte("bar"), []byte("quz")}},
-		// 	wantNulls: [][]bool{{false, false}, {false, false}},
-		// 	wantErr:   false,
-		// },
-		// {name: "pass with nil",
-		// 	args: args{
-		// 		r: bytes.NewBuffer([]byte(b3)),
-		// 		dstVals: [][][]byte{
-		// 			{[]byte("")},
-		// 			{[]byte("")}},
-		// 		dstNulls: [][]bool{{true}, {false}},
-		// 		comma:    ','},
-		// 	wantVals: [][][]byte{
-		// 		{[]byte("")},
-		// 		{[]byte("foo")}},
-		// 	wantNulls: [][]bool{{true}, {false}},
-		// 	wantErr:   false,
-		// },
-		// {name: "pass with no final \n",
-		// 	args: args{
-		// 		r: bytes.NewBuffer([]byte(b4)),
-		// 		dstVals: [][][]byte{
-		// 			{[]byte(""), []byte("")},
-		// 			{[]byte(""), []byte("")}},
-		// 		dstNulls: [][]bool{{false, false}, {false, false}},
-		// 		comma:    ','},
-		// 	wantVals: [][][]byte{
-		// 		{[]byte("foo"), []byte("qux")},
-		// 		{[]byte("bar"), []byte("quz")}},
-		// 	wantNulls: [][]bool{{false, false}, {false, false}},
-		// 	wantErr:   false,
-		// },
-		// {name: "pass with \r\n",
-		// 	args: args{
-		// 		r: bytes.NewBuffer([]byte(b5)),
-		// 		dstVals: [][][]byte{
-		// 			{[]byte(""), []byte("")}},
-		// 		dstNulls: [][]bool{{false, false}},
-		// 		comma:    ','},
-		// 	wantVals: [][][]byte{
-		// 		{[]byte("foo"), []byte("baz")}},
-		// 	wantNulls: [][]bool{{false, false}},
-		// 	wantErr:   false,
-		// },
-		// {name: "pass with final \r",
-		// 	args: args{
-		// 		r: bytes.NewBuffer([]byte(b6)),
-		// 		dstVals: [][][]byte{
-		// 			{[]byte(""), []byte("")}},
-		// 		dstNulls: [][]bool{{false, false}},
-		// 		comma:    ','},
-		// 	wantVals: [][][]byte{
-		// 		{[]byte("foo"), []byte("baz")}},
-		// 	wantNulls: [][]bool{{false, false}},
-		// 	wantErr:   false,
-		// },
-		// {name: "fail - too many fields",
-		// 	args: args{
-		// 		r: bytes.NewBuffer([]byte(f0)),
-		// 		dstVals: [][][]byte{
-		// 			{[]byte(""), []byte("")}},
-		// 		dstNulls: [][]bool{{false, false}},
-		// 		comma:    ','},
-		// 	wantVals: [][][]byte{
-		// 		{[]byte("foo"), []byte("bar")}},
-		// 	wantNulls: [][]bool{{false, false}},
-		// 	wantErr:   true,
-		// },
-		// {name: "fail - too few fields",
-		// 	args: args{
-		// 		r: bytes.NewBuffer([]byte(f1)),
-		// 		dstVals: [][][]byte{
-		// 			{[]byte(""), []byte("")},
-		// 			{[]byte(""), []byte("")}},
-		// 		dstNulls: [][]bool{{false, false}, {false, false}},
-		// 		comma:    ','},
-		// 	wantVals: [][][]byte{
-		// 		{[]byte("foo"), []byte("baz")},
-		// 		{[]byte("bar"), []byte("")}},
-		// 	wantNulls: [][]bool{{false, false}, {false, false}},
-		// 	wantErr:   true,
-		// },
+		{name: "pass normal",
+			args: args{
+				r: bytes.NewBuffer([]byte(b1)),
+				dstVals: [][]string{
+					{"", ""},
+					{"", ""},
+					{"", ""}},
+				dstNulls: [][]bool{{false, false}, {false, false}, {false, false}},
+				comma:    ','},
+			wantVals: [][]string{
+				{"foo", "qux"},
+				{"bar", "quux"},
+				{"baz", "quz"}},
+			wantNulls: [][]bool{{false, false}, {false, false}, {false, false}},
+			wantErr:   false,
+		},
+		{name: "pass with leading whitespace",
+			args: args{
+				r: bytes.NewBuffer([]byte(b2)),
+				dstVals: [][]string{
+					{"", ""},
+					{"", ""}},
+				dstNulls: [][]bool{{false, false}, {false, false}},
+				comma:    ','},
+			wantVals: [][]string{
+				{"foo", "qux"},
+				{"bar", "quz"}},
+			wantNulls: [][]bool{{false, false}, {false, false}},
+			wantErr:   false,
+		},
+		{name: "pass with nil",
+			args: args{
+				r: bytes.NewBuffer([]byte(b3)),
+				dstVals: [][]string{
+					{""},
+					{""}},
+				dstNulls: [][]bool{{true}, {false}},
+				comma:    ','},
+			wantVals: [][]string{
+				{""},
+				{"foo"}},
+			wantNulls: [][]bool{{true}, {false}},
+			wantErr:   false,
+		},
+		{name: "pass with no final \n",
+			args: args{
+				r: bytes.NewBuffer([]byte(b4)),
+				dstVals: [][]string{
+					{"", ""},
+					{"", ""}},
+				dstNulls: [][]bool{{false, false}, {false, false}},
+				comma:    ','},
+			wantVals: [][]string{
+				{"foo", "qux"},
+				{"bar", "quz"}},
+			wantNulls: [][]bool{{false, false}, {false, false}},
+			wantErr:   false,
+		},
+		{name: "pass with \r\n",
+			args: args{
+				r: bytes.NewBuffer([]byte(b5)),
+				dstVals: [][]string{
+					{"", ""}},
+				dstNulls: [][]bool{{false, false}},
+				comma:    ','},
+			wantVals: [][]string{
+				{"foo", "baz"}},
+			wantNulls: [][]bool{{false, false}},
+			wantErr:   false,
+		},
+		{name: "pass with final \r",
+			args: args{
+				r: bytes.NewBuffer([]byte(b6)),
+				dstVals: [][]string{
+					{"", ""}},
+				dstNulls: [][]bool{{false, false}},
+				comma:    ','},
+			wantVals: [][]string{
+				{"foo", "baz"}},
+			wantNulls: [][]bool{{false, false}},
+			wantErr:   false,
+		},
+		{name: "fail - too many fields",
+			args: args{
+				r: bytes.NewBuffer([]byte(f0)),
+				dstVals: [][]string{
+					{"", ""}},
+				dstNulls: [][]bool{{false, false}},
+				comma:    ','},
+			wantVals: [][]string{
+				{"foo", "bar"}},
+			wantNulls: [][]bool{{false, false}},
+			wantErr:   true,
+		},
+		{name: "fail - too few fields",
+			args: args{
+				r: bytes.NewBuffer([]byte(f1)),
+				dstVals: [][]string{
+					{"", ""},
+					{"", ""}},
+				dstNulls: [][]bool{{false, false}, {false, false}},
+				comma:    ','},
+			wantVals: [][]string{
+				{"foo", "baz"},
+				{"bar", ""}},
+			wantNulls: [][]bool{{false, false}, {false, false}},
+			wantErr:   true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3782,7 +3782,7 @@ func TestSeries_combineMath(t *testing.T) {
 			&Series{
 				values: &valueContainer{slice: []float64{3}, isNull: []bool{false}, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar", cache: [][]byte{[]byte("0")}},
+					{slice: []int{0}, isNull: []bool{false}, name: "bar", cache: []string{"0"}},
 					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
 			},
 		},
@@ -3945,7 +3945,7 @@ func Test_valueContainer_subsetRows(t *testing.T) {
 	type fields struct {
 		slice  interface{}
 		isNull []bool
-		cache  [][]byte
+		cache  []string
 		name   string
 	}
 	type args struct {
@@ -3962,7 +3962,7 @@ func Test_valueContainer_subsetRows(t *testing.T) {
 			args{[]int{1}},
 			&valueContainer{slice: []float64{1}, isNull: []bool{true}, name: "foo"}, false},
 		{"pass - reset cache", fields{slice: []string{"foo", "bar"}, isNull: []bool{false, false},
-			cache: [][]byte{[]byte("foo"), []byte("bar")}, name: "foo"},
+			cache: []string{"foo", "bar"}, name: "foo"},
 			args{[]int{1}},
 			&valueContainer{slice: []string{"bar"}, isNull: []bool{false}, name: "foo"}, false},
 		{"return existing", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"},
@@ -4090,7 +4090,7 @@ func Test_concatenateLabelsToStringsBytes(t *testing.T) {
 			[]string{"foo|0", "bar|1"}},
 		{"two levels, two index, cache", args{labels: []*valueContainer{
 			{slice: []string{"foo", "bar"}},
-			{slice: []int{0, 1}, cache: [][]byte{[]byte("0"), []byte("1")}}}},
+			{slice: []int{0, 1}, cache: []string{"0", "1"}}}},
 			[]string{"foo|0", "bar|1"}},
 	}
 	for _, tt := range tests {
@@ -4385,7 +4385,7 @@ func Test_valueContainer_dropRow(t *testing.T) {
 	type fields struct {
 		slice  interface{}
 		isNull []bool
-		cache  [][]byte
+		cache  []string
 		name   string
 	}
 	type args struct {
@@ -4399,16 +4399,16 @@ func Test_valueContainer_dropRow(t *testing.T) {
 		wantErr bool
 	}{
 		{"pass - reset cache", fields{slice: []int{0, 1}, isNull: []bool{false, false},
-			name: "qux", cache: [][]byte{[]byte("0"), []byte("1")}},
+			name: "qux", cache: []string{"0", "1"}},
 			args{0},
 			&valueContainer{slice: []int{1}, isNull: []bool{false}, name: "qux"},
 			false,
 		},
 		{"fail", fields{slice: []int{0, 1}, isNull: []bool{false, false},
-			name: "qux", cache: [][]byte{[]byte("foo")}},
+			name: "qux", cache: []string{"foo"}},
 			args{10},
 			&valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux",
-				cache: [][]byte{[]byte("foo")}},
+				cache: []string{"foo"}},
 			true,
 		},
 	}
@@ -4434,7 +4434,7 @@ func Test_valueContainer_indexOfRows(t *testing.T) {
 	type fields struct {
 		slice  interface{}
 		isNull []bool
-		cache  [][]byte
+		cache  []string
 		name   string
 	}
 	type args struct {

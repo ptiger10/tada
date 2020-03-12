@@ -101,7 +101,7 @@ func convertBoolToFloat(val bool) float64 {
 }
 
 func (vc *valueContainer) cast(dtype DType) {
-	if vc.isBytes() {
+	if vc.isString() {
 		vc.setCache()
 	}
 	switch dtype {
@@ -318,8 +318,8 @@ func (vc *valueContainer) resetCache() {
 
 // conditions under which cache is set:
 // - concatenating multiple container levels (groupby, lookup, promote)
-// - casting from string or byte
-// - calling vc.tostring()
+// - casting from string
+// - calling vc.string()
 // ignores if cache is already set
 func (vc *valueContainer) setCache() {
 	if vc.cache != nil {
@@ -328,54 +328,45 @@ func (vc *valueContainer) setCache() {
 	switch vc.slice.(type) {
 	case [][]byte:
 		arr := vc.slice.([][]byte)
-		vc.newCache = make([]string, len(arr))
+		vc.cache = make([]string, len(arr))
 		for i := range arr {
-			vc.newCache[i] = string(arr[i])
+			vc.cache[i] = string(arr[i])
 		}
 	case []string:
-		vc.newCache = vc.slice.([]string)
+		vc.cache = vc.slice.([]string)
 	case []float64:
 		arr := vc.slice.([]float64)
-		vc.newCache = make([]string, len(arr))
+		vc.cache = make([]string, len(arr))
 		for i := range arr {
-			vc.newCache[i] = fmt.Sprint(arr[i])
+			vc.cache[i] = fmt.Sprint(arr[i])
 		}
 	case []int:
 		arr := vc.slice.([]int)
-		vc.cache = make([][]byte, len(arr))
+		vc.cache = make([]string, len(arr))
 		for i := range arr {
-			vc.cache[i] = []byte(strconv.Itoa(arr[i]))
+			vc.cache[i] = strconv.Itoa(arr[i])
 		}
 	case []time.Time:
 		arr := vc.slice.([]time.Time)
-		vc.cache = make([][]byte, len(arr))
+		vc.cache = make([]string, len(arr))
 		for i := range arr {
-			vc.cache[i] = []byte(arr[i].String())
+			vc.cache[i] = arr[i].String()
 		}
 	default:
 		arr := reflect.ValueOf(vc.slice)
-		vc.cache = make([][]byte, arr.Len())
+		vc.cache = make([]string, arr.Len())
 		for i := 0; i < arr.Len(); i++ {
-			vc.cache[i] = []byte(fmt.Sprint(arr.Index(i).Interface()))
+			vc.cache[i] = fmt.Sprint(arr.Index(i).Interface())
 		}
 	}
 }
 
-func (vc *valueContainer) setCacheFromString(arr []string) {
-	if vc.cache != nil {
-		return
-	}
-	vc.cache = make([][]byte, len(arr))
-	for i := range arr {
-		vc.cache[i] = []byte(arr[i])
-	}
-	return
+func (vc *valueContainer) isString() bool {
+	_, ok := vc.slice.([]string)
+	return ok
 }
 
-func (vc *valueContainer) isBytes() bool {
-	switch vc.slice.(type) {
-	case [][]byte, []string:
-		return true
-	}
-	return false
+func (vc *valueContainer) setCacheFromString(arr []string) {
+	vc.cache = arr
+	return
 }

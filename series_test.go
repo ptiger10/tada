@@ -1357,7 +1357,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 			&Series{values: &valueContainer{slice: []float64{30, 0}, isNull: []bool{false, true}},
 				labels: []*valueContainer{
 					{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
-						cache: [][]byte{[]byte("bar"), []byte("baz")}}}},
+						cache: []string{"bar", "baz"}}}},
 		},
 		{"single label level, no named keys, left join", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1369,7 +1369,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				leftOn: nil, rightOn: nil},
 			&Series{values: &valueContainer{slice: []float64{30, 0}, isNull: []bool{false, true}},
 				labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
-					cache: [][]byte{[]byte("bar"), []byte("baz")}}}},
+					cache: []string{"bar", "baz"}}}},
 		},
 		{"multiple label level, no named keys, left join, match at index 1", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1387,9 +1387,9 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 			&Series{values: &valueContainer{slice: []float64{0, 20}, isNull: []bool{true, false}},
 				labels: []*valueContainer{
 					{name: "waldo", slice: []string{"baz", "bar"}, isNull: []bool{false, false},
-						cache: [][]byte{[]byte("baz"), []byte("bar")}},
+						cache: []string{"baz", "bar"}},
 					{name: "corge", slice: []int{0, 1}, isNull: []bool{false, false},
-						cache: [][]byte{[]byte("0"), []byte("1")}}}},
+						cache: []string{"0", "1"}}}},
 		},
 		{"fail - leftOn but not rightOn", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1475,7 +1475,7 @@ func TestSeries_Merge(t *testing.T) {
 				},
 				labels: []*valueContainer{
 					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0",
-						cache: [][]byte{[]byte("0"), []byte("1")},
+						cache: []string{"0", "1"},
 					}},
 				colLevelNames: []string{"*0"}},
 		},
@@ -1621,7 +1621,7 @@ func TestSeries_Add(t *testing.T) {
 				values: &valueContainer{slice: []float64{1, 6}, isNull: []bool{false, false}},
 				labels: []*valueContainer{
 					{slice: []int{0, 1}, isNull: []bool{false, false},
-						cache: [][]byte{[]byte("0"), []byte("1")},
+						cache: []string{"0", "1"},
 					}}},
 		},
 		{"missing as null",
@@ -1636,7 +1636,7 @@ func TestSeries_Add(t *testing.T) {
 				values: &valueContainer{slice: []float64{0, 6}, isNull: []bool{true, false}},
 				labels: []*valueContainer{
 					{slice: []int{0, 1}, isNull: []bool{false, false},
-						cache: [][]byte{[]byte("0"), []byte("1")},
+						cache: []string{"0", "1"},
 					}}},
 		},
 	}
@@ -1682,7 +1682,7 @@ func TestSeries_Subtract(t *testing.T) {
 				values: &valueContainer{slice: []float64{1, -2}, isNull: []bool{false, false}},
 				labels: []*valueContainer{
 					{slice: []int{0, 1}, isNull: []bool{false, false},
-						cache: [][]byte{[]byte("0"), []byte("1")},
+						cache: []string{"0", "1"},
 					}}},
 		},
 		{"missing as null",
@@ -1697,7 +1697,7 @@ func TestSeries_Subtract(t *testing.T) {
 				values: &valueContainer{slice: []float64{0, -2}, isNull: []bool{true, false}},
 				labels: []*valueContainer{
 					{slice: []int{0, 1}, isNull: []bool{false, false},
-						cache: [][]byte{[]byte("0"), []byte("1")},
+						cache: []string{"0", "1"},
 					}}},
 		},
 	}
@@ -1743,7 +1743,7 @@ func TestSeries_Multiply(t *testing.T) {
 				values: &valueContainer{slice: []float64{1, 8}, isNull: []bool{false, false}},
 				labels: []*valueContainer{
 					{slice: []int{0, 1}, isNull: []bool{false, false},
-						cache: [][]byte{[]byte("0"), []byte("1")},
+						cache: []string{"0", "1"},
 					}}},
 		},
 		{"missing as null",
@@ -1758,7 +1758,7 @@ func TestSeries_Multiply(t *testing.T) {
 				values: &valueContainer{slice: []float64{0, 8}, isNull: []bool{true, false}},
 				labels: []*valueContainer{
 					{slice: []int{0, 1}, isNull: []bool{false, false},
-						cache: [][]byte{[]byte("0"), []byte("1")},
+						cache: []string{"0", "1"},
 					}}},
 		},
 	}
@@ -1804,7 +1804,7 @@ func TestSeries_Divide(t *testing.T) {
 				values: &valueContainer{slice: []float64{1, .5}, isNull: []bool{false, false}},
 				labels: []*valueContainer{
 					{slice: []int{0, 1}, isNull: []bool{false, false},
-						cache: [][]byte{[]byte("0"), []byte("1")},
+						cache: []string{"0", "1"},
 					}}},
 		},
 		{"missing as null - divide by 0",
@@ -1819,7 +1819,7 @@ func TestSeries_Divide(t *testing.T) {
 				values: &valueContainer{slice: []float64{0, 1, 0}, isNull: []bool{true, false, true}},
 				labels: []*valueContainer{
 					{slice: []int{0, 1, 2}, isNull: []bool{false, false, false},
-						cache: [][]byte{[]byte("0"), []byte("1"), []byte("2")},
+						cache: []string{"0", "1", "2"},
 					}}},
 		},
 	}
@@ -2060,9 +2060,9 @@ func TestSeries_GroupBy(t *testing.T) {
 					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
 					labels: []*valueContainer{
 						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a",
-							cache: [][]byte{[]byte("0"), []byte("0"), []byte("1"), []byte("2")}},
+							cache: []string{"0", "0", "1", "2"}},
 						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b",
-							cache: [][]byte{[]byte("foo"), []byte("foo"), []byte("foo"), []byte("bar")}}},
+							cache: []string{"foo", "foo", "foo", "bar"}}},
 				},
 			}},
 		{"group by specific level", fields{
@@ -2082,7 +2082,7 @@ func TestSeries_GroupBy(t *testing.T) {
 					labels: []*valueContainer{
 						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a"},
 						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b",
-							cache: [][]byte{[]byte("foo"), []byte("foo"), []byte("foo"), []byte("bar")}},
+							cache: []string{"foo", "foo", "foo", "bar"}},
 					}},
 			}},
 		{"fail - no matching level", fields{

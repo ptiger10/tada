@@ -1240,7 +1240,7 @@ func concatenateLabelsToStringsBytes(labels []*valueContainer) []string {
 		numRows := labels[0].len()
 		ret := make([]string, numRows)
 		for i := 0; i < numRows; i++ {
-			ret[i] = labels[0].newCache[i]
+			ret[i] = labels[0].cache[i]
 		}
 		return ret
 	}
@@ -1251,7 +1251,7 @@ func concatenateLabelsToStringsBytes(labels []*valueContainer) []string {
 	for i := 0; i < numRows; i++ {
 		b.Reset()
 		for j := range labels {
-			b.WriteString(labels[j].newCache[i])
+			b.WriteString(labels[j].cache[i])
 			if j != len(labels)-1 {
 				b.WriteString(optionLevelSeparator)
 			}
@@ -1692,11 +1692,11 @@ func (vc *valueContainer) copy() *valueContainer {
 		cache:  copyCache(vc.cache),
 	}
 }
-func copyCache(input [][]byte) [][]byte {
+func copyCache(input []string) []string {
 	if input == nil {
 		return nil
 	}
-	ret := make([][]byte, len(input))
+	ret := make([]string, len(input))
 	copy(ret, input)
 	return ret
 }

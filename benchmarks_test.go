@@ -114,6 +114,7 @@ func Benchmark_concatenateStringLabelsBytes(b *testing.B) {
 	vc.setCache()
 	vcs := []*valueContainer{
 		vc,
+		vc,
 	}
 	for i := 0; i < b.N; i++ {
 		concatenateLabelsToStringsBytes(vcs)

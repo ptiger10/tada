@@ -143,7 +143,7 @@ func TestDataFrame_Cast(t *testing.T) {
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
-					{slice: []string{"1"}, isNull: []bool{false}, name: "bar", cache: [][]byte{[]byte("1")}}},
+					{slice: []string{"1"}, isNull: []bool{false}, name: "bar", cache: []string{"1"}}},
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "qux"},
@@ -2092,7 +2092,7 @@ func TestDataFrame_Merge(t *testing.T) {
 				},
 				labels: []*valueContainer{
 					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0",
-						cache: [][]byte{[]byte("0"), []byte("1")}},
+						cache: []string{"0", "1"}},
 				},
 				colLevelNames: []string{"*0"}},
 		},
@@ -2146,7 +2146,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 			&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
 				labels: []*valueContainer{
 					{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
-						cache: [][]byte{[]byte("bar"), []byte("baz")}},
+						cache: []string{"bar", "baz"}},
 				},
 				name:          "qux",
 				colLevelNames: []string{"*0"}},
@@ -2164,7 +2164,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 			&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
 				labels: []*valueContainer{
 					{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
-						cache: [][]byte{[]byte("bar"), []byte("baz")}},
+						cache: []string{"bar", "baz"}},
 				},
 				name:          "qux",
 				colLevelNames: []string{"*0"}},
@@ -2182,7 +2182,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 			&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
 				labels: []*valueContainer{
 					{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
-						cache: [][]byte{[]byte("bar"), []byte("baz")}},
+						cache: []string{"bar", "baz"}},
 				},
 				name:          "qux",
 				colLevelNames: []string{"*0"}},
@@ -2330,9 +2330,9 @@ func TestDataFrame_GroupBy(t *testing.T) {
 					values: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}}},
 					labels: []*valueContainer{
 						{slice: []int{0, 0, 1, 2}, isNull: []bool{false, false, false, false}, name: "a",
-							cache: [][]byte{[]byte("0"), []byte("0"), []byte("1"), []byte("2")}},
+							cache: []string{"0", "0", "1", "2"}},
 						{slice: []string{"foo", "foo", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "b",
-							cache: [][]byte{[]byte("foo"), []byte("foo"), []byte("foo"), []byte("bar")}},
+							cache: []string{"foo", "foo", "foo", "bar"}},
 					}},
 			},
 		},
@@ -3042,8 +3042,8 @@ func TestImportCSV(t *testing.T) {
 			args{"test_files/1_header_0_labels.csv", nil},
 			&DataFrame{
 				values: []*valueContainer{
-					{slice: [][]byte{[]byte("foo"), []byte("bar")}, isNull: []bool{false, false}, name: "Name"},
-					{slice: [][]byte{[]byte("1"), []byte("2")}, isNull: []bool{false, false}, name: "Age"}},
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "Name"},
+					{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "Age"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				name:          "",
 				colLevelNames: []string{"*0"}}, false},
