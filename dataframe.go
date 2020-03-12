@@ -149,16 +149,17 @@ func ConcatSeries(series ...*Series) (*DataFrame, error) {
 // Cast casts the underlying container values (column or label level) to []float64, []string, or []time.Time
 // and caches the []byte values of the container (if inexpensive).
 // Use cast to improve performance when calling multiple operations on values.
-func (df *DataFrame) Cast(containerAsType map[string]DType) error {
+func (df *DataFrame) Cast(containerAsType map[string]DType) {
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	for name, dtype := range containerAsType {
 		index, err := indexOfContainer(name, mergedLabelsAndCols)
 		if err != nil {
-			return fmt.Errorf("Cast(): %v", err)
+			df.resetWithError(fmt.Errorf("Cast(): %v", err))
+			return
 		}
 		mergedLabelsAndCols[index].cast(dtype)
 	}
-	return nil
+	return
 }
 
 // ReadCSV reads [][]string values into a DataFrame using `config`.

@@ -1085,6 +1085,9 @@ func Test_indexOfContainer(t *testing.T) {
 			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
 			{slice: []int{0}, isNull: []bool{false}, name: "Foo"}}},
 			1, false},
+		{"pass - number as name", args{"1", []*valueContainer{
+			{slice: []int{0}, isNull: []bool{false}, name: "1"}}},
+			0, false},
 		{"fail - not found", args{"foo", []*valueContainer{
 			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
 			{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},

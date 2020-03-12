@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/d4l3k/messagediff"
 	"github.com/ptiger10/tablediff"
 )
 
@@ -127,11 +128,10 @@ func TestDataFrame_Cast(t *testing.T) {
 		colAsType map[string]DType
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    *DataFrame
-		wantErr bool
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
 	}{
 		{"pass - set cache", fields{
 			values: []*valueContainer{
@@ -148,9 +148,8 @@ func TestDataFrame_Cast(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "qux"},
-			false,
 		},
-		{"pass", fields{
+		{"fail", fields{
 			values: []*valueContainer{
 				{slice: []int{1}, isNull: []bool{false}, name: "foo"},
 				{slice: []int{1}, isNull: []bool{false}, name: "bar"}},
@@ -159,13 +158,7 @@ func TestDataFrame_Cast(t *testing.T) {
 			name:          "qux"},
 			args{map[string]DType{"corge": Float64}},
 			&DataFrame{
-				values: []*valueContainer{
-					{slice: []int{1}, isNull: []bool{false}, name: "foo"},
-					{slice: []int{1}, isNull: []bool{false}, name: "bar"}},
-				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				colLevelNames: []string{"*0"},
-				name:          "qux"},
-			true,
+				err: fmt.Errorf("Cast(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -177,11 +170,10 @@ func TestDataFrame_Cast(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if err := df.Cast(tt.args.colAsType); (err != nil) != tt.wantErr {
-				t.Errorf("DataFrame.Cast() error = %v, wantErr %v", err, tt.wantErr)
-			}
+			df.Cast(tt.args.colAsType)
 			if !EqualDataFrames(df, tt.want) {
 				t.Errorf("DataFrame.Cast() -> %v, want %v", df, tt.want)
+				fmt.Println(messagediff.PrettyDiff(df, tt.want))
 			}
 		})
 	}
