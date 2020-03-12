@@ -1,14 +1,13 @@
-// Package tada (TAble DAta) facilitates test-driven data pipelines.
-// The key data structures are Series, DataFrames, and grouped versions of each.
+// Package tada (TAble DAta) enables test-driven data pipelines.
+// The key data structures are Series, DataFrames, and groupings of each.
 // tada combines concepts from popular spreadsheet applications, Python pandas, Apache Spark, and SQL.
-// The most common use cases for tada are exploring data, building extract, transform, and load (ETL) processes, and automating analytics.
+// The most common use cases for tada are exploring data, building extract, transform, and load (ETL) workflows, and automating analytics.
 // Some notable features of tada:
 // * flexible constructor that supports most primitive data types
 // * seamlessly handles null data and type conversions
-// * well-suited to either the Jupyter notebook style of data exploration or conventional IDE-based programming
-// * advanced filtering, grouping, and pivoting
-// * hierarchical indexing (i.e., multi-level indexes and columns)
-// * reads from either CSV or any spreadsheet or tabular data structured as [][]interface (e.g., Google Sheets)
+// * well-suited to conventional IDE-based programming, but also supports exploratory notebook usage
+// * advanced filtering, grouping, sorting, and pivoting
+// * multi-level labels and columns
 // * complete test coverage
 package tada
 
@@ -197,7 +196,7 @@ const (
 //  baz qux							bar qux
 type ReadConfig struct {
 	NumHeaderRows  int
-	NumLabelCols   int
+	NumLabelLevels int
 	Delimiter      rune
 	MajorDimIsCols bool
 }

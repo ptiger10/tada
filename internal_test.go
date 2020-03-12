@@ -1775,7 +1775,7 @@ func Test_readCSVByRows(t *testing.T) {
 		{"1 header row, 1 column, 1 label level",
 			args{
 				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				config: &ReadConfig{NumHeaderRows: 1, NumLabelCols: 1}},
+				config: &ReadConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels: []*valueContainer{
@@ -1813,7 +1813,7 @@ func Test_readCSVByCols(t *testing.T) {
 		{"1 header row, 1 column, 1 label levels",
 			args{
 				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
-				config: &ReadConfig{NumHeaderRows: 1, NumLabelCols: 1}},
+				config: &ReadConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels: []*valueContainer{
@@ -3692,7 +3692,7 @@ func Test_makeDataFrameFromMatrices(t *testing.T) {
 				{"foo", "bar"},
 				{"baz", ""}},
 			isNull: [][]bool{{false, false}, {false, true}},
-			config: &ReadConfig{NumHeaderRows: 1, NumLabelCols: 1}},
+			config: &ReadConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []string{""}, isNull: []bool{true}, name: "baz"},
@@ -3707,7 +3707,7 @@ func Test_makeDataFrameFromMatrices(t *testing.T) {
 				{"foo", "bar"},
 				{"baz", ""}},
 			isNull: [][]bool{{false, false}, {false, true}},
-			config: &ReadConfig{NumLabelCols: 1}},
+			config: &ReadConfig{NumLabelLevels: 1}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []string{"baz", ""}, isNull: []bool{false, true}, name: "0"},

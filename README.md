@@ -1,7 +1,56 @@
 # tada
-Predictable, flexible data handling and analysis in Go.
+Package tada (TAble DAta) enables test-driven data pipelines in pure Go.
 
-import "github.com/ptiger10/tada"
+tada combines concepts from pandas (Python), spreadsheets, R, Apache Spark, and SQL.
+Its most common use cases are cleaning, aggregating, transforming, and analyzing data.
+
+## Why should I use tada instead of...?
+
+* pandas
+  * Because it is written in Go, tada enjoys all the benefits of the Go ecosystem: 
+**type safety**, **transparent error handling**, **more intuitive datetimes**,
+and first-class tooling for **test-driven, IDE-centric development**. 
+  * tada's API was designed to be less flexible but **more predictable** than pandas.
+For example, some pandas functions return a Series under some conditions, but a DataFrame other times.
+When you have less uncertainty about what an API will accept and return, you have one less reason to lean on an exploratory notebook, encouraging you to build your data pipeline in your typical IDE workflow.
+  * tada is also **significantly smaller** (<1MB unpacked) than pandas (~230MB, including dependencies),
+which becomes relevant when storing your program on a web server or uploading it as a serverless function.
+  * However, pandas is faster and more fully featured, with the benefit of 1,500+ contributors developing it for more than decade.
+That said, tada is already in the same ballpark for [performance](comparison_summary.txt) on several key operations.
+  * pandas also benefits from adjacent libraries in the Python ecosystem including plotting libraries (e.g., matplotlib, Seaborn) and native support in Jupyter notebooks.
+tada has no plotting features but can be used with limited-functionality Jupyter notebooks by following [these steps](#using-with-jupyter-notebooks).  
+
+* spreadsheets 
+  * With any of these open-source alternatives, you can easily build **reusable, scalable data automations**. 
+With spreadsheets, you must either repeat the same actions over and over again - with high margin for error - or wrestle with confusing and brittle macros.
+  * However, spreadsheets are intuitive to non-technical users, while open-sources alternatives all do require knowledge of programming. 
+
+* R: 
+  * Unlike R, which has a steep learning curve due to its idiosyncratic syntax 
+and is custom-built for statistical computing and graphics,
+general-purpose languages like Python and Go are **easier to learn** and **better suited to adjacent tasks** 
+relevant to many analytics projects, such as concurrent web scraping or publishing data via a web server. 
+  * Go also has first-class tooling for **test-driven, IDE-centric development**, which are not as prominent in R development.
+  * However, R does allow more specialized analysis once you know how to use it.
+
+* Apache Spark: 
+  * Libraries like tada or pandas are **much easier to use**. 
+  You do not need to configure a cluster to run them. Just import the library into your project and start calling the API.
+  * However, when using a library you are constrained to the memory on your computer, and so cannot handle *really* big data as well Spark.
+
+* Other Go implementations of DataFrames and Series: tada is **more fully featured**.
+Notable advanced features include:
+  * flexible constructors (accepts almost all Go primitive types, plus time.Time for time series analysis)
+  * grouping, pivoting, sorting, and filtering
+  * multi-level labels and columns
+
+## Using with Jupyter notebooks
+* Follow the instructions for installing [gophernotes](https://github.com/gopherdata/gophernotes), including jupyter.
+* Install tada globally: `$ go get -u github.com/ptiger10/tada`
+* `$ jupyter notebook` (should launch a window in your default browser)
+* From Home screen -> New -> Go
+
+[Sample Notebook](tutorial.ipynb)
 
 ## Basic Usage
 ### Selecting data
@@ -205,5 +254,3 @@ quux 2019      3
 foo  1 5
 
 
-## To do
-- DF.WithCol() check for right level of column names

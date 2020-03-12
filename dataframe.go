@@ -1,6 +1,3 @@
-// tada is a package for test-driven ETL and analytics pipelines.
-// If a column has multiple name levels, its name is stored as a single pipe-delimited string.
-
 package tada
 
 import (

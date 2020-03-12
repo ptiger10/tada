@@ -10,11 +10,11 @@ var optionWarnings = true
 var optionNullStrings = map[string]bool{"NaN": true, "n/a": true, "N/A": true, "": true, "nil": true}
 var optionPrefix = "*"
 var optionDateTimeFormats = []string{
-	"2006-01-02", "01-02-2006", "01/02/2006", "1/2/2006", "2006-01-02 15:04:05 -0700 MST",
+	"2006-01-02", "01-02-2006", "01/02/2006", "1/2/06", "1/2/2006", "2006-01-02 15:04:05 -0700 MST",
 	time.RFC3339, time.RFC3339Nano, time.RFC822}
 var randSeed = time.Now().Unix()
 
-// SetOptionLevelSeparator changes the separator used in group names and multi-level column names `sep`
+// SetOptionLevelSeparator changes the separator used in group names and multi-level column names to `sep`
 // (default: "|").
 func SetOptionLevelSeparator(sep string) {
 	optionLevelSeparator = sep

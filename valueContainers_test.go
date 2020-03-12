@@ -483,10 +483,11 @@ func Test_convertStringToDateTime(t *testing.T) {
 		want  time.Time
 		want1 bool
 	}{
-		{"not null", args{"2020-02-01"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
-		{"not null", args{"02-01-2020"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
-		{"not null", args{"02/01/2020"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
-		{"not null", args{"2/1/2020"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
+		{"YYYY-MM-DD", args{"2020-02-01"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
+		{"MM-DD-YYYY", args{"02-01-2020"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
+		{"MM/DD/YYYY", args{"02/01/2020"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
+		{"M/D/YYYY", args{"2/1/2020"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
+		{"M/D/YY", args{"2/1/20"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
 		{"not null", args{"2020-02-01 00:00:00 +0000 UTC"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
 		{"RFC3339", args{"2020-02-01T00:00:00Z"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
 		{"RFC3339Nano", args{"2020-02-01T00:00:00.0000000000Z"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},

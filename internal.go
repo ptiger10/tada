@@ -468,7 +468,7 @@ func (df *DataFrame) toCSVByRows(ignoreLabels bool) ([][]string, error) {
 
 // expects non-nil cfg
 func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
-	numCols := len(csv[0]) - cfg.NumLabelCols
+	numCols := len(csv[0]) - cfg.NumLabelLevels
 	numRows := len(csv) - cfg.NumHeaderRows
 
 	// prepare intermediary values containers
@@ -477,31 +477,31 @@ func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
 	valsNames := makeStringMatrix(numCols, cfg.NumHeaderRows)
 
 	// prepare intermediary label containers
-	labels := makeStringMatrix(cfg.NumLabelCols, numRows)
-	labelsIsNull := makeBoolMatrix(cfg.NumLabelCols, numRows)
-	levelNames := makeStringMatrix(cfg.NumLabelCols, cfg.NumHeaderRows)
+	labels := makeStringMatrix(cfg.NumLabelLevels, numRows)
+	labelsIsNull := makeBoolMatrix(cfg.NumLabelLevels, numRows)
+	levelNames := makeStringMatrix(cfg.NumLabelLevels, cfg.NumHeaderRows)
 
 	// iterate over csv and transpose rows and columns
 	for row := range csv {
 		for column := range csv[row] {
 			if row < cfg.NumHeaderRows {
-				if column < cfg.NumLabelCols {
+				if column < cfg.NumLabelLevels {
 					// write header rows to labels, no offset
 					levelNames[column][row] = csv[row][column]
 				} else {
 					// write header rows to cols, offset for label cols
-					offsetFromLabelCols := column - cfg.NumLabelCols
+					offsetFromLabelCols := column - cfg.NumLabelLevels
 					valsNames[offsetFromLabelCols][row] = csv[row][column]
 				}
 				continue
 			}
 			offsetFromHeaderRows := row - cfg.NumHeaderRows
-			if column < cfg.NumLabelCols {
+			if column < cfg.NumLabelLevels {
 				// write values to labels, offset for header rows
 				labels[column][offsetFromHeaderRows] = csv[row][column]
 				labelsIsNull[column][offsetFromHeaderRows] = isNullString(csv[row][column])
 			} else {
-				offsetFromLabelCols := column - cfg.NumLabelCols
+				offsetFromLabelCols := column - cfg.NumLabelLevels
 				// write values to cols, offset for label cols and header rows
 				vals[offsetFromLabelCols][offsetFromHeaderRows] = csv[row][column]
 				valsIsNull[offsetFromLabelCols][offsetFromHeaderRows] = isNullString(csv[row][column])
@@ -539,7 +539,7 @@ func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
 // expects non-nil cfg
 func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 	numRows := len(csv[0]) - cfg.NumHeaderRows
-	numCols := len(csv) - cfg.NumLabelCols
+	numCols := len(csv) - cfg.NumLabelLevels
 
 	// prepare intermediary values containers
 	vals := make([][]string, numCols)
@@ -547,29 +547,29 @@ func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 	valsNames := make([]string, numCols)
 
 	// prepare intermediary label containers
-	labels := make([][]string, cfg.NumLabelCols)
-	labelsIsNull := make([][]bool, cfg.NumLabelCols)
-	labelsNames := make([]string, cfg.NumLabelCols)
+	labels := make([][]string, cfg.NumLabelLevels)
+	labelsIsNull := make([][]bool, cfg.NumLabelLevels)
+	labelsNames := make([]string, cfg.NumLabelLevels)
 
 	// iterate over all cols to get header names
-	for j := 0; j < cfg.NumLabelCols; j++ {
+	for j := 0; j < cfg.NumLabelLevels; j++ {
 		// write label headers, no offset
 		labelsNames[j] = strings.Join(csv[j][:cfg.NumHeaderRows], optionLevelSeparator)
 	}
 	for k := 0; k < numCols; k++ {
 		// write col headers, offset for label cols
-		offsetFromLabelCols := k + cfg.NumLabelCols
+		offsetFromLabelCols := k + cfg.NumLabelLevels
 		valsNames[k] = strings.Join(csv[offsetFromLabelCols][:cfg.NumHeaderRows], optionLevelSeparator)
 	}
 	for container := range csv {
-		if container < cfg.NumLabelCols {
+		if container < cfg.NumLabelLevels {
 			// write label values as slice, offset for header rows
 			valsToWrite := csv[container][cfg.NumHeaderRows:]
 			labels[container] = valsToWrite
 			labelsIsNull[container] = setNullsFromInterface(valsToWrite)
 		} else {
 			// write column values as slice, offset for label cols and header rows
-			offsetFromLabelCols := container - cfg.NumLabelCols
+			offsetFromLabelCols := container - cfg.NumLabelLevels
 			valsToWrite := csv[container][cfg.NumHeaderRows:]
 			vals[offsetFromLabelCols] = valsToWrite
 			valsIsNull[offsetFromLabelCols] = setNullsFromInterface(valsToWrite)
@@ -2601,39 +2601,41 @@ func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune
 	}
 }
 
-// major dimension: columns
+// major dimension of input: columns
 func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *ReadConfig) *DataFrame {
-	numCols := len(values) - config.NumLabelCols
+	numCols := len(values) - config.NumLabelLevels
 	numRows := len(values[0]) - config.NumHeaderRows
-	labelNames := make([]string, config.NumLabelCols)
+	labelNames := make([]string, config.NumLabelLevels)
 	// iterate over all label levels to get header names
-	for j := 0; j < config.NumLabelCols; j++ {
-		// write label headers, no offset
+	for j := 0; j < config.NumLabelLevels; j++ {
+		// write label header names, no offset
 		labelNames[j] = string(
 			strings.Join(values[j][:config.NumHeaderRows], optionLevelSeparator))
 	}
 
 	colNames := make([]string, numCols)
 	for k := 0; k < numCols; k++ {
-		// write column headers, offset by label levels
+		// write column header names, offset by label levels
 		colNames[k] = string(
-			strings.Join(values[k+config.NumLabelCols][:config.NumHeaderRows], optionLevelSeparator))
+			strings.Join(values[k+config.NumLabelLevels][:config.NumHeaderRows], optionLevelSeparator))
 	}
 
-	// remove headers
+	// remove headers from original data
 	for container := 0; container < len(values); container++ {
 		values[container] = values[container][config.NumHeaderRows:]
 		isNull[container] = isNull[container][config.NumHeaderRows:]
 	}
+	// write labels up to the number of label levels
 	labels := copyStringsIntoValueContainers(
-		values[:config.NumLabelCols],
-		isNull[:config.NumLabelCols],
+		values[:config.NumLabelLevels],
+		isNull[:config.NumLabelLevels],
 		labelNames,
 	)
 
+	// write columns after the label levels
 	columns := copyStringsIntoValueContainers(
-		values[config.NumLabelCols:],
-		isNull[config.NumLabelCols:],
+		values[config.NumLabelLevels:],
+		isNull[config.NumLabelLevels:],
 		colNames,
 	)
 
@@ -2641,7 +2643,7 @@ func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *ReadC
 	labels = defaultLabelsIfEmpty(labels, numRows)
 
 	// update label names if labels provided but no header
-	if config.NumHeaderRows == 0 && config.NumLabelCols != 0 {
+	if config.NumHeaderRows == 0 && config.NumLabelLevels != 0 {
 		for j := range labels {
 			labels[j].name = optionPrefix + fmt.Sprint(j)
 		}
