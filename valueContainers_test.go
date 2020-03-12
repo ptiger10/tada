@@ -607,7 +607,7 @@ func Test_valueContainer_setCache(t *testing.T) {
 		fields fields
 		want   []string
 	}{
-		{"byte", fields{slice: []string{"foo"}}, []string{"foo"}},
+		{"byte", fields{slice: [][]byte{[]byte("foo")}}, []string{"foo"}},
 		{"string", fields{slice: []string{"foo"}}, []string{"foo"}},
 		{"float64", fields{slice: []float64{1}}, []string{"1"}},
 		{"int", fields{slice: []int{1}}, []string{"1"}},

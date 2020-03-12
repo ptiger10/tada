@@ -281,15 +281,6 @@ func copyInterfaceIntoValueContainers(slices []interface{}, isNull [][]bool, nam
 	return ret
 }
 
-// convert bytes to interface. if isNull is nil, sets null values from `slices`
-func copyBytesIntoValueContainers(slices [][][]byte, isNull [][]bool, names []string) []*valueContainer {
-	slicesInterface := make([]interface{}, len(slices))
-	for k := range slices {
-		slicesInterface[k] = slices[k]
-	}
-	return copyInterfaceIntoValueContainers(slicesInterface, isNull, names)
-}
-
 // convert strings to interface. if isNull is nil, sets null values from `slices`
 func copyStringsIntoValueContainers(slices [][]string, isNull [][]bool, names []string) []*valueContainer {
 	slicesInterface := make([]interface{}, len(slices))

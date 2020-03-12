@@ -3687,36 +3687,36 @@ func Test_makeDataFrameFromMatrices(t *testing.T) {
 				},
 				colLevelNames: []string{"*0"},
 			}},
-		// {"pass - 1 header col, 1 label level", args{
-		// 	values: [][][]byte{
-		// 		{[]byte("foo"), []byte("bar")},
-		// 		{[]byte("baz"), nil}},
-		// 	isNull: [][]bool{{false, false}, {false, true}},
-		// 	config: &ReadConfig{NumHeaderRows: 1, NumLabelCols: 1}},
-		// 	&DataFrame{
-		// 		values: []*valueContainer{
-		// 			{slice: [][]byte{nil}, isNull: []bool{true}, name: "baz"},
-		// 		},
-		// 		labels: []*valueContainer{
-		// 			{slice: [][]byte{[]byte("bar")}, isNull: []bool{false}, name: "foo"},
-		// 		},
-		// 		colLevelNames: []string{"*0"},
-		// 	}},
-		// {"pass - 1 label level", args{
-		// 	values: [][][]byte{
-		// 		{[]byte("foo"), []byte("bar")},
-		// 		{[]byte("baz"), nil}},
-		// 	isNull: [][]bool{{false, false}, {false, true}},
-		// 	config: &ReadConfig{NumLabelCols: 1}},
-		// 	&DataFrame{
-		// 		values: []*valueContainer{
-		// 			{slice: [][]byte{[]byte("baz"), nil}, isNull: []bool{false, true}, name: "0"},
-		// 		},
-		// 		labels: []*valueContainer{
-		// 			{slice: [][]byte{[]byte("foo"), []byte("bar")}, isNull: []bool{false, false}, name: "*0"},
-		// 		},
-		// 		colLevelNames: []string{"*0"},
-		// 	}},
+		{"pass - 1 header col, 1 label level", args{
+			values: [][]string{
+				{"foo", "bar"},
+				{"baz", ""}},
+			isNull: [][]bool{{false, false}, {false, true}},
+			config: &ReadConfig{NumHeaderRows: 1, NumLabelCols: 1}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{""}, isNull: []bool{true}, name: "baz"},
+				},
+				labels: []*valueContainer{
+					{slice: []string{"bar"}, isNull: []bool{false}, name: "foo"},
+				},
+				colLevelNames: []string{"*0"},
+			}},
+		{"pass - 1 label level", args{
+			values: [][]string{
+				{"foo", "bar"},
+				{"baz", ""}},
+			isNull: [][]bool{{false, false}, {false, true}},
+			config: &ReadConfig{NumLabelCols: 1}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"baz", ""}, isNull: []bool{false, true}, name: "0"},
+				},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
+				},
+				colLevelNames: []string{"*0"},
+			}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
