@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"reflect"
+	"strings"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/ptiger10/tablediff"
@@ -159,32 +160,105 @@ func (df *DataFrame) Cast(containerAsType map[string]DType) {
 	return
 }
 
-// ReadCSV reads [][]string values into a DataFrame using `config`.
+// -- READERS
+
+// ReadOptionHeaders configures a read function to expect `n` rows of column headers (default: 1).
+func ReadOptionHeaders(n int) func(*readConfig) {
+	return func(r *readConfig) {
+		r.NumHeaderRows = n
+	}
+}
+
+// ReadOptionLabels configures a read function to expect the first `n` columns to be label levels (default: 0).
+func ReadOptionLabels(n int) func(*readConfig) {
+	return func(r *readConfig) {
+		r.NumLabelLevels = n
+	}
+}
+
+// ReadOptionDelimiter configures a read function to use `sep` as a field delimiter for use in ImportCSV or ReadCSVString (default: ",").
+func ReadOptionDelimiter(sep rune) func(*readConfig) {
+	return func(r *readConfig) {
+		r.Delimiter = sep
+	}
+}
+
+// ReadOptionSwitchDims configures a read function to expect columns to be the major dimension of csv data
+// (default: expects rows to be the major dimension).
+// For example, when reading this data:
+//
+// [["foo", "bar"], ["baz", "qux"]]
+//
+// `default`				   		`ReadOptionSwitchDims()`
+// (major dimension: rows)			(major dimension: columns)
+//	foo bar							foo baz
+//  baz qux							bar qux
+func ReadOptionSwitchDims() func(*readConfig) {
+	return func(r *readConfig) {
+		r.MajorDimIsCols = true
+	}
+}
+
+// ReadCSVString reads a stringified csv table into a DataFrame (configured by `options`).
+// The major dimension of the table should be rows.
+// For advanced cases, use the standard csv library NewReader().ReadAll() + tada.ReadCSV().
+// Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionDelimiter.
+//
+// Default if no options are supplied:
+// 1 header row, no labels, field delimiter is ","
+func ReadCSVString(data string, options ...func(*readConfig)) (*DataFrame, error) {
+	if data == "" {
+		return nil, fmt.Errorf("ReadCSVString(): `data` cannot be empty")
+	}
+	config := setReadConfig(options)
+
+	reader := strings.NewReader(data)
+	r := csv.NewReader(reader)
+	r.TrimLeadingSpace = true
+	records, err := r.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("ReadCSVString(): %v", err)
+	}
+	// should never return error because already checked for misalignment and empty string
+	return readCSVByRows(records, config)
+}
+
+// ReadCSV reads `data` into a DataFrame (configured by `options`).
 // The standard csv library NewReader().ReadAll() method returns [][]string (with rows as major dimension),
 // and allows for custom Comment, and LazyQuotes configuration.
-// If `config` is nil, reads in data using defaults:
-// 1 header row, default labels, rows as major dimension, "," as the field delimiter.
-func ReadCSV(data [][]string, config *ReadConfig) *DataFrame {
+// Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionSwitchDims.
+//
+// Default if no options are supplied:
+// 1 header row, no labels, rows as major dimension
+func ReadCSV(data [][]string, options ...func(*readConfig)) (ret *DataFrame) {
 	if len(data) == 0 {
 		return dataFrameWithError(fmt.Errorf("ReadCSV(): `data` must have at least one row"))
 	}
 	if len(data[0]) == 0 {
 		return dataFrameWithError(fmt.Errorf("ReadCSV(): `data` must have at least one column"))
 	}
-	config = defaultConfigIfNil(config)
+	config := setReadConfig(options)
 
+	var err error
 	if config.MajorDimIsCols {
-		return readCSVByCols(data, config)
+		ret, err = readCSVByCols(data, config)
+	} else {
+		ret, err = readCSVByRows(data, config)
 	}
-	return readCSVByRows(data, config)
+	if err != nil {
+		return dataFrameWithError(fmt.Errorf("ReadCSV(): %v", err))
+	}
+	return ret
 }
 
-// ImportCSV reads the file at `path` into a Dataframe using `config`.
+// ImportCSV reads the file at `path` into a Dataframe (configured by `options`).
 // For advanced cases, use the standard csv library NewReader().ReadAll() + tada.ReadCSV().
-// If `config` is nil, reads in data using defaults:
-// 1 header row, default labels, rows as major dimension, "," as the field delimiter.
-func ImportCSV(path string, config *ReadConfig) (*DataFrame, error) {
-	config = defaultConfigIfNil(config)
+// Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionDelimiter, ReadOptionSwitchDims.
+//
+// Default if no options are supplied:
+// 1 header row, no labels, field delimiter is ",", rows as major dimension
+func ImportCSV(path string, options ...func(*readConfig)) (*DataFrame, error) {
+	config := setReadConfig(options)
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("ImportCSV(): %s", err)
@@ -203,46 +277,64 @@ func ImportCSV(path string, config *ReadConfig) (*DataFrame, error) {
 	return makeDataFrameFromMatrices(retVals, retNulls, config), nil
 }
 
-// ReadInterface reads [][]interface{} into  a Dataframe using `config`.
+// ReadInterface reads `data` into  a Dataframe (configured by `options`).
 // Google Sheets, for example, exports data as [][]interface{} with either rows or columns as the major dimension.
-// If `config` is nil, reads in data using defaults:
-// 1 header row, default labels, rows as major dimension, "," as the field delimiter.
-func ReadInterface(input [][]interface{}, config *ReadConfig) *DataFrame {
-	config = defaultConfigIfNil(config)
-
-	if len(input) == 0 {
-		return dataFrameWithError(fmt.Errorf("ReadInterface(): `input` must have at least one row"))
+// Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionSwitchDims.
+//
+// Default if no options are supplied:
+// 1 header row, no labels, rows as major dimension
+func ReadInterface(data [][]interface{}, options ...func(*readConfig)) (ret *DataFrame) {
+	if len(data) == 0 {
+		return dataFrameWithError(fmt.Errorf("ReadInterface(): `data` must have at least one row"))
 	}
-	if len(input[0]) == 0 {
-		return dataFrameWithError(fmt.Errorf("ReadInterface(): `input` must have at least one column"))
+	if len(data[0]) == 0 {
+		return dataFrameWithError(fmt.Errorf("ReadInterface(): `data` must have at least one column"))
 	}
-	// convert [][]interface to [][]string
-	str := make([][]string, len(input))
-	for j := range str {
-		str[j] = make([]string, len(input[0]))
-	}
-	for i := range input {
-		for j := range input[i] {
-			str[i][j] = fmt.Sprint(input[i][j])
+	numLines := len(data[0])
+	for i := range data {
+		if len(data[i]) != numLines {
+			return dataFrameWithError(fmt.Errorf("ReadInterface(): `data`: slice %d: all slices must have same length as first slice (%d != %d)",
+				i, len(data[i]), numLines))
 		}
 	}
-	if config.MajorDimIsCols {
-		return readCSVByCols(str, config)
+
+	config := setReadConfig(options)
+	// convert [][]interface to [][]string
+	str := make([][]string, len(data))
+	for j := range str {
+		str[j] = make([]string, len(data[0]))
 	}
-	return readCSVByRows(str, config)
+	for i := range data {
+		for j := range data[i] {
+			str[i][j] = fmt.Sprint(data[i][j])
+		}
+	}
+
+	// ducks error because already checked for misalignment and empty data
+	if config.MajorDimIsCols {
+		ret, _ = readCSVByCols(str, config)
+	} else {
+		ret, _ = readCSVByRows(str, config)
+	}
+	return ret
 }
 
 // ReadMatrix reads data satisfying the gonum Matrix interface into a DataFrame.
+// Panics if any slices in the matrix are shorter than the first slice.
 func ReadMatrix(mat Matrix) *DataFrame {
+
 	numRows, numCols := mat.Dims()
-	csv := make([][]string, numCols)
-	for k := range csv {
-		csv[k] = make([]string, numRows)
+	// major dimension: columns
+	data := make([][]string, numCols)
+	for k := range data {
+		data[k] = make([]string, numRows)
 		for i := 0; i < numRows; i++ {
-			csv[k][i] = fmt.Sprint(mat.At(i, k))
+			data[k][i] = fmt.Sprint(mat.At(i, k))
 		}
 	}
-	return readCSVByCols(csv, &ReadConfig{})
+	// ducks error because expects all slices to be the same length
+	ret, _ := readCSVByCols(data, &readConfig{})
+	return ret
 }
 
 // ReadStruct reads a `slice` of structs into a DataFrame with field names converted to column names,
@@ -336,19 +428,21 @@ func (df *DataFrame) EqualsCSV(csv [][]string, ignoreLabels bool) (bool, *tabled
 	return eq, diffs
 }
 
-// WriteMockCSV reads `src` using `config` and writes a mock dataset to `w`,
+// WriteMockCSV reads `src` (configured by `options`) and writes `n` mock rows to `w`,
 // with column names and types inferred based on the data in `src`.
-// The number of rows is the mock dataset is equal to `outputRows`.
 // Regardless of the major dimension of `src`, the major dimension of the output is rows.
-// If `config` is nil, reads in data using defaults:
-// 1 header row, default labels, rows as major dimension, "," as the field delimiter.
-func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows int) error {
-	config = defaultConfigIfNil(config)
+// Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionSwitchDims.
+//
+// Default if no options are supplied:
+// 1 header row, no labels, rows as major dimension
+func WriteMockCSV(src [][]string, w io.Writer, n int, options ...func(*readConfig)) error {
+	config := setReadConfig(options)
 	numSampleRows := 10
 	inferredTypes := make([]map[string]int, 0)
 	dtypes := []string{"float", "int", "string", "datetime", "time", "bool"}
 	var headers [][]string
 	var rowCount, colCount int
+	// validate input
 	if len(src) == 0 {
 		return fmt.Errorf("WriteMockCSV(): `src` cannot be empty")
 	}
@@ -431,7 +525,7 @@ func WriteMockCSV(src [][]string, w io.Writer, config *ReadConfig, outputRows in
 		}
 	}
 	// major dimension of output is rows, for compatibility with csv.NewWriter
-	mockCSV := mockCSVFromDTypes(inferredTypes, outputRows)
+	mockCSV := mockCSVFromDTypes(inferredTypes, n)
 	mockCSV = append(headers, mockCSV...)
 	writer := csv.NewWriter(w)
 	return writer.WriteAll(mockCSV)

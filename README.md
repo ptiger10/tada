@@ -8,7 +8,7 @@ Its most common use cases are cleaning, aggregating, transforming, and analyzing
 
 * pandas
   * Because it is written in Go, tada enjoys all the benefits of the Go ecosystem: 
-**type safety**, **transparent error handling**, **more intuitive datetimes**,
+**type safety**, **transparent error handling**, **intuitive datetimes**,
 and first-class tooling for **test-driven, IDE-centric development**. 
   * tada's API was designed to be less flexible but **more predictable** than pandas.
 For example, some pandas functions return a Series under some conditions, but a DataFrame other times.
@@ -49,6 +49,8 @@ Notable advanced features include:
 * Install tada globally: `$ go get -u github.com/ptiger10/tada`
 * `$ jupyter notebook` (should launch a window in your default browser)
 * From Home screen -> New -> Go
+
+One of the biggest limitations of gophernotes is that it does not provide signature hinting. This is a [known issue](https://github.com/gopherdata/gophernotes/issues/173).
 
 [Sample Notebook](tutorial.ipynb)
 

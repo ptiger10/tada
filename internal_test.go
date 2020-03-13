@@ -1756,35 +1756,55 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 func Test_readCSVByRows(t *testing.T) {
 	type args struct {
 		csv    [][]string
-		config *ReadConfig
+		config *readConfig
 	}
 	tests := []struct {
-		name string
-		args args
-		want *DataFrame
+		name    string
+		args    args
+		want    *DataFrame
+		wantErr bool
 	}{
 		{"1 header row, 2 columns, no label levels",
 			args{
 				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				config: &ReadConfig{NumHeaderRows: 1}},
+				config: &readConfig{NumHeaderRows: 1}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}}},
+				colLevelNames: []string{"*0"}},
+			false},
 		{"1 header row, 1 column, 1 label level",
 			args{
 				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				config: &ReadConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
+				config: &readConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels: []*valueContainer{
 					{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"}},
-				colLevelNames: []string{"*0"}}},
+				colLevelNames: []string{"*0"}},
+			false},
+		{"misaligned: wrong numbers of columns: too many",
+			args{
+				csv:    [][]string{{"foo", "bar"}, {"1", "2", "3"}},
+				config: &readConfig{NumHeaderRows: 1}},
+			nil,
+			true},
+		{"misaligned: wrong numbers of columns: too few",
+			args{
+				csv:    [][]string{{"foo", "bar"}, {"1"}},
+				config: &readConfig{NumHeaderRows: 1}},
+			nil,
+			true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := readCSVByRows(tt.args.csv, tt.args.config); !EqualDataFrames(got, tt.want) {
+			got, err := readCSVByRows(tt.args.csv, tt.args.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readCSVByRows() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("readCSVByRows() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1794,36 +1814,56 @@ func Test_readCSVByRows(t *testing.T) {
 func Test_readCSVByCols(t *testing.T) {
 	type args struct {
 		csv    [][]string
-		config *ReadConfig
+		config *readConfig
 	}
 	tests := []struct {
-		name string
-		args args
-		want *DataFrame
+		name    string
+		args    args
+		want    *DataFrame
+		wantErr bool
 	}{
 		{"1 header row, 2 columns, no label levels",
 			args{
 				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
-				config: &ReadConfig{NumHeaderRows: 1}},
+				config: &readConfig{NumHeaderRows: 1}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}}},
+				colLevelNames: []string{"*0"}},
+			false},
 		{"1 header row, 1 column, 1 label levels",
 			args{
 				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
-				config: &ReadConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
+				config: &readConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels: []*valueContainer{
 					{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				},
-				colLevelNames: []string{"*0"}}},
+				colLevelNames: []string{"*0"}},
+			false},
+		{"misaligned lines: too few",
+			args{
+				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5"}},
+				config: &readConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
+			nil,
+			true},
+		{"misaligned lines: too many",
+			args{
+				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6,", "6"}},
+				config: &readConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
+			nil,
+			true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := readCSVByCols(tt.args.csv, tt.args.config); !EqualDataFrames(got, tt.want) {
+			got, err := readCSVByCols(tt.args.csv, tt.args.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readCSVByRows() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("readCSVByCols() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3664,7 +3704,7 @@ func Test_makeDataFrameFromMatrices(t *testing.T) {
 	type args struct {
 		values [][]string
 		isNull [][]bool
-		config *ReadConfig
+		config *readConfig
 	}
 	tests := []struct {
 		name string
@@ -3676,7 +3716,7 @@ func Test_makeDataFrameFromMatrices(t *testing.T) {
 				{"foo", "bar"},
 				{"baz", ""}},
 			isNull: [][]bool{{false, false}, {false, true}},
-			config: &ReadConfig{NumHeaderRows: 1}},
+			config: &readConfig{NumHeaderRows: 1}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []string{"bar"}, isNull: []bool{false}, name: "foo"},
@@ -3692,7 +3732,7 @@ func Test_makeDataFrameFromMatrices(t *testing.T) {
 				{"foo", "bar"},
 				{"baz", ""}},
 			isNull: [][]bool{{false, false}, {false, true}},
-			config: &ReadConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
+			config: &readConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []string{""}, isNull: []bool{true}, name: "baz"},
@@ -3707,7 +3747,7 @@ func Test_makeDataFrameFromMatrices(t *testing.T) {
 				{"foo", "bar"},
 				{"baz", ""}},
 			isNull: [][]bool{{false, false}, {false, true}},
-			config: &ReadConfig{NumLabelLevels: 1}},
+			config: &readConfig{NumLabelLevels: 1}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []string{"baz", ""}, isNull: []bool{false, true}, name: "0"},
@@ -4549,6 +4589,42 @@ func Test_nameOfContainer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := nameOfContainer(tt.args.containers, tt.args.n); got != tt.want {
 				t.Errorf("nameOfContainer() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_setReadConfig(t *testing.T) {
+	type args struct {
+		options []func(*readConfig)
+	}
+	tests := []struct {
+		name string
+		args args
+		want *readConfig
+	}{
+		{"default", args{nil}, &readConfig{
+			NumHeaderRows:  1,
+			NumLabelLevels: 0,
+			Delimiter:      ',',
+			MajorDimIsCols: false,
+		}},
+		{"pass", args{[]func(*readConfig){
+			ReadOptionHeaders(2),
+			ReadOptionLabels(2),
+			ReadOptionDelimiter('|'),
+			ReadOptionSwitchDims(),
+		}}, &readConfig{
+			NumHeaderRows:  2,
+			NumLabelLevels: 2,
+			Delimiter:      '|',
+			MajorDimIsCols: true,
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := setReadConfig(tt.args.options); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("setReadConfig() = %v, want %v", got, tt.want)
 			}
 		})
 	}

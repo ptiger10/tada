@@ -326,10 +326,62 @@ func TestDataFrame_Subset(t *testing.T) {
 	}
 }
 
+func TestReadCSVString(t *testing.T) {
+	type args struct {
+		data    string
+		options []func(*readConfig)
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantRet *DataFrame
+		wantErr bool
+	}{
+		{"pass",
+			args{"foo, bar\n 0, 1", nil},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"0"}, isNull: []bool{false}, name: "foo"},
+					{slice: []string{"1"}, isNull: []bool{false}, name: "bar"},
+				},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			false,
+		},
+		{"fail - rows - misaligned",
+			args{"foo\n bar, baz", nil},
+			nil,
+			true,
+		},
+		{"fail - columns - misaligned",
+			args{"foo\n bar, baz", []func(*readConfig){ReadOptionSwitchDims()}},
+			nil,
+			true,
+		},
+		{"fail - empty",
+			args{"", nil},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRet, err := ReadCSVString(tt.args.data, tt.args.options...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReadCSVString() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !EqualDataFrames(gotRet, tt.wantRet) {
+				t.Errorf("ReadCSVString() = %v, want %v", gotRet, tt.wantRet)
+			}
+		})
+	}
+}
+
 func TestReadCSV(t *testing.T) {
 	type args struct {
 		csv    [][]string
-		config *ReadConfig
+		config []func(*readConfig)
 	}
 	tests := []struct {
 		name string
@@ -339,7 +391,7 @@ func TestReadCSV(t *testing.T) {
 		{"1 header row, 2 columns, no index",
 			args{
 				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				config: &ReadConfig{NumHeaderRows: 1}},
+				config: nil},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
@@ -357,7 +409,7 @@ func TestReadCSV(t *testing.T) {
 		{"column as major dimension",
 			args{
 				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
-				config: &ReadConfig{MajorDimIsCols: true, NumHeaderRows: 1}},
+				config: []func(*readConfig){ReadOptionSwitchDims()}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
@@ -371,10 +423,14 @@ func TestReadCSV(t *testing.T) {
 			args{csv: [][]string{{}},
 				config: nil},
 			&DataFrame{err: fmt.Errorf("ReadCSV(): `data` must have at least one column")}},
+		{"fail - misaligned",
+			args{csv: [][]string{{"foo"}, {"bar", "baz"}},
+				config: nil},
+			&DataFrame{err: fmt.Errorf("ReadCSV(): row 1: all rows must have same number of columns as first row (2 != 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ReadCSV(tt.args.csv, tt.args.config)
+			got := ReadCSV(tt.args.csv, tt.args.config...)
 			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("ReadCSV() = %v, want %v", got, tt.want)
 			}
@@ -2821,8 +2877,8 @@ func TestWriteMockCSV(t *testing.T) {
 	randSeed = 3
 	type args struct {
 		src        [][]string
-		config     *ReadConfig
 		outputRows int
+		config     []func(*readConfig)
 	}
 	tests := []struct {
 		name    string
@@ -2838,17 +2894,18 @@ func TestWriteMockCSV(t *testing.T) {
 			"", true},
 		{"columns as major dim",
 			args{src: [][]string{{"corge", "1.5", "2.5"}, {"qux", "foo", "foo"}},
-				config: &ReadConfig{MajorDimIsCols: true, NumHeaderRows: 1}, outputRows: 3},
+				outputRows: 3,
+				config:     []func(*readConfig){ReadOptionSwitchDims()}},
 			want1, false},
-		{"fail - no rows", args{src: nil, config: &ReadConfig{MajorDimIsCols: true}, outputRows: 3},
+		{"fail - no rows", args{src: nil, outputRows: 3},
 			"", true},
-		{"fail - no cols", args{src: [][]string{{}}, config: &ReadConfig{MajorDimIsCols: true}, outputRows: 3},
+		{"fail - no cols", args{src: [][]string{{}}, outputRows: 3},
 			"", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
-			if err := WriteMockCSV(tt.args.src, w, tt.args.config, tt.args.outputRows); (err != nil) != tt.wantErr {
+			if err := WriteMockCSV(tt.args.src, w, tt.args.outputRows, tt.args.config...); (err != nil) != tt.wantErr {
 				t.Errorf("WriteMockCSV() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
@@ -3030,7 +3087,7 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 func TestImportCSV(t *testing.T) {
 	type args struct {
 		path   string
-		config *ReadConfig
+		config []func(*readConfig)
 	}
 	tests := []struct {
 		name    string
@@ -3059,7 +3116,7 @@ func TestImportCSV(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ImportCSV(tt.args.path, tt.args.config)
+			got, err := ImportCSV(tt.args.path, tt.args.config...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ImportCSV() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -3073,8 +3130,8 @@ func TestImportCSV(t *testing.T) {
 
 func TestReadInterface(t *testing.T) {
 	type args struct {
-		input  [][]interface{}
-		config *ReadConfig
+		data   [][]interface{}
+		config []func(*readConfig)
 	}
 	tests := []struct {
 		name string
@@ -3083,8 +3140,8 @@ func TestReadInterface(t *testing.T) {
 	}{
 		{"1 header row, 2 columns, no index",
 			args{
-				input:  [][]interface{}{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				config: &ReadConfig{NumHeaderRows: 1}},
+				data:   [][]interface{}{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
+				config: nil},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
@@ -3092,7 +3149,7 @@ func TestReadInterface(t *testing.T) {
 				colLevelNames: []string{"*0"}}},
 		{"1 header row, 2 columns, no index, nil config",
 			args{
-				input:  [][]interface{}{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
+				data:   [][]interface{}{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
 				config: nil},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
@@ -3101,25 +3158,29 @@ func TestReadInterface(t *testing.T) {
 				colLevelNames: []string{"*0"}}},
 		{"column as major dimension",
 			args{
-				input:  [][]interface{}{{"foo", "1", "2"}, {"bar", "5", "6"}},
-				config: &ReadConfig{MajorDimIsCols: true, NumHeaderRows: 1}},
+				data:   [][]interface{}{{"foo", "1", "2"}, {"bar", "5", "6"}},
+				config: []func(*readConfig){ReadOptionSwitchDims()}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}}},
 		{"fail - no rows",
-			args{input: nil,
+			args{data: nil,
 				config: nil},
-			&DataFrame{err: fmt.Errorf("ReadInterface(): `input` must have at least one row")}},
+			&DataFrame{err: fmt.Errorf("ReadInterface(): `data` must have at least one row")}},
 		{"fail - no columns",
-			args{input: [][]interface{}{{}},
+			args{data: [][]interface{}{{}},
 				config: nil},
-			&DataFrame{err: fmt.Errorf("ReadInterface(): `input` must have at least one column")}},
+			&DataFrame{err: fmt.Errorf("ReadInterface(): `data` must have at least one column")}},
+		{"fail - misaligned",
+			args{data: [][]interface{}{{"foo"}, {"bar", "baz"}},
+				config: nil},
+			&DataFrame{err: fmt.Errorf("ReadInterface(): `data`: slice 1: all slices must have same length as first slice (2 != 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ReadInterface(tt.args.input, tt.args.config)
+			got := ReadInterface(tt.args.data, tt.args.config...)
 			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("ReadInterface() = %v, want %v", got, tt.want)
 			}

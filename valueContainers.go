@@ -5,27 +5,7 @@ import (
 	"reflect"
 	"strconv"
 	"time"
-
-	"github.com/cheekybits/genny/generic"
 )
-
-// -- support for generics for grouped types
-type genericType generic.Type
-
-type empty struct{}
-
-func (e empty) float64() float64         { return 0 }
-func (e empty) string() string           { return "" }
-func (e empty) dateTime() time.Time      { return time.Time{} }
-func (e empty) genericType() genericType { return nil }
-
-type genericTypeContainer struct {
-	slice []genericType
-}
-
-func (vc *valueContainer) genericType() genericTypeContainer {
-	return genericTypeContainer{}
-}
 
 func (vc floatValueContainer) Less(i, j int) bool {
 	if vc.slice[i] < vc.slice[j] {

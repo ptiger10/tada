@@ -1,6 +1,6 @@
 // This file was automatically generated.
 // Any changes will be lost if this file is regenerated.
-// Run "make generate" to regenerate from template.
+// Run "make generate" in the `tada_generics` repo to regenerate from template.
 
 package tada
 

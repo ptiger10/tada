@@ -466,10 +466,31 @@ func (df *DataFrame) toCSVByRows(ignoreLabels bool) ([][]string, error) {
 	return ret, nil
 }
 
+func setReadConfig(options []func(*readConfig)) *readConfig {
+	// default config
+	config := &readConfig{
+		NumHeaderRows:  1,
+		NumLabelLevels: 0,
+		Delimiter:      ',',
+		MajorDimIsCols: false,
+	}
+	for _, option := range options {
+		option(config)
+	}
+	return config
+}
+
 // expects non-nil cfg
-func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
-	numCols := len(csv[0]) - cfg.NumLabelLevels
+func readCSVByRows(csv [][]string, cfg *readConfig) (*DataFrame, error) {
+	numFields := len(csv[0])
+	for i := range csv {
+		if len(csv[i]) != numFields {
+			return nil, fmt.Errorf("row %d: all rows must have same number of columns as first row (%d != %d)",
+				i, len(csv[i]), numFields)
+		}
+	}
 	numRows := len(csv) - cfg.NumHeaderRows
+	numCols := len(csv[0]) - cfg.NumLabelLevels
 
 	// prepare intermediary values containers
 	vals := makeStringMatrix(numCols, numRows)
@@ -533,11 +554,19 @@ func readCSVByRows(csv [][]string, cfg *ReadConfig) *DataFrame {
 		values:        retVals,
 		labels:        retLabels,
 		colLevelNames: retColLevelNames,
-	}
+	}, nil
 }
 
 // expects non-nil cfg
-func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
+func readCSVByCols(csv [][]string, cfg *readConfig) (*DataFrame, error) {
+	numLines := len(csv[0])
+	for i := range csv {
+		if len(csv[i]) != numLines {
+			return nil, fmt.Errorf("column %d: all columns must have same number of rows as first column (%d != %d)",
+				i, len(csv[i]), numLines)
+		}
+	}
+
 	numRows := len(csv[0]) - cfg.NumHeaderRows
 	numCols := len(csv) - cfg.NumLabelLevels
 
@@ -591,7 +620,7 @@ func readCSVByCols(csv [][]string, cfg *ReadConfig) *DataFrame {
 		values:        retVals,
 		labels:        retLabels,
 		colLevelNames: retColLevelNames,
-	}
+	}, nil
 
 }
 func defaultLabelsIfEmpty(labels []*valueContainer, numRows int) []*valueContainer {
@@ -617,13 +646,6 @@ func defaultColsIfNoHeader(numHeaderRows int, columns []*valueContainer) ([]stri
 		ret[l] = fmt.Sprintf("*%d", l)
 	}
 	return ret, columns
-}
-
-func defaultConfigIfNil(config *ReadConfig) *ReadConfig {
-	if config == nil {
-		config = &ReadConfig{NumHeaderRows: 1, Delimiter: ','}
-	}
-	return config
 }
 
 func readStruct(slice interface{}) ([]*valueContainer, error) {
@@ -2602,7 +2624,7 @@ func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune
 }
 
 // major dimension of input: columns
-func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *ReadConfig) *DataFrame {
+func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *readConfig) *DataFrame {
 	numCols := len(values) - config.NumLabelLevels
 	numRows := len(values[0]) - config.NumHeaderRows
 	labelNames := make([]string, config.NumLabelLevels)

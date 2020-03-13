@@ -7,6 +7,13 @@ import (
 	"time"
 )
 
+// -- support for generics for grouped types
+type empty struct{}
+
+func (e empty) float64() float64    { return 0 }
+func (e empty) string() string      { return "" }
+func (e empty) dateTime() time.Time { return time.Time{} }
+
 // -- GROUPED SERIES
 
 // Err returns the underlying error, if any.

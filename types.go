@@ -183,18 +183,11 @@ const (
 	DateTime
 )
 
-// ReadConfig supplies configuration details to a Read function.
-// `NumHeaderRows` specifies the number of rows at the top of the data that should be designated as column headers.
-// `NumLabelCols` specifies the number of columns starting from the left of the data that should be designated as label levels.
-// `Delimiter` specifies a custom field delimiter for use in ImportCSV (in the standard csv library, this delimiter is called Comma).
-// If `MajorDimIsCols` is false, the data is read as though the major dimension is rows (the default for the standard csv library).
-//
-// For example, when reading this data: [["foo", "bar"], ["baz", "qux"]]
-// `MajorDimIsCols` = false   		`MajorDimIsCols` = true
-// (major dimension: rows)			(major dimension: columns)
-//	foo bar							foo baz
-//  baz qux							bar qux
-type ReadConfig struct {
+// A readConfig configures a read function.
+// All read functions accept zero or more modifiers that alter the default read config, which is:
+// 1 header row, 0 label levels, "," as field delimiter, and rows as the major dimension of a nested slice.
+// A readConfig is modified by ReadOptionHeaders, ReadOptionLabels, ReadOptionDelimiter, and ReadOptionSwitchDims.
+type readConfig struct {
 	NumHeaderRows  int
 	NumLabelLevels int
 	Delimiter      rune
