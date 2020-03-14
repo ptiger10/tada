@@ -215,6 +215,7 @@ func ReadCSVString(data string, options ...func(*readConfig)) (*DataFrame, error
 	reader := strings.NewReader(data)
 	r := csv.NewReader(reader)
 	r.TrimLeadingSpace = true
+	r.LazyQuotes = true
 	records, err := r.ReadAll()
 	if err != nil {
 		return nil, fmt.Errorf("ReadCSVString(): %v", err)
@@ -419,13 +420,40 @@ func (df *DataFrame) ToInterface(ignoreLabels bool) [][]interface{} {
 	return ret
 }
 
-// EqualsCSV converts a dataframe to csv, compares it to another csv,
-// and evaluates whether the two match.
+// EqualsCSV converts `df` to csv, compares it to `data`,
+// and evaluates whether the stringified values match.
+// If `ignoreLabels` is false, considers the label levels in `df` as additional columns.
 // If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
-func (df *DataFrame) EqualsCSV(csv [][]string, ignoreLabels bool) (bool, *tablediff.Differences) {
+func (df *DataFrame) EqualsCSV(data [][]string, ignoreLabels bool) (bool, *tablediff.Differences, error) {
+	numLines := len(data[0])
+	for i := range data {
+		if len(data[i]) != numLines {
+			return false, nil, fmt.Errorf("EqualsCSV(): `data`: slice %d: all slices must have same length as first slice (%d != %d)",
+				i, len(data[i]), numLines)
+		}
+	}
 	compare := df.ToCSV(ignoreLabels)
-	diffs, eq := tablediff.Diff(compare, csv)
-	return eq, diffs
+	diffs, eq := tablediff.Diff(compare, data)
+	return eq, diffs, nil
+}
+
+// EqualsCSVFromString converts `df` to csv, compares it to the csv read from `data`,
+// and evaluates whether the two match.
+// If `ignoreLabels` is false, considers the label levels in `df` as additional columns.
+// If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
+func (df *DataFrame) EqualsCSVFromString(data string, ignoreLabels bool) (bool, *tablediff.Differences, error) {
+	compare := df.ToCSV(ignoreLabels)
+
+	reader := strings.NewReader(data)
+	r := csv.NewReader(reader)
+	r.TrimLeadingSpace = true
+	r.LazyQuotes = true
+	records, err := r.ReadAll()
+	if err != nil {
+		return false, nil, fmt.Errorf("EqualsCSVFromString()(): %v", err)
+	}
+	diffs, eq := tablediff.Diff(compare, records)
+	return eq, diffs, nil
 }
 
 // WriteMockCSV reads `src` (configured by `options`) and writes `n` mock rows to `w`,
