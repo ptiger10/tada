@@ -176,7 +176,7 @@ func ReadOptionLabels(n int) func(*readConfig) {
 	}
 }
 
-// ReadOptionDelimiter configures a read function to use `sep` as a field delimiter for use in ImportCSV or ReadCSVString (default: ",").
+// ReadOptionDelimiter configures a read function to use `sep` as a field delimiter for use in ImportCSV or ReadCSVFromString (default: ",").
 func ReadOptionDelimiter(sep rune) func(*readConfig) {
 	return func(r *readConfig) {
 		r.Delimiter = sep
@@ -199,16 +199,16 @@ func ReadOptionSwitchDims() func(*readConfig) {
 	}
 }
 
-// ReadCSVString reads a stringified csv table into a DataFrame (configured by `options`).
+// ReadCSVFromString reads a stringified csv table into a DataFrame (configured by `options`).
 // The major dimension of the table should be rows.
 // For advanced cases, use the standard csv library NewReader().ReadAll() + tada.ReadCSV().
 // Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionDelimiter.
 //
 // Default if no options are supplied:
 // 1 header row, no labels, field delimiter is ","
-func ReadCSVString(data string, options ...func(*readConfig)) (*DataFrame, error) {
+func ReadCSVFromString(data string, options ...func(*readConfig)) (*DataFrame, error) {
 	if data == "" {
-		return nil, fmt.Errorf("ReadCSVString(): `data` cannot be empty")
+		return nil, fmt.Errorf("ReadCSVFromString(): `data` cannot be empty")
 	}
 	config := setReadConfig(options)
 
@@ -218,7 +218,7 @@ func ReadCSVString(data string, options ...func(*readConfig)) (*DataFrame, error
 	r.LazyQuotes = true
 	records, err := r.ReadAll()
 	if err != nil {
-		return nil, fmt.Errorf("ReadCSVString(): %v", err)
+		return nil, fmt.Errorf("ReadCSVFromString(): %v", err)
 	}
 	// should never return error because already checked for misalignment and empty string
 	return readCSVByRows(records, config)
@@ -231,25 +231,24 @@ func ReadCSVString(data string, options ...func(*readConfig)) (*DataFrame, error
 //
 // Default if no options are supplied:
 // 1 header row, no labels, rows as major dimension
-func ReadCSV(data [][]string, options ...func(*readConfig)) (ret *DataFrame) {
+func ReadCSV(data [][]string, options ...func(*readConfig)) (ret *DataFrame, err error) {
 	if len(data) == 0 {
-		return dataFrameWithError(fmt.Errorf("ReadCSV(): `data` must have at least one row"))
+		return nil, fmt.Errorf("ReadCSV(): `data` must have at least one row")
 	}
 	if len(data[0]) == 0 {
-		return dataFrameWithError(fmt.Errorf("ReadCSV(): `data` must have at least one column"))
+		return nil, fmt.Errorf("ReadCSV(): `data` must have at least one column")
 	}
 	config := setReadConfig(options)
 
-	var err error
 	if config.MajorDimIsCols {
 		ret, err = readCSVByCols(data, config)
 	} else {
 		ret, err = readCSVByRows(data, config)
 	}
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("ReadCSV(): %v", err))
+		return nil, fmt.Errorf("ReadCSV(): %v", err)
 	}
-	return ret
+	return ret, nil
 }
 
 // ImportCSV reads the file at `path` into a Dataframe (configured by `options`).
@@ -284,18 +283,18 @@ func ImportCSV(path string, options ...func(*readConfig)) (*DataFrame, error) {
 //
 // Default if no options are supplied:
 // 1 header row, no labels, rows as major dimension
-func ReadInterface(data [][]interface{}, options ...func(*readConfig)) (ret *DataFrame) {
+func ReadInterface(data [][]interface{}, options ...func(*readConfig)) (ret *DataFrame, err error) {
 	if len(data) == 0 {
-		return dataFrameWithError(fmt.Errorf("ReadInterface(): `data` must have at least one row"))
+		return nil, fmt.Errorf("ReadInterface(): `data` must have at least one row")
 	}
 	if len(data[0]) == 0 {
-		return dataFrameWithError(fmt.Errorf("ReadInterface(): `data` must have at least one column"))
+		return nil, fmt.Errorf("ReadInterface(): `data` must have at least one column")
 	}
 	numLines := len(data[0])
 	for i := range data {
 		if len(data[i]) != numLines {
-			return dataFrameWithError(fmt.Errorf("ReadInterface(): `data`: slice %d: all slices must have same length as first slice (%d != %d)",
-				i, len(data[i]), numLines))
+			return nil, fmt.Errorf("ReadInterface(): `data`: slice %d: all slices must have same length as first slice (%d != %d)",
+				i, len(data[i]), numLines)
 		}
 	}
 
@@ -317,7 +316,7 @@ func ReadInterface(data [][]interface{}, options ...func(*readConfig)) (ret *Dat
 	} else {
 		ret, _ = readCSVByRows(str, config)
 	}
-	return ret
+	return ret, nil
 }
 
 // ReadMatrix reads data satisfying the gonum Matrix interface into a DataFrame.
