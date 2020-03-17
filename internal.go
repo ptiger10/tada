@@ -176,9 +176,10 @@ func nameOfContainer(containers []*valueContainer, n int) string {
 }
 
 // indexOfContainer returns the position of the first level within `cols` with a name matching `name`, or an error if no level matches
+// case-sensitive
 func indexOfContainer(name string, containers []*valueContainer) (int, error) {
 	for j := range containers {
-		if strings.ToLower(containers[j].name) == strings.ToLower(name) {
+		if containers[j].name == name {
 			return j, nil
 		}
 	}
@@ -2709,7 +2710,7 @@ func removeDefaultNameIndicator(name string) string {
 
 func suppressDefaultName(name string) string {
 	if regexp.MustCompile(`^\*`).MatchString(name) {
-		return ""
+		return "-"
 	}
 	return name
 }

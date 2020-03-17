@@ -9,8 +9,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/olekukonko/tablewriter"
 	"github.com/ptiger10/tablediff"
+	"github.com/ptiger10/tablewriter"
 )
 
 // -- CONSTRUCTORS
@@ -562,8 +562,9 @@ func WriteMockCSV(src [][]string, w io.Writer, n int, options ...func(*readConfi
 
 // String prints the DataFrame in table form, with the number of rows constrained by optionMaxRows,
 // and the number of columns constrained by optionMaxColumns,
-// which may be configured with SetOptionMaxRows(n) and SetOptionMaxColumns(n), respectively.
-// By default, repeated values are merged together, but this behavior may be changed with SetOptionAutoMerge(false).
+// which may be configured with PrintOptionMaxRows(n) and PrintOptionMaxColumns(n), respectively.
+// By default, repeated values are merged together, but this behavior may be disabled with PrintOptionAutoMerge(false).
+// By default, overly-wide non-header cells are truncated, but this behavior may be changed to wrapping with PrintOptionWrapLines(true).
 func (df *DataFrame) String() string {
 	if df.err != nil {
 		return fmt.Sprintf("Error: %v", df.err)
@@ -588,12 +589,6 @@ func (df *DataFrame) String() string {
 	for j := 0; j < df.numLevels(); j++ {
 		data[0][j] = suppressDefaultName(data[0][j])
 	}
-	// demarcate index headers
-	for l := 0; l < df.numColLevels(); l++ {
-		for j := 0; j < df.numLevels(); j++ {
-			data[l][j] = fmt.Sprintf("-%v-", data[l][j])
-		}
-	}
 
 	// truncate columns
 	if df.numColumns() >= optionMaxColumns {
@@ -611,20 +606,31 @@ func (df *DataFrame) String() string {
 				rightHalf...)
 		}
 	}
-	// write to table
+	// create table
 	var buf bytes.Buffer
-	table := tablewriter.NewWriter(&buf)
-	// optional caption
-	if df.name != "" {
-		table.SetCaption(true, fmt.Sprintf("name: %v", df.name))
+	table := tablewriter.NewTable(&buf)
+	// configure table
+	if optionMergeRepeats {
+		table.MergeRepeats()
 	}
+	if !optionWrapLines {
+		table.TruncateWideCells()
+	}
+	table.SetAlignment(tablewriter.AlignRight)
+	table.SetLabelLevelCount(df.numLevels())
 
-	table.SetHeader(data[0])
-	table.AppendBulk(data[1:])
-	table.SetAutoMergeCells(optionMergeRepeats)
-
+	// write headers and rows
+	for l := 0; l < df.numColLevels(); l++ {
+		table.AppendHeaderRow(data[l])
+	}
+	table.AppendRows(data[df.numColLevels():])
 	table.Render()
-	return string(buf.Bytes())
+	ret := string(buf.Bytes())
+	// append optional caption
+	if df.name != "" {
+		ret += fmt.Sprintf("name: %v\n", df.name)
+	}
+	return ret
 }
 
 // At returns the Element at the `row` and `column` index positions.
@@ -813,7 +819,7 @@ func (df *DataFrame) NameOfColumn(n int) string {
 	return nameOfContainer(df.values, n)
 }
 
-// IndexOfContainer returns the index position of the first container with a name matching `name`.
+// IndexOfContainer returns the index position of the first container with a name matching `name` (case-sensitive).
 // If `name` does not match any container, -1 is returned.
 // If `columns` is true, only column names will be searched.
 // If `columns` is false, only label level names will be searched.

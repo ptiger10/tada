@@ -1,12 +1,4 @@
-github.com/d4l3k/messagediff v1.2.1 h1:ZcAIMYsUg0EAp9X+tt8/enBE/Q8Yd5kzPynLyKptt9U=
-github.com/d4l3k/messagediff v1.2.1/go.mod h1:Oozbb1TVXFac9FtSIxHBMnBCq2qeH/2KkEQxENCrlLo=
-github.com/mattn/go-runewidth v0.0.7 h1:Ei8KR0497xHyKJPAv59M1dkC+rOZCMBJ+t3fZ+twI54=
-github.com/mattn/go-runewidth v0.0.7/go.mod h1:H031xJmbD/WCDINGzjvQ9THkh0rPKHF+m2gUSrubnMI=
-github.com/mattn/go-runewidth v0.0.8 h1:3tS41NlGYSmhhe/8fhGRzc+z3AYCw1Fe1WAyLuujKs0=
-github.com/mattn/go-runewidth v0.0.8/go.mod h1:H031xJmbD/WCDINGzjvQ9THkh0rPKHF+m2gUSrubnMI=
-github.com/olekukonko/tablewriter v0.0.4 h1:vHD/YYe1Wolo78koG299f7V/VAS08c6IpCLn+Ejf/w8=
-github.com/olekukonko/tablewriter v0.0.4/go.mod h1:zq6QwlOf5SlnkVbMSr5EoBv3636FWnp+qbPhuoO21uA=
-github.com/ptiger10/tablediff v0.0.0-20200222000733-e003218fd611 h1:SeL0EqyJywhz0a6oa2Qz5SEQQjlK9Or/PM47f/YATck=
-github.com/ptiger10/tablediff v0.0.0-20200222000733-e003218fd611/go.mod h1:3uUtSdk/ye6xhBdYsJC70kg88qbfJ0e7pzvXDBUKNow=
-github.com/ptiger10/tablediff v0.1.0 h1:2YXeA0NTW+jy1yvOT/8wnZ7VVMe49rYndcgoKFwHhtA=
-github.com/ptiger10/tablediff v0.1.0/go.mod h1:3uUtSdk/ye6xhBdYsJC70kg88qbfJ0e7pzvXDBUKNow=
+github.com/ptiger10/tablediff v0.2.0 h1:CaQh9UtTzisA/4+tMSEMAA3qEjfzF/jPYb0FFuT0w5I=
+github.com/ptiger10/tablediff v0.2.0/go.mod h1:KucUzq16U5KLCReauvOf4Fi0Zp8NMe5Zr4LEQsHxtqo=
+github.com/ptiger10/tablewriter v0.2.1 h1:r63dXa1ofpCeEEv+7dBMSZ75k/A2jwBF/Xty4LP8usI=
+github.com/ptiger10/tablewriter v0.2.1/go.mod h1:41ATaQp2h910kRg0wjpd/Rvo6J2VlDQDXD2mg0yBeB0=

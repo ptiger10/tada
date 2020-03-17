@@ -1078,17 +1078,17 @@ func Test_indexOfContainer(t *testing.T) {
 			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
 			{slice: []int{0}, isNull: []bool{false}, name: "foo"}}},
 			1, false},
-		{"pass - uppercase search", args{"FOO", []*valueContainer{
-			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-			{slice: []int{0}, isNull: []bool{false}, name: "foo"}}},
-			1, false},
-		{"pass - title case name", args{"foo", []*valueContainer{
-			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-			{slice: []int{0}, isNull: []bool{false}, name: "Foo"}}},
-			1, false},
 		{"pass - number as name", args{"1", []*valueContainer{
 			{slice: []int{0}, isNull: []bool{false}, name: "1"}}},
 			0, false},
+		{"fail - uppercase search", args{"FOO", []*valueContainer{
+			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+			{slice: []int{0}, isNull: []bool{false}, name: "foo"}}},
+			0, true},
+		{"fail - title case name", args{"foo", []*valueContainer{
+			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+			{slice: []int{0}, isNull: []bool{false}, name: "Foo"}}},
+			0, true},
 		{"fail - not found", args{"foo", []*valueContainer{
 			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
 			{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},

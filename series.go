@@ -153,7 +153,7 @@ func (s *Series) NameOfLabel(n int) string {
 	return nameOfContainer(s.labels, n)
 }
 
-// IndexOfLabel returns the index position of the first label level with a name matching `name`.
+// IndexOfLabel returns the index position of the first label level with a name matching `name` (case-sensitive).
 // If `name` does not match any container, -1 is returned.
 func (s *Series) IndexOfLabel(name string) int {
 	i, err := indexOfContainer(name, s.labels)
