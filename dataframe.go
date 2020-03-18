@@ -277,7 +277,7 @@ func ImportCSV(path string, options ...func(*readConfig)) (*DataFrame, error) {
 	return makeDataFrameFromMatrices(retVals, retNulls, config), nil
 }
 
-// ReadInterface reads `data` into  a Dataframe (configured by `options`).
+// ReadInterface converts `data` to [][]string and reads into  a Dataframe (configured by `options`).
 // Google Sheets, for example, exports data as [][]interface{} with either rows or columns as the major dimension.
 // Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionSwitchDims.
 //

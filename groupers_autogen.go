@@ -68,8 +68,8 @@ func groupedFloat64ReduceFunc(
 
 func (g *GroupedSeries) float64ReduceFunc(name string, fn func(slice []float64, isNull []bool, index []int) (float64, bool)) *Series {
 	var sharedData bool
-	if g.aligned {
-		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
+	if g.series.values.name != "" {
+		name = fmt.Sprintf("%v_%v", name, g.series.values.name)
 	}
 	retVals := groupedFloat64ReduceFunc(
 		g.series.values.float64().slice, g.series.values.isNull, name, g.aligned, g.rowIndices, fn)
@@ -90,22 +90,24 @@ func (g *GroupedSeries) float64ReduceFunc(name string, fn func(slice []float64, 
 func (g *GroupedDataFrame) float64ReduceFunc(
 	name string, cols []string, fn func(slice []float64, isNull []bool, index []int) (float64, bool)) *DataFrame {
 	if len(cols) == 0 {
-		cols = make([]string, len(g.df.values))
-		for k := range cols {
-			cols[k] = g.df.values[k].name
-		}
+		cols = g.df.ListColumnNames()
+	}
+	adjustedColNames := make([]string, len(cols))
+	for k := range cols {
+		adjustedColNames[k] = fmt.Sprintf("%v_%v", name, cols[k])
 	}
 	retVals := make([]*valueContainer, len(cols))
-	for k := range retVals {
+	for k, colName := range cols {
+		index, _ := indexOfContainer(colName, g.df.values)
 		retVals[k] = groupedFloat64ReduceFunc(
-			g.df.values[k].float64().slice, g.df.values[k].isNull, cols[k], false, g.rowIndices, fn)
+			g.df.values[index].float64().slice, g.df.values[k].isNull, adjustedColNames[k], false, g.rowIndices, fn)
 	}
 
 	return &DataFrame{
 		values:        retVals,
 		labels:        g.labels,
 		colLevelNames: []string{"*0"},
-		name:          name,
+		name:          fmt.Sprintf("%v_%v", name, g.df.name),
 	}
 }
 
@@ -168,8 +170,8 @@ func groupedStringReduceFunc(
 
 func (g *GroupedSeries) stringReduceFunc(name string, fn func(slice []string, isNull []bool, index []int) (string, bool)) *Series {
 	var sharedData bool
-	if g.aligned {
-		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
+	if g.series.values.name != "" {
+		name = fmt.Sprintf("%v_%v", name, g.series.values.name)
 	}
 	retVals := groupedStringReduceFunc(
 		g.series.values.string().slice, g.series.values.isNull, name, g.aligned, g.rowIndices, fn)
@@ -190,22 +192,24 @@ func (g *GroupedSeries) stringReduceFunc(name string, fn func(slice []string, is
 func (g *GroupedDataFrame) stringReduceFunc(
 	name string, cols []string, fn func(slice []string, isNull []bool, index []int) (string, bool)) *DataFrame {
 	if len(cols) == 0 {
-		cols = make([]string, len(g.df.values))
-		for k := range cols {
-			cols[k] = g.df.values[k].name
-		}
+		cols = g.df.ListColumnNames()
+	}
+	adjustedColNames := make([]string, len(cols))
+	for k := range cols {
+		adjustedColNames[k] = fmt.Sprintf("%v_%v", name, cols[k])
 	}
 	retVals := make([]*valueContainer, len(cols))
-	for k := range retVals {
+	for k, colName := range cols {
+		index, _ := indexOfContainer(colName, g.df.values)
 		retVals[k] = groupedStringReduceFunc(
-			g.df.values[k].string().slice, g.df.values[k].isNull, cols[k], false, g.rowIndices, fn)
+			g.df.values[index].string().slice, g.df.values[k].isNull, adjustedColNames[k], false, g.rowIndices, fn)
 	}
 
 	return &DataFrame{
 		values:        retVals,
 		labels:        g.labels,
 		colLevelNames: []string{"*0"},
-		name:          name,
+		name:          fmt.Sprintf("%v_%v", name, g.df.name),
 	}
 }
 
@@ -268,8 +272,8 @@ func groupedDateTimeReduceFunc(
 
 func (g *GroupedSeries) dateTimeReduceFunc(name string, fn func(slice []time.Time, isNull []bool, index []int) (time.Time, bool)) *Series {
 	var sharedData bool
-	if g.aligned {
-		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
+	if g.series.values.name != "" {
+		name = fmt.Sprintf("%v_%v", name, g.series.values.name)
 	}
 	retVals := groupedDateTimeReduceFunc(
 		g.series.values.dateTime().slice, g.series.values.isNull, name, g.aligned, g.rowIndices, fn)
@@ -290,21 +294,23 @@ func (g *GroupedSeries) dateTimeReduceFunc(name string, fn func(slice []time.Tim
 func (g *GroupedDataFrame) dateTimeReduceFunc(
 	name string, cols []string, fn func(slice []time.Time, isNull []bool, index []int) (time.Time, bool)) *DataFrame {
 	if len(cols) == 0 {
-		cols = make([]string, len(g.df.values))
-		for k := range cols {
-			cols[k] = g.df.values[k].name
-		}
+		cols = g.df.ListColumnNames()
+	}
+	adjustedColNames := make([]string, len(cols))
+	for k := range cols {
+		adjustedColNames[k] = fmt.Sprintf("%v_%v", name, cols[k])
 	}
 	retVals := make([]*valueContainer, len(cols))
-	for k := range retVals {
+	for k, colName := range cols {
+		index, _ := indexOfContainer(colName, g.df.values)
 		retVals[k] = groupedDateTimeReduceFunc(
-			g.df.values[k].dateTime().slice, g.df.values[k].isNull, cols[k], false, g.rowIndices, fn)
+			g.df.values[index].dateTime().slice, g.df.values[k].isNull, adjustedColNames[k], false, g.rowIndices, fn)
 	}
 
 	return &DataFrame{
 		values:        retVals,
 		labels:        g.labels,
 		colLevelNames: []string{"*0"},
-		name:          name,
+		name:          fmt.Sprintf("%v_%v", name, g.df.name),
 	}
 }

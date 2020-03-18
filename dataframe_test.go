@@ -2581,7 +2581,8 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				{slice: []string{"A", "B", "B", "B"}, isNull: []bool{false, false, false, false}, name: "type"}},
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
-			colLevelNames: []string{"*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "foo"},
 			args{labels: "type", columns: "year", values: "amount", aggFn: "sum"},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "2018"},
@@ -2590,7 +2591,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
-				name:          "sum"}},
+				name:          "sum_foo"}},
 		{"mean", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -2598,7 +2599,8 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				{slice: []string{"A", "B", "B", "B"}, isNull: []bool{false, false, false, false}, name: "type"}},
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
-			colLevelNames: []string{"*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "foo"},
 			args{labels: "type", columns: "year", values: "amount", aggFn: "mean"},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "2018"},
@@ -2607,7 +2609,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
-				name:          "mean"}},
+				name:          "mean_foo"}},
 		{"median", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -2615,7 +2617,8 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				{slice: []string{"A", "B", "B", "B"}, isNull: []bool{false, false, false, false}, name: "type"}},
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
-			colLevelNames: []string{"*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "foo"},
 			args{labels: "type", columns: "year", values: "amount", aggFn: "median"},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "2018"},
@@ -2624,7 +2627,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
-				name:          "median"}},
+				name:          "median_foo"}},
 		{"std", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -2632,7 +2635,8 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				{slice: []string{"A", "B", "B", "B"}, isNull: []bool{false, false, false, false}, name: "type"}},
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
-			colLevelNames: []string{"*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "foo"},
 			args{labels: "type", columns: "year", values: "amount", aggFn: "std"},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{0, 0}, isNull: []bool{false, false}, name: "2018"},
@@ -2641,7 +2645,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
-				name:          "std"}},
+				name:          "std_foo"}},
 		{"count", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -2649,7 +2653,9 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				{slice: []string{"A", "B", "B", "B"}, isNull: []bool{false, false, false, false}, name: "type"}},
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
-			colLevelNames: []string{"*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "foo",
+		},
 			args{labels: "type", columns: "year", values: "amount", aggFn: "count"},
 			&DataFrame{values: []*valueContainer{
 				{slice: []int{1, 1}, isNull: []bool{false, false}, name: "2018"},
@@ -2658,7 +2664,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
-				name:          "count"}},
+				name:          "count_foo"}},
 		{"min", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -2666,7 +2672,8 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				{slice: []string{"A", "B", "B", "B"}, isNull: []bool{false, false, false, false}, name: "type"}},
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
-			colLevelNames: []string{"*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "foo"},
 			args{labels: "type", columns: "year", values: "amount", aggFn: "min"},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "2018"},
@@ -2675,7 +2682,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
-				name:          "min"}},
+				name:          "min_foo"}},
 		{"max", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -2683,7 +2690,8 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				{slice: []string{"A", "B", "B", "B"}, isNull: []bool{false, false, false, false}, name: "type"}},
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
-			colLevelNames: []string{"*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "foo"},
 			args{labels: "type", columns: "year", values: "amount", aggFn: "max"},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "2018"},
@@ -2692,7 +2700,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
-				name:          "max"}},
+				name:          "max_foo"}},
 		{"fail - no matching index level", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},

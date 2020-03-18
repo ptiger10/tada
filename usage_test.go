@@ -1,30 +1,41 @@
 package tada
 
 import (
+	"log"
 	"testing"
 )
 
-// func TestUsage(t *testing.T) {
-// 	df := NewDataFrame(
-// 		[]interface{}{[]float64{1, 2, 3}, []string{"foo", "foo", "baz"}}).
-// 		SetColNames([]string{"qux", "quux"})
-// 	fmt.Println(df.Sum())
-// }
+func Test_TransformData(t *testing.T) {
+	data := `name, score
+            joe doe,
+            john doe, 5
+            jane doe, 8
+            john doe, 7
+			jane doe, 10`
 
-func TestFilter(t *testing.T) {
-	s := NewSeries([]float64{1, 2, 3})
-	s.Filter(map[string]FilterFn{"": {LessThan: 2}})
+	want := `name, mean_score
+						 john doe, 6
+						 jane doe, 9`
+
+	ret := exampleTransformData(data)
+	ok, diffs, err := ret.EqualsCSVFromString(want, false)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if !ok {
+		t.Errorf("TransformData(): got %v, want %v, has diffs: \n%v", ret, want, diffs)
+	}
 }
 
-// func TestMockCSV(t *testing.T) {
-// 	c := [][]string{{"qux", "corge", "waldo"},
-// 		{"1", "dog", "2/15/20"},
-// 		{"1", "dog", "2/15/20"}}
-// 	var b strings.Builder
-// 	WriteMockCSV(c, &b, nil)
-// }
-
-// func TestAlign(t *testing.T) {
-// 	df := NewDataFrame([]interface{}{[]float64{1, 2, 6}, []int{10, 20, 30}}, []string{"foo", "bar", "foo"}).SetCols([]string{"qux", "quux"})
-// 	fmt.Println(df.GroupBy().Align("qux").Min())
-// }
+func exampleTransformData(data string) *DataFrame {
+	df, err := ReadCSVFromString(data)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = df.HasCols("name", "score")
+	if err != nil {
+		log.Fatal(err)
+	}
+	df.InPlace().DropNull()
+	return df.GroupBy("name").Mean("score")
+}

@@ -327,7 +327,8 @@ func Test_convertStringToFloat(t *testing.T) {
 		want1 bool
 	}{
 		{"null", args{"foo", false}, 0, true},
-		{"not null", args{"3.5", false}, 3.5, false},
+		{"not null - float", args{"3.5", false}, 3.5, false},
+		{"not null - int", args{"3", false}, 3, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

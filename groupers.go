@@ -58,8 +58,8 @@ func (g *GroupedSeries) Transform(name string, lambda func(interface{}) interfac
 
 func (g *GroupedSeries) interfaceReduceFunc(name string, fn func(interface{}) interface{}) (*Series, error) {
 	var sharedData bool
-	if g.aligned {
-		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
+	if g.series.values.name != "" {
+		name = fmt.Sprintf("%v_%v", name, g.series.values.name)
 	}
 	retVals, err := groupedInterfaceReduceFunc(
 		g.series.values.slice, name, g.aligned, g.rowIndices, fn)
@@ -83,8 +83,8 @@ func (g *GroupedSeries) interfaceReduceFunc(name string, fn func(interface{}) in
 // for each group, returns the row at the selected index as a new row in a new Series
 func (g *GroupedSeries) indexReduceFunc(name string, index int) *Series {
 	var sharedData bool
-	if g.aligned {
-		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
+	if g.series.values.name != "" {
+		name = fmt.Sprintf("%v_%v", name, g.series.values.name)
 	}
 	retVals := groupedIndexReduceFunc(
 		g.series.values.slice, g.series.values.isNull, name, g.aligned, index, g.rowIndices)
@@ -105,10 +105,10 @@ func (g *GroupedSeries) indexReduceFunc(name string, index int) *Series {
 // for each group, returns a count
 func (g *GroupedSeries) countReduceFunc(name string, fn func(interface{}, []bool, []int) (int, bool)) *Series {
 	var sharedData bool
-	if g.aligned {
-		name = fmt.Sprintf("%v_%v", g.series.values.name, name)
+	if g.series.values.name != "" {
+		name = fmt.Sprintf("%v_%v", name, g.series.values.name)
 	}
-	retVals := groupedCountReduceFunc(name, g.series.values.slice, g.series.values.isNull, g.aligned, g.rowIndices, fn)
+	retVals := groupedCountReduceFunc(g.series.values.slice, g.series.values.isNull, name, g.aligned, g.rowIndices, fn)
 
 	retLabels := g.labels
 	if g.aligned {
@@ -358,36 +358,40 @@ func (g *GroupedDataFrame) Err() error {
 
 func (g *GroupedDataFrame) indexReduceFunc(name string, cols []string, index int) *DataFrame {
 	if len(cols) == 0 {
-		cols = make([]string, len(g.df.values))
-		for k := range cols {
-			cols[k] = g.df.values[k].name
-		}
+		cols = g.df.ListColumnNames()
+	}
+	adjustedColNames := make([]string, len(cols))
+	for k := range cols {
+		adjustedColNames[k] = fmt.Sprintf("%v_%v", name, cols[k])
 	}
 	retVals := make([]*valueContainer, len(cols))
-	for k := range retVals {
+	for k, colName := range cols {
+		colIndex, _ := indexOfContainer(colName, g.df.values)
 		retVals[k] = groupedIndexReduceFunc(
-			g.df.values[k].slice, g.df.values[k].isNull, cols[k], false, index, g.rowIndices)
+			g.df.values[colIndex].slice, g.df.values[k].isNull, adjustedColNames[k], false, index, g.rowIndices)
 	}
 	return &DataFrame{
 		values:        retVals,
 		labels:        g.labels,
 		colLevelNames: []string{"*0"},
-		name:          name,
+		name:          fmt.Sprintf("%v_%v", name, g.df.name),
 	}
 }
 
 func (g *GroupedDataFrame) interfaceReduceFunc(name string, cols []string, fn func(interface{}) interface{}) (*DataFrame, error) {
 	if len(cols) == 0 {
-		cols = make([]string, len(g.df.values))
-		for k := range cols {
-			cols[k] = g.df.values[k].name
-		}
+		cols = g.df.ListColumnNames()
+	}
+	adjustedColNames := make([]string, len(cols))
+	for k := range cols {
+		adjustedColNames[k] = fmt.Sprintf("%v_%v", name, cols[k])
 	}
 	var err error
 	retVals := make([]*valueContainer, len(cols))
-	for k := range retVals {
+	for k, colName := range cols {
+		index, _ := indexOfContainer(colName, g.df.values)
 		retVals[k], err = groupedInterfaceReduceFunc(
-			g.df.values[k].slice, cols[k], false, g.rowIndices, fn)
+			g.df.values[index].slice, adjustedColNames[k], false, g.rowIndices, fn)
 		if err != nil {
 			return nil, err
 		}
@@ -397,28 +401,30 @@ func (g *GroupedDataFrame) interfaceReduceFunc(name string, cols []string, fn fu
 		values:        retVals,
 		labels:        g.labels,
 		colLevelNames: []string{"*0"},
-		name:          name,
+		name:          fmt.Sprintf("%v_%v", name, g.df.name),
 	}, nil
 }
 
 func (g *GroupedDataFrame) countReduceFunc(name string, cols []string, fn func(interface{}, []bool, []int) (int, bool)) *DataFrame {
 	if len(cols) == 0 {
-		cols = make([]string, len(g.df.values))
-		for k := range cols {
-			cols[k] = g.df.values[k].name
-		}
+		cols = g.df.ListColumnNames()
+	}
+	adjustedColNames := make([]string, len(cols))
+	for k := range cols {
+		adjustedColNames[k] = fmt.Sprintf("%v_%v", name, cols[k])
 	}
 	retVals := make([]*valueContainer, len(cols))
-	for k := range retVals {
+	for k, colName := range cols {
+		index, _ := indexOfContainer(colName, g.df.values)
 		retVals[k] = groupedCountReduceFunc(
-			cols[k], g.df.values[k].slice, g.df.values[k].isNull, false, g.rowIndices, fn)
+			g.df.values[index].slice, g.df.values[k].isNull, adjustedColNames[k], false, g.rowIndices, fn)
 	}
 
 	return &DataFrame{
 		values:        retVals,
 		labels:        g.labels,
 		colLevelNames: []string{"*0"},
-		name:          name,
+		name:          fmt.Sprintf("%v_%v", name, g.df.name),
 	}
 }
 
@@ -737,7 +743,7 @@ func groupedIndexReduceFunc(
 	}
 }
 
-func groupedCountReduceFunc(name string, slice interface{}, nulls []bool, aligned bool, rowIndices [][]int,
+func groupedCountReduceFunc(slice interface{}, nulls []bool, name string, aligned bool, rowIndices [][]int,
 	fn func(interface{}, []bool, []int) (int, bool)) *valueContainer {
 	retLength := len(rowIndices)
 	if aligned {
