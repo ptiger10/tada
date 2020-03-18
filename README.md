@@ -24,16 +24,18 @@ For more detail and implementation notes, see [this doc](https://docs.google.com
 
 
 ## Example
-You start with a CSV. Like most real-world data, it is messy (this one is missing a score in the first row):
+You start with a CSV. Like most real-world data, it is messy. This one is missing a score in the first row. And we know that scores must range between 0 and 10, so the score of -100 and 1000 in the second and third rows must also be erroneous:
 ```
 var data = `name, score
             joe doe,
+            john doe, -100
+            jane doe, 1000
             john doe, 5
             jane doe, 8
             john doe, 7
             jane doe, 10`
 ```
-You want to write and validate a function that discards null data, groups by the `name` column, and returns the mean of the groups. 
+You want to write and validate a function that discards erroneous data, groups by the `name` column, and returns the mean of the groups. 
 
 First you write a test:
 ```
@@ -65,6 +67,8 @@ func TransformData(df *tada.DataFrame) *tada.DataFrame {
   err := df.HasCols("name", "score")
     ... handle err
   df.InPlace().DropNull()
+  validScore := tada.FilterFn{Float64: func(v float64) bool { return v >= 0 && v <= 10 }}
+	df.InPlace().Filter(map[string]tada.FilterFn{"score": validScore})
   df.InPlace().Sort(tada.Sorter{Name: "name", DType: tada.String})
   return df.GroupBy("name").Mean("score")
 }
