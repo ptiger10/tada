@@ -1,23 +1,31 @@
 package tada
 
 import (
+	"encoding/csv"
 	"log"
+	"strings"
 	"testing"
 )
 
 func Test_TransformData(t *testing.T) {
 	data := `name, score
-            joe doe,
-            john doe, 5
-            jane doe, 8
-            john doe, 7
+			joe doe,
+			john doe, 100
+            john doe, 6
+			jane doe, 8
+            john doe, 4
 			jane doe, 10`
 
 	want := `name, mean_score
 			jane doe, 9
-			john doe, 6`
+			john doe, 5`
 
-	df, err := ReadCSVFromString(data)
+	r := strings.NewReader(data)
+	cr := csv.NewReader(r)
+	cr.TrimLeadingSpace = true
+	records, err := cr.ReadAll()
+
+	df, err := ReadCSV(records)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -37,6 +45,8 @@ func exampleTransformData(df *DataFrame) *DataFrame {
 		log.Fatal(err)
 	}
 	df.InPlace().DropNull()
+	lte10 := FilterFn{Float64: func(v float64) bool { return v <= 10 }}
+	df.InPlace().Filter(map[string]FilterFn{"score": lte10})
 	df.InPlace().Sort(Sorter{Name: "name", DType: String})
 	return df.GroupBy("name").Mean("score")
 }

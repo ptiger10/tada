@@ -4048,21 +4048,6 @@ func Test_valueContainer_filter(t *testing.T) {
 		args   args
 		want   []int
 	}{
-		{"GreaterThan", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
-			args{FilterFn{GreaterThan: 1}},
-			[]int{2}},
-		{"LessThan", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
-			args{FilterFn{LessThan: 1}},
-			[]int{0}},
-		{"Contains", fields{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "foo"},
-			args{FilterFn{Contains: "b"}},
-			[]int{1, 2}},
-		{"Before", fields{slice: []time.Time{d.AddDate(0, 0, -1), d, d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false}, name: "foo"},
-			args{FilterFn{Before: d}},
-			[]int{0}},
-		{"After", fields{slice: []time.Time{d.AddDate(0, 0, -1), d, d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false}, name: "foo"},
-			args{FilterFn{After: d}},
-			[]int{2}},
 		{"Float64", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 			args{FilterFn{Float64: func(val float64) bool { return val > 1 }}},
 			[]int{2}},

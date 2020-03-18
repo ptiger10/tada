@@ -326,58 +326,6 @@ func TestDataFrame_Subset(t *testing.T) {
 	}
 }
 
-func TestReadCSVFromString(t *testing.T) {
-	type args struct {
-		data    string
-		options []func(*readConfig)
-	}
-	tests := []struct {
-		name    string
-		args    args
-		wantRet *DataFrame
-		wantErr bool
-	}{
-		{"pass",
-			args{"foo, bar\n 0, 1", nil},
-			&DataFrame{
-				values: []*valueContainer{
-					{slice: []string{"0"}, isNull: []bool{false}, name: "foo"},
-					{slice: []string{"1"}, isNull: []bool{false}, name: "bar"},
-				},
-				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			false,
-		},
-		{"fail - rows - misaligned",
-			args{"foo\n bar, baz", nil},
-			nil,
-			true,
-		},
-		{"fail - columns - misaligned",
-			args{"foo\n bar, baz", []func(*readConfig){ReadOptionSwitchDims()}},
-			nil,
-			true,
-		},
-		{"fail - empty",
-			args{"", nil},
-			nil,
-			true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotRet, err := ReadCSVFromString(tt.args.data, tt.args.options...)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ReadCSVFromString() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !EqualDataFrames(gotRet, tt.wantRet) {
-				t.Errorf("ReadCSVFromString() = %v, want %v", gotRet, tt.wantRet)
-			}
-		})
-	}
-}
-
 func TestReadCSV(t *testing.T) {
 	type args struct {
 		csv    [][]string
@@ -4565,6 +4513,78 @@ func TestDataFrame_NameOfColumn(t *testing.T) {
 			}
 			if got := df.NameOfColumn(tt.args.n); got != tt.want {
 				t.Errorf("DataFrame.NameOfColumn() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_SumColumns(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		name     string
+		colNames []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"pass",
+			fields{
+				values: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+					{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
+				},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{"sum", []string{"foo", "qux"}},
+			&Series{
+				values: &valueContainer{slice: []float64{0, 3}, isNull: []bool{true, false}, name: "sum"},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			}},
+		{"fail - bad name",
+			fields{
+				values: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+					{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
+				},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{"", []string{"corge", "qux"}},
+			&Series{
+				err: fmt.Errorf("SumColumns(): `name` (corge) not found"),
+			}},
+		{"fail - no columns",
+			fields{
+				values: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+					{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
+				},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{"", nil},
+			&Series{
+				err: fmt.Errorf("SumColumns(): `colNames` cannot be empty"),
+			}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.SumColumns(tt.args.name, tt.args.colNames...); !EqualSeries(got, tt.want) {
+				t.Errorf("DataFrame.SumColumns() = %v, want %v", got, tt.want)
 			}
 		})
 	}

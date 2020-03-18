@@ -626,7 +626,6 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 // Filter may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container.
-// Supplying a zero-value for a field is equivalent to leaving it blank (e.g., GreaterThan: 0).
 //
 // Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
 // For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
@@ -646,7 +645,6 @@ func (s *Series) Filter(filters map[string]FilterFn) *Series {
 // Filter may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container
-// Supplying a zero-value for a field is equivalent to leaving it blank (e.g., GreaterThan: 0).
 //
 // Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
 // For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,

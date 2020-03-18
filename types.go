@@ -1,7 +1,6 @@
 // Package tada (TAble DAta) enables test-driven data pipelines.
-// The key data structures are Series, DataFrames, and groupings of each.
-// tada combines concepts from popular spreadsheet applications, Python pandas, Apache Spark, and SQL.
-// The most common use cases for tada are exploring data, building extract, transform, and load (ETL) workflows, and automating analytics.
+// tada combines concepts from pandas, spreadsheets, R, Apache Spark, and SQL.
+// Its most common use cases are cleaning, aggregating, transforming, and analyzing data.
 // Some notable features of tada:
 // * flexible constructor that supports most primitive data types
 // * seamlessly handles null data and type conversions
@@ -9,6 +8,16 @@
 // * advanced filtering, grouping, sorting, and pivoting
 // * multi-level labels and columns
 // * complete test coverage
+//
+// The key data types are Series, DataFrames, and groupings of each.
+// A Series is analogous to one column of a spreadsheet, and a DataFrame is analogous to a whole spreadsheet.
+// Printing either data type will render an ASCII table.
+//
+// Both Series and DataFrames have one or more "label levels".
+// On printing, these appear as the leftmost columns in a table, and typically have values that help identify ("label") specific rows.
+// They are analogous to the "index" concept in pandas.
+//
+// For more detail and implementation notes, see [this doc](https://docs.google.com/document/d/18DvZzd6Tg6Bz0SX0fY2SrXOjE8d9xDhU6bDEnaIc_rM/edit?usp=sharing).
 package tada
 
 import (
@@ -130,15 +139,10 @@ type NullFiller struct {
 // Values are coerced to the type specified in the field (e.g., DateTime -> time.Time) before the filter function is evaluated.
 // Once it has been filtered, data retains its original type.
 type FilterFn struct {
-	GreaterThan float64
-	LessThan    float64
-	Contains    string
-	Before      time.Time
-	After       time.Time
-	Float64     func(val float64) bool
-	String      func(val string) bool
-	DateTime    func(val time.Time) bool
-	Interface   func(val interface{}) bool
+	Float64   func(val float64) bool
+	String    func(val string) bool
+	DateTime  func(val time.Time) bool
+	Interface func(val interface{}) bool
 }
 
 // An ApplyFn supplies logic to the Apply() function.

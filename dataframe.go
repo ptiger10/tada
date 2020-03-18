@@ -176,7 +176,7 @@ func ReadOptionLabels(n int) func(*readConfig) {
 	}
 }
 
-// ReadOptionDelimiter configures a read function to use `sep` as a field delimiter for use in ImportCSV or ReadCSVFromString (default: ",").
+// ReadOptionDelimiter configures a read function to use `sep` as a field delimiter for use in ImportCSV (default: ",").
 func ReadOptionDelimiter(sep rune) func(*readConfig) {
 	return func(r *readConfig) {
 		r.Delimiter = sep
@@ -197,31 +197,6 @@ func ReadOptionSwitchDims() func(*readConfig) {
 	return func(r *readConfig) {
 		r.MajorDimIsCols = true
 	}
-}
-
-// ReadCSVFromString reads a stringified csv table into a DataFrame (configured by `options`).
-// The major dimension of the table should be rows.
-// For advanced cases, use the standard csv library NewReader().ReadAll() + tada.ReadCSV().
-// Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionDelimiter.
-//
-// Default if no options are supplied:
-// 1 header row, no labels, field delimiter is ","
-func ReadCSVFromString(data string, options ...func(*readConfig)) (*DataFrame, error) {
-	if data == "" {
-		return nil, fmt.Errorf("ReadCSVFromString(): `data` cannot be empty")
-	}
-	config := setReadConfig(options)
-
-	reader := strings.NewReader(data)
-	r := csv.NewReader(reader)
-	r.TrimLeadingSpace = true
-	r.LazyQuotes = true
-	records, err := r.ReadAll()
-	if err != nil {
-		return nil, fmt.Errorf("ReadCSVFromString(): %v", err)
-	}
-	// should never return error because already checked for misalignment and empty string
-	return readCSVByRows(records, config)
 }
 
 // ReadCSV reads `data` into a DataFrame (configured by `options`).
@@ -1601,7 +1576,6 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 // which is a map of container names (either column or label names) and tada.FilterFn structs.
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container.
-// Supplying a zero-value for a field is equivalent to leaving it blank (e.g., GreaterThan: 0).
 //
 // Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
 // For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
@@ -1620,7 +1594,6 @@ func (df *DataFrame) Filter(filters map[string]FilterFn) *DataFrame {
 // which is a map of container names (either column or label names) and tada.FilterFn structs.
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container.
-// Supplying a zero-value for a field is equivalent to leaving it blank (e.g., GreaterThan: 0).
 //
 // Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
 // For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
@@ -2082,6 +2055,29 @@ func (df *DataFrame) math(name string, mathFunction func([]float64, []bool, []in
 		values: &valueContainer{slice: retVals, isNull: retNulls, name: name},
 		labels: []*valueContainer{{slice: labels, isNull: labelNulls, name: "*0"}},
 	}
+}
+
+// SumColumns finds each column matching a supplied `colName`, coerces its values to float64, and adds them row-wise.
+// The resulting Series is named `name`.
+// If any column has a null value for a given row, that row is considered null.
+func (df *DataFrame) SumColumns(name string, colNames ...string) *Series {
+	if len(colNames) == 0 {
+		return seriesWithError(fmt.Errorf("SumColumns(): `colNames` cannot be empty"))
+	}
+	var ret *Series
+	for i, name := range colNames {
+		_, err := indexOfContainer(name, df.values)
+		if err != nil {
+			return seriesWithError(fmt.Errorf("SumColumns(): %v", err))
+		}
+		if i == 0 {
+			ret = df.Col(name)
+		} else {
+			ret = ret.Add(df.Col(name), false)
+		}
+	}
+	ret.SetName(name)
+	return ret
 }
 
 // Sum coerces the values in each column to float64 and sums each column.
