@@ -14,10 +14,14 @@ func Test_TransformData(t *testing.T) {
 			jane doe, 10`
 
 	want := `name, mean_score
-						 john doe, 6
-						 jane doe, 9`
+			jane doe, 9
+			john doe, 6`
 
-	ret := exampleTransformData(data)
+	df, err := ReadCSVFromString(data)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ret := exampleTransformData(df)
 	ok, diffs, err := ret.EqualsCSVFromString(want, false)
 	if err != nil {
 		log.Fatal(err)
@@ -27,15 +31,12 @@ func Test_TransformData(t *testing.T) {
 	}
 }
 
-func exampleTransformData(data string) *DataFrame {
-	df, err := ReadCSVFromString(data)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = df.HasCols("name", "score")
+func exampleTransformData(df *DataFrame) *DataFrame {
+	err := df.HasCols("name", "score")
 	if err != nil {
 		log.Fatal(err)
 	}
 	df.InPlace().DropNull()
+	df.InPlace().Sort(Sorter{Name: "name", DType: String})
 	return df.GroupBy("name").Mean("score")
 }

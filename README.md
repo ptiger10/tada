@@ -15,16 +15,19 @@ var data = `name, score
             john doe, 7
             jane doe, 10`
 ```
-You want to write a validated automation that discards null data, groups by the `name` column, and returns the mean of the groups. 
+You want to write and validate a function that discards null data, groups by the `name` column, and returns the mean of the groups. 
 
 First you write a test:
 ```
 func Test_TransformData(t *testing.T) {
-  want := `name, mean
+  want := `name, mean_score
            jane doe, 9
            john doe, 6`
 
-  ret := TransformData(data)
+  df, err := tada.ReadCSVFromString(data)
+    ... handle err
+
+  ret := TransformData(df)
   ok, diffs, err := ret.EqualsCSVFromString(want)
   ... handle err
   if !ok {
@@ -35,12 +38,11 @@ func Test_TransformData(t *testing.T) {
 
 Then you write the transformation steps:
 ```
-func TransformData(data string) *tada.DataFrame {
-  df, err := tada.ReadCSVFromString(data)
-    ... handle err
-  err = df.HasCols("name", "score")
+func TransformData(df *tada.DataFrame) *tada.DataFrame {
+  err := df.HasCols("name", "score")
     ... handle err
   df.InPlace().DropNull()
+  df.InPlace().Sort(tada.Sorter{Name: "name", DType: tada.String})
   return df.GroupBy("name").Mean("score")
 }
 ```
