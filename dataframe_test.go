@@ -397,6 +397,58 @@ func TestReadCSV(t *testing.T) {
 	}
 }
 
+func TestReadCSVFromString(t *testing.T) {
+	type args struct {
+		data    string
+		options []func(*readConfig)
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantRet *DataFrame
+		wantErr bool
+	}{
+		{"pass",
+			args{"foo, bar\n 0, 1", nil},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"0"}, isNull: []bool{false}, name: "foo"},
+					{slice: []string{"1"}, isNull: []bool{false}, name: "bar"},
+				},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			false,
+		},
+		{"fail - rows - misaligned",
+			args{"foo\n bar, baz", nil},
+			nil,
+			true,
+		},
+		{"fail - columns - misaligned",
+			args{"foo\n bar, baz", []func(*readConfig){ReadOptionSwitchDims()}},
+			nil,
+			true,
+		},
+		{"fail - empty",
+			args{"", nil},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRet, err := ReadCSVFromString(tt.args.data, tt.args.options...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReadCSVFromString() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !EqualDataFrames(gotRet, tt.wantRet) {
+				t.Errorf("ReadCSVFromString() = %v, want %v", gotRet, tt.wantRet)
+			}
+		})
+	}
+}
+
 func TestDataFrame_SubsetLabels(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer

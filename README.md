@@ -11,6 +11,7 @@ Some notable features of tada:
 * advanced filtering, grouping, sorting, and pivoting
 * multi-level labels and columns
 * complete test coverage
+* comparable to pandas [performance](comparison_summary.txt) on key operations
 
 The key data types are Series, DataFrames, and groupings of each.
 A Series is analogous to one column of a spreadsheet, and a DataFrame is analogous to a whole spreadsheet.
@@ -44,12 +45,7 @@ func Test_TransformData(t *testing.T) {
            jane doe, 9
            john doe, 6`
 
-  r := strings.NewReader(data)
-	cr := csv.NewReader(r)
-	cr.TrimLeadingSpace = true
-	records, err := cr.ReadAll()
-    ... handle err
-  df, err := tada.ReadCSV(records)
+  df, err := tada.ReadCSVFromString(records)
     ... handle err
 
   ret := TransformData(df)

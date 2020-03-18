@@ -176,7 +176,7 @@ func ReadOptionLabels(n int) func(*readConfig) {
 	}
 }
 
-// ReadOptionDelimiter configures a read function to use `sep` as a field delimiter for use in ImportCSV (default: ",").
+// ReadOptionDelimiter configures a read function to use `sep` as a field delimiter for use in ImportCSV or ReadCSVFromString (default: ",").
 func ReadOptionDelimiter(sep rune) func(*readConfig) {
 	return func(r *readConfig) {
 		r.Delimiter = sep
@@ -224,6 +224,32 @@ func ReadCSV(data [][]string, options ...func(*readConfig)) (ret *DataFrame, err
 		return nil, fmt.Errorf("ReadCSV(): %v", err)
 	}
 	return ret, nil
+}
+
+// ReadCSVFromString reads a stringified csv table into a DataFrame (configured by `options`).
+// This function is most commonly used in conjuction with calling WriteMockCSV(), saving the result as a string, and then reading a DataFrame from that string within a test.
+// The major dimension of the table should be rows.
+// For advanced cases, use the standard csv library NewReader().ReadAll() + tada.ReadCSV().
+// Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionDelimiter.
+//
+// Default if no options are supplied:
+// 1 header row, no labels, field delimiter is ","
+func ReadCSVFromString(data string, options ...func(*readConfig)) (*DataFrame, error) {
+	if data == "" {
+		return nil, fmt.Errorf("ReadCSVFromString(): `data` cannot be empty")
+	}
+	config := setReadConfig(options)
+
+	reader := strings.NewReader(data)
+	r := csv.NewReader(reader)
+	r.TrimLeadingSpace = true
+	r.LazyQuotes = true
+	records, err := r.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("ReadCSVFromString(): %v", err)
+	}
+	// should never return error because already checked for misalignment and empty string
+	return readCSVByRows(records, config)
 }
 
 // ImportCSV reads the file at `path` into a Dataframe (configured by `options`).

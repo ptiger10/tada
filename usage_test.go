@@ -10,7 +10,7 @@ import (
 func Test_TransformData(t *testing.T) {
 	data := `name, score
 			joe doe,
-			john doe, 100
+			john doe, -100
             john doe, 6
 			jane doe, 8
             john doe, 4
@@ -45,8 +45,8 @@ func exampleTransformData(df *DataFrame) *DataFrame {
 		log.Fatal(err)
 	}
 	df.InPlace().DropNull()
-	lte10 := FilterFn{Float64: func(v float64) bool { return v <= 10 }}
-	df.InPlace().Filter(map[string]FilterFn{"score": lte10})
+	validScore := FilterFn{Float64: func(v float64) bool { return v >= 0 && v <= 10 }}
+	df.InPlace().Filter(map[string]FilterFn{"score": validScore})
 	df.InPlace().Sort(Sorter{Name: "name", DType: String})
 	return df.GroupBy("name").Mean("score")
 }
