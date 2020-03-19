@@ -2,6 +2,8 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/ptiger10/tada)](https://goreportcard.com/report/github.com/ptiger10/tada) 
 [![GoDoc](https://godoc.org/github.com/ptiger10/tada?status.svg)](https://godoc.org/github.com/ptiger10/tada) 
+[![Build Status](https://travis-ci.org/ptiger10/tada.svg?branch=master)](https://travis-ci.org/ptiger10/tada)
+[![codecov](https://codecov.io/gh/ptiger10/tada/branch/master/graph/badge.svg)](https://codecov.io/gh/ptiger10/tada)
 
 # tada
 tada (TAble DAta) is a package that enables test-driven data pipelines in pure Go.
