@@ -1,3 +1,8 @@
+![tada logo](logo.png)
+
+[![Go Report Card](https://goreportcard.com/badge/github.com/ptiger10/tada)](https://goreportcard.com/report/github.com/ptiger10/tada) 
+[![GoDoc](https://godoc.org/github.com/ptiger10/tada?status.svg)](https://godoc.org/github.com/ptiger10/tada) 
+
 # tada
 Package tada (TAble DAta) enables test-driven data pipelines in pure Go.
 
@@ -107,6 +112,7 @@ Extended [tutorial](tutorial.ipynb)
 ## Using with Jupyter notebooks
 * Follow the instructions for installing [gophernotes](https://github.com/gopherdata/gophernotes), including jupyter.
 * Install tada globally: `$ go get -u github.com/ptiger10/tada`
+* Whenever you update tada, 
 * `$ jupyter notebook` (should launch a window in your default browser)
 * From Home screen -> New -> Go
 
@@ -114,5 +120,5 @@ One of the biggest limitations of gophernotes is that it does not provide signat
 
 [Sample Notebook](tutorial.ipynb)
 
-
+Logo: @egonelbre, licensed under CC0
 

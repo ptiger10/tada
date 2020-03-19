@@ -1,9 +1,7 @@
 package tada
 
 import (
-	"encoding/csv"
 	"log"
-	"strings"
 	"testing"
 )
 
@@ -11,6 +9,7 @@ func Test_TransformData(t *testing.T) {
 	data := `name, score
 			joe doe,
 			john doe, -100
+			jane doe, 1000
             john doe, 6
 			jane doe, 8
             john doe, 4
@@ -20,12 +19,7 @@ func Test_TransformData(t *testing.T) {
 			jane doe, 9
 			john doe, 5`
 
-	r := strings.NewReader(data)
-	cr := csv.NewReader(r)
-	cr.TrimLeadingSpace = true
-	records, err := cr.ReadAll()
-
-	df, err := ReadCSV(records)
+	df, err := ReadCSVFromString(data)
 	if err != nil {
 		log.Fatal(err)
 	}

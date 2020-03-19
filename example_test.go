@@ -7,6 +7,21 @@ import (
 )
 
 func ExampleDataFrame() {
+	df := NewDataFrame([]interface{}{
+		[]float64{1, 2}, []string{"baz", "qux"}},
+	).
+		SetColNames([]string{"foo", "bar"})
+	fmt.Println(df)
+	// Output:
+	// +---++-----+-----+
+	// | - || foo | bar |
+	// |---||-----|-----|
+	// | 0 ||   1 | baz |
+	// | 1 ||   2 | qux |
+	// +---++-----+-----+
+}
+
+func ExampleDataFrame_withLabel() {
 	df := NewDataFrame([]interface{}{[]float64{1, 2}, []string{"foo", "bar"}}).
 		SetColNames([]string{"a", "b"}).
 		SetLabelNames([]string{"baz"}).
@@ -115,15 +130,15 @@ func ExampleSeries_null() {
 }
 
 func ExampleSeries() {
-	s := NewSeries([]float64{1, 2}, []string{"foo", "foo"}).SetName("A")
+	s := NewSeries([]float64{1, 2}).SetName("foo")
 	fmt.Println(s)
 	// Output:
-	// +-----++---+
-	// |  -  || A |
-	// |-----||---|
-	// | foo || 1 |
-	// |     || 2 |
-	// +-----++---+
+	// +---++-----+
+	// | - || foo |
+	// |---||-----|
+	// | 0 ||   1 |
+	// | 1 ||   2 |
+	// +---++-----+
 }
 
 func ExampleGroupedSeries() {

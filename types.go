@@ -4,7 +4,7 @@
 // Some notable features of tada:
 // * flexible constructor that supports most primitive data types
 // * seamlessly handles null data and type conversions
-// * well-suited to conventional IDE-based programming, but also supports exploratory notebook usage
+// * well-suited to conventional IDE-based programming, but also supports notebook usage
 // * advanced filtering, grouping, sorting, and pivoting
 // * multi-level labels and columns
 // * complete test coverage

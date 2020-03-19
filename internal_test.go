@@ -4143,8 +4143,8 @@ func Test_filter(t *testing.T) {
 				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
 				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
 			map[string]FilterFn{
-				"qux": FilterFn{Float64: func(val float64) bool { return val >= 1 }},
-				"bar": FilterFn{String: func(val string) bool { return val == "foo" }},
+				"qux": {Float64: func(val float64) bool { return val >= 1 }},
+				"bar": {String: func(val string) bool { return val == "foo" }},
 			}},
 			[]int{1},
 			false},
@@ -4153,7 +4153,7 @@ func Test_filter(t *testing.T) {
 				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
 				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
 			map[string]FilterFn{
-				"corge": FilterFn{Float64: func(val float64) bool { return val >= 1 }},
+				"corge": {Float64: func(val float64) bool { return val >= 1 }},
 			}},
 			nil,
 			true},
@@ -4162,7 +4162,7 @@ func Test_filter(t *testing.T) {
 				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
 				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
 			map[string]FilterFn{
-				"qux": FilterFn{},
+				"qux": {},
 			}},
 			nil,
 			true},
