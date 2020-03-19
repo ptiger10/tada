@@ -1,6 +1,6 @@
 module github.com/ptiger10/tada
 
-go 1.12
+go 1.14
 
 require (
 	github.com/ptiger10/tablediff v0.2.0
