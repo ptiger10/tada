@@ -2055,23 +2055,31 @@ func (df *DataFrame) dropColLevel(level int) *DataFrame {
 
 // -- ITERATORS
 
-// IterRows returns a slice of maps that return the underlying data for every row in the DataFrame.
-// The key in each map is a column header, including label level headers.
-// The value in each map is an Element containing an interface value and whether or not the value is null.
-// If multiple label levels or columns have the same header, only the Elements of the right-most column are returned.
-func (df *DataFrame) IterRows() []map[string]Element {
-	ret := make([]map[string]Element, df.Len())
-	for i := 0; i < df.Len(); i++ {
-		// all label levels + all columns
-		ret[i] = make(map[string]Element, df.numLevels()+len(df.values))
-		for j := range df.labels {
-			key := df.labels[j].name
-			ret[i][key] = df.labels[j].iterRow(i)
-		}
-		for k := range df.values {
-			key := df.values[k].name
-			ret[i][key] = df.values[k].iterRow(i)
-		}
+// Iterator returns an iterator which may be used to access the values in each row as map[string]Element.
+func (df *DataFrame) Iterator() *DataFrameIterator {
+	return &DataFrameIterator{
+		current: -1,
+		df:      df,
+	}
+}
+
+// Next advances to next row. Returns false at end of iteration.
+func (iter *DataFrameIterator) Next() bool {
+	iter.current++
+	return iter.current < iter.df.Len()
+}
+
+// Row returns the current row in the DataFrame as map[string]Element.
+// The map keys are the names of containers (including label levels).
+// The value in each map is an Element containing an interface value and a boolean denoting if the value is null.
+// If multiple columns have the same header, only the Elements of the left-most column are returned.
+func (iter *DataFrameIterator) Row() map[string]Element {
+	ret := make(map[string]Element)
+	for k := iter.df.numColumns() - 1; k >= 0; k-- {
+		ret[iter.df.values[k].name] = iter.df.values[k].iterRow(iter.current)
+	}
+	for j := iter.df.numLevels() - 1; j >= 0; j-- {
+		ret[iter.df.labels[j].name] = iter.df.labels[j].iterRow(iter.current)
 	}
 	return ret
 }

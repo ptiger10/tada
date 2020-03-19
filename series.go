@@ -123,7 +123,7 @@ func (s *Series) Len() int {
 	return reflect.ValueOf(s.values.slice).Len()
 }
 
-// numLevels returns the number of columns of labels in the Series.
+// numLevels returns the number of label levels in the Series.
 func (s *Series) numLevels() int {
 	return len(s.labels)
 }
@@ -961,20 +961,30 @@ func (s *Series) GroupBy(names ...string) *GroupedSeries {
 
 // -- ITERATORS
 
-// IterRows returns a slice of maps that return the underlying data for every row in the Series.
-// The key in each map is a column header, including label level headers.
-// The name of the main values header is the same as the name of the Series itself.
-// The value in each map is an Element containing an interface value and a bool denoting if the value is null.
-// If multiple columns have the same header, only the Elements of the right-most column are returned.
-func (s *Series) IterRows() []map[string]Element {
-	ret := make([]map[string]Element, s.Len())
-	for i := 0; i < s.Len(); i++ {
-		// all label levels + the main Series values
-		ret[i] = make(map[string]Element, s.numLevels()+1)
-		for j := range s.labels {
-			ret[i][s.labels[j].name] = s.labels[j].iterRow(i)
-		}
-		ret[i][s.values.name] = s.values.iterRow(i)
+// Iterator returns an iterator which may be used to access the values in each row as map[string]Element.
+func (s *Series) Iterator() *SeriesIterator {
+	return &SeriesIterator{
+		current: -1,
+		s:       s,
+	}
+}
+
+// Next advances to next row. Returns false at end of iteration.
+func (iter *SeriesIterator) Next() bool {
+	iter.current++
+	return iter.current < iter.s.Len()
+}
+
+// Row returns the current row in the Series as map[string]Element.
+// The map keys are the names of containers (including label levels).
+// The name of the Series values column is the same as the name of the Series itself.
+// The value in each map is an Element containing an interface value and a boolean denoting if the value is null.
+// If multiple columns have the same header, only the Elements of the left-most column are returned.
+func (iter *SeriesIterator) Row() map[string]Element {
+	ret := make(map[string]Element)
+	ret[iter.s.values.name] = iter.s.values.iterRow(iter.current)
+	for j := iter.s.numLevels() - 1; j >= 0; j-- {
+		ret[iter.s.labels[j].name] = iter.s.labels[j].iterRow(iter.current)
 	}
 	return ret
 }

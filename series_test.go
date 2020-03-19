@@ -1285,49 +1285,6 @@ func TestSeries_Filter(t *testing.T) {
 	}
 }
 
-func TestSeries_IterRows(t *testing.T) {
-	type fields struct {
-		values *valueContainer
-		labels []*valueContainer
-		err    error
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   []map[string]Element
-	}{
-		{"single label level, named values", fields{
-			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
-			labels: []*valueContainer{{name: "*0", slice: []string{"bar", ""}, isNull: []bool{false, true}}}},
-			[]map[string]Element{
-				{"foo": Element{float64(1), false}, "*0": Element{"bar", false}},
-				{"foo": Element{float64(2), false}, "*0": Element{"", true}},
-			}},
-		{"multi label levels, unnamed values", fields{
-			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
-			labels: []*valueContainer{
-				{name: "*0", slice: []string{"bar", ""}, isNull: []bool{false, true}},
-				{name: "*1", slice: []string{"foo", "baz"}, isNull: []bool{false, false}},
-			}},
-			[]map[string]Element{
-				{"": Element{float64(1), false}, "*0": Element{"bar", false}, "*1": Element{"foo", false}},
-				{"": Element{float64(2), false}, "*0": Element{"", true}, "*1": Element{"baz", false}},
-			}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values: tt.fields.values,
-				labels: tt.fields.labels,
-				err:    tt.fields.err,
-			}
-			if got := s.IterRows(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.IterRows() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestSeries_LookupAdvanced(t *testing.T) {
 	type fields struct {
 		values *valueContainer
@@ -3329,6 +3286,116 @@ func TestSeries_NameOfLabel(t *testing.T) {
 			}
 			if got := s.NameOfLabel(tt.args.n); got != tt.want {
 				t.Errorf("Series.NameOfLabel() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Iterator(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *SeriesIterator
+	}{
+		{"pass",
+			fields{
+				values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
+			&SeriesIterator{
+				current: -1,
+				s: &Series{values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+					labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}},
+				}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			got := s.Iterator()
+			if got.current != tt.want.current {
+				t.Errorf("Series.Iterator() = %v, want %v", got.current, tt.want.current)
+			}
+			if !EqualSeries(got.s, tt.want.s) {
+				t.Errorf("Series.Iterator() = %v, want %v", got.s, tt.want.s)
+			}
+		})
+	}
+}
+
+func TestSeriesIterator_Next(t *testing.T) {
+	type fields struct {
+		current int
+		s       *Series
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   bool
+	}{
+		{"not at end", fields{
+			current: -1,
+			s: &Series{values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}},
+			}},
+			true,
+		},
+		{"at end", fields{
+			current: 0,
+			s: &Series{values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}},
+			}},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			iter := &SeriesIterator{
+				current: tt.fields.current,
+				s:       tt.fields.s,
+			}
+			if got := iter.Next(); got != tt.want {
+				t.Errorf("SeriesIterator.Next() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeriesIterator_Row(t *testing.T) {
+	type fields struct {
+		current int
+		s       *Series
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   map[string]Element
+	}{
+		{"pass",
+			fields{0, &Series{values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}},
+			}},
+			map[string]Element{"foo": Element{float64(0), false}, "qux": Element{int(0), false}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			iter := &SeriesIterator{
+				current: tt.fields.current,
+				s:       tt.fields.s,
+			}
+			if got := iter.Row(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("SeriesIterator.Row() = %v, want %v", got, tt.want)
 			}
 		})
 	}

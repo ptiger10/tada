@@ -48,6 +48,12 @@ type Series struct {
 	err        error
 }
 
+// A SeriesIterator iterates over the rows in a Series.
+type SeriesIterator struct {
+	current int
+	s       *Series
+}
+
 // A SeriesMutator is used to change Series values in place.
 type SeriesMutator struct {
 	series *Series
@@ -61,6 +67,12 @@ type DataFrame struct {
 	name          string
 	err           error
 	colLevelNames []string
+}
+
+// A DataFrameIterator iterates over the rows in a DataFrame.
+type DataFrameIterator struct {
+	current int
+	df      *DataFrame
 }
 
 // A DataFrameMutator is used to change DataFrame values in place.

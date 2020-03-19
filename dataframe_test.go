@@ -1842,41 +1842,6 @@ func TestDataFrame_Sort(t *testing.T) {
 	}
 }
 
-func TestDataFrame_IterRows(t *testing.T) {
-	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		want   []map[string]Element
-	}{
-		{"single label level, named values", fields{
-			values: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"}},
-			labels: []*valueContainer{{name: "*0", slice: []string{"bar", ""}, isNull: []bool{false, true}}}},
-			[]map[string]Element{
-				{"foo": Element{float64(1), false}, "*0": Element{"bar", false}},
-				{"foo": Element{float64(2), false}, "*0": Element{"", true}},
-			}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
-			}
-			if got := df.IterRows(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.IterRows() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestDataFrame_Sum(t *testing.T) {
 	type fields struct {
 		labels []*valueContainer
@@ -4743,6 +4708,145 @@ func Test_listNamesAtLevel(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("listNamesAtLevel() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_Iterator(t *testing.T) {
+	type fields struct {
+		values        []*valueContainer
+		labels        []*valueContainer
+		name          string
+		colLevelNames []string
+		err           error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *DataFrameIterator
+	}{
+		{"pass",
+			fields{
+				values: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+					{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
+				},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				name:          "foo",
+				colLevelNames: []string{"*0"}},
+			&DataFrameIterator{
+				current: -1,
+				df: &DataFrame{
+					values: []*valueContainer{
+						{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+						{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
+					},
+					labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+					name:          "foo",
+					colLevelNames: []string{"*0"},
+				}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				values:        tt.fields.values,
+				labels:        tt.fields.labels,
+				name:          tt.fields.name,
+				colLevelNames: tt.fields.colLevelNames,
+				err:           tt.fields.err,
+			}
+			got := df.Iterator()
+			if got.current != tt.want.current {
+				t.Errorf("DataFrame.Iterator() = %v, want %v", got.current, tt.want.current)
+			}
+			if !EqualDataFrames(got.df, tt.want.df) {
+				t.Errorf("DataFrame.Iterator() = %v, want %v", got.df, tt.want.df)
+			}
+		})
+	}
+}
+
+func TestDataFrameIterator_Next(t *testing.T) {
+	type fields struct {
+		current int
+		df      *DataFrame
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   bool
+	}{
+		{"not at end", fields{
+			current: -1,
+			df: &DataFrame{
+				values: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+					{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
+				},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				name:          "foo",
+				colLevelNames: []string{"*0"}}},
+			true,
+		},
+		{"at end", fields{
+			current: 1,
+			df: &DataFrame{values: []*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
+			},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				name:          "foo",
+				colLevelNames: []string{"*0"}}},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			iter := &DataFrameIterator{
+				current: tt.fields.current,
+				df:      tt.fields.df,
+			}
+			if got := iter.Next(); got != tt.want {
+				t.Errorf("DataFrameIterator.Next() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrameIterator_Row(t *testing.T) {
+	type fields struct {
+		current int
+		df      *DataFrame
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   map[string]Element
+	}{
+		{"pass",
+			fields{
+				current: 0,
+				df: &DataFrame{
+					values: []*valueContainer{
+						{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+						{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
+					},
+					labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+					name:          "foo",
+					colLevelNames: []string{"*0"}}},
+			map[string]Element{"foo": Element{int(0), true}, "qux": Element{float64(1), false}, "*0": Element{int(0), false}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			iter := &DataFrameIterator{
+				current: tt.fields.current,
+				df:      tt.fields.df,
+			}
+			if got := iter.Row(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrameIterator.Row() = %v, want %v", got, tt.want)
 			}
 		})
 	}
