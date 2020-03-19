@@ -2919,7 +2919,7 @@ func TestGroupedDataFrame_GetGroup(t *testing.T) {
 	}
 }
 
-func TestGroupedSeries_IterGroups(t *testing.T) {
+func TestGroupedSeries_Iterator(t *testing.T) {
 	type fields struct {
 		orderedKeys []string
 		rowIndices  [][]int
@@ -2931,23 +2931,24 @@ func TestGroupedSeries_IterGroups(t *testing.T) {
 	tests := []struct {
 		name   string
 		fields fields
-		want   []*Series
+		want   *GroupedSeriesIterator
 	}{
-		{fields: fields{
-			orderedKeys: []string{"foo", "bar"},
-			rowIndices:  [][]int{{0, 1}, {2, 3}},
-			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
-			series: &Series{
-				values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			want: []*Series{
-				{values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
+		{"pass",
+			fields{
+				orderedKeys: []string{"foo", "bar"},
+				rowIndices:  [][]int{{0, 1}, {2, 3}},
+				labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				series: &Series{
+					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
 					labels: []*valueContainer{
-						{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "*0"}}},
-				{values: &valueContainer{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "qux"},
+						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			&GroupedSeriesIterator{
+				current:    -1,
+				rowIndices: [][]int{{0, 1}, {2, 3}},
+				s: &Series{
+					values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
 					labels: []*valueContainer{
-						{slice: []string{"bar", "bar"}, isNull: []bool{false, false}, name: "*0"}}},
+						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}},
 			}},
 	}
 	for _, tt := range tests {
@@ -2960,11 +2961,92 @@ func TestGroupedSeries_IterGroups(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			got := g.IterGroups()
-			for k := range got {
-				if !EqualSeries(got[k], tt.want[k]) {
-					t.Errorf("GroupedSeries.IterGroups() = %v, want %v", got, tt.want)
-				}
+			got := g.Iterator()
+			if !reflect.DeepEqual(got.current, tt.want.current) {
+				t.Errorf("GroupedSeries.Iterator() = %v, want %v", got.current, tt.want.current)
+			}
+			if !reflect.DeepEqual(got.rowIndices, tt.want.rowIndices) {
+				t.Errorf("GroupedSeries.Iterator() = %v, want %v", got.rowIndices, tt.want.rowIndices)
+			}
+			if !EqualSeries(got.s, tt.want.s) {
+				t.Errorf("GroupedSeries.Iterator() = %v, want %v", got.s, tt.want.s)
+			}
+		})
+	}
+}
+
+func TestGroupedSeriesIterator_Next(t *testing.T) {
+	type fields struct {
+		current    int
+		rowIndices [][]int
+		s          *Series
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   bool
+	}{
+		{"not at end", fields{current: -1,
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+			s: &Series{
+				values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}},
+		}, true},
+		{"at end", fields{current: 1,
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+			s: &Series{
+				values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}},
+		}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeriesIterator{
+				current:    tt.fields.current,
+				rowIndices: tt.fields.rowIndices,
+				s:          tt.fields.s,
+			}
+			if got := g.Next(); got != tt.want {
+				t.Errorf("GroupedSeriesIterator.Next() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGroupedSeriesIterator_Series(t *testing.T) {
+	type fields struct {
+		current    int
+		rowIndices [][]int
+		s          *Series
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass", fields{current: 0,
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+			s: &Series{
+				values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}},
+		}, &Series{
+			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
+			labels: []*valueContainer{
+				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "*0"}}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeriesIterator{
+				current:    tt.fields.current,
+				rowIndices: tt.fields.rowIndices,
+				s:          tt.fields.s,
+			}
+			if got := g.Series(); !EqualSeries(got, tt.want) {
+				t.Errorf("GroupedSeriesIterator.Series() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -3011,7 +3093,7 @@ func TestGroupedSeries_ListGroups(t *testing.T) {
 	}
 }
 
-func TestGroupedDataFrame_IterGroups(t *testing.T) {
+func TestGroupedDataFrame_Iterator(t *testing.T) {
 	type fields struct {
 		orderedKeys []string
 		rowIndices  [][]int
@@ -3022,10 +3104,10 @@ func TestGroupedDataFrame_IterGroups(t *testing.T) {
 	tests := []struct {
 		name   string
 		fields fields
-		want   []*DataFrame
+		want   *GroupedDataFrameIterator
 	}{
-		{name: "single level",
-			fields: fields{
+		{"pass",
+			fields{
 				rowIndices:  [][]int{{0, 1}, {2, 3}},
 				orderedKeys: []string{"foo", "bar"},
 				labels: []*valueContainer{
@@ -3035,14 +3117,14 @@ func TestGroupedDataFrame_IterGroups(t *testing.T) {
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
 					colLevelNames: []string{"*0"}}},
-			want: []*DataFrame{
-				{values: []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "baz"}},
-					labels:        []*valueContainer{{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "*0"}},
-					colLevelNames: []string{"*0"}},
-				{values: []*valueContainer{{slice: []string{"c", "d"}, isNull: []bool{false, false}, name: "baz"}},
-					labels:        []*valueContainer{{slice: []string{"bar", "bar"}, isNull: []bool{false, false}, name: "*0"}},
-					colLevelNames: []string{"*0"}},
-			},
+			&GroupedDataFrameIterator{
+				current:    -1,
+				rowIndices: [][]int{{0, 1}, {2, 3}},
+				df: &DataFrame{values: []*valueContainer{
+					{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "baz"}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+					colLevelNames: []string{"*0"}}},
 		},
 	}
 	for _, tt := range tests {
@@ -3054,11 +3136,96 @@ func TestGroupedDataFrame_IterGroups(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			got := g.IterGroups()
-			for k := range got {
-				if !EqualDataFrames(got[k], tt.want[k]) {
-					t.Errorf("GroupedDataFrame.IterGroups() = %v, want %v", got, tt.want)
-				}
+			got := g.Iterator()
+			if !reflect.DeepEqual(got.current, tt.want.current) {
+				t.Errorf("GroupedDataFrame.Iterator() = %v, want %v", got.current, tt.want.current)
+			}
+			if !reflect.DeepEqual(got.rowIndices, tt.want.rowIndices) {
+				t.Errorf("GroupedDataFrame.Iterator() = %v, want %v", got.rowIndices, tt.want.rowIndices)
+			}
+			if !EqualDataFrames(got.df, tt.want.df) {
+				t.Errorf("GroupedDataFrame.Iterator() = %v, want %v", got.df, tt.want.df)
+			}
+		})
+	}
+}
+
+func TestGroupedDataFrameIterator_Next(t *testing.T) {
+	type fields struct {
+		current    int
+		rowIndices [][]int
+		df         *DataFrame
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   bool
+	}{
+		{"not at end", fields{current: -1,
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+			df: &DataFrame{values: []*valueContainer{
+				{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "baz"}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+		}, true},
+		{"at end", fields{current: 1,
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+			df: &DataFrame{values: []*valueContainer{
+				{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "baz"}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+		}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedDataFrameIterator{
+				current:    tt.fields.current,
+				rowIndices: tt.fields.rowIndices,
+				df:         tt.fields.df,
+			}
+			if got := g.Next(); got != tt.want {
+				t.Errorf("GroupedDataFrameIterator.Next() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGroupedDataFrameIterator_DataFrame(t *testing.T) {
+	type fields struct {
+		current    int
+		rowIndices [][]int
+		df         *DataFrame
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *DataFrame
+	}{
+		{"pass", fields{current: 0,
+			rowIndices: [][]int{{0, 1}, {2, 3}},
+			df: &DataFrame{values: []*valueContainer{
+				{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "baz"}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+		}, &DataFrame{values: []*valueContainer{
+			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "baz"}},
+			labels: []*valueContainer{
+				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedDataFrameIterator{
+				current:    tt.fields.current,
+				rowIndices: tt.fields.rowIndices,
+				df:         tt.fields.df,
+			}
+			if got := g.DataFrame(); !EqualDataFrames(got, tt.want) {
+				t.Errorf("GroupedDataFrameIterator.DataFrame() = %v, want %v", got, tt.want)
 			}
 		})
 	}

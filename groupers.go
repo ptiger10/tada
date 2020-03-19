@@ -31,9 +31,9 @@ func (g *GroupedSeries) String() string {
 
 // GetGroup returns the grouped rows sharing the same `group` key as a new Series.
 func (g *GroupedSeries) GetGroup(group string) *Series {
-	for m, key := range g.orderedKeys {
+	for i, key := range g.orderedKeys {
 		if key == group {
-			return g.series.Subset(g.rowIndices[m])
+			return g.series.Subset(g.rowIndices[i])
 		}
 	}
 	return seriesWithError(fmt.Errorf("GetGroup(): `group` (%v) not in groups", group))
@@ -319,13 +319,24 @@ func (s *Series) RollingDuration(d time.Duration) *GroupedSeries {
 	}
 }
 
-// IterGroups returns an iterator which may be used to access each group of rows as a new Series, in the order in which the groups originally appeared.
-func (g *GroupedSeries) IterGroups() []*Series {
-	ret := make([]*Series, len(g.rowIndices))
-	for m, key := range g.orderedKeys {
-		ret[m] = g.GetGroup(key)
+// Next advances to next grouped Series. Returns false at end of iteration.
+func (g *GroupedSeriesIterator) Next() bool {
+	g.current++
+	return g.current < len(g.rowIndices)
+}
+
+// Series returns the current grouped Series.
+func (g *GroupedSeriesIterator) Series() *Series {
+	return g.s.Subset(g.rowIndices[g.current])
+}
+
+// Iterator returns an iterator which may be used to access each group of rows as a new Series, in the order in which the groups originally appeared.
+func (g *GroupedSeries) Iterator() *GroupedSeriesIterator {
+	return &GroupedSeriesIterator{
+		current:    -1,
+		rowIndices: g.rowIndices,
+		s:          g.series,
 	}
-	return ret
 }
 
 // Len returns the number of group labels.
@@ -430,9 +441,9 @@ func (g *GroupedDataFrame) countReduceFunc(name string, cols []string, fn func(i
 
 // GetGroup returns the grouped rows sharing the same `group` key as a new DataFrame.
 func (g *GroupedDataFrame) GetGroup(group string) *DataFrame {
-	for m, key := range g.orderedKeys {
+	for i, key := range g.orderedKeys {
 		if key == group {
-			return g.df.Subset(g.rowIndices[m])
+			return g.df.Subset(g.rowIndices[i])
 		}
 	}
 	return dataFrameWithError(fmt.Errorf("GetGroup(): `group` (%v) not in groups", group))
@@ -572,14 +583,24 @@ func (g *GroupedDataFrame) HavingCount(lambda func(int) bool) *GroupedDataFrame 
 	}
 }
 
-// IterGroups returns an iterator which may be used to access each group of rows as a new DataFrame,
-// in the order in which the groups originally appeared.
-func (g *GroupedDataFrame) IterGroups() []*DataFrame {
-	ret := make([]*DataFrame, len(g.rowIndices))
-	for m, key := range g.orderedKeys {
-		ret[m] = g.GetGroup(key)
+// Next advances to next grouped DataFrame. Returns false at end of iteration.
+func (g *GroupedDataFrameIterator) Next() bool {
+	g.current++
+	return g.current < len(g.rowIndices)
+}
+
+// DataFrame returns the current grouped DataFrame.
+func (g *GroupedDataFrameIterator) DataFrame() *DataFrame {
+	return g.df.Subset(g.rowIndices[g.current])
+}
+
+// Iterator returns an iterator which may be used to access each group of rows as a new DataFrame, in the order in which the groups originally appeared.
+func (g *GroupedDataFrame) Iterator() *GroupedDataFrameIterator {
+	return &GroupedDataFrameIterator{
+		current:    -1,
+		rowIndices: g.rowIndices,
+		df:         g.df,
 	}
-	return ret
 }
 
 // ListGroups returns a list of group keys in the order in which they originally appeared.

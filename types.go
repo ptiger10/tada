@@ -10,6 +10,8 @@
 //
 // * well-suited to conventional IDE-based programming, but also supports notebook usage
 //
+// * robust datetime support
+//
 // * advanced filtering, grouping, sorting, and pivoting
 //
 // * multi-level labels and columns
@@ -77,6 +79,13 @@ type GroupedSeries struct {
 	err         error
 }
 
+// GroupedSeriesIterator iterates over all Series in the group.
+type GroupedSeriesIterator struct {
+	current    int
+	rowIndices [][]int
+	s          *Series
+}
+
 // A GroupedDataFrame is a collection of row positions sharing the same group key.
 // A GroupedDataFrame has a reference to an underlying DataFrame, which is used for reduce operations.
 type GroupedDataFrame struct {
@@ -85,6 +94,13 @@ type GroupedDataFrame struct {
 	labels      []*valueContainer
 	df          *DataFrame
 	err         error
+}
+
+// GroupedDataFrameIterator iterates over all DataFrames in the group.
+type GroupedDataFrameIterator struct {
+	current    int
+	rowIndices [][]int
+	df         *DataFrame
 }
 
 // Matrix is an interface which is compatible with gonum's mat.Matrix interface
