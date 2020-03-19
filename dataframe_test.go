@@ -2909,10 +2909,6 @@ func TestWriteMockCSV(t *testing.T) {
 				outputRows: 3,
 				config:     []func(*readConfig){ReadOptionSwitchDims()}},
 			want1, false},
-		{"fail - no rows", args{src: nil, outputRows: 3},
-			"", true},
-		{"fail - no cols", args{src: [][]string{{}}, outputRows: 3},
-			"", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

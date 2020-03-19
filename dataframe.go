@@ -481,9 +481,6 @@ func WriteMockCSV(src [][]string, w io.Writer, n int, options ...func(*readConfi
 		colCount = len(src)
 		rowCount = len(src[0])
 	}
-	if rowCount == 0 {
-		return fmt.Errorf("WriteMockCSV(): `src` must have at least one row")
-	}
 	if colCount == 0 {
 		return fmt.Errorf("WriteMockCSV(): `src` must have at least one column")
 	}
