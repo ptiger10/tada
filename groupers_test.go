@@ -1630,7 +1630,7 @@ func TestGroupedDataFrame_float64ReduceFunc(t *testing.T) {
 				{slice: []float64{1, 3}, isNull: []bool{false, false}, name: "first_qux"}},
 				labels:        []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
-				name:          "first_"},
+				name:          "first"},
 		},
 		{
 			name: "select one specific column (and not the first)",
@@ -1653,7 +1653,7 @@ func TestGroupedDataFrame_float64ReduceFunc(t *testing.T) {
 				{slice: []float64{1, 3}, isNull: []bool{false, false}, name: "first_waldo"}},
 				labels:        []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
-				name:          "first_"},
+				name:          "first"},
 		},
 	}
 	for _, tt := range tests {
@@ -1711,7 +1711,7 @@ func TestGroupedDataFrame_stringReduceFunc(t *testing.T) {
 				{slice: []string{"a", "c"}, isNull: []bool{false, false}, name: "first_qux"}},
 				labels:        []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
-				name:          "first_"},
+				name:          "first"},
 		},
 		{
 			name: "select one specific column (and not the first)",
@@ -1734,7 +1734,7 @@ func TestGroupedDataFrame_stringReduceFunc(t *testing.T) {
 				{slice: []string{"1", "3"}, isNull: []bool{false, false}, name: "first_waldo"}},
 				labels:        []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
-				name:          "first_"},
+				name:          "first"},
 		},
 	}
 	for _, tt := range tests {
@@ -1793,7 +1793,7 @@ func TestGroupedDataFrame_dateTimeReduceFunc(t *testing.T) {
 				{slice: []time.Time{d, d.AddDate(0, 0, 2)}, isNull: []bool{false, false}, name: "first_qux"}},
 				labels:        []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
-				name:          "first_"},
+				name:          "first"},
 		},
 		{
 			name: "select one specific column (and not the first)",
@@ -1816,7 +1816,7 @@ func TestGroupedDataFrame_dateTimeReduceFunc(t *testing.T) {
 				{slice: []time.Time{d, d.AddDate(0, 0, 1)}, isNull: []bool{false, false}, name: "first_waldo"}},
 				labels:        []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
-				name:          "first_"},
+				name:          "first"},
 		},
 	}
 	for _, tt := range tests {
@@ -3847,7 +3847,7 @@ func TestGroupedDataFrame_interfaceReduceFunc(t *testing.T) {
 					{slice: []int{1, 3}, isNull: []bool{false, false}, name: "custom_foo"}},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
-				name:          "custom_",
+				name:          "custom",
 				colLevelNames: []string{"*0"}},
 			false},
 		{"pass - select second column", fields{
@@ -3870,7 +3870,7 @@ func TestGroupedDataFrame_interfaceReduceFunc(t *testing.T) {
 					{slice: []int{1, 3}, isNull: []bool{false, false}, name: "custom_bar"}},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
-				name:          "custom_",
+				name:          "custom",
 				colLevelNames: []string{"*0"}},
 			false},
 		{"fail", fields{

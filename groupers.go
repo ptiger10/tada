@@ -381,11 +381,14 @@ func (g *GroupedDataFrame) indexReduceFunc(name string, cols []string, index int
 		retVals[k] = groupedIndexReduceFunc(
 			g.df.values[colIndex].slice, g.df.values[k].isNull, adjustedColNames[k], false, index, g.rowIndices)
 	}
+	if g.df.name != "" {
+		name = fmt.Sprintf("%v_%v", name, g.df.name)
+	}
 	return &DataFrame{
 		values:        retVals,
 		labels:        g.labels,
 		colLevelNames: []string{"*0"},
-		name:          fmt.Sprintf("%v_%v", name, g.df.name),
+		name:          name,
 	}
 }
 
@@ -407,12 +410,15 @@ func (g *GroupedDataFrame) interfaceReduceFunc(name string, cols []string, fn fu
 			return nil, err
 		}
 	}
+	if g.df.name != "" {
+		name = fmt.Sprintf("%v_%v", name, g.df.name)
+	}
 
 	return &DataFrame{
 		values:        retVals,
 		labels:        g.labels,
 		colLevelNames: []string{"*0"},
-		name:          fmt.Sprintf("%v_%v", name, g.df.name),
+		name:          name,
 	}, nil
 }
 
@@ -430,12 +436,15 @@ func (g *GroupedDataFrame) countReduceFunc(name string, cols []string, fn func(i
 		retVals[k] = groupedCountReduceFunc(
 			g.df.values[index].slice, g.df.values[k].isNull, adjustedColNames[k], false, g.rowIndices, fn)
 	}
+	if g.df.name != "" {
+		name = fmt.Sprintf("%v_%v", name, g.df.name)
+	}
 
 	return &DataFrame{
 		values:        retVals,
 		labels:        g.labels,
 		colLevelNames: []string{"*0"},
-		name:          fmt.Sprintf("%v_%v", name, g.df.name),
+		name:          name,
 	}
 }
 

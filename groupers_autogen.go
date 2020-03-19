@@ -102,12 +102,15 @@ func (g *GroupedDataFrame) float64ReduceFunc(
 		retVals[k] = groupedFloat64ReduceFunc(
 			g.df.values[index].float64().slice, g.df.values[k].isNull, adjustedColNames[k], false, g.rowIndices, fn)
 	}
+	if g.df.name != "" {
+		name = fmt.Sprintf("%v_%v", name, g.df.name)
+	}
 
 	return &DataFrame{
 		values:        retVals,
 		labels:        g.labels,
 		colLevelNames: []string{"*0"},
-		name:          fmt.Sprintf("%v_%v", name, g.df.name),
+		name:          name,
 	}
 }
 
@@ -204,12 +207,15 @@ func (g *GroupedDataFrame) stringReduceFunc(
 		retVals[k] = groupedStringReduceFunc(
 			g.df.values[index].string().slice, g.df.values[k].isNull, adjustedColNames[k], false, g.rowIndices, fn)
 	}
+	if g.df.name != "" {
+		name = fmt.Sprintf("%v_%v", name, g.df.name)
+	}
 
 	return &DataFrame{
 		values:        retVals,
 		labels:        g.labels,
 		colLevelNames: []string{"*0"},
-		name:          fmt.Sprintf("%v_%v", name, g.df.name),
+		name:          name,
 	}
 }
 
@@ -306,11 +312,14 @@ func (g *GroupedDataFrame) dateTimeReduceFunc(
 		retVals[k] = groupedDateTimeReduceFunc(
 			g.df.values[index].dateTime().slice, g.df.values[k].isNull, adjustedColNames[k], false, g.rowIndices, fn)
 	}
+	if g.df.name != "" {
+		name = fmt.Sprintf("%v_%v", name, g.df.name)
+	}
 
 	return &DataFrame{
 		values:        retVals,
 		labels:        g.labels,
 		colLevelNames: []string{"*0"},
-		name:          fmt.Sprintf("%v_%v", name, g.df.name),
+		name:          name,
 	}
 }
