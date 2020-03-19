@@ -6,6 +6,8 @@
 # tada
 tada (TAble DAta) is a package that enables test-driven data pipelines in pure Go.
 
+**DISCLAIMER: still under development. API subject to breaking changes until v1. Use in production at your own risk.**
+
 tada combines concepts from pandas, spreadsheets, R, Apache Spark, and SQL.
 Its most common use cases are cleaning, aggregating, transforming, and analyzing data.
 
@@ -70,7 +72,8 @@ func TransformData(df *tada.DataFrame) *tada.DataFrame {
     ... handle err
   df.InPlace().DropNull()
   validScore := tada.FilterFn{Float64: func(v float64) bool { return v >= 0 && v <= 10 }}
-	df.InPlace().Filter(map[string]tada.FilterFn{"score": validScore})
+	
+  df.InPlace().Filter(map[string]tada.FilterFn{"score": validScore})
   df.InPlace().Sort(tada.Sorter{Name: "name", DType: tada.String})
   return df.GroupBy("name").Mean("score")
 }

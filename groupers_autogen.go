@@ -90,7 +90,7 @@ func (g *GroupedSeries) float64ReduceFunc(name string, fn func(slice []float64, 
 func (g *GroupedDataFrame) float64ReduceFunc(
 	name string, cols []string, fn func(slice []float64, isNull []bool, index []int) (float64, bool)) *DataFrame {
 	if len(cols) == 0 {
-		cols = g.df.ListColumnNames()
+		cols = g.df.ListColNames()
 	}
 	adjustedColNames := make([]string, len(cols))
 	for k := range cols {
@@ -192,7 +192,7 @@ func (g *GroupedSeries) stringReduceFunc(name string, fn func(slice []string, is
 func (g *GroupedDataFrame) stringReduceFunc(
 	name string, cols []string, fn func(slice []string, isNull []bool, index []int) (string, bool)) *DataFrame {
 	if len(cols) == 0 {
-		cols = g.df.ListColumnNames()
+		cols = g.df.ListColNames()
 	}
 	adjustedColNames := make([]string, len(cols))
 	for k := range cols {
@@ -294,7 +294,7 @@ func (g *GroupedSeries) dateTimeReduceFunc(name string, fn func(slice []time.Tim
 func (g *GroupedDataFrame) dateTimeReduceFunc(
 	name string, cols []string, fn func(slice []time.Time, isNull []bool, index []int) (time.Time, bool)) *DataFrame {
 	if len(cols) == 0 {
-		cols = g.df.ListColumnNames()
+		cols = g.df.ListColNames()
 	}
 	adjustedColNames := make([]string, len(cols))
 	for k := range cols {

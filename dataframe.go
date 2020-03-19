@@ -673,9 +673,33 @@ func listNames(columns []*valueContainer) []string {
 	return ret
 }
 
-// ListColumnNames returns the name of all the columns in the DataFrame, in order.
-func (df *DataFrame) ListColumnNames() []string {
+func listNamesAtLevel(columns []*valueContainer, level int, numLevels int) ([]string, error) {
+	ret := make([]string, len(columns))
+	if level >= numLevels {
+		return nil, fmt.Errorf("`level` out of range: %d >= %d", level, numLevels)
+	}
+	for k := range columns {
+		levels := splitNameIntoLevels(columns[k].name)
+		ret[k] = levels[level]
+	}
+	return ret, nil
+}
+
+// ListColNames returns the name of all the columns in the DataFrame, in order.
+// If `df` has multiple column levels, each column name is a single string with level values separated by "|" (may be changed with SetOptionDefaultSeparator).
+// To return the names at a specific level, use ListColNamesAtLevel().
+func (df *DataFrame) ListColNames() []string {
 	return listNames(df.values)
+}
+
+// ListColNamesAtLevel returns the name of all the columns in the DataFrame, in order, at the supplied column `level`.
+// If `level` is out of range, returns a nil slice.
+func (df *DataFrame) ListColNamesAtLevel(level int) []string {
+	ret, err := listNamesAtLevel(df.values, level, df.numColLevels())
+	if err != nil {
+		return nil
+	}
+	return ret
 }
 
 // ListLabelNames returns the name of all the label levels in the DataFrame, in order.
@@ -814,9 +838,9 @@ func (df *DataFrame) NameOfLabel(n int) string {
 	return nameOfContainer(df.labels, n)
 }
 
-// NameOfColumn returns the name of the column at index position `n`.
+// NameOfCol returns the name of the column at index position `n`.
 // If n is out of range, returns "-out of range-"
-func (df *DataFrame) NameOfColumn(n int) string {
+func (df *DataFrame) NameOfCol(n int) string {
 	return nameOfContainer(df.values, n)
 }
 
@@ -1102,15 +1126,30 @@ func (df *DataFrame) Null(subset ...string) *DataFrame {
 	return df.Subset(anyNull)
 }
 
-// FilterCols returns the column positions of all columns (excluding labels) that satisfy `lambda`.
-func (df *DataFrame) FilterCols(lambda func(string) bool) []int {
-	var ret []int
-	for k := range df.values {
-		if lambda(df.values[k].name) {
-			ret = append(ret, k)
+// FilterCols returns the columns with names that satisfy `lambda` at the supplied column `level`.
+// `level` should be 0 unless df has multiple column levels.
+func (df *DataFrame) FilterCols(lambda func(string) bool, level int) *DataFrame {
+	df = df.Copy()
+	df.InPlace().FilterCols(lambda, level)
+	return df
+}
+
+// FilterCols returns the columns with names that satisfy `lambda` at the supplied column `level`.
+// `level` should be 0 unless df has multiple column levels.
+func (df *DataFrameMutator) FilterCols(lambda func(string) bool, level int) {
+	var subset []int
+	names, err := listNamesAtLevel(df.dataframe.values, level, df.dataframe.numColLevels())
+	if err != nil {
+		df.dataframe.resetWithError(fmt.Errorf("FilterCols(): %v", err))
+		return
+	}
+	for k := range names {
+		if lambda(names[k]) {
+			subset = append(subset, k)
 		}
 	}
-	return ret
+	df.SubsetCols(subset)
+	return
 }
 
 // -- SETTERS
@@ -1457,7 +1496,7 @@ func (df *DataFrame) Transpose() *DataFrame {
 	// iterate over columns
 	for k := range df.values {
 		// write label values
-		splitColName := splitLabelIntoLevels(df.values[k].name, df.numColLevels() > 1)
+		splitColName := splitNameIntoLevels(df.values[k].name)
 		for l := range splitColName {
 			labels[l][k] = splitColName[l]
 			labelsIsNull[l][k] = false
@@ -1472,7 +1511,7 @@ func (df *DataFrame) Transpose() *DataFrame {
 
 	retColNames := make([]string, len(vals))
 	for k := range colNames {
-		retColNames[k] = joinLevelsIntoLabel(colNames[k])
+		retColNames[k] = joinLevelsIntoName(colNames[k])
 	}
 	// transfer to valueContainers
 	retLabels := copyStringsIntoValueContainers(labels, labelsIsNull, labelNames)
@@ -1556,7 +1595,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 		// m -> incrementor of unique values in the column to be promoted
 		for m, uniqueValue := range uniqueValuesToPromote {
 			newColumnIndex := k*len(uniqueValuesToPromote) + m
-			newHeader := joinLevelsIntoLabel([]string{uniqueValue, df.values[k].name})
+			newHeader := joinLevelsIntoName([]string{uniqueValue, df.values[k].name})
 			colNames[newColumnIndex] = newHeader
 			// each item in newVals is a slice of the same type as originalVals at that column position
 			newVals[newColumnIndex] = reflect.MakeSlice(originalVals.Type(), numNewRows, numNewRows).Interface()
@@ -2007,9 +2046,9 @@ func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFr
 func (df *DataFrame) dropColLevel(level int) *DataFrame {
 	df.colLevelNames = append(df.colLevelNames[:level], df.colLevelNames[level+1:]...)
 	for k := range df.values {
-		priorNames := splitLabelIntoLevels(df.values[k].name, true)
+		priorNames := splitNameIntoLevels(df.values[k].name)
 		newNames := append(priorNames[:level], priorNames[level+1:]...)
-		df.values[k].name = joinLevelsIntoLabel(newNames)
+		df.values[k].name = joinLevelsIntoName(newNames)
 	}
 	return df
 }

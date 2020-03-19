@@ -358,7 +358,7 @@ func (g *GroupedDataFrame) Err() error {
 
 func (g *GroupedDataFrame) indexReduceFunc(name string, cols []string, index int) *DataFrame {
 	if len(cols) == 0 {
-		cols = g.df.ListColumnNames()
+		cols = g.df.ListColNames()
 	}
 	adjustedColNames := make([]string, len(cols))
 	for k := range cols {
@@ -380,7 +380,7 @@ func (g *GroupedDataFrame) indexReduceFunc(name string, cols []string, index int
 
 func (g *GroupedDataFrame) interfaceReduceFunc(name string, cols []string, fn func(interface{}) interface{}) (*DataFrame, error) {
 	if len(cols) == 0 {
-		cols = g.df.ListColumnNames()
+		cols = g.df.ListColNames()
 	}
 	adjustedColNames := make([]string, len(cols))
 	for k := range cols {
@@ -407,7 +407,7 @@ func (g *GroupedDataFrame) interfaceReduceFunc(name string, cols []string, fn fu
 
 func (g *GroupedDataFrame) countReduceFunc(name string, cols []string, fn func(interface{}, []bool, []int) (int, bool)) *DataFrame {
 	if len(cols) == 0 {
-		cols = g.df.ListColumnNames()
+		cols = g.df.ListColNames()
 	}
 	adjustedColNames := make([]string, len(cols))
 	for k := range cols {

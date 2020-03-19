@@ -760,45 +760,73 @@ func TestDataFrame_Range(t *testing.T) {
 
 func TestDataFrame_FilterCols(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		colLevelNames []string
+		err           error
 	}
 	type args struct {
 		lambda func(string) bool
+		level  int
 	}
 	tests := []struct {
 		name   string
 		fields fields
 		args   args
-		want   []int
+		want   *DataFrame
 	}{
-		{"single level", fields{
-			values: []*valueContainer{
-				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
-				{slice: []float64{1}, isNull: []bool{false}, name: "bar"},
-				{slice: []float64{1}, isNull: []bool{false}, name: "baz"}},
-			labels: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
-				{slice: []int{10}, isNull: []bool{false}, name: "*10"}}},
+		{"pass",
+			fields{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+					{slice: []float64{1}, isNull: []bool{false}, name: "bar"},
+					{slice: []float64{1}, isNull: []bool{false}, name: "baz"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+			},
 			args{func(s string) bool {
 				if strings.Contains(s, "ba") {
 					return true
 				}
 				return false
-			}},
-			[]int{1, 2}},
+			}, 0},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "bar"},
+					{slice: []float64{1}, isNull: []bool{false}, name: "baz"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+		},
+		{"fail - out of range", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "bar"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "baz"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}}},
+			args{func(s string) bool {
+				if strings.Contains(s, "ba") {
+					return true
+				}
+				return false
+			}, 10},
+			&DataFrame{
+				err: fmt.Errorf("FilterCols(): `level` out of range: 10 >= 0")},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				colLevelNames: tt.fields.colLevelNames,
+				err:           tt.fields.err,
 			}
-			if got := df.FilterCols(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+			if got := df.FilterCols(tt.args.lambda, tt.args.level); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.FilterCols() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2935,7 +2963,7 @@ func TestWriteMockCSV(t *testing.T) {
 	}
 }
 
-func TestDataFrame_ListColumnNames(t *testing.T) {
+func TestDataFrame_ListColNames(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -2949,10 +2977,10 @@ func TestDataFrame_ListColumnNames(t *testing.T) {
 		want   []string
 	}{
 		{"pass", fields{
-			values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo|bar"}},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			name:   "baz"},
-			[]string{"foo"}},
+			[]string{"foo|bar"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2963,8 +2991,57 @@ func TestDataFrame_ListColumnNames(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.ListColumnNames(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.ListColumnNames() = %v, want %v", got, tt.want)
+			if got := df.ListColNames(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.ListColNames() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_ListColNamesAtLevel(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		level int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []string
+	}{
+		{"pass", fields{
+			values:        []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo|bar"}},
+			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:          "baz",
+			colLevelNames: []string{"*0", "*1"},
+		},
+			args{0},
+			[]string{"foo"}},
+		{"fail", fields{
+			values:        []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo|bar"}},
+			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			colLevelNames: []string{"*0", "*1"},
+			name:          "baz"},
+			args{10},
+			nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.ListColNamesAtLevel(tt.args.level); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.ListColNamesAtLevel() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -4529,7 +4606,7 @@ func TestDataFrame_NameOfLabel(t *testing.T) {
 	}
 }
 
-func TestDataFrame_NameOfColumn(t *testing.T) {
+func TestDataFrame_NameOfCol(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -4563,8 +4640,8 @@ func TestDataFrame_NameOfColumn(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.NameOfColumn(tt.args.n); got != tt.want {
-				t.Errorf("DataFrame.NameOfColumn() = %v, want %v", got, tt.want)
+			if got := df.NameOfCol(tt.args.n); got != tt.want {
+				t.Errorf("DataFrame.NameOfCol() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -4637,6 +4714,35 @@ func TestDataFrame_SumColumns(t *testing.T) {
 			}
 			if got := df.SumColumns(tt.args.name, tt.args.colNames...); !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.SumColumns() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_listNamesAtLevel(t *testing.T) {
+	type args struct {
+		columns   []*valueContainer
+		level     int
+		numLevels int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{"pass", args{[]*valueContainer{{name: "foo|bar"}, {name: "bar|baz"}}, 0, 2}, []string{"foo", "bar"}, false},
+		{"fail - wrong numLevels", args{[]*valueContainer{{name: "foo|bar"}, {name: "bar|baz"}}, 3, 2}, nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := listNamesAtLevel(tt.args.columns, tt.args.level, tt.args.numLevels)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("listNamesAtLevel() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("listNamesAtLevel() = %v, want %v", got, tt.want)
 			}
 		})
 	}

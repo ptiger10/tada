@@ -453,7 +453,7 @@ func (df *DataFrame) toCSVByRows(ignoreLabels bool) ([][]string, error) {
 			offset = df.numLevels()
 		}
 		// if number of col levels is only one, return the name as a single-item slice
-		multiColHeaders := splitLabelIntoLevels(df.values[k].name, df.numColLevels() > 1)
+		multiColHeaders := splitNameIntoLevels(df.values[k].name)
 		for l := 0; l < df.numColLevels(); l++ {
 			// write multi column headers, offset by label levels
 			ret[l][k+offset] = multiColHeaders[l]
@@ -1360,15 +1360,11 @@ func reduceContainersForLookup(containers []*valueContainer) map[string]int {
 	return ret
 }
 
-// control for inadvertent splitting just because the name has the level separator using `toSplit`
-func splitLabelIntoLevels(label string, toSplit bool) []string {
-	if toSplit {
-		return strings.Split(label, optionLevelSeparator)
-	}
-	return []string{label}
+func splitNameIntoLevels(name string) []string {
+	return strings.Split(name, optionLevelSeparator)
 }
 
-func joinLevelsIntoLabel(levels []string) string {
+func joinLevelsIntoName(levels []string) string {
 	return strings.Join(levels, optionLevelSeparator)
 }
 
