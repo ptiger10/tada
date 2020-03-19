@@ -1,12 +1,19 @@
 // Package tada (TAble DAta) enables test-driven data pipelines.
+//
 // tada combines concepts from pandas, spreadsheets, R, Apache Spark, and SQL.
 // Its most common use cases are cleaning, aggregating, transforming, and analyzing data.
 // Some notable features of tada:
+//
 // * flexible constructor that supports most primitive data types
+//
 // * seamlessly handles null data and type conversions
+//
 // * well-suited to conventional IDE-based programming, but also supports notebook usage
+//
 // * advanced filtering, grouping, sorting, and pivoting
+//
 // * multi-level labels and columns
+//
 // * complete test coverage
 //
 // The key data types are Series, DataFrames, and groupings of each.
@@ -17,7 +24,7 @@
 // On printing, these appear as the leftmost columns in a table, and typically have values that help identify ("label") specific rows.
 // They are analogous to the "index" concept in pandas.
 //
-// For more detail and implementation notes, see [this doc](https://docs.google.com/document/d/18DvZzd6Tg6Bz0SX0fY2SrXOjE8d9xDhU6bDEnaIc_rM/edit?usp=sharing).
+// For more detail and implementation notes, see https://docs.google.com/document/d/18DvZzd6Tg6Bz0SX0fY2SrXOjE8d9xDhU6bDEnaIc_rM/
 package tada
 
 import (

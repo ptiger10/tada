@@ -4,7 +4,7 @@
 [![GoDoc](https://godoc.org/github.com/ptiger10/tada?status.svg)](https://godoc.org/github.com/ptiger10/tada) 
 
 # tada
-Package tada (TAble DAta) enables test-driven data pipelines in pure Go.
+tada (TAble DAta) is a package that enables test-driven data pipelines in pure Go.
 
 tada combines concepts from pandas, spreadsheets, R, Apache Spark, and SQL.
 Its most common use cases are cleaning, aggregating, transforming, and analyzing data.
