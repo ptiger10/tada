@@ -28,6 +28,7 @@ They are analogous to the "index" concept in pandas.
 
 For more detail and implementation notes, see [this doc](https://docs.google.com/document/d/18DvZzd6Tg6Bz0SX0fY2SrXOjE8d9xDhU6bDEnaIc_rM/edit?usp=sharing).
 
+*Logo: @egonelbre, licensed under CC0*
 
 ## Example
 You start with a CSV. Like most real-world data, it is messy. This one is missing a score in the first row. And we know that scores must range between 0 and 10, so the score of -100 and 1000 in the second and third rows must also be erroneous:
@@ -50,7 +51,7 @@ func Test_TransformData(t *testing.T) {
            jane doe, 9
            john doe, 6`
 
-  df, err := tada.ReadCSVFromString(records)
+  df, err := tada.ReadCSVFromString(data)
     ... handle err
 
   ret := TransformData(df)
@@ -119,6 +120,4 @@ Extended [tutorial](tutorial.ipynb)
 One of the biggest limitations of gophernotes is that it does not provide signature hinting. This is a [known issue](https://github.com/gopherdata/gophernotes/issues/173).
 
 [Sample Notebook](tutorial.ipynb)
-
-Logo: @egonelbre, licensed under CC0
 
