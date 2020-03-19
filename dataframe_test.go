@@ -3267,7 +3267,7 @@ func TestImportCSV(t *testing.T) {
 		wantErr bool
 	}{
 		{"1 header, 0 labels - nil config",
-			args{"test_files/1_header_0_labels.csv", nil},
+			args{"test_csv/1_header_0_labels.csv", nil},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "Name"},
@@ -3279,10 +3279,10 @@ func TestImportCSV(t *testing.T) {
 			args{"missing.csv", nil},
 			nil, true},
 		{"fail - bad delimiter",
-			args{"test_files/bad_delimiter.csv", nil},
+			args{"test_csv/bad_delimiter.csv", nil},
 			nil, true},
 		{"fail - empty",
-			args{"test_files/empty.csv", nil},
+			args{"test_csv/empty.csv", nil},
 			nil, true},
 	}
 	for _, tt := range tests {
@@ -3438,11 +3438,11 @@ func TestDataFrame_ExportCSV(t *testing.T) {
 			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
 			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
-			args{"test_files/output.csv", false}, false},
+			args{"test_csv/output.csv", false}, false},
 		{"fail - no df", fields{values: nil,
 			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
-			args{"test_files/output.csv", false}, true},
+			args{"test_csv/output.csv", false}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

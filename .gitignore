@@ -1,6 +1,7 @@
 .vscode/*
-test_files/*
+*_ignore*
 Makefile
 cleanGeneratedCode.sh
 *.out
 *.test
+benchmarks_*
