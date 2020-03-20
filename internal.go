@@ -2694,7 +2694,7 @@ func suppressDefaultName(name string) string {
 	return name
 }
 
-func xs(containers []*valueContainer, values map[string]interface{}) ([]int, error) {
+func filterByValue(containers []*valueContainer, values map[string]interface{}) ([]int, error) {
 	subIndexes := make([][]int, len(values))
 	var incrementor int
 	for k, v := range values {

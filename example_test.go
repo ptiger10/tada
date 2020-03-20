@@ -22,14 +22,14 @@ func ExampleSeries() {
 	// +---++-----+
 }
 
-func ExampleSeries_test_withError() {
+func ExampleSeries_withError() {
 	s := &Series{err: errors.New("foo")}
 	fmt.Println(s)
 	// Output:
 	// Error: foo
 }
 
-func ExampleSeries_test_null() {
+func ExampleSeries_withNullValues() {
 	s := NewSeries([]string{"foo", ""})
 	fmt.Println(s)
 	// Output:
@@ -41,7 +41,7 @@ func ExampleSeries_test_null() {
 	// +---++-----+
 }
 
-func ExampleSeries_test_nested() {
+func ExampleSeries_nestedSlice() {
 	s := NewSeries([][]string{{"foo", "bar"}, {"baz"}, {}}).
 		SetName("a")
 	fmt.Println(s)
@@ -67,6 +67,26 @@ func ExampleDataFrame() {
 	// | 0 || 1 | baz |
 	// | 1 || 2 | qux |
 	// +---++---+-----+
+}
+
+func ExampleDataFrame_withError() {
+	df := &DataFrame{err: errors.New("foo")}
+	fmt.Println(df)
+	// Output:
+	// Error: foo
+}
+
+func ExampleDataFrame_withNullValues() {
+	df := NewDataFrame([]interface{}{[]float64{math.NaN(), 2}, []string{"foo", ""}}).SetColNames([]string{"a", "b"}).SetName("qux")
+	fmt.Println(df)
+	// Output:
+	// +---++-----+-----+
+	// | - ||  a  |  b  |
+	// |---||-----|-----|
+	// | 0 || n/a | foo |
+	// | 1 ||   2 | n/a |
+	// +---++-----+-----+
+	// name: qux
 }
 
 func ExampleDataFrame_SetColNames() {
@@ -95,6 +115,23 @@ func ExampleDataFrame_SetLabelNames() {
 	// |   0 || 1 |
 	// |   1 || 2 |
 	// +-----++---+
+}
+
+func ExampleDataFrame_SetLabelNames_multiple() {
+	df := NewDataFrame(
+		[]interface{}{[]float64{1, 2}},
+		[]int{0, 1}, []string{"foo", "bar"},
+	).
+		SetColNames([]string{"A"}).
+		SetLabelNames([]string{"baz", "qux"})
+	fmt.Println(df)
+	// Output:
+	// +-----+-----++---+
+	// | baz | qux || A |
+	// |-----|-----||---|
+	// |   0 | foo || 1 |
+	// |   1 | bar || 2 |
+	// +-----+-----++---+
 }
 
 func ExampleDataFrame_WithCol_rename() {
@@ -226,7 +263,8 @@ func ExampleDataFrame_Filter_interface() {
 	// | 1 ||   2 | fred | 2020-01-02T00:00:00Z |
 	// +---++-----+------+----------------------+
 }
-func ExampleDataFrame_test_excess_rows() {
+
+func ExamplePrintOptionMaxRows() {
 	df := NewDataFrame([]interface{}{
 		[]float64{1, 2, 3, 4, 5, 6, 7, 8}}).SetColNames([]string{"A"})
 	archive := optionMaxRows
@@ -247,24 +285,7 @@ func ExampleDataFrame_test_excess_rows() {
 	// +-----++-----+
 }
 
-func ExampleDataFrame_test_multi_labels() {
-	df := NewDataFrame(
-		[]interface{}{[]float64{1, 2}},
-		[]int{0, 1}, []string{"foo", "bar"},
-	).
-		SetColNames([]string{"A"}).
-		SetLabelNames([]string{"baz", "qux"})
-	fmt.Println(df)
-	// Output:
-	// +-----+-----++---+
-	// | baz | qux || A |
-	// |-----|-----||---|
-	// |   0 | foo || 1 |
-	// |   1 | bar || 2 |
-	// +-----+-----++---+
-}
-
-func ExampleDataFrame_test_excess_cols() {
+func ExamplePrintOptionMaxColumns() {
 	df := NewDataFrame([]interface{}{
 		[]float64{1, 2}, []float64{3, 4}, []float64{5, 6},
 		[]float64{3, 4}, []float64{5, 6},
@@ -282,35 +303,15 @@ func ExampleDataFrame_test_excess_cols() {
 	// +---++---+-----+---+
 }
 
-func ExampleDataFrame_test_null() {
-	df := NewDataFrame([]interface{}{[]float64{math.NaN(), 2}, []string{"foo", ""}}).SetColNames([]string{"a", "b"}).SetName("qux")
-	fmt.Println(df)
-	// Output:
-	// +---++-----+-----+
-	// | - ||  a  |  b  |
-	// |---||-----|-----|
-	// | 0 || n/a | foo |
-	// | 1 ||   2 | n/a |
-	// +---++-----+-----+
-	// name: qux
-}
-
-func ExampleDataFrame_test_withError() {
-	df := &DataFrame{err: errors.New("foo")}
-	fmt.Println(df)
-	// Output:
-	// Error: foo
-}
-
-func ExampleGroupedSeries_test_multiple() {
-	g := NewSeries([]float64{1, 2, 3, 4}, []string{"foo", "foo", "bar", "bar"}).GroupBy("*0")
-	fmt.Println(g)
+func ExampleGroupedSeries() {
+	s := NewSeries([]float64{1, 2, 3, 4}, []string{"foo", "foo", "bar", "bar"})
+	fmt.Println(s.GroupBy("*0"))
 	// Output:
 	// Groups: foo,bar
 }
-func ExampleGroupedSeries_test_single() {
-	g := NewSeries([]float64{1, 2}, []string{"foo", "foo"}, []string{"bar", "bar"}).GroupBy("*0", "*1")
-	fmt.Println(g)
+func ExampleGroupedSeries_compoundGroup() {
+	s := NewSeries([]float64{1, 2}, []string{"foo", "foo"}, []string{"bar", "bar"})
+	fmt.Println(s.GroupBy("*0", "*1"))
 	// Output:
 	// Groups: foo|bar
 }

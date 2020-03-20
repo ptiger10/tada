@@ -3248,7 +3248,7 @@ func TestSeries_stringFunc(t *testing.T) {
 	}
 }
 
-func TestSeries_XS(t *testing.T) {
+func TestSeries_FilterByValue(t *testing.T) {
 	type fields struct {
 		values     *valueContainer
 		labels     []*valueContainer
@@ -3277,7 +3277,7 @@ func TestSeries_XS(t *testing.T) {
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{map[string]interface{}{"corge": 0}},
 			&Series{
-				err: errors.New("XS(): `name` (corge) not found")},
+				err: errors.New("FilterByValue(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -3288,8 +3288,8 @@ func TestSeries_XS(t *testing.T) {
 				sharedData: tt.fields.sharedData,
 				err:        tt.fields.err,
 			}
-			if got := s.XS(tt.args.filters); !EqualSeries(got, tt.want) {
-				t.Errorf("Series.XS() = %v, want %v", got, tt.want)
+			if got := s.FilterByValue(tt.args.filters); !EqualSeries(got, tt.want) {
+				t.Errorf("Series.FilterByValue() = %v, want %v", got, tt.want)
 			}
 		})
 	}

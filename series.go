@@ -178,33 +178,6 @@ func (s *Series) IndexOfRows(name string, value interface{}) []int {
 	return mergedLabelsAndValues[i].indexOfRows(value)
 }
 
-// XS returns a cross section of the rows in the Series satisfying all `filters`,
-// which is a map of of container names (either the Series name or label name) to interface{} values.
-// A filter is satisfied for a given row value if the stringified value in that container matches the stringified interface{} value.
-// XS may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
-// Returns a new Series.
-func (s *Series) XS(filters map[string]interface{}) *Series {
-	s = s.Copy()
-	s.InPlace().XS(filters)
-	return s
-}
-
-// XS returns a cross section of the rows in the Series satisfying all `filters`,
-// which is a map of of container names (either the Series name or label name) to interface{} values.
-// A filter is satisfied for a given row value if the stringified value in that container matches the stringified interface{} value.
-// XS may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
-// Modifies the underlying Series in place.
-func (s *SeriesMutator) XS(filters map[string]interface{}) {
-	mergedLabelsAndValues := append(s.series.labels, s.series.values)
-	index, err := xs(mergedLabelsAndValues, filters)
-	if err != nil {
-		s.series.resetWithError(fmt.Errorf("XS(): %v", err))
-		return
-	}
-	s.Subset(index)
-	return
-}
-
 // SelectLabels finds the first level with matching `name` and returns as a Series with all existing label levels (including itself).
 // If label level name is default (prefixed with *), removes the prefix.
 // Returns a new Series with shared labels.
@@ -634,7 +607,7 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
 // If no filter is provided, returns a new copy of the Series.
-// For equality filtering on one or more containers, see also s.XS().
+// For equality filtering on one or more containers, see also s.FilterByValue().
 // Returns a new Series.
 func (s *Series) Filter(filters map[string]FilterFn) *Series {
 	s.Copy()
@@ -653,7 +626,7 @@ func (s *Series) Filter(filters map[string]FilterFn) *Series {
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
 // If no filter is provided, does nothing.
-// For equality filtering on one or more containers, see also s.XS().
+// For equality filtering on one or more containers, see also s.FilterByValue().
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Filter(filters map[string]FilterFn) {
 	if len(filters) == 0 {
@@ -715,6 +688,33 @@ func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{})
 		},
 		labels: copyContainers(s.labels),
 	}, nil
+}
+
+// FilterByValue returns a cross section of the rows in the Series satisfying all `filters`,
+// which is a map of of container names (either the Series name or label name) to interface{} values.
+// A filter is satisfied for a given row value if the stringified value in that container matches the stringified interface{} value.
+// FilterByValue may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
+// Returns a new Series.
+func (s *Series) FilterByValue(filters map[string]interface{}) *Series {
+	s = s.Copy()
+	s.InPlace().FilterByValue(filters)
+	return s
+}
+
+// FilterByValue returns a cross section of the rows in the Series satisfying all `filters`,
+// which is a map of of container names (either the Series name or label name) to interface{} values.
+// A filter is satisfied for a given row value if the stringified value in that container matches the stringified interface{} value.
+// FilterByValue may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
+// Modifies the underlying Series in place.
+func (s *SeriesMutator) FilterByValue(filters map[string]interface{}) {
+	mergedLabelsAndValues := append(s.series.labels, s.series.values)
+	index, err := filterByValue(mergedLabelsAndValues, filters)
+	if err != nil {
+		s.series.resetWithError(fmt.Errorf("FilterByValue(): %v", err))
+		return
+	}
+	s.Subset(index)
+	return
 }
 
 // -- APPLY

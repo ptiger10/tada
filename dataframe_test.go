@@ -3646,7 +3646,7 @@ func TestDataFrame_Err(t *testing.T) {
 	}
 }
 
-func TestDataFrame_XS(t *testing.T) {
+func TestDataFrame_FilterByValue(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -3681,7 +3681,7 @@ func TestDataFrame_XS(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{map[string]interface{}{"corge": "a"}},
 			&DataFrame{
-				err: fmt.Errorf("XS(): `name` (corge) not found")},
+				err: fmt.Errorf("FilterByValue(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -3693,8 +3693,8 @@ func TestDataFrame_XS(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.XS(tt.args.filters); !EqualDataFrames(got, tt.want) {
-				t.Errorf("DataFrame.XS() = %v, want %v", got, tt.want)
+			if got := df.FilterByValue(tt.args.filters); !EqualDataFrames(got, tt.want) {
+				t.Errorf("DataFrame.FilterByValue() = %v, want %v", got, tt.want)
 			}
 		})
 	}

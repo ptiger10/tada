@@ -4574,7 +4574,7 @@ func Test_xs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := xs(tt.args.containers, tt.args.values)
+			got, err := filterByValue(tt.args.containers, tt.args.values)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("xs() error = %v, wantErr %v", err, tt.wantErr)
 				return

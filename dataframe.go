@@ -888,31 +888,6 @@ func (df *DataFrame) SliceLabels() []interface{} {
 	return ret
 }
 
-// XS returns a cross section of the rows in the DataFrame satisfying all `filters`,
-// which is a map of of container names (either column or label names) to interface{} values.
-// A filter is satisfied for a given row value if the stringified value in that container matches the stringified interface{} value.
-// Returns a new DataFrame.
-func (df *DataFrame) XS(filters map[string]interface{}) *DataFrame {
-	df = df.Copy()
-	df.InPlace().XS(filters)
-	return df
-}
-
-// XS returns a cross section of the rows in the DataFrame satisfying all `filters`,
-// which is a map of of container names (either column or label names) to interface{} values.
-// A filter is satisfied for a given row value if the stringified value in that container matches the stringified interface{} value.
-// Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) XS(filters map[string]interface{}) {
-	mergedLabelsAndColumns := append(df.dataframe.labels, df.dataframe.values...)
-	index, err := xs(mergedLabelsAndColumns, filters)
-	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("XS(): %v", err))
-		return
-	}
-	df.Subset(index)
-	return
-}
-
 // SelectLabels finds the first label level with matching `name`
 // and returns the values as a Series.
 // The labels in the Series are shared with the labels in the DataFrame.
@@ -1646,7 +1621,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
 // If no filter is provided, returns a new copy of the DataFrame.
-// For equality filtering on one or more containers, see also df.XS().
+// For equality filtering on one or more containers, see also df.FilterByValue().
 // Returns a new DataFrame.
 func (df *DataFrame) Filter(filters map[string]FilterFn) *DataFrame {
 	df.Copy()
@@ -1664,7 +1639,7 @@ func (df *DataFrame) Filter(filters map[string]FilterFn) *DataFrame {
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
 // If no filter is provided, does nothing.
-// For equality filtering on one or more containers, see also df.XS().
+// For equality filtering on one or more containers, see also df.FilterByValue().
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Filter(filters map[string]FilterFn) {
 	if len(filters) == 0 {
@@ -1720,6 +1695,31 @@ func (df *DataFrame) Where(filters map[string]FilterFn, ifTrue, ifFalse interfac
 		},
 		labels: copyContainers(df.labels),
 	}, nil
+}
+
+// FilterByValue returns a cross section of the rows in the DataFrame satisfying all `filters`,
+// which is a map of of container names (either column or label names) to interface{} values.
+// A filter is satisfied for a given row value if the stringified value in that container matches the stringified interface{} value.
+// Returns a new DataFrame.
+func (df *DataFrame) FilterByValue(filters map[string]interface{}) *DataFrame {
+	df = df.Copy()
+	df.InPlace().FilterByValue(filters)
+	return df
+}
+
+// FilterByValue returns the rows in the DataFrame satisfying all `filters`,
+// which is a map of of container names (either column or label names) to interface{} values.
+// A filter is satisfied for a given row value if the stringified value in that container at that row matches the stringified interface{} value.
+// Modifies the underlying DataFrame in place.
+func (df *DataFrameMutator) FilterByValue(filters map[string]interface{}) {
+	mergedLabelsAndColumns := append(df.dataframe.labels, df.dataframe.values...)
+	index, err := filterByValue(mergedLabelsAndColumns, filters)
+	if err != nil {
+		df.dataframe.resetWithError(fmt.Errorf("FilterByValue(): %v", err))
+		return
+	}
+	df.Subset(index)
+	return
 }
 
 // -- APPLY
