@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ptiger10/tablediff"
 )
@@ -4843,6 +4844,68 @@ func TestDataFrameIterator_Row(t *testing.T) {
 			}
 			if got := iter.Row(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrameIterator.Row() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_Resample(t *testing.T) {
+	d := time.Date(2020, 2, 15, 0, 0, 0, 0, time.UTC)
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		how map[string]Resampler
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},
+				{slice: []string{"2019-12-30"}, isNull: []bool{false}, name: "bar"}},
+			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:          "baz",
+			colLevelNames: []string{"*0"},
+		},
+			args{map[string]Resampler{"foo": Resampler{ByYear: true}, "bar": Resampler{ByMonth: true}}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, isNull: []bool{false}, name: "foo"},
+				{slice: []time.Time{time.Date(2019, 12, 1, 0, 0, 0, 0, time.UTC)}, isNull: []bool{false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				name:          "baz",
+				colLevelNames: []string{"*0"}},
+		},
+		{"fail - bad column", fields{
+			values: []*valueContainer{
+				{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},
+				{slice: []string{"2019-12-30"}, isNull: []bool{false}, name: "bar"}},
+			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:          "baz",
+			colLevelNames: []string{"*0"},
+		},
+			args{map[string]Resampler{"corge": Resampler{ByYear: true}}},
+			&DataFrame{err: fmt.Errorf("Resample(): `name` (corge) not found")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.Resample(tt.args.how); !EqualDataFrames(got, tt.want) {
+				t.Errorf("DataFrame.Resample() = %v, want %v", got, tt.want)
 			}
 		})
 	}

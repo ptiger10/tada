@@ -2398,10 +2398,10 @@ func Test_valueContainer_resample(t *testing.T) {
 		{"year - reset cache",
 			fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo",
 				cache: []string{"2020-02-02 12:30:45 +0000 UTC"}},
-			args{Resampler{ByYear: true}},
+			args{Resampler{ByYear: true, Location: time.UTC}},
 			&valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
 				isNull: []bool{false}, name: "foo"}},
-		{"year - string", fields{slice: []string{"2020-02-02T12:30:45Z"}, isNull: []bool{false}, name: "foo"},
+		{"year - string - sets Location automatically ", fields{slice: []string{"2020-02-02T12:30:45Z"}, isNull: []bool{false}, name: "foo"},
 			args{Resampler{ByYear: true}},
 			&valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
 				isNull: []bool{false}, name: "foo"}},
@@ -2433,16 +2433,16 @@ func Test_resample(t *testing.T) {
 		args args
 		want time.Time
 	}{
-		{"year", args{d, Resampler{ByYear: true}}, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
-		{"month", args{d, Resampler{ByMonth: true}}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC)},
-		{"day", args{d, Resampler{ByDay: true}}, time.Date(2020, 2, 2, 0, 0, 0, 0, time.UTC)},
-		{"week (Sunday)", args{d, Resampler{ByWeek: true}},
+		{"year", args{d, Resampler{ByYear: true, Location: time.UTC}}, time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
+		{"month", args{d, Resampler{ByMonth: true, Location: time.UTC}}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC)},
+		{"day", args{d, Resampler{ByDay: true, Location: time.UTC}}, time.Date(2020, 2, 2, 0, 0, 0, 0, time.UTC)},
+		{"week (Sunday)", args{d, Resampler{ByWeek: true, Location: time.UTC}},
 			time.Date(2020, 2, 2, 0, 0, 0, 0, time.UTC)},
-		{"week (Monday)", args{d, Resampler{ByWeek: true, StartOfWeek: time.Monday}},
+		{"week (Monday)", args{d, Resampler{ByWeek: true, StartOfWeek: time.Monday, Location: time.UTC}},
 			time.Date(2020, 1, 27, 0, 0, 0, 0, time.UTC)},
-		{"hour", args{d, Resampler{ByDuration: time.Hour}}, time.Date(2020, 2, 2, 12, 0, 0, 0, time.UTC)},
-		{"minute", args{d, Resampler{ByDuration: time.Minute}}, time.Date(2020, 2, 2, 12, 30, 0, 0, time.UTC)},
-		{"second", args{d, Resampler{ByDuration: time.Second}}, time.Date(2020, 2, 2, 12, 30, 45, 0, time.UTC)},
+		{"hour", args{d, Resampler{ByDuration: time.Hour, Location: time.UTC}}, time.Date(2020, 2, 2, 12, 0, 0, 0, time.UTC)},
+		{"minute", args{d, Resampler{ByDuration: time.Minute, Location: time.UTC}}, time.Date(2020, 2, 2, 12, 30, 0, 0, time.UTC)},
+		{"second", args{d, Resampler{ByDuration: time.Second, Location: time.UTC}}, time.Date(2020, 2, 2, 12, 30, 45, 0, time.UTC)},
 		{"no change", args{d, Resampler{}}, time.Date(2020, 2, 2, 12, 30, 45, 100, time.UTC)},
 	}
 	for _, tt := range tests {

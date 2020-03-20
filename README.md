@@ -118,8 +118,8 @@ Extended [tutorial](tutorial.ipynb)
 
 ## Using with Jupyter notebooks
 * Follow the instructions for installing [gophernotes](https://github.com/gopherdata/gophernotes), including jupyter.
-* Install tada globally: `$ go get -u github.com/ptiger10/tada`
-* Whenever you update tada, 
+* Install `tada` from anywhere using Go modules (this will install the latest version to `$GOPATH/pkg/mod/ptiger10/tada`, which is what gophernotes references to import 3rd party packages): `$ GO111MODULE=on go get -u github.com/ptiger10/tada`
+* Run the same snippet whenever you want gophernotes to have access to the latest version of `tada`. 
 * `$ jupyter notebook` (should launch a window in your default browser)
 * From Home screen -> New -> Go
 

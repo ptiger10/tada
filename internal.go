@@ -2233,13 +2233,13 @@ func withinWindow(root time.Time, other time.Time, d time.Duration) bool {
 
 func resample(t time.Time, by Resampler) time.Time {
 	if by.ByYear {
-		return time.Date(t.Year(), 1, 1, 0, 0, 0, 0, time.UTC)
+		return time.Date(t.Year(), 1, 1, 0, 0, 0, 0, by.Location)
 	} else if by.ByMonth {
-		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)
+		return time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, by.Location)
 	} else if by.ByDay {
-		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+		return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, by.Location)
 	} else if by.ByWeek {
-		day := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, time.UTC)
+		day := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, by.Location)
 		daysSinceStartOfWeek := day.Weekday() - by.StartOfWeek
 		if daysSinceStartOfWeek >= 0 {
 			// subtract days back to beginning of week
@@ -2255,6 +2255,9 @@ func resample(t time.Time, by Resampler) time.Time {
 func (vc *valueContainer) resample(by Resampler) {
 	vals := vc.dateTime().slice
 	retVals := make([]time.Time, len(vals))
+	if by.Location == nil {
+		by.Location = time.UTC
+	}
 	for i := range vals {
 		retVals[i] = resample(vals[i], by)
 	}

@@ -1684,7 +1684,7 @@ func (df *DataFrameMutator) Filter(filters map[string]FilterFn) {
 // -- APPLY
 
 // Apply applies a user-defined function to every row in a container based on `lambdas`,
-// which is a map of container names (either column or label names) and tada.ApplyFn structs.
+// which is a map of container names (either column or label names) to tada.ApplyFn structs.
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its ApplyFn struct provides the apply logic for that container.
 // Values are converted from their original type to the selected field type.
@@ -1699,7 +1699,7 @@ func (df *DataFrame) Apply(lambdas map[string]ApplyFn) *DataFrame {
 }
 
 // Apply applies a user-defined function to every row in a container based on `lambdas`,
-// which is a map of container names (either column or label names) and tada.ApplyFn structs.
+// which is a map of container names (either column or label names) to tada.ApplyFn structs.
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its ApplyFn struct provides the apply logic for that container.
 // Values are converted from their original type to the selected field type.
@@ -1728,7 +1728,7 @@ func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 }
 
 // ApplyFormat applies a user-defined formatting function to every row in a container based on `lambdas`,
-// which is a map of container names (either column or label names) and tada.ApplyFormatFn structs.
+// which is a map of container names (either column or label names) to tada.ApplyFormatFn structs.
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its ApplyFormatFn struct provides the formatting logic for that container.
 // Values are converted from their original type to the selected field type and then to string.
@@ -1743,7 +1743,7 @@ func (df *DataFrame) ApplyFormat(lambdas map[string]ApplyFormatFn) *DataFrame {
 }
 
 // ApplyFormat applies a user-defined formatting function to every row in a container based on `lambdas`,
-// which is a map of container names (either column or label names) and tada.ApplyFormatFn structs.
+// which is a map of container names (either column or label names) to tada.ApplyFormatFn structs.
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its ApplyFormatFn struct provides the formatting logic for that container.
 // Values are converted from their original type to the selected field type and then to string.
@@ -2050,6 +2050,35 @@ func (df *DataFrame) dropColLevel(level int) *DataFrame {
 		df.values[k].name = joinLevelsIntoName(newNames)
 	}
 	return df
+}
+
+// Resample coerces values to time.Time and truncates them by the logic supplied in `how`,
+// which is a map of of container names (either column or label names) to tada.Resampler structs.
+// For each container name in the map, the first field selected (i.e., not left blank)
+// in its Resampler struct provides the resampling logic for that container.
+// Returns a new DataFrame.
+func (df *DataFrame) Resample(how map[string]Resampler) *DataFrame {
+	df = df.Copy()
+	df.InPlace().Resample(how)
+	return df
+}
+
+// Resample coerces values to time.Time and truncates them by the logic supplied in `how`,
+// which is a map of of container names (either column or label names) to tada.Resampler structs.
+// For each container name in the map, the first field selected (i.e., not left blank)
+// in its Resampler struct provides the resampling logic for that container.
+// Modifies the underlying DataFrame in place.
+func (df *DataFrameMutator) Resample(how map[string]Resampler) {
+	mergedLabelsAndColumns := append(df.dataframe.labels, df.dataframe.values...)
+	for name, resampler := range how {
+		index, err := indexOfContainer(name, mergedLabelsAndColumns)
+		if err != nil {
+			df.dataframe.resetWithError(fmt.Errorf("Resample(): %v", err))
+			return
+		}
+		mergedLabelsAndColumns[index].resample(resampler)
+	}
+	return
 }
 
 // -- ITERATORS

@@ -234,12 +234,13 @@ type readConfig struct {
 }
 
 // Resampler supplies logic for the Resample() function.
-// Only the first field selected (i.e., not left nil) is used - any others are ignored (except for `ByWeek` and `StartOfWeek`).
-// If true, `ByYear` truncates the timestamp by year.
-// If true, `ByMonth` truncates the timestamp by month.
-// If true, `ByDay` truncates the timestamp by day.
-// If true, `ByWeek` returns the first day of the most recent week (starting on `StartOfWeek`) relative to timestamp.
+// Only the first non-Location field selected (i.e., not left nil) is used - any others are ignored (except for `ByWeek`, which may be modified by `StartOfWeek`).
+// `ByYear` truncates the timestamp by year.
+// `ByMonth` truncates the timestamp by month.
+// `ByDay` truncates the timestamp by day.
+// `ByWeek` returns the first day of the most recent week (starting on `StartOfWeek`) relative to timestamp.
 // Otherwise, truncates the timestamp `ByDuration`.
+// If `Location` is not provided, time.UTC is used as the default location.
 type Resampler struct {
 	ByYear      bool
 	ByMonth     bool
@@ -247,6 +248,7 @@ type Resampler struct {
 	ByWeek      bool
 	StartOfWeek time.Weekday
 	ByDuration  time.Duration
+	Location    *time.Location
 }
 
 // Cutter supplies logic for the Cut() function.
