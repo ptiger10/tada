@@ -1681,6 +1681,48 @@ func (df *DataFrameMutator) Filter(filters map[string]FilterFn) {
 	return
 }
 
+// Where iterates over the rows in `df` and evaluates whether each one satisifes `filters`,
+// which is a map of container names (either column or label names) and tada.FilterFn structs.
+// If yes, returns `ifTrue` at that row position.
+// If not, returns `ifFalse` at that row position.
+// Returns a new Series named `name` with the same labels as the original Series and null status based on the supplied values.
+// If an unsupported value type is supplied as either ifTrue or ifFalse, returns an error.
+func (df *DataFrame) Where(name string, filters map[string]FilterFn, ifTrue, ifFalse interface{}) (*Series, error) {
+	ret := make([]interface{}, df.Len())
+	// []int of positions where all filters are true
+	mergedLabelsAndColumns := append(df.labels, df.values...)
+	index, err := filter(mergedLabelsAndColumns, filters)
+	if err != nil {
+		return nil, fmt.Errorf("Where(): %v", err)
+	}
+	for _, i := range index {
+		ret[i] = ifTrue
+	}
+	// []int of positions where any filters is not true
+	inverseIndex := difference(makeIntRange(0, df.Len()), index)
+	for _, i := range inverseIndex {
+		ret[i] = ifFalse
+	}
+	isNull, err := setNullsFromInterface(ret)
+	if err != nil {
+		_, err := setNullsFromInterface([]interface{}{ifTrue})
+		// ifTrue is unsupported?
+		if err != nil {
+			return nil, fmt.Errorf("Where(): ifTrue: %v", err)
+		}
+		// ifFalse is unsupported?
+		return nil, fmt.Errorf("Where(): ifFalse: %v", err)
+	}
+	return &Series{
+		values: &valueContainer{
+			slice:  ret,
+			isNull: isNull,
+			name:   name,
+		},
+		labels: copyContainers(df.labels),
+	}, nil
+}
+
 // -- APPLY
 
 // Apply applies a user-defined function to every row in a container based on `lambdas`,
@@ -1720,9 +1762,11 @@ func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 			df.dataframe.resetWithError((fmt.Errorf("Apply(): %v", err)))
 		}
 		mergedLabelsAndCols[index].apply(lambda)
+		// if either prior or new value is null, new value is null
+		// ducks error because values are controlled to be of supported type
+		newNulls, _ := setNullsFromInterface(mergedLabelsAndCols[index].slice)
 		mergedLabelsAndCols[index].isNull = isEitherNull(
-			mergedLabelsAndCols[index].isNull,
-			setNullsFromInterface(mergedLabelsAndCols[index].slice))
+			mergedLabelsAndCols[index].isNull, newNulls)
 	}
 	return
 }
@@ -1764,9 +1808,11 @@ func (df *DataFrameMutator) ApplyFormat(lambdas map[string]ApplyFormatFn) {
 			df.dataframe.resetWithError((fmt.Errorf("ApplyFormat(): %v", err)))
 		}
 		mergedLabelsAndCols[index].applyFormat(lambda)
+		// if either prior or new value is null, new value is null
+		// ducks error because values are controlled to be of supported type
+		newNulls, _ := setNullsFromInterface(mergedLabelsAndCols[index].slice)
 		mergedLabelsAndCols[index].isNull = isEitherNull(
-			mergedLabelsAndCols[index].isNull,
-			setNullsFromInterface(mergedLabelsAndCols[index].slice))
+			mergedLabelsAndCols[index].isNull, newNulls)
 	}
 	return
 }

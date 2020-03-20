@@ -1635,6 +1635,106 @@ func TestDataFrame_Filter(t *testing.T) {
 	}
 }
 
+func TestDataFrame_Where(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		name    string
+		filters map[string]FilterFn
+		ifTrue  interface{}
+		ifFalse interface{}
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *Series
+		wantErr bool
+	}{
+		{"pass",
+			fields{
+				values: []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}},
+			},
+			args{
+				name: "foo",
+				filters: map[string]FilterFn{"qux": {Float64: func(v float64) bool {
+					return v > 1
+				}},
+					"": {String: func(v string) bool {
+						return strings.Contains(v, "ba")
+					}},
+				},
+				ifTrue:  "yes",
+				ifFalse: 0},
+			&Series{
+				values: &valueContainer{slice: []interface{}{0, 0, "yes"}, isNull: []bool{false, false, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			false},
+		{"pass - nulls",
+			fields{
+				values: []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{
+				name: "foo",
+				filters: map[string]FilterFn{"qux": {Float64: func(v float64) bool {
+					return v > 1
+				}},
+					"": {String: func(v string) bool {
+						return strings.Contains(v, "ba")
+					}},
+				},
+				ifTrue:  "yes",
+				ifFalse: ""},
+			&Series{
+				values: &valueContainer{slice: []interface{}{"", "", "yes"}, isNull: []bool{true, true, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			false},
+		{"fail - bad container name",
+			fields{
+				values: []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{"foo", map[string]FilterFn{"corge": {Float64: func(v float64) bool { return true }}}, "yes", 0},
+			nil, true},
+		{"fail - unsupported ifTrue",
+			fields{
+				values: []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{"foo", map[string]FilterFn{"qux": {Float64: func(v float64) bool { return true }}}, complex64(1), 0},
+			nil, true},
+		{"fail - unsupported ifFalse",
+			fields{
+				values: []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{"foo", map[string]FilterFn{"qux": {Float64: func(v float64) bool { return false }}}, 0, complex64(1)},
+			nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			got, err := df.Where(tt.args.name, tt.args.filters, tt.args.ifTrue, tt.args.ifFalse)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.Where() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !EqualSeries(got, tt.want) {
+				t.Errorf("DataFrame.Where() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestDataFrame_Apply(t *testing.T) {
 	type fields struct {
 		labels []*valueContainer

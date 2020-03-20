@@ -676,16 +676,19 @@ func (s *SeriesMutator) Filter(filters map[string]FilterFn) {
 	s.Subset(index)
 }
 
-// Where iterates over the values in `s` and evaluates whether all `filters` are true.
+// Where iterates over the rows in `s` and evaluates whether each one satisifes `filters`,
+// which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
 // If yes, returns `ifTrue` at that row position.
 // If not, returns `ifFalse` at that row position.
-func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{}) *Series {
+// Returns a new Series named `name` with the same labels as the original Series and null status based on the supplied values.
+// If an unsupported value type is supplied as either ifTrue or ifFalse, returns an error.
+func (s *Series) Where(name string, filters map[string]FilterFn, ifTrue, ifFalse interface{}) (*Series, error) {
 	ret := make([]interface{}, s.Len())
 	// []int of positions where all filters are true
 	mergedLabelsAndValues := append(s.labels, s.values)
 	index, err := filter(mergedLabelsAndValues, filters)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("Where(): %v", err))
+		return nil, fmt.Errorf("Where(): %v", err)
 	}
 	for _, i := range index {
 		ret[i] = ifTrue
@@ -695,14 +698,24 @@ func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{})
 	for _, i := range inverseIndex {
 		ret[i] = ifFalse
 	}
+	isNull, err := setNullsFromInterface(ret)
+	if err != nil {
+		_, err := setNullsFromInterface([]interface{}{ifTrue})
+		// ifTrue is unsupported?
+		if err != nil {
+			return nil, fmt.Errorf("Where(): ifTrue: %v", err)
+		}
+		// ifFalse is unsupported?
+		return nil, fmt.Errorf("Where(): ifFalse: %v", err)
+	}
 	return &Series{
 		values: &valueContainer{
 			slice:  ret,
-			isNull: copyNulls(s.values.isNull),
-			name:   s.values.name,
+			isNull: isNull,
+			name:   name,
 		},
 		labels: copyContainers(s.labels),
-	}
+	}, nil
 }
 
 // -- APPLY
@@ -734,8 +747,10 @@ func (s *SeriesMutator) Apply(lambda ApplyFn) {
 		return
 	}
 	s.series.values.apply(lambda)
-	// set to null if null either prior to or after transformation
-	s.series.values.isNull = isEitherNull(s.series.values.isNull, setNullsFromInterface(s.series.values.slice))
+	// if either prior or new value is null, new value is null
+	// ducks error because values are controlled to be of supported type
+	newNulls, _ := setNullsFromInterface(s.series.values.slice)
+	s.series.values.isNull = isEitherNull(s.series.values.isNull, newNulls)
 	return
 }
 
@@ -766,8 +781,10 @@ func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
 		return
 	}
 	s.series.values.applyFormat(lambda)
-	// set to null if null either prior to or after transformation
-	s.series.values.isNull = isEitherNull(s.series.values.isNull, setNullsFromInterface(s.series.values.slice))
+	// if either prior or new value is null, new value is null
+	// ducks error because values are controlled to be of supported type
+	newNulls, _ := setNullsFromInterface(s.series.values.slice)
+	s.series.values.isNull = isEitherNull(s.series.values.isNull, newNulls)
 	return
 }
 
@@ -1146,9 +1163,11 @@ func (s *Series) Cut(bins []float64, config *Cutter) *Series {
 	if err != nil {
 		return seriesWithError(fmt.Errorf("Cut(): %v", err))
 	}
+	// ducks error because values are []string
+	nulls, _ := setNullsFromInterface(retSlice)
 	retVals := &valueContainer{
 		slice:  retSlice,
-		isNull: setNullsFromInterface(retSlice),
+		isNull: nulls,
 		name:   s.values.name,
 	}
 	return &Series{
@@ -1187,9 +1206,11 @@ func (s *Series) PercentileCut(bins []float64, labels []string) *Series {
 	if err != nil {
 		return seriesWithError(fmt.Errorf("PercentileCut(): %v", err))
 	}
+	// ducks error because values are []string
+	nulls, _ := setNullsFromInterface(retSlice)
 	retVals := &valueContainer{
 		slice:  retSlice,
-		isNull: setNullsFromInterface(retSlice),
+		isNull: nulls,
 		name:   s.values.name,
 	}
 	return &Series{

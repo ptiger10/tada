@@ -241,27 +241,67 @@ func Test_setNullsFromInterface(t *testing.T) {
 		input interface{}
 	}
 	tests := []struct {
-		name string
-		args args
-		want []bool
+		name    string
+		args    args
+		want    []bool
+		wantErr bool
 	}{
-		{"float", args{[]float64{1, math.NaN()}}, []bool{false, true}},
-		{"int", args{[]int{0}}, []bool{false}},
-		{"string", args{[]string{"foo", ""}}, []bool{false, true}},
-		{"bytes", args{[][]byte{[]byte("foo"), []byte("")}}, []bool{false, true}},
-		{"dateTime", args{[]time.Time{time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC), {}}}, []bool{false, true, true}},
+		{"float", args{[]float64{1, math.NaN()}}, []bool{false, true}, false},
+		{"int", args{[]int{0}}, []bool{false}, false},
+		{"string", args{[]string{"foo", ""}}, []bool{false, true}, false},
+		{"bytes", args{[][]byte{[]byte("foo"), []byte("")}}, []bool{false, true}, false},
+		{"dateTime", args{[]time.Time{time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC), {}}}, []bool{false, true, true}, false},
 		{"interface", args{[]interface{}{
 			int(1), uint(1), float32(1), float64(1), time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), "foo",
 			math.NaN(), "", time.Time{}}},
 			[]bool{false, false, false, false, false, false,
-				true, true, true}},
-		{"nested string", args{[][]string{{"foo"}, {}}}, []bool{false, true}},
-		{"nil - not slice", args{"foo"}, nil},
+				true, true, true}, false},
+		{"nested string", args{[][]string{{"foo"}, {}}}, []bool{false, true}, false},
+		{"fail - not slice", args{"foo"}, nil, true},
+		{"fail - interface with unsupported value", args{[]interface{}{complex64(1)}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := setNullsFromInterface(tt.args.input); !reflect.DeepEqual(got, tt.want) {
+			got, err := setNullsFromInterface(tt.args.input)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("setNullsFromInterface() error = %v, want %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("setNullsFromInterface() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_isNullInterface(t *testing.T) {
+	type args struct {
+		i interface{}
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    bool
+		wantErr bool
+	}{
+		{"null float64", args{math.NaN()}, true, false},
+		{"null string", args{""}, true, false},
+		{"null time.Time", args{time.Time{}}, true, false},
+		{"float64", args{float64(1)}, false, false},
+		{"string", args{"foo"}, false, false},
+		{"time.Time", args{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, false, false},
+		{"other", args{true}, false, false},
+		{"other - slice", args{[]bool{true}}, false, false},
+		{"unsupported", args{complex64(1)}, false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := isNullInterface(tt.args.i)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("isNullInterface() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("isNullInterface() = %v, want %v", got, tt.want)
 			}
 		})
 	}

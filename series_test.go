@@ -2129,37 +2129,74 @@ func TestSeries_Where(t *testing.T) {
 		err    error
 	}
 	type args struct {
+		name    string
 		filters map[string]FilterFn
 		ifTrue  interface{}
 		ifFalse interface{}
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *Series
+		name    string
+		fields  fields
+		args    args
+		want    *Series
+		wantErr bool
 	}{
 		{"pass",
 			fields{
 				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
-			args{map[string]FilterFn{"qux": {Float64: func(v float64) bool {
-				return v > 1
-			}},
-				"": {String: func(v string) bool {
-					return strings.Contains(v, "ba")
+			args{
+				name: "foo",
+				filters: map[string]FilterFn{"qux": {Float64: func(v float64) bool {
+					return v > 1
 				}},
-			}, "yes", 0},
+					"": {String: func(v string) bool {
+						return strings.Contains(v, "ba")
+					}},
+				},
+				ifTrue:  "yes",
+				ifFalse: 0},
 			&Series{
-				values: &valueContainer{slice: []interface{}{0, 0, "yes"}, isNull: []bool{false, false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
-		{"fail",
+				values: &valueContainer{slice: []interface{}{0, 0, "yes"}, isNull: []bool{false, false, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			false},
+		{"pass - nulls",
 			fields{
 				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
-			args{map[string]FilterFn{"corge": {Float64: func(v float64) bool { return true }}}, "yes", 0},
+			args{
+				name: "foo",
+				filters: map[string]FilterFn{"qux": {Float64: func(v float64) bool {
+					return v > 1
+				}},
+					"": {String: func(v string) bool {
+						return strings.Contains(v, "ba")
+					}},
+				},
+				ifTrue:  "yes",
+				ifFalse: ""},
 			&Series{
-				err: errors.New("Where(): `name` (corge) not found")}},
+				values: &valueContainer{slice: []interface{}{"", "", "yes"}, isNull: []bool{true, true, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			false},
+		{"fail - bad container name",
+			fields{
+				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{"foo", map[string]FilterFn{"corge": {Float64: func(v float64) bool { return true }}}, "yes", 0},
+			nil, true},
+		{"fail - unsupported ifTrue",
+			fields{
+				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{"foo", map[string]FilterFn{"qux": {Float64: func(v float64) bool { return true }}}, complex64(1), 0},
+			nil, true},
+		{"fail - unsupported ifFalse",
+			fields{
+				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{"foo", map[string]FilterFn{"qux": {Float64: func(v float64) bool { return false }}}, 0, complex64(1)},
+			nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2168,7 +2205,12 @@ func TestSeries_Where(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Where(tt.args.filters, tt.args.ifTrue, tt.args.ifFalse); !EqualSeries(got, tt.want) {
+			got, err := s.Where(tt.args.name, tt.args.filters, tt.args.ifTrue, tt.args.ifFalse)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Series.Where() err = %v, want %v", err, tt.wantErr)
+				return
+			}
+			if !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Where() = %v, want %v", got, tt.want)
 			}
 		})

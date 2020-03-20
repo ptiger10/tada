@@ -80,15 +80,12 @@ func isSlice(input interface{}) bool {
 }
 
 func makeValueContainerFromInterface(slice interface{}, name string) (*valueContainer, error) {
-	if !isSlice(slice) {
-		return nil, fmt.Errorf("unsupported kind (%v); must be slice", reflect.TypeOf(slice).Kind())
-	}
 	if reflect.ValueOf(slice).Len() == 0 {
 		return nil, fmt.Errorf("empty slice: cannot be empty")
 	}
-	isNull := setNullsFromInterface(slice)
-	if isNull == nil {
-		return nil, fmt.Errorf("unable to calculate null values ([]%v not supported)", reflect.TypeOf(slice).Elem())
+	isNull, err := setNullsFromInterface(slice)
+	if err != nil {
+		return nil, err
 	}
 	return &valueContainer{
 		slice: slice, isNull: isNull, name: name,
@@ -210,8 +207,8 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 		}
 		cols[lvl].name = input.(string)
 	case reflect.Slice:
-		isNull := setNullsFromInterface(input)
-		if isNull == nil {
+		isNull, err := setNullsFromInterface(input)
+		if err != nil {
 			return nil, fmt.Errorf("unable to calculate null values ([]%v not supported)", reflect.TypeOf(input).Elem())
 		}
 		if l := reflect.ValueOf(input).Len(); l != requiredLen {
@@ -269,7 +266,8 @@ func copyInterfaceIntoValueContainers(slices []interface{}, isNull [][]bool, nam
 	if isNull == nil {
 		isNull = make([][]bool, len(slices))
 		for k := range slices {
-			isNull[k] = setNullsFromInterface(slices[k])
+			// ducks error because nulls are set from existing values
+			isNull[k], _ = setNullsFromInterface(slices[k])
 		}
 	}
 	for k := range slices {
@@ -596,13 +594,17 @@ func readCSVByCols(csv [][]string, cfg *readConfig) (*DataFrame, error) {
 			// write label values as slice, offset for header rows
 			valsToWrite := csv[container][cfg.NumHeaderRows:]
 			labels[container] = valsToWrite
-			labelsIsNull[container] = setNullsFromInterface(valsToWrite)
+			// duck error because values are all string, and therefore supported
+			nulls, _ := setNullsFromInterface(valsToWrite)
+			labelsIsNull[container] = nulls
 		} else {
 			// write column values as slice, offset for label cols and header rows
 			offsetFromLabelCols := container - cfg.NumLabelLevels
 			valsToWrite := csv[container][cfg.NumHeaderRows:]
 			vals[offsetFromLabelCols] = valsToWrite
-			valsIsNull[offsetFromLabelCols] = setNullsFromInterface(valsToWrite)
+			// duck error because values are all string, and therefore supported
+			nulls, _ := setNullsFromInterface(valsToWrite)
+			valsIsNull[offsetFromLabelCols] = nulls
 		}
 	}
 
@@ -677,9 +679,13 @@ func readStruct(slice interface{}) ([]*valueContainer, error) {
 	// transfer to final container
 	ret := make([]*valueContainer, numCols)
 	for k := range ret {
+		nulls, err := setNullsFromInterface(retValues[k])
+		if err != nil {
+			return nil, fmt.Errorf("field %v: %v", k, err)
+		}
 		ret[k] = &valueContainer{
 			slice:  retValues[k],
-			isNull: setNullsFromInterface(retValues[k]),
+			isNull: nulls,
 			name:   retNames[k],
 		}
 	}
@@ -1676,10 +1682,10 @@ func copyCache(input []string) []string {
 	return ret
 }
 
-func setNullsFromInterface(input interface{}) []bool {
+func setNullsFromInterface(input interface{}) ([]bool, error) {
 	var ret []bool
-	if reflect.TypeOf(input).Kind() != reflect.Slice {
-		return nil
+	if k := reflect.TypeOf(input).Kind(); k != reflect.Slice {
+		return nil, fmt.Errorf("unsupported kind (%v); must be slice", k)
 	}
 	switch input.(type) {
 	case []float64:
@@ -1727,8 +1733,12 @@ func setNullsFromInterface(input interface{}) []bool {
 	case []interface{}:
 		vals := input.([]interface{})
 		ret = make([]bool, len(vals))
-		for i := range ret {
-			if isNullInterface(vals[i]) {
+		for i := range vals {
+			null, err := isNullInterface(vals[i])
+			if err != nil {
+				return nil, fmt.Errorf("unable to calculate null value for %v: %v", vals[i], err)
+			}
+			if null {
 				ret[i] = true
 			} else {
 				ret[i] = false
@@ -1754,30 +1764,38 @@ func setNullsFromInterface(input interface{}) []bool {
 			ret[i] = (v.Index(i).Len() == 0)
 		}
 	default:
-		return nil
+		return nil, fmt.Errorf("unable to calculate null values ([]%v not supported)", reflect.TypeOf(input).Elem())
 	}
-	return ret
+	return ret, nil
 }
 
-func isNullInterface(i interface{}) bool {
+func isNullInterface(i interface{}) (bool, error) {
 	switch i.(type) {
 	case float64:
 		f := i.(float64)
 		if math.IsNaN(f) {
-			return true
+			return true, nil
 		}
+		return false, nil
 	case string:
 		s := i.(string)
 		if isNullString(s) {
-			return true
+			return true, nil
 		}
+		return false, nil
 	case time.Time:
 		t := i.(time.Time)
 		if (time.Time{}) == t {
-			return true
+			return true, nil
 		}
+		return false, nil
+	case []float64, []string, []time.Time,
+		[]bool, []uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64, []float32,
+		bool, uint, uint8, uint16, uint32, uint64, int, int8, int16, int32, int64, float32:
+		return false, nil
+	default:
+		return false, fmt.Errorf("unsupported type: %v", reflect.TypeOf(i))
 	}
-	return false
 }
 
 func isNullString(s string) bool {
