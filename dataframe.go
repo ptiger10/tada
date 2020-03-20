@@ -1685,9 +1685,9 @@ func (df *DataFrameMutator) Filter(filters map[string]FilterFn) {
 // which is a map of container names (either column or label names) and tada.FilterFn structs.
 // If yes, returns `ifTrue` at that row position.
 // If not, returns `ifFalse` at that row position.
-// Returns a new Series named `name` with the same labels as the original Series and null status based on the supplied values.
+// Returns an unnamed Series with a copy of the labels from the original Series and null status based on the supplied values.
 // If an unsupported value type is supplied as either ifTrue or ifFalse, returns an error.
-func (df *DataFrame) Where(name string, filters map[string]FilterFn, ifTrue, ifFalse interface{}) (*Series, error) {
+func (df *DataFrame) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{}) (*Series, error) {
 	ret := make([]interface{}, df.Len())
 	// []int of positions where all filters are true
 	mergedLabelsAndColumns := append(df.labels, df.values...)
@@ -1717,7 +1717,6 @@ func (df *DataFrame) Where(name string, filters map[string]FilterFn, ifTrue, ifF
 		values: &valueContainer{
 			slice:  ret,
 			isNull: isNull,
-			name:   name,
 		},
 		labels: copyContainers(df.labels),
 	}, nil

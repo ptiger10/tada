@@ -680,9 +680,9 @@ func (s *SeriesMutator) Filter(filters map[string]FilterFn) {
 // which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
 // If yes, returns `ifTrue` at that row position.
 // If not, returns `ifFalse` at that row position.
-// Returns a new Series named `name` with the same labels as the original Series and null status based on the supplied values.
+// Returns an unnamed Series a copy of the labels from the original Series and null status based on the supplied values.
 // If an unsupported value type is supplied as either ifTrue or ifFalse, returns an error.
-func (s *Series) Where(name string, filters map[string]FilterFn, ifTrue, ifFalse interface{}) (*Series, error) {
+func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{}) (*Series, error) {
 	ret := make([]interface{}, s.Len())
 	// []int of positions where all filters are true
 	mergedLabelsAndValues := append(s.labels, s.values)
@@ -712,7 +712,6 @@ func (s *Series) Where(name string, filters map[string]FilterFn, ifTrue, ifFalse
 		values: &valueContainer{
 			slice:  ret,
 			isNull: isNull,
-			name:   name,
 		},
 		labels: copyContainers(s.labels),
 	}, nil

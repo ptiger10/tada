@@ -1673,7 +1673,7 @@ func TestDataFrame_Where(t *testing.T) {
 				ifTrue:  "yes",
 				ifFalse: 0},
 			&Series{
-				values: &valueContainer{slice: []interface{}{0, 0, "yes"}, isNull: []bool{false, false, false}, name: "foo"},
+				values: &valueContainer{slice: []interface{}{0, 0, "yes"}, isNull: []bool{false, false, false}, name: ""},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			false},
 		{"pass - nulls",
@@ -1692,7 +1692,7 @@ func TestDataFrame_Where(t *testing.T) {
 				ifTrue:  "yes",
 				ifFalse: ""},
 			&Series{
-				values: &valueContainer{slice: []interface{}{"", "", "yes"}, isNull: []bool{true, true, false}, name: "foo"},
+				values: &valueContainer{slice: []interface{}{"", "", "yes"}, isNull: []bool{true, true, false}, name: ""},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			false},
 		{"fail - bad container name",
@@ -1723,7 +1723,7 @@ func TestDataFrame_Where(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			got, err := df.Where(tt.args.name, tt.args.filters, tt.args.ifTrue, tt.args.ifFalse)
+			got, err := df.Where(tt.args.filters, tt.args.ifTrue, tt.args.ifFalse)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.Where() error = %v, wantErr %v", err, tt.wantErr)
 				return
