@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func Test_TransformData(t *testing.T) {
+func Test_transformData(t *testing.T) {
 	data := `name, score
 			joe doe,
 			john doe, -100
@@ -24,7 +24,7 @@ func Test_TransformData(t *testing.T) {
 		log.Fatal(err)
 	}
 	ret := exampleTransformData(df)
-	ok, diffs, err := ret.EqualsCSVFromString(want, false)
+	ok, diffs, err := ret.EqualsCSVFromString(want, true)
 	if err != nil {
 		log.Fatal(err)
 	}

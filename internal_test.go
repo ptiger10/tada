@@ -1651,7 +1651,7 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 		err           error
 	}
 	type args struct {
-		ignoreLabels bool
+		includeLabels bool
 	}
 	tests := []struct {
 		name    string
@@ -1668,7 +1668,7 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 			},
-			args: args{ignoreLabels: false},
+			args: args{includeLabels: true},
 			want: [][]string{
 				{"*0", "foo", "bar"},
 				{"0", "1", "a"},
@@ -1683,7 +1683,7 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 			},
-			args: args{ignoreLabels: true},
+			args: args{includeLabels: false},
 			want: [][]string{
 				{"foo", "bar"},
 				{"1", "a"},
@@ -1698,7 +1698,7 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0", "*1"},
 			},
-			args: args{ignoreLabels: false},
+			args: args{includeLabels: true},
 			want: [][]string{
 				{"", "foo", "bar"},
 				{"*0", "baz", "qux"},
@@ -1716,6 +1716,7 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 				},
 				colLevelNames: []string{"*0"},
 			},
+			args: args{includeLabels: true},
 			want: [][]string{
 				{"*0", "*1", "foo", "bar"},
 				{"0", "10", "1", "a"},
@@ -1742,7 +1743,7 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 				colLevelNames: tt.fields.colLevelNames,
 				err:           tt.fields.err,
 			}
-			got, err := df.toCSVByRows(tt.args.ignoreLabels)
+			got, err := df.toCSVByRows(tt.args.includeLabels)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.toCSVByRows() = %v, want %v", got, tt.want)
 			}

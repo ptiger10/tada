@@ -420,7 +420,7 @@ func difference(slice1 []int, slice2 []int) []int {
 	return ret
 }
 
-func (df *DataFrame) toCSVByRows(ignoreLabels bool) ([][]string, error) {
+func (df *DataFrame) toCSVByRows(includeLabels bool) ([][]string, error) {
 	if df.values == nil {
 		return nil, fmt.Errorf("cannot export empty dataframe")
 	}
@@ -428,14 +428,14 @@ func (df *DataFrame) toCSVByRows(ignoreLabels bool) ([][]string, error) {
 	ret := make([][]string, df.numColLevels()+df.Len())
 	for i := range ret {
 		var newCols int
-		if !ignoreLabels {
+		if includeLabels {
 			newCols = df.numLevels() + df.numColumns()
 		} else {
 			newCols = df.numColumns()
 		}
 		ret[i] = make([]string, newCols)
 	}
-	if !ignoreLabels {
+	if includeLabels {
 		for j := range df.labels {
 			// write label headers, index at first header row
 			ret[df.numColLevels()-1][j] = df.labels[j].name
@@ -449,7 +449,7 @@ func (df *DataFrame) toCSVByRows(ignoreLabels bool) ([][]string, error) {
 	// if there are multiple column headers, those rows will be blank above the index header
 	for k := range df.values {
 		var offset int
-		if !ignoreLabels {
+		if includeLabels {
 			offset = df.numLevels()
 		}
 		// if number of col levels is only one, return the name as a single-item slice

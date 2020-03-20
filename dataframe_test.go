@@ -3099,8 +3099,8 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 		colLevelNames []string
 	}
 	type args struct {
-		csv          [][]string
-		ignoreLabels bool
+		csv           [][]string
+		includeLabels bool
 	}
 	tests := []struct {
 		name    string
@@ -3118,7 +3118,7 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "baz"},
-			args:    args{[][]string{{"*0", "foo"}, {"0", "1"}}, false},
+			args:    args{csv: [][]string{{"*0", "foo"}, {"0", "1"}}, includeLabels: true},
 			want:    true,
 			want1:   nil,
 			wantErr: false},
@@ -3130,7 +3130,7 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "baz"},
-			args:    args{[][]string{{"foo"}, {"1"}}, true},
+			args:    args{csv: [][]string{{"foo"}, {"1"}}, includeLabels: false},
 			want:    true,
 			want1:   nil,
 			wantErr: false},
@@ -3156,7 +3156,7 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			got, got1, err := df.EqualsCSV(tt.args.csv, tt.args.ignoreLabels)
+			got, got1, err := df.EqualsCSV(tt.args.csv, tt.args.includeLabels)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.EqualsCSV() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -3180,8 +3180,8 @@ func TestDataFrame_EqualsCSVString(t *testing.T) {
 		colLevelNames []string
 	}
 	type args struct {
-		data         string
-		ignoreLabels bool
+		data          string
+		includeLabels bool
 	}
 	tests := []struct {
 		name    string
@@ -3199,7 +3199,7 @@ func TestDataFrame_EqualsCSVString(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "baz"},
-			args:    args{"*0, foo\n 0, 1", false},
+			args:    args{data: "*0, foo\n 0, 1", includeLabels: true},
 			want:    true,
 			want1:   nil,
 			wantErr: false},
@@ -3211,7 +3211,7 @@ func TestDataFrame_EqualsCSVString(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "baz"},
-			args:    args{"foo\n 1", true},
+			args:    args{data: "foo\n 1", includeLabels: false},
 			want:    true,
 			want1:   nil,
 			wantErr: false},
@@ -3237,7 +3237,7 @@ func TestDataFrame_EqualsCSVString(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			got, got1, err := df.EqualsCSVFromString(tt.args.data, tt.args.ignoreLabels)
+			got, got1, err := df.EqualsCSVFromString(tt.args.data, tt.args.includeLabels)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.EqualsCSVString() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -3372,7 +3372,7 @@ func TestDataFrame_ToCSV(t *testing.T) {
 		colLevelNames []string
 	}
 	type args struct {
-		ignoreLabels bool
+		includeLabels bool
 	}
 	tests := []struct {
 		name    string
@@ -3386,13 +3386,13 @@ func TestDataFrame_ToCSV(t *testing.T) {
 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
-			args{false},
+			args{true},
 			[][]string{{"*0", "foo"}, {"0", "a"}, {"1", "b"}}, false},
 		{"fail",
 			fields{values: nil,
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
-			args{false},
+			args{true},
 			nil, true},
 	}
 	for _, tt := range tests {
@@ -3404,7 +3404,7 @@ func TestDataFrame_ToCSV(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			got := df.ToCSV(tt.args.ignoreLabels)
+			got := df.ToCSV(tt.args.includeLabels)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.ToCSV() = %v, want %v", got, tt.want)
 			}
@@ -3421,8 +3421,8 @@ func TestDataFrame_ExportCSV(t *testing.T) {
 		colLevelNames []string
 	}
 	type args struct {
-		file         string
-		ignoreLabels bool
+		file          string
+		includeLabels bool
 	}
 	tests := []struct {
 		name    string
@@ -3449,7 +3449,7 @@ func TestDataFrame_ExportCSV(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if err := df.ExportCSV(tt.args.file, tt.args.ignoreLabels); (err != nil) != tt.wantErr {
+			if err := df.ExportCSV(tt.args.file, tt.args.includeLabels); (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.ExportCSV() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
@@ -3465,7 +3465,7 @@ func TestDataFrame_ToInterface(t *testing.T) {
 		colLevelNames []string
 	}
 	type args struct {
-		ignoreLabels bool
+		includeLabels bool
 	}
 	tests := []struct {
 		name    string
@@ -3479,13 +3479,13 @@ func TestDataFrame_ToInterface(t *testing.T) {
 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
-			args{false},
+			args{includeLabels: true},
 			[][]interface{}{{"*0", "foo"}, {"0", "a"}, {"1", "b"}}, false},
 		{"fail",
 			fields{values: nil,
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
-			args{false},
+			args{includeLabels: true},
 			nil, true},
 	}
 	for _, tt := range tests {
@@ -3497,7 +3497,7 @@ func TestDataFrame_ToInterface(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			got := df.ToInterface(tt.args.ignoreLabels)
+			got := df.ToInterface(tt.args.includeLabels)
 
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.ToInterface() = %v, want %v", got, tt.want)

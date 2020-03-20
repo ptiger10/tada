@@ -367,9 +367,9 @@ func (df *DataFrame) ToSeries() *Series {
 
 // ToCSV writes a DataFrame to a [][]string with rows as the major dimension.
 // Null values are replaced with "n/a".
-// If `ignoreLabels` is true, then the DataFrame's labels are not written.
-func (df *DataFrame) ToCSV(ignoreLabels bool) [][]string {
-	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
+// If `includeLabels` is true, then the DataFrame's labels are written.
+func (df *DataFrame) ToCSV(includeLabels bool) [][]string {
+	transposedStringValues, err := df.toCSVByRows(includeLabels)
 	if err != nil {
 		return nil
 	}
@@ -388,8 +388,9 @@ func (df *DataFrame) ToCSV(ignoreLabels bool) [][]string {
 // ExportCSV converts a DataFrame to a [][]string with rows as the major dimension,
 // and writes the output to a csv file.
 // Null values are replaced with "n/a".
-func (df *DataFrame) ExportCSV(file string, ignoreLabels bool) error {
-	ret := df.ToCSV(ignoreLabels)
+// If `includeLabels` is true, then the DataFrame's labels are written.
+func (df *DataFrame) ExportCSV(file string, includeLabels bool) error {
+	ret := df.ToCSV(includeLabels)
 	if len(ret) == 0 {
 		return fmt.Errorf("ExportCSV(): `df` cannot be empty")
 	}
@@ -403,8 +404,9 @@ func (df *DataFrame) ExportCSV(file string, ignoreLabels bool) error {
 
 // ToInterface exports a DataFrame to a [][]interface with rows as the major dimension.
 // Null values are not changed, and should be handled explicitly with DropNull() or FillNull().
-func (df *DataFrame) ToInterface(ignoreLabels bool) [][]interface{} {
-	transposedStringValues, err := df.toCSVByRows(ignoreLabels)
+// If `includeLabels` is true, then the DataFrame's labels are written.
+func (df *DataFrame) ToInterface(includeLabels bool) [][]interface{} {
+	transposedStringValues, err := df.toCSVByRows(includeLabels)
 	if err != nil {
 		return nil
 	}
@@ -422,9 +424,9 @@ func (df *DataFrame) ToInterface(ignoreLabels bool) [][]interface{} {
 
 // EqualsCSV converts `df` to csv, compares it to `data`,
 // and evaluates whether the stringified values match.
-// If `ignoreLabels` is false, considers the label levels in `df` as additional columns.
+// If `includeLabels` is true, then the DataFrame's labels are included as columns.
 // If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
-func (df *DataFrame) EqualsCSV(data [][]string, ignoreLabels bool) (bool, *tablediff.Differences, error) {
+func (df *DataFrame) EqualsCSV(data [][]string, includeLabels bool) (bool, *tablediff.Differences, error) {
 	numLines := len(data[0])
 	for i := range data {
 		if len(data[i]) != numLines {
@@ -432,17 +434,17 @@ func (df *DataFrame) EqualsCSV(data [][]string, ignoreLabels bool) (bool, *table
 				i, len(data[i]), numLines)
 		}
 	}
-	compare := df.ToCSV(ignoreLabels)
+	compare := df.ToCSV(includeLabels)
 	diffs, eq := tablediff.Diff(compare, data)
 	return eq, diffs, nil
 }
 
 // EqualsCSVFromString converts `df` to csv, compares it to the csv read from `data`,
 // and evaluates whether the two match.
-// If `ignoreLabels` is false, considers the label levels in `df` as additional columns.
+// If `includeLabels` is true, then the DataFrame's labels are included as columns.
 // If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
-func (df *DataFrame) EqualsCSVFromString(data string, ignoreLabels bool) (bool, *tablediff.Differences, error) {
-	compare := df.ToCSV(ignoreLabels)
+func (df *DataFrame) EqualsCSVFromString(data string, includeLabels bool) (bool, *tablediff.Differences, error) {
+	compare := df.ToCSV(includeLabels)
 
 	reader := strings.NewReader(data)
 	r := csv.NewReader(reader)
@@ -569,12 +571,12 @@ func (df *DataFrame) String() string {
 	}
 	var data [][]string
 	if df.Len() <= optionMaxRows {
-		data = df.ToCSV(false)
+		data = df.ToCSV(true)
 	} else {
 		// truncate rows
 		n := optionMaxRows / 2
-		topHalf := df.Head(n).ToCSV(false)
-		bottomHalf := df.Tail(n).ToCSV(false)[df.numColLevels():]
+		topHalf := df.Head(n).ToCSV(true)
+		bottomHalf := df.Tail(n).ToCSV(true)[df.numColLevels():]
 		filler := make([]string, df.numLevels()+df.numColumns())
 		for k := range filler {
 			filler[k] = "..."

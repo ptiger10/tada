@@ -185,8 +185,8 @@ func TestSeries_EqualsCSV(t *testing.T) {
 		err    error
 	}
 	type args struct {
-		csv          [][]string
-		ignoreLabels bool
+		csv           [][]string
+		includeLabels bool
 	}
 	tests := []struct {
 		name   string
@@ -199,7 +199,7 @@ func TestSeries_EqualsCSV(t *testing.T) {
 			fields: fields{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}}},
-			args:  args{[][]string{{"*0", "foo"}, {"0", "1"}}, false},
+			args:  args{csv: [][]string{{"*0", "foo"}, {"0", "1"}}, includeLabels: true},
 			want:  true,
 			want1: nil},
 	}
@@ -210,7 +210,7 @@ func TestSeries_EqualsCSV(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			got, got1 := s.EqualsCSV(tt.args.csv, tt.args.ignoreLabels)
+			got, got1 := s.EqualsCSV(tt.args.csv, tt.args.includeLabels)
 			if got != tt.want {
 				t.Errorf("Series.EqualsCSV() got = %v, want %v", got, tt.want)
 			}
@@ -228,7 +228,7 @@ func TestSeries_ToCSV(t *testing.T) {
 		err    error
 	}
 	type args struct {
-		ignoreLabels bool
+		includeLabels bool
 	}
 	tests := []struct {
 		name    string
@@ -240,17 +240,17 @@ func TestSeries_ToCSV(t *testing.T) {
 		{"pass", fields{
 			values: &valueContainer{slice: []float64{1}, name: "foo", isNull: []bool{false}},
 			labels: []*valueContainer{{slice: []int{1}, name: "bar", isNull: []bool{false}}}},
-			args{false},
+			args{true},
 			[][]string{{"bar", "foo"}, {"1", "1"}}, false},
 		{"with nulls", fields{
 			values: &valueContainer{slice: []float64{0}, name: "foo", isNull: []bool{true}},
 			labels: []*valueContainer{{slice: []int{1}, name: "bar", isNull: []bool{false}}}},
-			args{false},
+			args{true},
 			[][]string{{"bar", "foo"}, {"1", "n/a"}}, false},
 		{"fail - empty", fields{
 			values: nil,
 			labels: nil},
-			args{false},
+			args{true},
 			nil, true},
 	}
 	for _, tt := range tests {
@@ -260,7 +260,7 @@ func TestSeries_ToCSV(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			got, err := s.ToCSV(tt.args.ignoreLabels)
+			got, err := s.ToCSV(tt.args.includeLabels)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.ToCSV() error = %v, wantErr %v", err, tt.wantErr)
 				return

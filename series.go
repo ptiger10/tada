@@ -71,14 +71,16 @@ func (s *Series) ToDataFrame() *DataFrame {
 
 // EqualsCSV converts a Series to csv, compares it to another csv,
 // and evaluates whether the two match and isolates their differences.
-func (s *Series) EqualsCSV(csv [][]string, ignoreLabels bool) (bool, *tablediff.Differences) {
-	compare, _ := s.ToCSV(ignoreLabels)
+// If `includeLabels` is true, then the Series' labels are included as columns.
+func (s *Series) EqualsCSV(csv [][]string, includeLabels bool) (bool, *tablediff.Differences) {
+	compare, _ := s.ToCSV(includeLabels)
 	diffs, eq := tablediff.Diff(compare, csv)
 	return eq, diffs
 }
 
 // ToCSV converts a Series to a DataFrame and returns as [][]string.
-func (s *Series) ToCSV(ignoreLabels bool) ([][]string, error) {
+// If `includeLabels` is true, then the Series' labels are written.
+func (s *Series) ToCSV(includeLabels bool) ([][]string, error) {
 	if s.values == nil {
 		return nil, fmt.Errorf("ToCSV(): cannot export empty Series")
 	}
@@ -88,7 +90,7 @@ func (s *Series) ToCSV(ignoreLabels bool) ([][]string, error) {
 		colLevelNames: []string{"*0"},
 		err:           s.err,
 	}
-	csv := df.ToCSV(ignoreLabels)
+	csv := df.ToCSV(includeLabels)
 	return csv, nil
 }
 
