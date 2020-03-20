@@ -1,4 +1,5 @@
 github.com/ptiger10/tablediff v0.2.0 h1:CaQh9UtTzisA/4+tMSEMAA3qEjfzF/jPYb0FFuT0w5I=
 github.com/ptiger10/tablediff v0.2.0/go.mod h1:KucUzq16U5KLCReauvOf4Fi0Zp8NMe5Zr4LEQsHxtqo=
-github.com/ptiger10/tablewriter v0.2.1 h1:r63dXa1ofpCeEEv+7dBMSZ75k/A2jwBF/Xty4LP8usI=
 github.com/ptiger10/tablewriter v0.2.1/go.mod h1:41ATaQp2h910kRg0wjpd/Rvo6J2VlDQDXD2mg0yBeB0=
+github.com/ptiger10/tablewriter v0.3.1 h1:/mdjhS3tSDlav+MsQg8hgSu87v82Fg07S2EBFqr3Q9c=
+github.com/ptiger10/tablewriter v0.3.1/go.mod h1:Mf9srZNhUOCo5jAlQAYB5lAJSBPcpo6MYMBJJulIzh8=

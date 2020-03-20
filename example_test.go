@@ -247,6 +247,23 @@ func ExampleDataFrame_test_excess_rows() {
 	// +-----++-----+
 }
 
+func ExampleDataFrame_test_multi_labels() {
+	df := NewDataFrame(
+		[]interface{}{[]float64{1, 2}},
+		[]int{0, 1}, []string{"foo", "bar"},
+	).
+		SetColNames([]string{"A"}).
+		SetLabelNames([]string{"baz", "qux"})
+	fmt.Println(df)
+	// Output:
+	// +-----+-----++---+
+	// | baz | qux || A |
+	// |-----|-----||---|
+	// |   0 | foo || 1 |
+	// |   1 | bar || 2 |
+	// +-----+-----++---+
+}
+
 func ExampleDataFrame_test_excess_cols() {
 	df := NewDataFrame([]interface{}{
 		[]float64{1, 2}, []float64{3, 4}, []float64{5, 6},
