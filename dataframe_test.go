@@ -2937,11 +2937,6 @@ func TestReadMatrix(t *testing.T) {
 	}
 }
 
-type testStruct struct {
-	Name string
-	Age  int
-}
-
 func TestReadStruct(t *testing.T) {
 	type args struct {
 		slice interface{}
@@ -2952,17 +2947,21 @@ func TestReadStruct(t *testing.T) {
 		want    *DataFrame
 		wantErr bool
 	}{
-		{"pass", args{[]testStruct{{"foo", 1}, {"bar", 2}}},
+		{"pass", args{[]testStruct{{"foo", 1}, {"", 2}}},
 			&DataFrame{
 				values: []*valueContainer{
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "Name"},
-					{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "Age"}},
+					{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "Name"},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "Age"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				name:          "",
 				colLevelNames: []string{"*0"}},
 			false,
 		},
 		{"fail - bad input", args{"foo"},
+			nil,
+			true,
+		},
+		{"fail - unsupported value", args{[]testStructUnsupported{{complex64(1)}}},
 			nil,
 			true,
 		},

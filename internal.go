@@ -651,6 +651,8 @@ func defaultColsIfNoHeader(numHeaderRows int, columns []*valueContainer) ([]stri
 	return ret, columns
 }
 
+// each struct becomes a different row
+// each field becomes a different column
 func readStruct(slice interface{}) ([]*valueContainer, error) {
 	if !isSlice(slice) {
 		return nil, fmt.Errorf("unsupported kind (%v); must be slice", reflect.TypeOf(slice).Kind())
@@ -662,19 +664,23 @@ func readStruct(slice interface{}) ([]*valueContainer, error) {
 	if v.Len() == 0 {
 		return nil, fmt.Errorf("slice must contain at least one struct")
 	}
-	strct := v.Index(0)
-	numCols := strct.NumField()
-	retValues := make([][]string, numCols)
+	firstStruct := v.Index(0)
+	numCols := firstStruct.NumField()
+	if numCols == 0 {
+		return nil, fmt.Errorf("struct must contain at least one field")
+	}
+	retValues := make([]interface{}, numCols)
 	retNames := make([]string, numCols)
 	for k := 0; k < numCols; k++ {
+		colType := reflect.TypeOf(firstStruct.Field(k).Interface())
+		colValues := reflect.MakeSlice(reflect.SliceOf(colType), v.Len(), v.Len())
+		retNames[k] = v.Index(0).Type().Field(k).Name
 		for i := 0; i < v.Len(); i++ {
-			strct := v.Index(i)
-			if i == 0 {
-				retNames[k] = strct.Type().Field(k).Name
-				retValues[k] = make([]string, v.Len())
-			}
-			retValues[k][i] = fmt.Sprint(strct.Field(k).Interface())
+			dst := colValues.Index(i)
+			src := v.Index(i).Field(k)
+			dst.Set(src)
 		}
+		retValues[k] = colValues.Interface()
 	}
 	// transfer to final container
 	ret := make([]*valueContainer, numCols)

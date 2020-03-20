@@ -1911,6 +1911,18 @@ func Test_readCSVByCols(t *testing.T) {
 	}
 }
 
+type testStruct struct {
+	Name string
+	Age  int
+}
+
+type testStructUnsupported struct {
+	Age complex64
+}
+
+type testStructNoFields struct {
+}
+
 func Test_readStruct(t *testing.T) {
 	type args struct {
 		slice interface{}
@@ -1924,13 +1936,22 @@ func Test_readStruct(t *testing.T) {
 		{"pass", args{[]testStruct{{"foo", 1}, {"bar", 2}}},
 			[]*valueContainer{
 				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "Name"},
-				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "Age"}},
+				{slice: []int{1, 2}, isNull: []bool{false, false}, name: "Age"}},
+			false},
+		{"pass - partial", args{[]testStruct{{Name: "foo"}, {Name: "bar"}}},
+			[]*valueContainer{
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "Name"},
+				{slice: []int{0, 0}, isNull: []bool{false, false}, name: "Age"}},
 			false},
 		{"fail - not slice", args{testStruct{"foo", 1}},
 			nil, true},
 		{"fail - not struct", args{[]string{"foo"}},
 			nil, true},
 		{"fail - empty", args{[]testStruct{}},
+			nil, true},
+		{"fail - no fields", args{[]testStructNoFields{{}}},
+			nil, true},
+		{"fail - unsupported value", args{[]testStructUnsupported{{complex64(1)}}},
 			nil, true},
 	}
 	for _, tt := range tests {
