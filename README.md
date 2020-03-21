@@ -18,7 +18,7 @@ Some notable features of tada:
 * seamlessly handles null data and type conversions
 * well-suited to conventional IDE-based programming, but also supports exploratory notebook usage
 * robust datetime support
-* advanced filtering, grouping, sorting, and pivoting
+* advanced filtering, lookups and merging, grouping, sorting, and pivoting
 * multi-level labels and columns
 * complete test coverage
 * comparable to pandas [performance](comparison_summary.txt) on key operations

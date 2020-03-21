@@ -1936,6 +1936,7 @@ func (df *DataFrame) Lookup(other *DataFrame) *DataFrame {
 }
 
 // LookupAdvanced performs the lookup portion of a join of `other` onto `df` matching on the container keys specified.
+// Supported `how` options: left, right, inner.
 //
 // LookupAdvanced identifies the row alignment between `df` and `other` and returns the aligned values.
 // Rows are aligned when:

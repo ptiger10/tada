@@ -12,7 +12,7 @@
 //
 // * robust datetime support
 //
-// * advanced filtering, grouping, sorting, and pivoting
+// * advanced filtering, lookups and merging, grouping, sorting, and pivoting
 //
 // * multi-level labels and columns
 //

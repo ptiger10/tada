@@ -825,6 +825,7 @@ func (s *Series) Lookup(other *Series) *Series {
 }
 
 // LookupAdvanced performs the lookup portion of a join of `other` onto `s` matching on the container keys specified.
+// Supported `how` options: left, right, inner.
 //
 // LookupAdvanced identifies the row alignment between `s` and `other` and returns the aligned values.
 // Rows are aligned when:
