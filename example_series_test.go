@@ -53,6 +53,123 @@ func ExampleSeries_nestedSlice() {
 	// +---++-----------+
 }
 
+func ExampleSeries_Cut() {
+	s := NewSeries([]float64{1, 3, 5}).SetName("foo")
+	fmt.Println(s)
+
+	fmt.Println(s.Cut([]float64{0, 2, 4}, nil))
+	// Output:
+	// +---++-----+
+	// | - || foo |
+	// |---||-----|
+	// | 0 ||   1 |
+	// | 1 ||   3 |
+	// | 2 ||   5 |
+	// +---++-----+
+	//
+	// +---++-----+
+	// | - || foo |
+	// |---||-----|
+	// | 0 || 0-2 |
+	// | 1 || 2-4 |
+	// | 2 || n/a |
+	// +---++-----+
+}
+
+func ExampleSeries_Cut_andMore() {
+	s := NewSeries([]float64{1, 3, 5}).SetName("foo")
+	fmt.Println(s)
+
+	fmt.Println(s.Cut([]float64{0, 2, 4}, &Cutter{AndMore: true}))
+	// Output:
+	// +---++-----+
+	// | - || foo |
+	// |---||-----|
+	// | 0 ||   1 |
+	// | 1 ||   3 |
+	// | 2 ||   5 |
+	// +---++-----+
+	//
+	// +---++-----+
+	// | - || foo |
+	// |---||-----|
+	// | 0 || 0-2 |
+	// | 1 || 2-4 |
+	// | 2 ||  >4 |
+	// +---++-----+
+}
+
+func ExampleSeries_Cut_customLabels() {
+	s := NewSeries([]float64{1, 3}).SetName("foo")
+	fmt.Println(s)
+
+	fmt.Println(s.Cut([]float64{0, 2, 4}, &Cutter{Labels: []string{"low", "high"}}))
+	// Output:
+	// +---++-----+
+	// | - || foo |
+	// |---||-----|
+	// | 0 ||   1 |
+	// | 1 ||   3 |
+	// +---++-----+
+	//
+	// +---++------+
+	// | - || foo  |
+	// |---||------|
+	// | 0 ||  low |
+	// | 1 || high |
+	// +---++------+
+}
+
+func ExampleSeries_PercentileCut() {
+	s := NewSeries([]float64{1, 2, 3, 4}).SetName("foo")
+	fmt.Println(s)
+
+	fmt.Println(s.PercentileCut([]float64{0, .5, 1}, nil))
+	// Output:
+	// +---++-----+
+	// | - || foo |
+	// |---||-----|
+	// | 0 ||   1 |
+	// | 1 ||   2 |
+	// | 2 ||   3 |
+	// | 3 ||   4 |
+	// +---++-----+
+	//
+	// +---++-------+
+	// | - ||  foo  |
+	// |---||-------|
+	// | 0 || 0-0.5 |
+	// | 1 ||       |
+	// | 2 || 0.5-1 |
+	// | 3 ||       |
+	// +---++-------+
+}
+
+func ExampleSeries_PercentileCut_customLabels() {
+	s := NewSeries([]float64{1, 2, 3, 4}).SetName("foo")
+	fmt.Println(s)
+
+	fmt.Println(s.PercentileCut([]float64{0, .5, 1}, []string{"Bottom 50%", "Top 50%"}))
+	// Output:
+	// +---++-----+
+	// | - || foo |
+	// |---||-----|
+	// | 0 ||   1 |
+	// | 1 ||   2 |
+	// | 2 ||   3 |
+	// | 3 ||   4 |
+	// +---++-----+
+	//
+	// +---++------------+
+	// | - ||    foo     |
+	// |---||------------|
+	// | 0 || Bottom 50% |
+	// | 1 ||            |
+	// | 2 ||    Top 50% |
+	// | 3 ||            |
+	// +---++------------+
+}
+
 func ExampleSeries_Lookup() {
 	s := NewSeries([]float64{1, 2}, []int{0, 1}).SetName("foo")
 	fmt.Println("--original Series--")
