@@ -87,7 +87,7 @@ func TransformData(df *tada.DataFrame) *tada.DataFrame {
   return df.GroupBy("name").Mean("score")
 }
 ```
-
+More [examples](https://godoc.org/github.com/ptiger10/tada#pkg-examples)
 Extended [tutorial](tutorial.ipynb)
 
 
@@ -103,7 +103,7 @@ Extended [tutorial](tutorial.ipynb)
 ### Reading from CSV
 `df := tada.ImportCSV("foo.csv")`
 
-See [examples](https://pkg.go.dev/github.com/ptiger10/tada?tab=doc#pkg-examples)
+More [examples](https://godoc.org/github.com/ptiger10/tada#pkg-examples)
 
 ## Using with Jupyter notebooks
 * Follow the instructions for installing [gophernotes](https://github.com/gopherdata/gophernotes), including jupyter.
