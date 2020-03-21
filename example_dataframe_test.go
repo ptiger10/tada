@@ -307,6 +307,38 @@ func ExampleDataFrame_WithCol_append() {
 	// +---++-----+-------+
 }
 
+func ExampleDataFrame_Sort() {
+	df := NewDataFrame([]interface{}{
+		[]float64{2, 2, 1}, []string{"b", "c", "a"}},
+	).
+		SetColNames([]string{"foo", "bar"})
+	fmt.Println(df)
+
+	// first sort by foo in ascending order, then sort by bar in descending order
+	ret := df.Sort(
+		// Float64 is the default sorting DType, and ascending is the default ordering
+		Sorter{Name: "foo"},
+		Sorter{Name: "bar", DType: String, Descending: true},
+	)
+	fmt.Println(ret)
+	// Output:
+	// +---++-----+-----+
+	// | - || foo | bar |
+	// |---||-----|-----|
+	// | 0 ||   2 |   b |
+	// | 1 ||     |   c |
+	// | 2 ||   1 |   a |
+	// +---++-----+-----+
+	//
+	// +---++-----+-----+
+	// | - || foo | bar |
+	// |---||-----|-----|
+	// | 2 ||   1 |   a |
+	// | 1 ||   2 |   c |
+	// | 0 ||     |   b |
+	// +---++-----+-----+
+}
+
 func ExampleDataFrame_Filter_float64() {
 	dt1 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	dt2 := dt1.AddDate(0, 0, 1)
