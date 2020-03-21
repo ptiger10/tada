@@ -15,6 +15,48 @@ import (
 
 // -- CONSTRUCTORS
 
+// NewDataFrame creates a new DataFrame with `slices` (akin to column values) and optional `labels`.
+// `Slices` must be comprised of supported slices, and each `label` must be a supported slice.
+//
+// If no `labels` are supplied, a default label level is inserted ([]int incrementing from 0).
+// Columns are named sequentially (e.g., 0, 1, etc) by default. Default column names are displayed on printing.
+// Label levels are named *n (e.g., *0, *1, etc) by default. Default label names are hidden on printing.
+//
+// Supported slice types: all variants of []float, []int, & []uint,
+// []string, []bool, []time.Time, []interface{},
+// and 2-dimensional variants of each (e.g., [][]string, [][]float64).
+func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
+	if slices == nil && labels == nil {
+		return dataFrameWithError(fmt.Errorf("NewSeries(): `slices` and `labels` cannot both be nil"))
+	}
+	var values []*valueContainer
+	var err error
+	if slices != nil {
+		// handle values
+		values, err = makeValueContainersFromInterfaces(slices, false)
+		if err != nil {
+			return dataFrameWithError(fmt.Errorf("NewDataFrame(): `slices`: %v", err))
+		}
+	}
+	// handle labels
+	retLabels, err := makeValueContainersFromInterfaces(labels, true)
+	if err != nil {
+		return dataFrameWithError(fmt.Errorf("NewDataFrame(): `labels`: %v", err))
+	}
+	if len(retLabels) == 0 {
+		// handle default labels
+		numRows := reflect.ValueOf(slices[0]).Len()
+		defaultLabels := makeDefaultLabels(0, numRows, true)
+		retLabels = append(retLabels, defaultLabels)
+	}
+	if slices == nil {
+		// default values
+		defaultValues := makeDefaultLabels(0, reflect.ValueOf(labels[0]).Len(), false)
+		values = append(values, defaultValues)
+	}
+	return &DataFrame{values: values, labels: retLabels, colLevelNames: []string{"*0"}}
+}
+
 // MakeMultiLevelLabels expects `labels` to be a slice of slices.
 // It returns a product of these slices by repeating each label value n times,
 // where n is the number of unique label values in the other slices.
@@ -66,44 +108,6 @@ func MakeMultiLevelLabels(labels []interface{}) ([]interface{}, error) {
 	}
 
 	return ret, nil
-}
-
-// NewDataFrame creates a new DataFrame with `slices` (akin to column values)
-// and optional `labels` (akin to named index values).
-// `Slices` must be comprised of slices, and each `label` must be a slice.
-// Acceptable slice types: all variants of []float, []int, & []uint,
-// [][]byte, []string, []bool, []time.Time, []interface{},
-// and 2-dimensional variants of each (e.g., [][]string, [][]float64).
-func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
-	if slices == nil && labels == nil {
-		return dataFrameWithError(fmt.Errorf("NewSeries(): `slices` and `labels` cannot both be nil"))
-	}
-	var values []*valueContainer
-	var err error
-	if slices != nil {
-		// handle values
-		values, err = makeValueContainersFromInterfaces(slices, false)
-		if err != nil {
-			return dataFrameWithError(fmt.Errorf("NewDataFrame(): `slices`: %v", err))
-		}
-	}
-	// handle labels
-	retLabels, err := makeValueContainersFromInterfaces(labels, true)
-	if err != nil {
-		return dataFrameWithError(fmt.Errorf("NewDataFrame(): `labels`: %v", err))
-	}
-	if len(retLabels) == 0 {
-		// handle default labels
-		numRows := reflect.ValueOf(slices[0]).Len()
-		defaultLabels := makeDefaultLabels(0, numRows, true)
-		retLabels = append(retLabels, defaultLabels)
-	}
-	if slices == nil {
-		// default values
-		defaultValues := makeDefaultLabels(0, reflect.ValueOf(labels[0]).Len(), false)
-		values = append(values, defaultValues)
-	}
-	return &DataFrame{values: values, labels: retLabels, colLevelNames: []string{"*0"}}
 }
 
 // Copy returns a new DataFrame with identical values as the original but no shared objects
@@ -200,12 +204,15 @@ func ReadOptionSwitchDims() func(*readConfig) {
 }
 
 // ReadCSV reads `data` into a DataFrame (configured by `options`).
-// The standard csv library NewReader().ReadAll() method returns [][]string (with rows as major dimension),
-// and allows for custom Comment, and LazyQuotes configuration.
+// Often used with (encoding/csv) csv.NewReader().ReadAll()
 // Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionSwitchDims.
 //
 // Default if no options are supplied:
 // 1 header row, no labels, rows as major dimension
+//
+// If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
+// If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing.
+// Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
 func ReadCSV(data [][]string, options ...func(*readConfig)) (ret *DataFrame, err error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("ReadCSV(): `data` must have at least one row")
@@ -234,6 +241,10 @@ func ReadCSV(data [][]string, options ...func(*readConfig)) (ret *DataFrame, err
 //
 // Default if no options are supplied:
 // 1 header row, no labels, field delimiter is ","
+//
+// If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
+// If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing
+// Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
 func ReadCSVFromString(data string, options ...func(*readConfig)) (*DataFrame, error) {
 	if data == "" {
 		return nil, fmt.Errorf("ReadCSVFromString(): `data` cannot be empty")
@@ -242,8 +253,9 @@ func ReadCSVFromString(data string, options ...func(*readConfig)) (*DataFrame, e
 
 	reader := strings.NewReader(data)
 	r := csv.NewReader(reader)
+	r.Comma = config.Delimiter
+
 	r.TrimLeadingSpace = true
-	r.LazyQuotes = true
 	records, err := r.ReadAll()
 	if err != nil {
 		return nil, fmt.Errorf("ReadCSVFromString(): %v", err)
@@ -258,6 +270,10 @@ func ReadCSVFromString(data string, options ...func(*readConfig)) (*DataFrame, e
 //
 // Default if no options are supplied:
 // 1 header row, no labels, field delimiter is ",", rows as major dimension
+//
+// If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
+// If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing
+// Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
 func ImportCSV(path string, options ...func(*readConfig)) (*DataFrame, error) {
 	config := setReadConfig(options)
 	data, err := ioutil.ReadFile(path)
@@ -284,6 +300,10 @@ func ImportCSV(path string, options ...func(*readConfig)) (*DataFrame, error) {
 //
 // Default if no options are supplied:
 // 1 header row, no labels, rows as major dimension
+//
+// If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
+// If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing
+// Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
 func ReadInterface(data [][]interface{}, options ...func(*readConfig)) (ret *DataFrame, err error) {
 	if len(data) == 0 {
 		return nil, fmt.Errorf("ReadInterface(): `data` must have at least one row")
@@ -340,6 +360,8 @@ func ReadMatrix(mat Matrix) *DataFrame {
 
 // ReadStruct reads a `slice` of structs into a DataFrame with field names converted to column names,
 // field values converted to column values, and default labels. The structs must all be of the same type.
+//
+// A default label level named *0 is inserted ([]int incrementing from 0). Default label names are hidden on printing.
 func ReadStruct(slice interface{}) (*DataFrame, error) {
 	values, err := readStruct(slice)
 	if err != nil {
@@ -1616,7 +1638,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container.
 //
-// Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retains their original type.
 // For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
@@ -1634,7 +1656,7 @@ func (df *DataFrame) Filter(filters map[string]FilterFn) *DataFrame {
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container.
 //
-// Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retains their original type.
 // For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
@@ -1660,6 +1682,8 @@ func (df *DataFrameMutator) Filter(filters map[string]FilterFn) {
 // which is a map of container names (either column or label names) and tada.FilterFn structs.
 // If yes, returns `ifTrue` at that row position.
 // If not, returns `ifFalse` at that row position.
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retains their original type.
+//
 // Returns an unnamed Series with a copy of the labels from the original Series and null status based on the supplied values.
 // If an unsupported value type is supplied as either ifTrue or ifFalse, returns an error.
 func (df *DataFrame) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{}) (*Series, error) {

@@ -1,7 +1,9 @@
 package tada
 
 import (
+	"encoding/csv"
 	"log"
+	"strings"
 	"testing"
 )
 
@@ -19,10 +21,16 @@ func Test_transformData(t *testing.T) {
 			jane doe, 9
 			john doe, 5`
 
-	df, err := ReadCSVFromString(data)
+	// this block is equivalent to ReadCSVFromString(data)
+	r := strings.NewReader(data)
+	cr := csv.NewReader(r)
+	cr.TrimLeadingSpace = true
+	records, err := cr.ReadAll()
 	if err != nil {
 		log.Fatal(err)
 	}
+	df, _ := ReadCSV(records)
+
 	ret := exampleTransformData(df)
 	ok, diffs, err := ret.EqualsCSVFromString(want, true)
 	if err != nil {

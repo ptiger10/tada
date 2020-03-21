@@ -10,49 +10,122 @@ import (
 	"time"
 )
 
-func ExampleSeries() {
-	s := NewSeries([]float64{1, 2}).SetName("foo")
-	fmt.Println(s)
+func ExampleReadCSV() {
+	data := [][]string{
+		{"foo", "bar"},
+		{"baz", "qux"},
+		{"corge", "fred"},
+	}
+	df, _ := ReadCSV(data)
+	fmt.Println(df)
 	// Output:
-	// +---++-----+
-	// | - || foo |
-	// |---||-----|
-	// | 0 ||   1 |
-	// | 1 ||   2 |
-	// +---++-----+
+	// +---++-------+------+
+	// | - ||  foo  | bar  |
+	// |---||-------|------|
+	// | 0 ||   baz |  qux |
+	// | 1 || corge | fred |
+	// +---++-------+------+
 }
 
-func ExampleSeries_withError() {
-	s := &Series{err: errors.New("foo")}
-	fmt.Println(s)
+func ExampleReadCSV_noHeaders() {
+	data := [][]string{
+		{"foo", "bar"},
+		{"baz", "qux"},
+		{"corge", "fred"},
+	}
+	df, _ := ReadCSV(data, ReadOptionHeaders(0))
+	fmt.Println(df)
 	// Output:
-	// Error: foo
+	// +---++-------+------+
+	// | - ||   0   |  1   |
+	// |---||-------|------|
+	// | 0 ||   foo |  bar |
+	// | 1 ||   baz |  qux |
+	// | 2 || corge | fred |
+	// +---++-------+------+
 }
 
-func ExampleSeries_withNullValues() {
-	s := NewSeries([]string{"foo", ""})
-	fmt.Println(s)
+func ExampleReadCSV_multipleHeaders() {
+	data := [][]string{
+		{"foo", "bar"},
+		{"baz", "qux"},
+		{"corge", "fred"},
+	}
+	df, _ := ReadCSV(data, ReadOptionHeaders(2))
+	fmt.Println(df)
 	// Output:
-	// +---++-----+
-	// | - ||  0  |
-	// |---||-----|
-	// | 0 || foo |
-	// | 1 || n/a |
-	// +---++-----+
+	// +----++-------+------+
+	// |    ||  foo  | bar  |
+	// | *0 ||  baz  | qux  |
+	// |----||-------|------|
+	// |  0 || corge | fred |
+	// +----++-------+------+
 }
 
-func ExampleSeries_nestedSlice() {
-	s := NewSeries([][]string{{"foo", "bar"}, {"baz"}, {}}).
-		SetName("a")
-	fmt.Println(s)
+func ExampleReadCSV_withLabels() {
+	data := [][]string{
+		{"foo", "bar"},
+		{"baz", "qux"},
+		{"corge", "fred"},
+	}
+	df, _ := ReadCSV(data, ReadOptionLabels(1))
+	fmt.Println(df)
 	// Output:
-	// +---++-----------+
-	// | - ||     a     |
-	// |---||-----------|
-	// | 0 || [foo bar] |
-	// | 1 ||     [baz] |
-	// | 2 ||       n/a |
-	// +---++-----------+
+	// +-------++------+
+	// |  foo  || bar  |
+	// |-------||------|
+	// |   baz ||  qux |
+	// | corge || fred |
+	// +-------++------+
+}
+
+func ExampleReadCSV_colsAsMajorDimension() {
+	data := [][]string{
+		{"foo", "bar"},
+		{"baz", "qux"},
+		{"corge", "fred"},
+	}
+	df, _ := ReadCSV(data, ReadOptionSwitchDims())
+	fmt.Println(df)
+	// Output:
+	// +---++-----+-----+-------+
+	// | - || foo | baz | corge |
+	// |---||-----|-----|-------|
+	// | 0 || bar | qux |  fred |
+	// +---++-----+-----+-------+
+}
+
+func ExampleReadCSVFromString() {
+	data := `
+foo,bar
+baz,qux
+corge,fred`
+
+	df, _ := ReadCSVFromString(data)
+	fmt.Println(df)
+	// Output:
+	// +---++-------+------+
+	// | - ||  foo  | bar  |
+	// |---||-------|------|
+	// | 0 ||   baz |  qux |
+	// | 1 || corge | fred |
+	// +---++-------+------+
+}
+
+func ExampleReadCSVFromString_withDelimiter() {
+	data := `foo|bar
+baz|qux
+corge|fred`
+
+	df, _ := ReadCSVFromString(data, ReadOptionDelimiter('|'))
+	fmt.Println(df)
+	// Output:
+	// +---++-------+------+
+	// | - ||  foo  | bar  |
+	// |---||-------|------|
+	// | 0 ||   baz |  qux |
+	// | 1 || corge | fred |
+	// +---++-------+------+
 }
 
 func ExampleDataFrame() {
@@ -134,14 +207,48 @@ func ExampleDataFrame_SetLabelNames_multiple() {
 	// +-----+-----++---+
 }
 
+func ExampleDataFrameMutator_WithCol_rename() {
+	df := NewDataFrame([]interface{}{
+		[]float64{1, 2}},
+	).
+		SetColNames([]string{"foo"})
+	fmt.Println(df)
+
+	df.InPlace().WithCol("foo", "qux")
+	fmt.Println(df)
+	// Output:
+	// +---++-----+
+	// | - || foo |
+	// |---||-----|
+	// | 0 ||   1 |
+	// | 1 ||   2 |
+	// +---++-----+
+	//
+	// +---++-----+
+	// | - || qux |
+	// |---||-----|
+	// | 0 ||   1 |
+	// | 1 ||   2 |
+	// +---++-----+
+}
+
 func ExampleDataFrame_WithCol_rename() {
 	df := NewDataFrame([]interface{}{
 		[]float64{1, 2}},
 	).
 		SetColNames([]string{"foo"})
+	fmt.Println(df)
+
 	ret := df.WithCol("foo", "qux")
 	fmt.Println(ret)
 	// Output:
+	// +---++-----+
+	// | - || foo |
+	// |---||-----|
+	// | 0 ||   1 |
+	// | 1 ||   2 |
+	// +---++-----+
+	//
 	// +---++-----+
 	// | - || qux |
 	// |---||-----|
@@ -155,9 +262,18 @@ func ExampleDataFrame_WithCol_overwrite() {
 		[]float64{1, 2}},
 	).
 		SetColNames([]string{"foo"})
+	fmt.Println(df)
+
 	ret := df.WithCol("foo", []string{"baz", "qux"})
 	fmt.Println(ret)
 	// Output:
+	// +---++-----+
+	// | - || foo |
+	// |---||-----|
+	// | 0 ||   1 |
+	// | 1 ||   2 |
+	// +---++-----+
+	//
 	// +---++-----+
 	// | - || foo |
 	// |---||-----|
@@ -171,9 +287,18 @@ func ExampleDataFrame_WithCol_append() {
 		[]float64{1, 2}},
 	).
 		SetColNames([]string{"foo"})
+	fmt.Println(df)
+
 	ret := df.WithCol("bar", []bool{false, true})
 	fmt.Println(ret)
 	// Output:
+	// +---++-----+
+	// | - || foo |
+	// |---||-----|
+	// | 0 ||   1 |
+	// | 1 ||   2 |
+	// +---++-----+
+	//
 	// +---++-----+-------+
 	// | - || foo |  bar  |
 	// |---||-----|-------|
@@ -189,11 +314,19 @@ func ExampleDataFrame_Filter_float64() {
 		[]float64{1, 2}, []string{"corge", "fred"}, []time.Time{dt1, dt2}},
 	).
 		SetColNames([]string{"foo", "bar", "baz"})
+	fmt.Println(df)
 
 	gt1 := FilterFn{Float64: func(v float64) bool { return v > 1 }}
 	ret := df.Filter(map[string]FilterFn{"foo": gt1})
 	fmt.Println(ret)
 	// Output:
+	// +---++-----+-------+----------------------+
+	// | - || foo |  bar  |         baz          |
+	// |---||-----|-------|----------------------|
+	// | 0 ||   1 | corge | 2020-01-01T00:00:00Z |
+	// | 1 ||   2 |  fred | 2020-01-02T00:00:00Z |
+	// +---++-----+-------+----------------------+
+	//
 	// +---++-----+------+----------------------+
 	// | - || foo | bar  |         baz          |
 	// |---||-----|------|----------------------|
@@ -208,11 +341,19 @@ func ExampleDataFrame_Filter_string() {
 		[]float64{1, 2}, []string{"corge", "fred"}, []time.Time{dt1, dt2}},
 	).
 		SetColNames([]string{"foo", "bar", "baz"})
+	fmt.Println(df)
 
 	containsD := FilterFn{String: func(v string) bool { return strings.Contains(v, "d") }}
 	ret := df.Filter(map[string]FilterFn{"bar": containsD})
 	fmt.Println(ret)
 	// Output:
+	// +---++-----+-------+----------------------+
+	// | - || foo |  bar  |         baz          |
+	// |---||-----|-------|----------------------|
+	// | 0 ||   1 | corge | 2020-01-01T00:00:00Z |
+	// | 1 ||   2 |  fred | 2020-01-02T00:00:00Z |
+	// +---++-----+-------+----------------------+
+	//
 	// +---++-----+------+----------------------+
 	// | - || foo | bar  |         baz          |
 	// |---||-----|------|----------------------|
@@ -227,11 +368,19 @@ func ExampleDataFrame_Filter_dateTime() {
 		[]float64{1, 2}, []string{"corge", "fred"}, []time.Time{dt1, dt2}},
 	).
 		SetColNames([]string{"foo", "bar", "baz"})
+	fmt.Println(df)
 
 	afterDate := FilterFn{DateTime: func(v time.Time) bool { return v.After(dt1) }}
 	ret := df.Filter(map[string]FilterFn{"baz": afterDate})
 	fmt.Println(ret)
 	// Output:
+	// +---++-----+-------+----------------------+
+	// | - || foo |  bar  |         baz          |
+	// |---||-----|-------|----------------------|
+	// | 0 ||   1 | corge | 2020-01-01T00:00:00Z |
+	// | 1 ||   2 |  fred | 2020-01-02T00:00:00Z |
+	// +---++-----+-------+----------------------+
+	//
 	// +---++-----+------+----------------------+
 	// | - || foo | bar  |         baz          |
 	// |---||-----|------|----------------------|
@@ -246,6 +395,7 @@ func ExampleDataFrame_Filter_interface() {
 		[]int{1, 2}, []string{"corge", "fred"}, []time.Time{dt1, dt2}},
 	).
 		SetColNames([]string{"foo", "bar", "baz"})
+	fmt.Println(df)
 
 	gt1 := FilterFn{Interface: func(v interface{}) bool {
 		val, ok := v.(int)
@@ -257,6 +407,13 @@ func ExampleDataFrame_Filter_interface() {
 	ret := df.Filter(map[string]FilterFn{"foo": gt1})
 	fmt.Println(ret)
 	// Output:
+	// +---++-----+-------+----------------------+
+	// | - || foo |  bar  |         baz          |
+	// |---||-----|-------|----------------------|
+	// | 0 ||   1 | corge | 2020-01-01T00:00:00Z |
+	// | 1 ||   2 |  fred | 2020-01-02T00:00:00Z |
+	// +---++-----+-------+----------------------+
+	//
 	// +---++-----+------+----------------------+
 	// | - || foo | bar  |         baz          |
 	// |---||-----|------|----------------------|
@@ -264,6 +421,31 @@ func ExampleDataFrame_Filter_interface() {
 	// +---++-----+------+----------------------+
 }
 
+func ExampleDataFrame_Where() {
+	df := NewDataFrame([]interface{}{
+		[]int{1, 2}},
+	).
+		SetColNames([]string{"foo"})
+	fmt.Println(df)
+
+	gt1 := FilterFn{Float64: func(v float64) bool { return v > 1 }}
+	ret, _ := df.Where(map[string]FilterFn{"foo": gt1}, true, false)
+	fmt.Println(ret)
+	// Output:
+	// +---++-----+
+	// | - || foo |
+	// |---||-----|
+	// | 0 ||   1 |
+	// | 1 ||   2 |
+	// +---++-----+
+	//
+	// +---++-------+
+	// | - ||       |
+	// |---||-------|
+	// | 0 || false |
+	// | 1 ||  true |
+	// +---++-------+
+}
 func ExamplePrintOptionMaxRows() {
 	df := NewDataFrame([]interface{}{
 		[]float64{1, 2, 3, 4, 5, 6, 7, 8}}).SetColNames([]string{"A"})
@@ -301,17 +483,4 @@ func ExamplePrintOptionMaxColumns() {
 	// | 0 || 1 | ... | 5 |
 	// | 1 || 2 |     | 6 |
 	// +---++---+-----+---+
-}
-
-func ExampleGroupedSeries() {
-	s := NewSeries([]float64{1, 2, 3, 4}, []string{"foo", "foo", "bar", "bar"})
-	fmt.Println(s.GroupBy("*0"))
-	// Output:
-	// Groups: foo,bar
-}
-func ExampleGroupedSeries_compoundGroup() {
-	s := NewSeries([]float64{1, 2}, []string{"foo", "foo"}, []string{"bar", "bar"})
-	fmt.Println(s.GroupBy("*0", "*1"))
-	// Output:
-	// Groups: foo|bar
 }

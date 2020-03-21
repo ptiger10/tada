@@ -420,6 +420,17 @@ func TestReadCSVFromString(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			false,
 		},
+		{"pass - custom delimiter",
+			args{"foo|bar\n 0|1", []func(*readConfig){ReadOptionDelimiter('|')}},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"0"}, isNull: []bool{false}, name: "foo"},
+					{slice: []string{"1"}, isNull: []bool{false}, name: "bar"},
+				},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			false,
+		},
 		{"fail - rows - misaligned",
 			args{"foo\n bar, baz", nil},
 			nil,

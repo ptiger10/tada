@@ -56,8 +56,14 @@ func Test_TransformData(t *testing.T) {
            jane doe, 9
            john doe, 6`
 
-  df, err := tada.ReadCSVFromString(data)
-    ... handle err
+
+  // this block is equivalent to tada.ReadCSVFromString(data)
+	r := strings.NewReader(data)
+	cr := csv.NewReader(r)
+	cr.TrimLeadingSpace = true
+	records, err := cr.ReadAll()
+	... handle err
+	df, _ := ReadCSV(records)
 
   ret := TransformData(df)
   ok, diffs, err := ret.EqualsCSVFromString(want)
@@ -85,7 +91,7 @@ func TransformData(df *tada.DataFrame) *tada.DataFrame {
 Extended [tutorial](tutorial.ipynb)
 
 
-## Basic usage
+## Usage
 ### Constructor:
 #### Series
 `s := tada.Series([]float{1,2,3})`
@@ -94,27 +100,10 @@ Extended [tutorial](tutorial.ipynb)
 #### DataFrame
 `df := tada.DataFrame([]interface{}{[]string{"foo"}, []float{2}})`
 
-### Reading from:
-#### CSV file
+### Reading from CSV
 `df := tada.ImportCSV("foo.csv")`
-#### CSV data as nested slice
-`df := tada.ReadCSV([][]string{{"foo", "bar"}, {"baz", "qux}})`
-#### Nested interface
-`df := tada.ReadInterface([][]interface{}{[]float64{1, 2, 3}})`
-#### Structs
-`df := tada.ReadStruct([]ExampleStruct{{n: 1}, {n: 2}})`
-#### gonum.Matrix
-`df := tada.ReadMatrix(mat.NewDense(2, 1, []float64{1, 2}))`
 
-### With options:
-#### Designating the first row as column headers
-`df := tada.ImportCSV("foo.csv", tada.ReadOptionHeaders(1))`
-#### Designating the first two columns as label levels
-`df := tada.ImportCSV("foo.csv", tada.ReadOptionLabels(2))`
-#### Using a custom comma delimiter
-`df := tada.ImportCSV("foo.csv", tada.ReadOptionDelimiter('|'))`
-#### Using columns as the major dimension
-`df := tada.ImportCSV("foo.csv", tada.ReadOptionSwitchDims())`
+See [examples](https://pkg.go.dev/github.com/ptiger10/tada?tab=doc#pkg-examples)
 
 ## Using with Jupyter notebooks
 * Follow the instructions for installing [gophernotes](https://github.com/gopherdata/gophernotes), including jupyter.
@@ -127,3 +116,6 @@ One of the biggest limitations of gophernotes is that it does not provide signat
 
 [Sample Notebook](tutorial.ipynb)
 
+## Performance Tuning
+* Modify a Series or DataFrame in place (without returning a new copy) by first calling `InPlace()`.
+* If you expect to use a column as numeric, string, or time.Time values multiple times, `Cast()` it to `tada.Float64`, `tada.String`, or `tada.DateTime`, respectively.

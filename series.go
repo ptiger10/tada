@@ -11,10 +11,16 @@ import (
 
 // -- CONSTRUCTORS
 
-// NewSeries constructs a Series from a slice of values and optional label slices.
-// Supported underlying slice types: real numbers, string, time.Time, boolean, or interface.
-// If supplying `labels` as []interface{}, be sure to use the spread operator (...),
-// or else the labels will not be read properly.
+// NewSeries constructs a Series from a `slice` of values and optional `label` slices.
+// // `Slice` and all `labels` must be supported slices.
+//
+// If no `labels` are supplied, a default label level is inserted ([]int incrementing from 0).
+// Series values are named 0 by default. The default values name is displayed on printing.
+// Label levels are named *n (e.g., *0, *1, etc) by default. Default label names are hidden on printing.
+//
+// Supported slice types: all variants of []float, []int, & []uint,
+// []string, []bool, []time.Time, []interface{},
+// and 2-dimensional variants of each (e.g., [][]string, [][]float64).
 func NewSeries(slice interface{}, labels ...interface{}) *Series {
 	if slice == nil && labels == nil {
 		return seriesWithError(fmt.Errorf("NewSeries(): `slice` and `labels` cannot both be nil"))
@@ -602,7 +608,7 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container.
 //
-// Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retains their original type.
 // For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
@@ -621,7 +627,7 @@ func (s *Series) Filter(filters map[string]FilterFn) *Series {
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container
 //
-// Values are coerced from their original type to the selected field type for filtering, but after filtering retains its original type.
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retains their original type.
 // For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
@@ -653,6 +659,8 @@ func (s *SeriesMutator) Filter(filters map[string]FilterFn) {
 // which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
 // If yes, returns `ifTrue` at that row position.
 // If not, returns `ifFalse` at that row position.
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retains their original type.
+//
 // Returns an unnamed Series a copy of the labels from the original Series and null status based on the supplied values.
 // If an unsupported value type is supplied as either ifTrue or ifFalse, returns an error.
 func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{}) (*Series, error) {
