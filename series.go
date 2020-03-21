@@ -1229,23 +1229,23 @@ func (s *Series) PercentileCut(bins []float64, labels []string) *Series {
 
 // -- Slicers
 
-// SliceFloat64 coerces the Series values into []float64.
-func (s *Series) SliceFloat64() []float64 {
+// GetValuesFloat64 coerces the Series values into []float64.
+func (s *Series) GetValuesFloat64() []float64 {
 	output := make([]float64, s.Len())
 	copy(output, s.values.float64().slice)
 	return output
 }
 
-// SliceString coerces the Series values into []string.
-func (s *Series) SliceString() []string {
+// GetValuesString coerces the Series values into []string.
+func (s *Series) GetValuesString() []string {
 	output := make([]string, s.Len())
 	copy(output, s.values.string().slice)
 	return output
 
 }
 
-// SliceTime coerces the Series values into []time.Time.
-func (s *Series) SliceTime() []time.Time {
+// GetValuesTime coerces the Series values into []time.Time.
+func (s *Series) GetValuesTime() []time.Time {
 	output := make([]time.Time, s.Len())
 	copy(output, s.values.dateTime().slice)
 	return output
@@ -1264,9 +1264,9 @@ func (s *Series) GetValues() interface{} {
 	return ret.slice
 }
 
-// SliceLabels returns label levels as interface{} slices within an []interface
+// GetLabels returns label levels as interface{} slices within an []interface
 // that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
-func (s *Series) SliceLabels() []interface{} {
+func (s *Series) GetLabels() []interface{} {
 	var ret []interface{}
 	labels := copyContainers(s.labels)
 	for j := range labels {

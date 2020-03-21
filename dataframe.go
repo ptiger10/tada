@@ -897,11 +897,11 @@ func (df *DataFrame) IndexOfRows(name string, value interface{}) []int {
 	return mergedLabelsAndColumns[i].indexOfRows(value)
 }
 
-// SliceLabels returns label levels as interface{} slices within an []interface
+// GetLabels returns label levels as interface{} slices within an []interface
 // that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
 // NB: If supplying this output to either of these constructors,
 // be sure to use the spread operator (...), or else the labels will not be read as separate levels.
-func (df *DataFrame) SliceLabels() []interface{} {
+func (df *DataFrame) GetLabels() []interface{} {
 	var ret []interface{}
 	labels := copyContainers(df.labels)
 	for j := range labels {
@@ -1770,7 +1770,7 @@ func (df *DataFrame) Apply(lambdas map[string]ApplyFn) *DataFrame {
 // Values are converted from their original type to the selected field type.
 // For example, {"foo": ApplyFn{Float64: lambda}} converts the values in the foo container to float64 and
 // applies the lambda function to each row in the container, outputting a new float64 value for each row.
-// If a value is null either before or after the lambda function is applied, it is also null after.// Modifies the underlying DataFrame in place.
+// If a value is null either before or after the lambda function is applied, it is also null after.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)

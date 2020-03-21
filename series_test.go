@@ -2439,7 +2439,7 @@ func TestSeries_Latest(t *testing.T) {
 	}
 }
 
-func TestSeries_SliceFloat64(t *testing.T) {
+func TestSeries_GetValuesFloat64(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -2463,19 +2463,19 @@ func TestSeries_SliceFloat64(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			got := s.SliceFloat64()
+			got := s.GetValuesFloat64()
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.SliceFloat64() = %v, want %v", got, tt.want)
+				t.Errorf("Series.GetValuesFloat64() = %v, want %v", got, tt.want)
 			}
 			got[0] = 10
-			if reflect.DeepEqual(got, s.SliceFloat64()) {
-				t.Errorf("Series.SliceFloat64() retained reference to original, want copy")
+			if reflect.DeepEqual(got, s.GetValuesFloat64()) {
+				t.Errorf("Series.GetValuesFloat64() retained reference to original, want copy")
 			}
 		})
 	}
 }
 
-func TestSeries_SliceString(t *testing.T) {
+func TestSeries_GetValuesString(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -2502,19 +2502,19 @@ func TestSeries_SliceString(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			got := s.SliceString()
+			got := s.GetValuesString()
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.SliceString() = %v, want %v", got, tt.want)
+				t.Errorf("Series.GetValuesString() = %v, want %v", got, tt.want)
 			}
 			got[0] = "baz"
-			if reflect.DeepEqual(got, s.SliceString()) {
-				t.Errorf("Series.SliceString() retained reference to original, want copy")
+			if reflect.DeepEqual(got, s.GetValuesString()) {
+				t.Errorf("Series.GetValuesString() retained reference to original, want copy")
 			}
 		})
 	}
 }
 
-func TestSeries_SliceTime(t *testing.T) {
+func TestSeries_GetValuesTime(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -2538,13 +2538,13 @@ func TestSeries_SliceTime(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			got := s.SliceTime()
+			got := s.GetValuesTime()
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.SliceTime() = %v, want %v", got, tt.want)
+				t.Errorf("Series.GetValuesTime() = %v, want %v", got, tt.want)
 			}
 			got[0] = time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC)
-			if reflect.DeepEqual(got, s.SliceTime()) {
-				t.Errorf("Series.SliceTime() retained reference to original, want copy")
+			if reflect.DeepEqual(got, s.GetValuesTime()) {
+				t.Errorf("Series.GetValuesTime() retained reference to original, want copy")
 			}
 		})
 	}
@@ -2627,7 +2627,7 @@ func TestSeries_GetValues(t *testing.T) {
 	}
 }
 
-func TestSeries_SliceLabels(t *testing.T) {
+func TestSeries_GetLabels(t *testing.T) {
 	type fields struct {
 		values     *valueContainer
 		labels     []*valueContainer
@@ -2655,8 +2655,8 @@ func TestSeries_SliceLabels(t *testing.T) {
 				sharedData: tt.fields.sharedData,
 				err:        tt.fields.err,
 			}
-			if got := s.SliceLabels(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.SliceLabels() = %v, want %v", got, tt.want)
+			if got := s.GetLabels(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.GetLabels() = %v, want %v", got, tt.want)
 			}
 		})
 	}

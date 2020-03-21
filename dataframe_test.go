@@ -4557,7 +4557,7 @@ func TestDataFrame_SwapLabels(t *testing.T) {
 	}
 }
 
-func TestDataFrame_SliceLabels(t *testing.T) {
+func TestDataFrame_GetLabels(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -4589,8 +4589,8 @@ func TestDataFrame_SliceLabels(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.SliceLabels(); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.SliceLabels() = %v, want %v", got, tt.want)
+			if got := df.GetLabels(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.GetLabels() = %v, want %v", got, tt.want)
 			}
 		})
 	}
