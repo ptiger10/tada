@@ -2550,7 +2550,7 @@ func TestSeries_GetValuesTime(t *testing.T) {
 	}
 }
 
-func TestSeries_SliceNulls(t *testing.T) {
+func TestSeries_GetNulls(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -2577,13 +2577,13 @@ func TestSeries_SliceNulls(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			got := s.SliceNulls()
+			got := s.GetNulls()
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.SliceNulls() = %v, want %v", got, tt.want)
+				t.Errorf("Series.GetNulls() = %v, want %v", got, tt.want)
 			}
 			got[0] = true
-			if reflect.DeepEqual(got, s.SliceNulls()) {
-				t.Errorf("Series.SliceNulls() retained reference to original, want copy")
+			if reflect.DeepEqual(got, s.GetNulls()) {
+				t.Errorf("Series.GetNulls() retained reference to original, want copy")
 			}
 		})
 	}
@@ -3438,6 +3438,54 @@ func TestSeriesIterator_Row(t *testing.T) {
 			}
 			if got := iter.Row(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("SeriesIterator.Row() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_SetNulls(t *testing.T) {
+	type fields struct {
+		values *valueContainer
+		labels []*valueContainer
+		err    error
+	}
+	type args struct {
+		nulls []bool
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    []bool
+		wantErr bool
+	}{
+		{"pass",
+			fields{values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}},
+			},
+			args{[]bool{true}},
+			[]bool{true},
+			false},
+		{"fail - wrong shape",
+			fields{values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}},
+			},
+			args{[]bool{true, false}},
+			[]bool{false},
+			true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if err := s.SetNulls(tt.args.nulls); (err != nil) != tt.wantErr {
+				t.Errorf("Series.SetNulls() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(s.values.isNull, tt.want) {
+				t.Errorf("Series.SetNulls() values.isNull -> = %v, want %v", s.values.isNull, tt.want)
 			}
 		})
 	}

@@ -1251,11 +1251,21 @@ func (s *Series) GetValuesTime() []time.Time {
 	return output
 }
 
-// SliceNulls returns whether each value is null or not.
-func (s *Series) SliceNulls() []bool {
+// GetNulls returns whether each value is null or not.
+func (s *Series) GetNulls() []bool {
 	output := make([]bool, s.Len())
 	copy(output, s.values.isNull)
 	return output
+}
+
+// SetNulls overwrites the Series' underlying boolean slice that records whether each value is null or not.
+func (s *Series) SetNulls(nulls []bool) error {
+	if len(nulls) != len(s.values.isNull) {
+		return fmt.Errorf("SetNulls(): `nulls` must be same length as existing null slice (%d != %d)",
+			len(nulls), len(s.values.isNull))
+	}
+	s.values.isNull = nulls
+	return nil
 }
 
 // GetValues returns a copy of the underlying Series data as an interface.
