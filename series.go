@@ -1258,16 +1258,6 @@ func (s *Series) GetNulls() []bool {
 	return output
 }
 
-// SetNulls overwrites the Series' underlying boolean slice that records whether each value is null or not.
-func (s *Series) SetNulls(nulls []bool) error {
-	if len(nulls) != len(s.values.isNull) {
-		return fmt.Errorf("SetNulls(): `nulls` must be same length as existing null slice (%d != %d)",
-			len(nulls), len(s.values.isNull))
-	}
-	s.values.isNull = nulls
-	return nil
-}
-
 // GetValues returns a copy of the underlying Series data as an interface.
 func (s *Series) GetValues() interface{} {
 	ret := s.values.copy()

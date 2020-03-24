@@ -1213,7 +1213,7 @@ func TestDataFrame_SetLabels(t *testing.T) {
 			name:   "baz"},
 			args{[]string{"bar", "foo"}},
 			&DataFrame{
-				err: fmt.Errorf("SetLabels(): number of colNames must be less than number of columns (2 >= 2)")},
+				err: fmt.Errorf("SetAsLabels(): number of colNames must be less than number of columns (2 >= 2)")},
 		},
 		{"fail - no matching col", fields{
 			values: []*valueContainer{
@@ -1223,7 +1223,7 @@ func TestDataFrame_SetLabels(t *testing.T) {
 			name:   "baz"},
 			args{[]string{"corge"}},
 			&DataFrame{
-				err: fmt.Errorf("SetLabels(): `name` (corge) not found")},
+				err: fmt.Errorf("SetAsLabels(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -1234,8 +1234,8 @@ func TestDataFrame_SetLabels(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.SetLabels(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
-				t.Errorf("DataFrame.SetLabels() = %v, want %v", got, tt.want)
+			if got := df.SetAsLabels(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
+				t.Errorf("DataFrame.SetAsLabels() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -5016,6 +5016,86 @@ func TestDataFrame_Resample(t *testing.T) {
 			}
 			if got := df.Resample(tt.args.how); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Resample() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_SetNulls(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		n     int
+		nulls []bool
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    []bool
+		wantErr bool
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
+			},
+			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			name:          "foo",
+			colLevelNames: []string{"*0"}},
+			args{0, []bool{true, true}},
+			[]bool{true, true},
+			false,
+		},
+		{"fail - out of range", fields{
+			values: []*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
+			},
+			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			name:          "foo",
+			colLevelNames: []string{"*0"}},
+			args{10, []bool{true, true}},
+			[]bool{false, false},
+			true,
+		},
+		{"fail - wrong shape", fields{
+			values: []*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
+			},
+			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			name:          "foo",
+			colLevelNames: []string{"*0"}},
+			args{0, []bool{false}},
+			[]bool{false, false},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			err := df.SetNulls(tt.args.n, tt.args.nulls)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.SetNulls() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if err == nil {
+				mergedLabelsAndCols := append(df.labels, df.values...)
+				if !reflect.DeepEqual(mergedLabelsAndCols[tt.args.n].isNull, tt.want) {
+					t.Errorf("DataFrame.SetNulls() values.isNull -> = %v, want %v", mergedLabelsAndCols[tt.args.n].isNull, tt.want)
+				}
 			}
 		})
 	}

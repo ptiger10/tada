@@ -599,7 +599,7 @@ func (df *DataFrame) String() string {
 		n := optionMaxRows / 2
 		topHalf := df.Head(n).ToCSV(true)
 		bottomHalf := df.Tail(n).ToCSV(true)[df.numColLevels():]
-		filler := make([]string, df.numLevels()+df.numColumns())
+		filler := make([]string, df.NumLevels()+df.NumColumns())
 		for k := range filler {
 			filler[k] = "..."
 		}
@@ -608,19 +608,19 @@ func (df *DataFrame) String() string {
 			bottomHalf...)
 	}
 	// do not print *0-type label names
-	for j := 0; j < df.numLevels(); j++ {
+	for j := 0; j < df.NumLevels(); j++ {
 		data[0][j] = suppressDefaultName(data[0][j])
 	}
 
 	// truncate columns
-	if df.numColumns() >= optionMaxColumns {
+	if df.NumColumns() >= optionMaxColumns {
 		n := (optionMaxColumns / 2)
 
 		for i := range data {
-			labels := data[i][:df.numLevels()]
-			leftHalf := data[i][df.numLevels() : n+df.numLevels()]
+			labels := data[i][:df.NumLevels()]
+			leftHalf := data[i][df.NumLevels() : n+df.NumLevels()]
 			filler := "..."
-			rightHalf := data[i][df.numLevels()+df.numColumns()-n:]
+			rightHalf := data[i][df.NumLevels()+df.NumColumns()-n:]
 			data[i] = append(
 				append(
 					labels,
@@ -639,7 +639,7 @@ func (df *DataFrame) String() string {
 		table.TruncateWideCells()
 	}
 	table.SetAlignment(tablewriter.AlignRight)
-	table.SetLabelLevelCount(df.numLevels())
+	table.SetLabelLevelCount(df.NumLevels())
 
 	// write headers and rows
 	for l := 0; l < df.numColLevels(); l++ {
@@ -661,7 +661,7 @@ func (df *DataFrame) At(row, column int) Element {
 	if row >= df.Len() {
 		return Element{}
 	}
-	if column >= df.numColumns() {
+	if column >= df.NumColumns() {
 		return Element{}
 	}
 	v := reflect.ValueOf(df.values[column].slice)
@@ -681,8 +681,17 @@ func (df *DataFrame) Err() error {
 	return df.err
 }
 
-// numLevels returns the number of label columns in the DataFrame.
-func (df *DataFrame) numLevels() int {
+func (df *DataFrame) numColLevels() int {
+	return len(df.colLevelNames)
+}
+
+// NumColumns returns the number of colums in the DataFrame.
+func (df *DataFrame) NumColumns() int {
+	return len(df.values)
+}
+
+// NumLevels returns the number of label levels in the DataFrame.
+func (df *DataFrame) NumLevels() int {
 	return len(df.labels)
 }
 
@@ -888,13 +897,13 @@ func (df *DataFrame) IndexOfContainer(name string, columns bool) int {
 // in the container named `name`.
 // To search Series values, supply either the Series name or an empty string ("") as `name`.
 func (df *DataFrame) IndexOfRows(name string, value interface{}) []int {
-	mergedLabelsAndColumns := append(df.labels, df.values...)
-	i, err := indexOfContainer(name, mergedLabelsAndColumns)
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	i, err := indexOfContainer(name, mergedLabelsAndCols)
 	if err != nil {
 		errorWarning(fmt.Errorf("IndexOfRows(): %v", err))
 		return nil
 	}
-	return mergedLabelsAndColumns[i].indexOfRows(value)
+	return mergedLabelsAndCols[i].indexOfRows(value)
 }
 
 // GetLabels returns label levels as interface{} slices within an []interface
@@ -974,7 +983,7 @@ func (df *DataFrame) Head(n int) *DataFrame {
 	for k := range df.values {
 		retVals[k] = df.values[k].head(n)
 	}
-	retLabels := make([]*valueContainer, df.numLevels())
+	retLabels := make([]*valueContainer, df.NumLevels())
 	for j := range df.labels {
 		retLabels[j] = df.labels[j].head(n)
 	}
@@ -992,7 +1001,7 @@ func (df *DataFrame) Tail(n int) *DataFrame {
 	for k := range df.values {
 		retVals[k] = df.values[k].tail(n)
 	}
-	retLabels := make([]*valueContainer, df.numLevels())
+	retLabels := make([]*valueContainer, df.NumLevels())
 	for j := range df.labels {
 		retLabels[j] = df.labels[j].tail(n)
 	}
@@ -1015,7 +1024,7 @@ func (df *DataFrame) Range(first, last int) *DataFrame {
 	for k := range df.values {
 		retVals[k] = df.values[k].rangeSlice(first, last)
 	}
-	retLabels := make([]*valueContainer, df.numLevels())
+	retLabels := make([]*valueContainer, df.NumLevels())
 	for j := range df.labels {
 		retLabels[j] = df.labels[j].rangeSlice(first, last)
 	}
@@ -1120,6 +1129,22 @@ func (df *DataFrame) Null(subset ...string) *DataFrame {
 	}
 	anyNull := union(subIndexes)
 	return df.Subset(anyNull)
+}
+
+// SetNulls overwrites the underlying boolean slice that records whether each value is null or not
+// for the container at position `n` (either labels or columns).
+// Exported for use in Arrow conversions.
+func (df *DataFrame) SetNulls(n int, nulls []bool) error {
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	if n >= len(mergedLabelsAndCols) {
+		return fmt.Errorf("SetNulls(): `n` cannot be greater than the number of labels and columns (%d)", len(mergedLabelsAndCols))
+	}
+	if len(nulls) != df.Len() {
+		return fmt.Errorf("SetNulls(): `nulls` must be same length as existing null slice (%d != %d)",
+			len(nulls), df.Len())
+	}
+	mergedLabelsAndCols[n].isNull = nulls
+	return nil
 }
 
 // FilterCols returns the columns with names that satisfy `lambda` at the supplied column `level`.
@@ -1331,28 +1356,28 @@ func (df *DataFrameMutator) Relabel() {
 	return
 }
 
-// SetLabels appends the column(s) supplied as `colNames` as label levels and drops the column(s).
+// SetAsLabels appends the column(s) supplied as `colNames` as label levels and drops the column(s).
 // The number of `colNames` supplied must be less than the number of columns in the Series.
 // Returns a new DataFrame.
-func (df *DataFrame) SetLabels(colNames ...string) *DataFrame {
+func (df *DataFrame) SetAsLabels(colNames ...string) *DataFrame {
 	df.Copy()
-	df.InPlace().SetLabels(colNames...)
+	df.InPlace().SetAsLabels(colNames...)
 	return df
 }
 
-// SetLabels appends the column(s) supplied as `colNames` as label levels and drops the column(s).
+// SetAsLabels appends the column(s) supplied as `colNames` as label levels and drops the column(s).
 // The number of `colNames` supplied must be less than the number of columns in the Series.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) SetLabels(colNames ...string) {
+func (df *DataFrameMutator) SetAsLabels(colNames ...string) {
 	if len(colNames) >= len(df.dataframe.values) {
-		df.dataframe.resetWithError(fmt.Errorf("SetLabels(): number of colNames must be less than number of columns (%d >= %d)",
+		df.dataframe.resetWithError(fmt.Errorf("SetAsLabels(): number of colNames must be less than number of columns (%d >= %d)",
 			len(colNames), len(df.dataframe.values)))
 		return
 	}
 	for i := 0; i < len(colNames); i++ {
 		index, err := indexOfContainer(colNames[i], df.dataframe.values)
 		if err != nil {
-			df.dataframe.resetWithError(fmt.Errorf("SetLabels(): %v", err))
+			df.dataframe.resetWithError(fmt.Errorf("SetAsLabels(): %v", err))
 			return
 		}
 		df.dataframe.labels = append(df.dataframe.labels, df.dataframe.values[index])
@@ -1375,24 +1400,24 @@ func (df *DataFrame) ResetLabels(index ...int) *DataFrame {
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) ResetLabels(labelLevels ...int) {
 	if len(labelLevels) == 0 {
-		labelLevels = makeIntRange(0, df.dataframe.numLevels())
+		labelLevels = makeIntRange(0, df.dataframe.NumLevels())
 	}
 	for incrementor, i := range labelLevels {
 		// iteratively subset all label levels except the one to be dropped
 		adjustedIndex := i - incrementor
-		if adjustedIndex >= df.dataframe.numLevels() {
+		if adjustedIndex >= df.dataframe.NumLevels() {
 			df.dataframe.resetWithError(fmt.Errorf(
-				"ResetLabels(): index out of range (%d > %d)", i, df.dataframe.numLevels()+incrementor))
+				"ResetLabels(): index out of range (%d > %d)", i, df.dataframe.NumLevels()+incrementor))
 			return
 		}
 		newVal := df.dataframe.labels[adjustedIndex]
 		// If label level name has default indicator, remove default indicator
 		newVal.name = removeDefaultNameIndicator(newVal.name)
 		df.dataframe.values = append(df.dataframe.values, newVal)
-		exclude := excludeFromIndex(df.dataframe.numLevels(), adjustedIndex)
+		exclude := excludeFromIndex(df.dataframe.NumLevels(), adjustedIndex)
 		df.dataframe.labels, _ = subsetContainers(df.dataframe.labels, exclude)
 	}
-	if df.dataframe.numLevels() == 0 {
+	if df.dataframe.NumLevels() == 0 {
 		defaultLabels := makeDefaultLabels(0, df.dataframe.Len(), true)
 		df.dataframe.labels = append(df.dataframe.labels, defaultLabels)
 	}
@@ -1437,14 +1462,6 @@ func (df *DataFrame) SetColNames(colNames []string) *DataFrame {
 
 // -- RESHAPING
 
-func (df *DataFrame) numColLevels() int {
-	return len(df.colLevelNames)
-}
-
-func (df *DataFrame) numColumns() int {
-	return len(df.values)
-}
-
 // Transpose switches all row values to column values and label names to column names.
 // For example a DataFrame with 2 rows and 1 column has 2 columns and 1 row after transposition.
 func (df *DataFrame) Transpose() *DataFrame {
@@ -1453,14 +1470,14 @@ func (df *DataFrame) Transpose() *DataFrame {
 	valsIsNull := make([][]bool, df.Len())
 	// each new column has the same number of rows as prior columns
 	for i := range vals {
-		vals[i] = make([]string, df.numColumns())
-		valsIsNull[i] = make([]bool, df.numColumns())
+		vals[i] = make([]string, df.NumColumns())
+		valsIsNull[i] = make([]bool, df.NumColumns())
 	}
 	// label names become column names: 2 row x 1 level -> 2 col x 1 level
 	colNames := make([][]string, df.Len())
 	// each new column name has the same number of levels as prior label levels
 	for i := range colNames {
-		colNames[i] = make([]string, df.numLevels())
+		colNames[i] = make([]string, df.NumLevels())
 	}
 	// column levels become label levels: 2 level x 1 col -> 2 level x 1 row
 	labels := make([][]string, df.numColLevels())
@@ -1469,12 +1486,12 @@ func (df *DataFrame) Transpose() *DataFrame {
 	// column level names become label level names
 	labelNames := make([]string, df.numColLevels())
 	// label level names become column level names
-	colLevelNames := make([]string, df.numLevels())
+	colLevelNames := make([]string, df.NumLevels())
 
 	// each new label level has same number of rows as prior columns
 	for l := range labels {
-		labels[l] = make([]string, df.numColumns())
-		labelsIsNull[l] = make([]bool, df.numColumns())
+		labels[l] = make([]string, df.NumColumns())
+		labelsIsNull[l] = make([]bool, df.NumColumns())
 	}
 
 	// iterate over labels to write column names and column level names
@@ -1564,7 +1581,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 	retColLevelNames := append([]string{valsToPromote.name}, df.colLevelNames...)
 	// new values will have as many columns as unique values in the column-to-be-stacked * existing columns
 	// (minus the stacked column * existing columns, if a column is selected and not label level)
-	numNewCols := len(uniqueValuesToPromote) * df.numColumns()
+	numNewCols := len(uniqueValuesToPromote) * df.NumColumns()
 	numNewRows := reflect.ValueOf(labels[0].slice).Len()
 	colNames := make([]string, numNewCols)
 	// each item in newVals should be a slice representing a new column
@@ -1582,7 +1599,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 	// iterate over original columns -> unique values of stacked column -> row index of each unique value
 	// compare to original value at column and row position
 	// write to new row in container corresponding to unique label combo
-	for k := 0; k < df.numColumns(); k++ {
+	for k := 0; k < df.NumColumns(); k++ {
 		// skip column if it is derivative of the original - then drop those columns later
 		if k == colIndex {
 			continue
@@ -1689,8 +1706,8 @@ func (df *DataFrameMutator) Filter(filters map[string]FilterFn) {
 func (df *DataFrame) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{}) (*Series, error) {
 	ret := make([]interface{}, df.Len())
 	// []int of positions where all filters are true
-	mergedLabelsAndColumns := append(df.labels, df.values...)
-	index, err := filter(mergedLabelsAndColumns, filters)
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	index, err := filter(mergedLabelsAndCols, filters)
 	if err != nil {
 		return nil, fmt.Errorf("Where(): %v", err)
 	}
@@ -1736,8 +1753,8 @@ func (df *DataFrame) FilterByValue(filters map[string]interface{}) *DataFrame {
 // A filter is satisfied for a given row value if the stringified value in that container at that row matches the stringified interface{} value.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) FilterByValue(filters map[string]interface{}) {
-	mergedLabelsAndColumns := append(df.dataframe.labels, df.dataframe.values...)
-	index, err := filterByValue(mergedLabelsAndColumns, filters)
+	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
+	index, err := filterByValue(mergedLabelsAndCols, filters)
 	if err != nil {
 		df.dataframe.resetWithError(fmt.Errorf("FilterByValue(): %v", err))
 		return
@@ -2038,7 +2055,7 @@ func (df *DataFrame) GroupBy(names ...string) *GroupedDataFrame {
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	// if no names supplied, group by all label levels and use all label level names
 	if len(names) == 0 {
-		index = makeIntRange(0, df.numLevels())
+		index = makeIntRange(0, df.NumLevels())
 	} else {
 		index, err = convertColNamesToIndexPositions(names, mergedLabelsAndCols)
 		if err != nil {
@@ -2139,14 +2156,14 @@ func (df *DataFrame) Resample(how map[string]Resampler) *DataFrame {
 // in its Resampler struct provides the resampling logic for that container.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Resample(how map[string]Resampler) {
-	mergedLabelsAndColumns := append(df.dataframe.labels, df.dataframe.values...)
+	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
 	for name, resampler := range how {
-		index, err := indexOfContainer(name, mergedLabelsAndColumns)
+		index, err := indexOfContainer(name, mergedLabelsAndCols)
 		if err != nil {
 			df.dataframe.resetWithError(fmt.Errorf("Resample(): %v", err))
 			return
 		}
-		mergedLabelsAndColumns[index].resample(resampler)
+		mergedLabelsAndCols[index].resample(resampler)
 	}
 	return
 }
@@ -2173,10 +2190,10 @@ func (iter *DataFrameIterator) Next() bool {
 // If multiple columns have the same header, only the Elements of the left-most column are returned.
 func (iter *DataFrameIterator) Row() map[string]Element {
 	ret := make(map[string]Element)
-	for k := iter.df.numColumns() - 1; k >= 0; k-- {
+	for k := iter.df.NumColumns() - 1; k >= 0; k-- {
 		ret[iter.df.values[k].name] = iter.df.values[k].iterRow(iter.current)
 	}
-	for j := iter.df.numLevels() - 1; j >= 0; j-- {
+	for j := iter.df.NumLevels() - 1; j >= 0; j-- {
 		ret[iter.df.labels[j].name] = iter.df.labels[j].iterRow(iter.current)
 	}
 	return ret

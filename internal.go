@@ -427,9 +427,9 @@ func (df *DataFrame) toCSVByRows(includeLabels bool) ([][]string, error) {
 	for i := range ret {
 		var newCols int
 		if includeLabels {
-			newCols = df.numLevels() + df.numColumns()
+			newCols = df.NumLevels() + df.NumColumns()
 		} else {
-			newCols = df.numColumns()
+			newCols = df.NumColumns()
 		}
 		ret[i] = make([]string, newCols)
 	}
@@ -448,7 +448,7 @@ func (df *DataFrame) toCSVByRows(includeLabels bool) ([][]string, error) {
 	for k := range df.values {
 		var offset int
 		if includeLabels {
-			offset = df.numLevels()
+			offset = df.NumLevels()
 		}
 		// if number of col levels is only one, return the name as a single-item slice
 		multiColHeaders := splitNameIntoLevels(df.values[k].name)
