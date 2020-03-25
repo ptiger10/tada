@@ -2283,7 +2283,8 @@ func (vc *valueContainer) resample(by Resampler) {
 		by.Location = time.UTC
 	}
 	for i := range vals {
-		retVals[i] = resample(vals[i], by)
+		t := vals[i].In(by.Location)
+		retVals[i] = resample(t, by)
 	}
 	vc.slice = retVals
 	vc.resetCache()

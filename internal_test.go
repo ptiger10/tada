@@ -2441,6 +2441,10 @@ func Test_valueContainer_fillnull(t *testing.T) {
 
 func Test_valueContainer_resample(t *testing.T) {
 	d := time.Date(2020, 2, 2, 12, 30, 45, 0, time.UTC)
+	tz, err := time.LoadLocation("America/Los_Angeles")
+	if err != nil {
+		log.Fatal(err)
+	}
 	type fields struct {
 		slice  interface{}
 		isNull []bool
@@ -2466,6 +2470,14 @@ func Test_valueContainer_resample(t *testing.T) {
 			args{Resampler{ByYear: true}},
 			&valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
 				isNull: []bool{false}, name: "foo"}},
+		{"day - resets Location automatically ", fields{slice: []time.Time{time.Date(2019, 12, 31, 18, 30, 0, 0, tz)}, isNull: []bool{false}, name: "foo"},
+			args{Resampler{ByDay: true}},
+			&valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
+				isNull: []bool{false}, name: "foo"}},
+		{"day - retains Location ", fields{slice: []time.Time{time.Date(2019, 12, 31, 18, 30, 0, 0, tz)}, isNull: []bool{false}, name: "foo"},
+			args{Resampler{ByDay: true, Location: tz}},
+			&valueContainer{slice: []time.Time{time.Date(2019, 12, 31, 0, 0, 0, 0, tz)},
+				isNull: []bool{false}, name: "foo"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2477,7 +2489,7 @@ func Test_valueContainer_resample(t *testing.T) {
 			}
 			vc.resample(tt.args.by)
 			if !reflect.DeepEqual(vc, tt.want) {
-				t.Errorf("vc.resample() -> %v, want %v", vc, tt.want)
+				t.Errorf("vc.resample() -> %v, want %v", vc.slice, tt.want.slice)
 			}
 		})
 	}
