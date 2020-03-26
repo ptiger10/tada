@@ -681,6 +681,28 @@ func (df *DataFrame) Err() error {
 	return df.err
 }
 
+// HasType returns the index positions of all label and column containers
+// containing a slice of values where reflect.Type.String() == `sliceType`.
+// Container index positions may then be supplied to df.SubsetLabels() or df.SubsetCols().
+//
+// For example, to search for datetime labels: `labels, _ := df.HasType("[]time.Time")`
+//
+// To search for float64 columns: `_, cols := df.HasType("[]float64")`
+//
+func (df *DataFrame) HasType(sliceType string) (labelIndex, columnIndex []int) {
+	for j := range df.labels {
+		if df.labels[j].dtype().String() == sliceType {
+			labelIndex = append(labelIndex, j)
+		}
+	}
+	for k := range df.values {
+		if df.values[k].dtype().String() == sliceType {
+			columnIndex = append(columnIndex, k)
+		}
+	}
+	return
+}
+
 func (df *DataFrame) numColLevels() int {
 	return len(df.colLevelNames)
 }

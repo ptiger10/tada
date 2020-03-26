@@ -2824,8 +2824,8 @@ func Test_valueContainer_dtype(t *testing.T) {
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
 			}
-			if got := vc.dtype(); got != tt.want {
-				t.Errorf("valueContainer.dtype() = %v, want %v", got, tt.want)
+			if got := vc.dtype(); got.String() != tt.want {
+				t.Errorf("valueContainer.dtype() = %v, want %v", got.String(), tt.want)
 			}
 		})
 	}

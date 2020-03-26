@@ -2901,7 +2901,7 @@ func TestSeries_At(t *testing.T) {
 	}
 }
 
-func TestSeries_DType(t *testing.T) {
+func TestSeries_Type(t *testing.T) {
 	type fields struct {
 		values     *valueContainer
 		labels     []*valueContainer
@@ -2927,8 +2927,8 @@ func TestSeries_DType(t *testing.T) {
 				sharedData: tt.fields.sharedData,
 				err:        tt.fields.err,
 			}
-			if got := s.DType(); got != tt.want {
-				t.Errorf("Series.DType() = %v, want %v", got, tt.want)
+			if got := s.Type(); got.String() != tt.want {
+				t.Errorf("Series.Type() = %v, want %v", got.String(), tt.want)
 			}
 		})
 	}

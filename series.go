@@ -1275,8 +1275,8 @@ func (s *Series) GetLabels() []interface{} {
 	return ret
 }
 
-// DType returns the slice type of the underlying Series values
-func (s *Series) DType() string {
+// Type returns the slice type of the underlying Series values
+func (s *Series) Type() reflect.Type {
 	return s.values.dtype()
 }
 

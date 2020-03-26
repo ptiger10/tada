@@ -5100,3 +5100,54 @@ func TestDataFrame_SetNulls(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_HasType(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		sliceType string
+	}
+	tests := []struct {
+		name            string
+		fields          fields
+		args            args
+		wantLabelIndex  []int
+		wantColumnIndex []int
+	}{
+		{"labels and values", fields{
+			values: []*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []int{0, 1}, isNull: []bool{true, false}, name: "foo"},
+			},
+			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			name:          "foo",
+			colLevelNames: []string{"*0"}},
+			args{"[]int"},
+			[]int{0}, []int{0, 2},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			gotLabelIndex, gotColumnIndex := df.HasType(tt.args.sliceType)
+			if !reflect.DeepEqual(gotLabelIndex, tt.wantLabelIndex) {
+				t.Errorf("DataFrame.HasType() gotLabelIndex = %v, want %v", gotLabelIndex, tt.wantLabelIndex)
+			}
+			if !reflect.DeepEqual(gotColumnIndex, tt.wantColumnIndex) {
+				t.Errorf("DataFrame.HasType() gotColumnIndex = %v, want %v", gotColumnIndex, tt.wantColumnIndex)
+			}
+		})
+	}
+}
