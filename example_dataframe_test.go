@@ -11,12 +11,8 @@ import (
 )
 
 func ExampleReadCSV() {
-	data := [][]string{
-		{"foo", "bar"},
-		{"baz", "qux"},
-		{"corge", "fred"},
-	}
-	df, _ := ReadCSV(data)
+	data := "foo, bar\n baz, qux\n corge, fred"
+	df, _ := ReadCSV(strings.NewReader(data))
 	fmt.Println(df)
 	// Output:
 	// +---++-------+------+
@@ -28,12 +24,8 @@ func ExampleReadCSV() {
 }
 
 func ExampleReadCSV_noHeaders() {
-	data := [][]string{
-		{"foo", "bar"},
-		{"baz", "qux"},
-		{"corge", "fred"},
-	}
-	df, _ := ReadCSV(data, ReadOptionHeaders(0))
+	data := "foo, bar\n baz, qux\n corge, fred"
+	df, _ := ReadCSV(strings.NewReader(data), ReadOptionHeaders(0))
 	fmt.Println(df)
 	// Output:
 	// +---++-------+------+
@@ -46,12 +38,8 @@ func ExampleReadCSV_noHeaders() {
 }
 
 func ExampleReadCSV_multipleHeaders() {
-	data := [][]string{
-		{"foo", "bar"},
-		{"baz", "qux"},
-		{"corge", "fred"},
-	}
-	df, _ := ReadCSV(data, ReadOptionHeaders(2))
+	data := "foo, bar\n baz, qux\n corge, fred"
+	df, _ := ReadCSV(strings.NewReader(data), ReadOptionHeaders(2))
 	fmt.Println(df)
 	// Output:
 	// +----++-------+------+
@@ -63,12 +51,10 @@ func ExampleReadCSV_multipleHeaders() {
 }
 
 func ExampleReadCSV_withLabels() {
-	data := [][]string{
-		{"foo", "bar"},
-		{"baz", "qux"},
-		{"corge", "fred"},
-	}
-	df, _ := ReadCSV(data, ReadOptionLabels(1))
+	data := `foo, bar
+	baz, qux
+	corge, fred`
+	df, _ := ReadCSV(strings.NewReader(data), ReadOptionLabels(1))
 	fmt.Println(df)
 	// Output:
 	// +-------++------+
@@ -79,13 +65,45 @@ func ExampleReadCSV_withLabels() {
 	// +-------++------+
 }
 
-func ExampleReadCSV_colsAsMajorDimension() {
+func ExampleReadCSV_delimiter() {
+	data := `foo|bar
+	baz|qux
+	corge|fred`
+	df, _ := ReadCSV(strings.NewReader(data), ReadOptionDelimiter('|'))
+	fmt.Println(df)
+	// Output:
+	// +---++-------+------+
+	// | - ||  foo  | bar  |
+	// |---||-------|------|
+	// | 0 ||   baz |  qux |
+	// | 1 || corge | fred |
+	// +---++-------+------+
+}
+
+func ExampleReadCSVFromRecords() {
 	data := [][]string{
 		{"foo", "bar"},
 		{"baz", "qux"},
 		{"corge", "fred"},
 	}
-	df, _ := ReadCSV(data, ReadOptionSwitchDims())
+	df, _ := ReadCSVFromRecords(data)
+	fmt.Println(df)
+	// Output:
+	// +---++-------+------+
+	// | - ||  foo  | bar  |
+	// |---||-------|------|
+	// | 0 ||   baz |  qux |
+	// | 1 || corge | fred |
+	// +---++-------+------+
+}
+
+func ExampleReadCSVFromRecords_colsAsMajorDimension() {
+	data := [][]string{
+		{"foo", "bar"},
+		{"baz", "qux"},
+		{"corge", "fred"},
+	}
+	df, _ := ReadCSVFromRecords(data, ReadOptionSwitchDims())
 	fmt.Println(df)
 	// Output:
 	// +---++-----+-----+-------+
@@ -93,39 +111,6 @@ func ExampleReadCSV_colsAsMajorDimension() {
 	// |---||-----|-----|-------|
 	// | 0 || bar | qux |  fred |
 	// +---++-----+-----+-------+
-}
-
-func ExampleReadCSVFromString() {
-	data := `
-foo,bar
-baz,qux
-corge,fred`
-
-	df, _ := ReadCSVFromString(data)
-	fmt.Println(df)
-	// Output:
-	// +---++-------+------+
-	// | - ||  foo  | bar  |
-	// |---||-------|------|
-	// | 0 ||   baz |  qux |
-	// | 1 || corge | fred |
-	// +---++-------+------+
-}
-
-func ExampleReadCSVFromString_withDelimiter() {
-	data := `foo|bar
-baz|qux
-corge|fred`
-
-	df, _ := ReadCSVFromString(data, ReadOptionDelimiter('|'))
-	fmt.Println(df)
-	// Output:
-	// +---++-------+------+
-	// | - ||  foo  | bar  |
-	// |---||-------|------|
-	// | 0 ||   baz |  qux |
-	// | 1 || corge | fred |
-	// +---++-------+------+
 }
 
 func ExampleDataFrame() {

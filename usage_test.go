@@ -1,13 +1,12 @@
 package tada
 
 import (
-	"encoding/csv"
 	"log"
 	"strings"
 	"testing"
 )
 
-func Test_transformData(t *testing.T) {
+func Test_sampleDataPipeline(t *testing.T) {
 	data := `name, score
 			joe doe,
 			john doe, -100
@@ -21,27 +20,19 @@ func Test_transformData(t *testing.T) {
 			jane doe, 9
 			john doe, 5`
 
-	// this block is equivalent to ReadCSVFromString(data)
-	r := strings.NewReader(data)
-	cr := csv.NewReader(r)
-	cr.TrimLeadingSpace = true
-	records, err := cr.ReadAll()
-	if err != nil {
-		log.Fatal(err)
-	}
-	df, _ := ReadCSV(records)
+	df, _ := ReadCSV(strings.NewReader(data))
 
-	ret := exampleTransformData(df)
-	ok, diffs, err := ret.EqualsCSVFromString(want, true)
+	ret := sampleDataPipeline(df)
+	ok, diffs, err := ret.EqualsCSV(strings.NewReader(want), true)
 	if err != nil {
 		log.Fatal(err)
 	}
 	if !ok {
-		t.Errorf("TransformData(): got %v, want %v, has diffs: \n%v", ret, want, diffs)
+		t.Errorf("sampleDataPipeline(): got %v, want %v, has diffs: \n%v", ret, want, diffs)
 	}
 }
 
-func exampleTransformData(df *DataFrame) *DataFrame {
+func sampleDataPipeline(df *DataFrame) *DataFrame {
 	err := df.HasCols("name", "score")
 	if err != nil {
 		log.Fatal(err)

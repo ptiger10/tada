@@ -3614,6 +3614,7 @@ func Test_readCSVBytes(t *testing.T) {
 	b4 := "foo,bar\nqux,quz"
 	b5 := "foo\nbaz\r\n"
 	b6 := "foo\nbaz\r"
+	b7 := "foo, bar\n qux, \n quux, quz\n"
 
 	f0 := "foo\nbar,baz\n"
 	f1 := "foo,bar\nbaz\n"
@@ -3725,6 +3726,28 @@ func Test_readCSVBytes(t *testing.T) {
 				{"foo", "baz"}},
 			wantNulls: [][]bool{{false, false}},
 			wantErr:   false,
+		},
+		{name: "pass with missing value",
+			args: args{
+				r: bytes.NewBuffer([]byte(b7)),
+				dstVals: [][]string{
+					{"", "", ""},
+					{"", "", ""},
+				},
+				dstNulls: [][]bool{
+					{false, false, false},
+					{false, false, false},
+				},
+				comma: ','},
+			wantVals: [][]string{
+				{"foo", "qux", "quux"},
+				{"bar", "", "quz"},
+			},
+			wantNulls: [][]bool{
+				{false, false, false},
+				{false, true, false},
+			},
+			wantErr: false,
 		},
 		{name: "fail - too many fields",
 			args: args{
@@ -4655,7 +4678,7 @@ func Test_nameOfContainer(t *testing.T) {
 
 func Test_setReadConfig(t *testing.T) {
 	type args struct {
-		options []func(*readConfig)
+		options []ReadOption
 	}
 	tests := []struct {
 		name string
@@ -4668,7 +4691,7 @@ func Test_setReadConfig(t *testing.T) {
 			Delimiter:      ',',
 			MajorDimIsCols: false,
 		}},
-		{"pass", args{[]func(*readConfig){
+		{"pass", args{[]ReadOption{
 			ReadOptionHeaders(2),
 			ReadOptionLabels(2),
 			ReadOptionDelimiter('|'),

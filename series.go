@@ -2,6 +2,7 @@ package tada
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"reflect"
 	"time"
@@ -75,18 +76,18 @@ func (s *Series) ToDataFrame() *DataFrame {
 	}
 }
 
-// EqualsCSV converts a Series to csv, compares it to another csv,
-// and evaluates whether the two match and isolates their differences.
+// EqualsCSV converts `s` to csv, compares it to the records read from `r`,
+// and evaluates whether the stringified values match.
+// If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
+//
 // If `includeLabels` is true, then the Series' labels are included as columns.
-func (s *Series) EqualsCSV(csv [][]string, includeLabels bool) (bool, *tablediff.Differences) {
-	compare, _ := s.ToCSV(includeLabels)
-	diffs, eq := tablediff.Diff(compare, csv)
-	return eq, diffs
+func (s *Series) EqualsCSV(r io.Reader, includeLabels bool, options ...ReadOption) (bool, *tablediff.Differences, error) {
+	df := s.ToDataFrame()
+	return df.EqualsCSV(r, includeLabels, options...)
 }
 
 // ToCSV converts a Series to a DataFrame and returns as [][]string.
-// If `includeLabels` is true, then the Series' labels are written.
-func (s *Series) ToCSV(includeLabels bool) ([][]string, error) {
+func (s *Series) ToCSV(options ...WriteOption) ([][]string, error) {
 	if s.values == nil {
 		return nil, fmt.Errorf("ToCSV(): cannot export empty Series")
 	}
@@ -96,7 +97,7 @@ func (s *Series) ToCSV(includeLabels bool) ([][]string, error) {
 		colLevelNames: []string{"*0"},
 		err:           s.err,
 	}
-	csv := df.ToCSV(includeLabels)
+	csv := df.ToCSV(options...)
 	return csv, nil
 }
 

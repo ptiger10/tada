@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"reflect"
-	"strings"
 
 	"github.com/ptiger10/tablediff"
 	"github.com/ptiger10/tablewriter"
@@ -180,7 +179,7 @@ func ReadOptionLabels(n int) func(*readConfig) {
 	}
 }
 
-// ReadOptionDelimiter configures a read function to use `sep` as a field delimiter for use in ImportCSV or ReadCSVFromString (default: ",").
+// ReadOptionDelimiter configures a read function to use `sep` as a field delimiter for use in ReadCSV (default: ",").
 func ReadOptionDelimiter(sep rune) func(*readConfig) {
 	return func(r *readConfig) {
 		r.Delimiter = sep
@@ -203,147 +202,70 @@ func ReadOptionSwitchDims() func(*readConfig) {
 	}
 }
 
-// ReadCSV reads `data` into a DataFrame (configured by `options`).
+// ReadCSVFromRecords reads `data` into a DataFrame (configured by `options`).
 // Often used with (encoding/csv) csv.NewReader().ReadAll()
 // Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionSwitchDims.
 //
 // Default if no options are supplied:
-// 1 header row, no labels, rows as major dimension
+// 1 header row; no labels; rows as major dimension
 //
 // If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
 // If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing.
 // Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
-func ReadCSV(data [][]string, options ...func(*readConfig)) (ret *DataFrame, err error) {
-	if len(data) == 0 {
-		return nil, fmt.Errorf("ReadCSV(): `data` must have at least one row")
+func ReadCSVFromRecords(records [][]string, options ...ReadOption) (ret *DataFrame, err error) {
+	if len(records) == 0 {
+		return nil, fmt.Errorf("ReadCSVFromRecords(): `records` must have at least one row")
 	}
-	if len(data[0]) == 0 {
-		return nil, fmt.Errorf("ReadCSV(): `data` must have at least one column")
+	if len(records[0]) == 0 {
+		return nil, fmt.Errorf("ReadCSVFromRecords(): `records` must have at least one column")
 	}
 	config := setReadConfig(options)
 
 	if config.MajorDimIsCols {
-		ret, err = readCSVByCols(data, config)
+		ret, err = readCSVByCols(records, config)
 	} else {
-		ret, err = readCSVByRows(data, config)
+		ret, err = readCSVByRows(records, config)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("ReadCSV(): %v", err)
+		return nil, fmt.Errorf("ReadCSVFromRecords(): %v", err)
 	}
 	return ret, nil
 }
 
-// ReadCSVFromString reads a stringified csv table into a DataFrame (configured by `options`).
-// This function is most commonly used in conjuction with calling WriteMockCSV(), saving the result as a string, and then reading a DataFrame from that string within a test.
-// The major dimension of the table should be rows.
-// For advanced cases, use the standard csv library NewReader().ReadAll() + tada.ReadCSV().
+// ReadCSV reads csv records in `r` into a Dataframe (configured by `options`).
+// Rows must be the major dimension of `r`.
+// For advanced cases, use the standard csv library NewReader().ReadAll() + tada.ReadCSVFromRecords().
 // Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionDelimiter.
 //
 // Default if no options are supplied:
-// 1 header row, no labels, field delimiter is ","
+// 1 header row; no labels; field delimiter is ","
 //
 // If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
 // If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing
 // Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
-func ReadCSVFromString(data string, options ...func(*readConfig)) (*DataFrame, error) {
-	if data == "" {
-		return nil, fmt.Errorf("ReadCSVFromString(): `data` cannot be empty")
-	}
+func ReadCSV(r io.Reader, options ...ReadOption) (*DataFrame, error) {
 	config := setReadConfig(options)
-
-	reader := strings.NewReader(data)
-	r := csv.NewReader(reader)
-	r.Comma = config.Delimiter
-
-	r.TrimLeadingSpace = true
-	records, err := r.ReadAll()
+	b, err := ioutil.ReadAll(r)
 	if err != nil {
-		return nil, fmt.Errorf("ReadCSVFromString(): %v", err)
+		return nil, fmt.Errorf("ReadCSV(): %s", err)
 	}
-	// should never return error because already checked for misalignment and empty string
-	return readCSVByRows(records, config)
-}
-
-// ImportCSV reads the file at `path` into a Dataframe (configured by `options`).
-// For advanced cases, use the standard csv library NewReader().ReadAll() + tada.ReadCSV().
-// Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionDelimiter, ReadOptionSwitchDims.
-//
-// Default if no options are supplied:
-// 1 header row, no labels, field delimiter is ",", rows as major dimension
-//
-// If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
-// If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing
-// Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
-func ImportCSV(path string, options ...func(*readConfig)) (*DataFrame, error) {
-	config := setReadConfig(options)
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("ImportCSV(): %s", err)
-	}
-	numRows, numCols, err := extractCSVDimensions(data, config.Delimiter)
+	numRows, numCols, err := extractCSVDimensions(b, config.Delimiter)
 	if numRows == 0 {
-		return nil, fmt.Errorf("ImportCSV(): must have at least one row")
+		return nil, fmt.Errorf("ReadCSV(): must have at least one row")
 	}
 	retVals := makeStringMatrix(numCols, numRows)
 	retNulls := makeBoolMatrix(numCols, numRows)
-	r := bytes.NewReader(data)
-	err = readCSVBytes(r, retVals, retNulls, config.Delimiter)
+	data := bytes.NewReader(b)
+	err = readCSVBytes(data, retVals, retNulls, config.Delimiter)
 	if err != nil {
-		return nil, fmt.Errorf("ImportCSV(): %s", err)
+		return nil, fmt.Errorf("ReadCSV(): %s", err)
 	}
 	return makeDataFrameFromMatrices(retVals, retNulls, config), nil
-}
-
-// ReadInterface converts `data` to [][]string and reads into  a Dataframe (configured by `options`).
-// Google Sheets, for example, exports data as [][]interface{} with either rows or columns as the major dimension.
-// Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionSwitchDims.
-//
-// Default if no options are supplied:
-// 1 header row, no labels, rows as major dimension
-//
-// If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
-// If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing
-// Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
-func ReadInterface(data [][]interface{}, options ...func(*readConfig)) (ret *DataFrame, err error) {
-	if len(data) == 0 {
-		return nil, fmt.Errorf("ReadInterface(): `data` must have at least one row")
-	}
-	if len(data[0]) == 0 {
-		return nil, fmt.Errorf("ReadInterface(): `data` must have at least one column")
-	}
-	numLines := len(data[0])
-	for i := range data {
-		if len(data[i]) != numLines {
-			return nil, fmt.Errorf("ReadInterface(): `data`: slice %d: all slices must have same length as first slice (%d != %d)",
-				i, len(data[i]), numLines)
-		}
-	}
-
-	config := setReadConfig(options)
-	// convert [][]interface to [][]string
-	str := make([][]string, len(data))
-	for j := range str {
-		str[j] = make([]string, len(data[0]))
-	}
-	for i := range data {
-		for j := range data[i] {
-			str[i][j] = fmt.Sprint(data[i][j])
-		}
-	}
-
-	// ducks error because already checked for misalignment and empty data
-	if config.MajorDimIsCols {
-		ret, _ = readCSVByCols(str, config)
-	} else {
-		ret, _ = readCSVByRows(str, config)
-	}
-	return ret, nil
 }
 
 // ReadMatrix reads data satisfying the gonum Matrix interface into a DataFrame.
 // Panics if any slices in the matrix are shorter than the first slice.
 func ReadMatrix(mat Matrix) *DataFrame {
-
 	numRows, numCols := mat.Dims()
 	// major dimension: columns
 	data := make([][]string, numCols)
@@ -355,6 +277,12 @@ func ReadMatrix(mat Matrix) *DataFrame {
 	}
 	// ducks error because expects all slices to be the same length
 	ret, _ := readCSVByCols(data, &readConfig{})
+	// convert back to float64
+	casters := make(map[string]DType)
+	for _, name := range ret.ListColNames() {
+		casters[name] = Float64
+	}
+	ret.Cast(casters)
 	return ret
 }
 
@@ -387,11 +315,54 @@ func (df *DataFrame) ToSeries() *Series {
 	}
 }
 
+// EqualsCSV reads `r` into df2 (configured by `options`),
+// converts both df and df2 into [][]string records.
+// and evaluates whether the stringified values match.
+// If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
+//
+// If `includeLabels` is true, then `df`'s labels are included as columns.
+func (df *DataFrame) EqualsCSV(r io.Reader, includeLabels bool, options ...ReadOption) (bool, *tablediff.Differences, error) {
+	config := setReadConfig(options)
+	df2, err := ReadCSV(r, options...)
+	if err != nil {
+		return false, nil, fmt.Errorf("EqualsCSV(): reading `r`: %v", err)
+	}
+
+	compare := df.ToCSV(writeOptionIncludeLabels(includeLabels))
+	// df2 has default labels? exclude them
+	compare2 := df2.ToCSV(writeOptionIncludeLabels(config.NumLabelLevels > 0))
+	diffs, eq := tablediff.Diff(compare, compare2)
+	return eq, diffs, nil
+}
+
+// -- WRITERS
+
+// WriteOptionExcludeLabels excludes the label levels from the output.
+func WriteOptionExcludeLabels() func(*writeConfig) {
+	return func(w *writeConfig) {
+		w.IncludeLabels = false
+	}
+}
+
+// for internal use
+func writeOptionIncludeLabels(set bool) func(w *writeConfig) {
+	return func(w *writeConfig) {
+		w.IncludeLabels = set
+	}
+}
+
+// WriteOptionDelimiter configures a write function to use `sep` as a field delimiter for use in write functions (default: ",").
+func WriteOptionDelimiter(sep rune) func(*writeConfig) {
+	return func(w *writeConfig) {
+		w.Delimiter = sep
+	}
+}
+
 // ToCSV writes a DataFrame to a [][]string with rows as the major dimension.
 // Null values are replaced with "n/a".
-// If `includeLabels` is true, then the DataFrame's labels are written.
-func (df *DataFrame) ToCSV(includeLabels bool) [][]string {
-	transposedStringValues, err := df.toCSVByRows(includeLabels)
+func (df *DataFrame) ToCSV(options ...WriteOption) [][]string {
+	config := setWriteConfig(options)
+	transposedStringValues, err := df.toCSVByRows(config.IncludeLabels)
 	if err != nil {
 		return nil
 	}
@@ -407,106 +378,49 @@ func (df *DataFrame) ToCSV(includeLabels bool) [][]string {
 	return transposedStringValues
 }
 
-// ExportCSV converts a DataFrame to a [][]string with rows as the major dimension,
-// and writes the output to a csv file.
+// WriteCSV converts a DataFrame to a csv with rows as the major dimension,
+// and writes the output to `w`.
 // Null values are replaced with "n/a".
-// If `includeLabels` is true, then the DataFrame's labels are written.
-func (df *DataFrame) ExportCSV(file string, includeLabels bool) error {
-	ret := df.ToCSV(includeLabels)
+func (df *DataFrame) WriteCSV(w io.Writer, options ...WriteOption) error {
+	config := setWriteConfig(options)
+	ret := df.ToCSV(writeOptionIncludeLabels(config.IncludeLabels))
 	if len(ret) == 0 {
 		return fmt.Errorf("ExportCSV(): `df` cannot be empty")
 	}
 	var b bytes.Buffer
-	w := csv.NewWriter(&b)
+	cw := csv.NewWriter(&b)
 	// duck error because csv is controlled
-	w.WriteAll(ret)
-	ioutil.WriteFile(file, b.Bytes(), 0666)
+	cw.Comma = config.Delimiter
+	cw.WriteAll(ret)
+	w.Write(b.Bytes())
 	return nil
 }
 
-// ToInterface exports a DataFrame to a [][]interface with rows as the major dimension.
-// Null values are not changed, and should be handled explicitly with DropNull() or FillNull().
-// If `includeLabels` is true, then the DataFrame's labels are written.
-func (df *DataFrame) ToInterface(includeLabels bool) [][]interface{} {
-	transposedStringValues, err := df.toCSVByRows(includeLabels)
-	if err != nil {
-		return nil
-	}
-	ret := make([][]interface{}, len(transposedStringValues))
-	for k := range ret {
-		ret[k] = make([]interface{}, len(transposedStringValues[0]))
-	}
-	for i := range transposedStringValues {
-		for k := range transposedStringValues[i] {
-			ret[i][k] = transposedStringValues[i][k]
-		}
-	}
-	return ret
-}
-
-// EqualsCSV converts `df` to csv, compares it to `data`,
-// and evaluates whether the stringified values match.
-// If `includeLabels` is true, then the DataFrame's labels are included as columns.
-// If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
-func (df *DataFrame) EqualsCSV(data [][]string, includeLabels bool) (bool, *tablediff.Differences, error) {
-	numLines := len(data[0])
-	for i := range data {
-		if len(data[i]) != numLines {
-			return false, nil, fmt.Errorf("EqualsCSV(): `data`: slice %d: all slices must have same length as first slice (%d != %d)",
-				i, len(data[i]), numLines)
-		}
-	}
-	compare := df.ToCSV(includeLabels)
-	diffs, eq := tablediff.Diff(compare, data)
-	return eq, diffs, nil
-}
-
-// EqualsCSVFromString converts `df` to csv, compares it to the csv read from `data`,
-// and evaluates whether the two match.
-// If `includeLabels` is true, then the DataFrame's labels are included as columns.
-// If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
-func (df *DataFrame) EqualsCSVFromString(data string, includeLabels bool) (bool, *tablediff.Differences, error) {
-	compare := df.ToCSV(includeLabels)
-
-	reader := strings.NewReader(data)
-	r := csv.NewReader(reader)
-	r.TrimLeadingSpace = true
-	r.LazyQuotes = true
-	records, err := r.ReadAll()
-	if err != nil {
-		return false, nil, fmt.Errorf("EqualsCSVFromString()(): %v", err)
-	}
-	diffs, eq := tablediff.Diff(compare, records)
-	return eq, diffs, nil
-}
-
-// WriteMockCSV reads `src` (configured by `options`) and writes `n` mock rows to `w`,
+// WriteMockCSV reads `r` (configured by `options`) and writes `n` mock rows to `w`,
 // with column names and types inferred based on the data in `src`.
 // Regardless of the major dimension of `src`, the major dimension of the output is rows.
 // Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionSwitchDims.
 //
 // Default if no options are supplied:
 // 1 header row, no labels, rows as major dimension
-func WriteMockCSV(src [][]string, w io.Writer, n int, options ...func(*readConfig)) error {
+func WriteMockCSV(r io.Reader, w io.Writer, n int, options ...ReadOption) error {
 	config := setReadConfig(options)
 	numSampleRows := 10
 	inferredTypes := make([]map[string]int, 0)
 	dtypes := []string{"float", "int", "string", "datetime", "time", "bool"}
 	var headers [][]string
-	var rowCount, colCount int
-	// validate input
-	if len(src) == 0 {
-		return fmt.Errorf("WriteMockCSV(): `src` cannot be empty")
+	var rowCount int
+	data, err := ReadCSV(r, options...)
+	if err != nil {
+		return fmt.Errorf("WriteMockCSV(): reading `r`: %v", err)
 	}
+	// data has default labels? exclude them
+	src := data.ToCSV(writeOptionIncludeLabels(config.NumLabelLevels > 0))
+
 	if !config.MajorDimIsCols {
 		rowCount = len(src)
-		colCount = len(src[0])
 	} else {
-		colCount = len(src)
 		rowCount = len(src[0])
-	}
-	if colCount == 0 {
-		return fmt.Errorf("WriteMockCSV(): `src` must have at least one column")
 	}
 	// numSampleRows must not exceed total number of non-header rows in `src`
 	maxRows := rowCount - config.NumHeaderRows
@@ -593,12 +507,12 @@ func (df *DataFrame) String() string {
 	}
 	var data [][]string
 	if df.Len() <= optionMaxRows {
-		data = df.ToCSV(true)
+		data = df.ToCSV()
 	} else {
 		// truncate rows
 		n := optionMaxRows / 2
-		topHalf := df.Head(n).ToCSV(true)
-		bottomHalf := df.Tail(n).ToCSV(true)[df.numColLevels():]
+		topHalf := df.Head(n).ToCSV()
+		bottomHalf := df.Tail(n).ToCSV()[df.numColLevels():]
 		filler := make([]string, df.NumLevels()+df.NumColumns())
 		for k := range filler {
 			filler[k] = "..."
@@ -943,6 +857,7 @@ func (df *DataFrame) GetLabels() []interface{} {
 
 // SelectLabels finds the first label level with matching `name`
 // and returns the values as a Series.
+// Similar to Col(), but selects label values instead of column values.
 // The labels in the Series are shared with the labels in the DataFrame.
 // If label level name is default (prefixed with *), the prefix is removed.
 func (df *DataFrame) SelectLabels(name string) *Series {

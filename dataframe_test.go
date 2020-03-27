@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/d4l3k/messagediff"
 	"github.com/ptiger10/tablediff"
 )
 
@@ -327,10 +330,10 @@ func TestDataFrame_Subset(t *testing.T) {
 	}
 }
 
-func TestReadCSV(t *testing.T) {
+func TestReadCSVFromRecords(t *testing.T) {
 	type args struct {
 		csv    [][]string
-		config []func(*readConfig)
+		config []ReadOption
 	}
 	tests := []struct {
 		name    string
@@ -361,7 +364,7 @@ func TestReadCSV(t *testing.T) {
 		{"column as major dimension",
 			args{
 				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
-				config: []func(*readConfig){ReadOptionSwitchDims()}},
+				config: []ReadOption{ReadOptionSwitchDims()}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
@@ -386,7 +389,51 @@ func TestReadCSV(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ReadCSV(tt.args.csv, tt.args.config...)
+			got, err := ReadCSVFromRecords(tt.args.csv, tt.args.config...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReadCSVFromRecords() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !EqualDataFrames(got, tt.want) {
+				t.Errorf("ReadCSVFromRecords() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+type badReader struct{}
+
+func (r badReader) Read([]byte) (int, error) {
+	return 0, fmt.Errorf("foo")
+}
+
+func TestReadCSV_String(t *testing.T) {
+	type args struct {
+		r      io.Reader
+		config []ReadOption
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *DataFrame
+		wantErr bool
+	}{
+		{"1 header, 0 labels - nil config",
+			args{strings.NewReader("Name, Age\n foo, 1\n bar, 2"), nil},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "Name"},
+					{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "Age"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				name:          "",
+				colLevelNames: []string{"*0"}}, false},
+		{"fail - bad reader",
+			args{badReader{}, nil},
+			nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ReadCSV(tt.args.r, tt.args.config...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReadCSV() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -398,64 +445,46 @@ func TestReadCSV(t *testing.T) {
 	}
 }
 
-func TestReadCSVFromString(t *testing.T) {
+func TestReadCSV_File(t *testing.T) {
 	type args struct {
-		data    string
-		options []func(*readConfig)
+		path   string
+		config []ReadOption
 	}
 	tests := []struct {
 		name    string
 		args    args
-		wantRet *DataFrame
+		want    *DataFrame
 		wantErr bool
 	}{
-		{"pass",
-			args{"foo, bar\n 0, 1", nil},
+		{"1 header, 0 labels - nil config",
+			args{"test_csv/1_header_0_labels.csv", nil},
 			&DataFrame{
 				values: []*valueContainer{
-					{slice: []string{"0"}, isNull: []bool{false}, name: "foo"},
-					{slice: []string{"1"}, isNull: []bool{false}, name: "bar"},
-				},
-				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			false,
-		},
-		{"pass - custom delimiter",
-			args{"foo|bar\n 0|1", []func(*readConfig){ReadOptionDelimiter('|')}},
-			&DataFrame{
-				values: []*valueContainer{
-					{slice: []string{"0"}, isNull: []bool{false}, name: "foo"},
-					{slice: []string{"1"}, isNull: []bool{false}, name: "bar"},
-				},
-				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			false,
-		},
-		{"fail - rows - misaligned",
-			args{"foo\n bar, baz", nil},
-			nil,
-			true,
-		},
-		{"fail - columns - misaligned",
-			args{"foo\n bar, baz", []func(*readConfig){ReadOptionSwitchDims()}},
-			nil,
-			true,
-		},
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "Name"},
+					{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "Age"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				name:          "",
+				colLevelNames: []string{"*0"}}, false},
+		{"fail - bad delimiter",
+			args{"test_csv/bad_delimiter.csv", nil},
+			nil, true},
 		{"fail - empty",
-			args{"", nil},
-			nil,
-			true,
-		},
+			args{"test_csv/empty.csv", nil},
+			nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotRet, err := ReadCSVFromString(tt.args.data, tt.args.options...)
+			f, err := os.Open(tt.args.path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			got, err := ReadCSV(f, tt.args.config...)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ReadCSVFromString() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ReadCSV() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !EqualDataFrames(gotRet, tt.wantRet) {
-				t.Errorf("ReadCSVFromString() = %v, want %v", gotRet, tt.wantRet)
+			if !EqualDataFrames(got, tt.want) {
+				t.Errorf("ReadCSV() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -2932,8 +2961,8 @@ func TestReadMatrix(t *testing.T) {
 			args: args{mat: testMatrix{values: [][]float64{{1, 2}}}},
 			want: &DataFrame{
 				values: []*valueContainer{
-					{slice: []string{"1"}, isNull: []bool{false}, name: "0"},
-					{slice: []string{"2"}, isNull: []bool{false}, name: "1"}},
+					{slice: []float64{1}, isNull: []bool{false}, name: "0", cache: []string{"1"}},
+					{slice: []float64{2}, isNull: []bool{false}, name: "1", cache: []string{"2"}}},
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				name:          "",
 				colLevelNames: []string{"*0"}},
@@ -2999,9 +3028,9 @@ func TestWriteMockCSV(t *testing.T) {
 `
 	randSeed = 3
 	type args struct {
-		src        [][]string
+		r          io.Reader
 		outputRows int
-		config     []func(*readConfig)
+		config     []ReadOption
 	}
 	tests := []struct {
 		name    string
@@ -3009,22 +3038,25 @@ func TestWriteMockCSV(t *testing.T) {
 		wantW   string
 		wantErr bool
 	}{
-		{"pass", args{src: [][]string{{"corge", "qux"}, {"1.5", "foo"}, {"2.5", "foo"}}, config: nil, outputRows: 3},
+		{"pass",
+			args{
+				r:          strings.NewReader("corge, qux\n 1.5, foo\n 2.5, foo"),
+				config:     nil,
+				outputRows: 3},
 			want1, false},
-		{"fail - no rows", args{src: nil, config: nil, outputRows: 3},
-			"", true},
-		{"fail - no cols", args{src: [][]string{{}}, config: nil, outputRows: 3},
-			"", true},
 		{"columns as major dim",
-			args{src: [][]string{{"corge", "1.5", "2.5"}, {"qux", "foo", "foo"}},
+			args{
+				r:          strings.NewReader("corge, 1.5, 2.5\n qux, foo, foo"),
 				outputRows: 3,
-				config:     []func(*readConfig){ReadOptionSwitchDims()}},
+				config:     []ReadOption{ReadOptionSwitchDims()}},
 			want1, false},
+		{"fail - no data", args{r: strings.NewReader(""), config: nil, outputRows: 3},
+			"", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
-			if err := WriteMockCSV(tt.args.src, w, tt.args.outputRows, tt.args.config...); (err != nil) != tt.wantErr {
+			if err := WriteMockCSV(tt.args.r, w, tt.args.outputRows, tt.args.config...); (err != nil) != tt.wantErr {
 				t.Errorf("WriteMockCSV() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
@@ -3210,8 +3242,9 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 		colLevelNames []string
 	}
 	type args struct {
-		csv           [][]string
+		r             io.Reader
 		includeLabels bool
+		options       []ReadOption
 	}
 	tests := []struct {
 		name    string
@@ -3221,7 +3254,7 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 		want1   *tablediff.Differences
 		wantErr bool
 	}{
-		{name: "pass",
+		{name: "pass - read in labels",
 			fields: fields{
 				values: []*valueContainer{
 					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
@@ -3229,7 +3262,8 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "baz"},
-			args:    args{csv: [][]string{{"*0", "foo"}, {"0", "1"}}, includeLabels: true},
+			args: args{r: strings.NewReader("*0, foo\n 0, 1"), includeLabels: true,
+				options: []ReadOption{ReadOptionLabels(1)}},
 			want:    true,
 			want1:   nil,
 			wantErr: false},
@@ -3241,7 +3275,7 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "baz"},
-			args:    args{csv: [][]string{{"foo"}, {"1"}}, includeLabels: false},
+			args:    args{r: strings.NewReader("foo\n 1"), includeLabels: false},
 			want:    true,
 			want1:   nil,
 			wantErr: false},
@@ -3253,7 +3287,7 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "baz"},
-			args:    args{[][]string{{"*0", "foo"}, {"0"}}, false},
+			args:    args{r: strings.NewReader("*0, foo\n 0"), includeLabels: false},
 			want:    false,
 			want1:   nil,
 			wantErr: true},
@@ -3267,7 +3301,7 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			got, got1, err := df.EqualsCSV(tt.args.csv, tt.args.includeLabels)
+			got, got1, err := df.EqualsCSV(tt.args.r, tt.args.includeLabels)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.EqualsCSV() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -3282,198 +3316,6 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 	}
 }
 
-func TestDataFrame_EqualsCSVString(t *testing.T) {
-	type fields struct {
-		labels        []*valueContainer
-		values        []*valueContainer
-		name          string
-		err           error
-		colLevelNames []string
-	}
-	type args struct {
-		data          string
-		includeLabels bool
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    bool
-		want1   *tablediff.Differences
-		wantErr bool
-	}{
-		{name: "pass",
-			fields: fields{
-				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
-				},
-				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				colLevelNames: []string{"*0"},
-				name:          "baz"},
-			args:    args{data: "*0, foo\n 0, 1", includeLabels: true},
-			want:    true,
-			want1:   nil,
-			wantErr: false},
-		{name: "pass - ignore labels",
-			fields: fields{
-				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
-				},
-				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				colLevelNames: []string{"*0"},
-				name:          "baz"},
-			args:    args{data: "foo\n 1", includeLabels: false},
-			want:    true,
-			want1:   nil,
-			wantErr: false},
-		{name: "fail - misaligned",
-			fields: fields{
-				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
-				},
-				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				colLevelNames: []string{"*0"},
-				name:          "baz"},
-			args:    args{"*0, foo\n 0, 1, 2", false},
-			want:    false,
-			want1:   nil,
-			wantErr: true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			df := &DataFrame{
-				labels:        tt.fields.labels,
-				values:        tt.fields.values,
-				name:          tt.fields.name,
-				err:           tt.fields.err,
-				colLevelNames: tt.fields.colLevelNames,
-			}
-			got, got1, err := df.EqualsCSVFromString(tt.args.data, tt.args.includeLabels)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("DataFrame.EqualsCSVString() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("DataFrame.EqualsCSVString() got = %v, want %v", got, tt.want)
-			}
-			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("DataFrame.EqualsCSV() got1 = %#v, want %#v", got1, tt.want1)
-			}
-		})
-	}
-}
-func TestImportCSV(t *testing.T) {
-	type args struct {
-		path   string
-		config []func(*readConfig)
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *DataFrame
-		wantErr bool
-	}{
-		{"1 header, 0 labels - nil config",
-			args{"test_csv/1_header_0_labels.csv", nil},
-			&DataFrame{
-				values: []*valueContainer{
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "Name"},
-					{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "Age"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				name:          "",
-				colLevelNames: []string{"*0"}}, false},
-		{"fail - no file",
-			args{"missing.csv", nil},
-			nil, true},
-		{"fail - bad delimiter",
-			args{"test_csv/bad_delimiter.csv", nil},
-			nil, true},
-		{"fail - empty",
-			args{"test_csv/empty.csv", nil},
-			nil, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ImportCSV(tt.args.path, tt.args.config...)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ImportCSV() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !EqualDataFrames(got, tt.want) {
-				t.Errorf("ImportCSV() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestReadInterface(t *testing.T) {
-	type args struct {
-		data   [][]interface{}
-		config []func(*readConfig)
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *DataFrame
-		wantErr bool
-	}{
-		{"1 header row, 2 columns, no index",
-			args{
-				data:   [][]interface{}{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				config: nil},
-			&DataFrame{values: []*valueContainer{
-				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			false},
-		{"1 header row, 2 columns, no index, nil config",
-			args{
-				data:   [][]interface{}{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				config: nil},
-			&DataFrame{values: []*valueContainer{
-				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			false},
-		{"column as major dimension",
-			args{
-				data:   [][]interface{}{{"foo", "1", "2"}, {"bar", "5", "6"}},
-				config: []func(*readConfig){ReadOptionSwitchDims()}},
-			&DataFrame{values: []*valueContainer{
-				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			false},
-		{"fail - no rows",
-			args{data: nil,
-				config: nil},
-			nil, true},
-		{"fail - no columns",
-			args{data: [][]interface{}{{}},
-				config: nil},
-			nil, true},
-		{"fail - misaligned",
-			args{data: [][]interface{}{{"foo"}, {"bar", "baz"}},
-				config: nil},
-			nil, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := ReadInterface(tt.args.data, tt.args.config...)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ReadInterface() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !EqualDataFrames(got, tt.want) {
-				t.Errorf("ReadInterface() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestDataFrame_ToCSV(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
@@ -3483,7 +3325,7 @@ func TestDataFrame_ToCSV(t *testing.T) {
 		colLevelNames []string
 	}
 	type args struct {
-		includeLabels bool
+		options []WriteOption
 	}
 	tests := []struct {
 		name    string
@@ -3497,13 +3339,13 @@ func TestDataFrame_ToCSV(t *testing.T) {
 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
-			args{true},
+			args{},
 			[][]string{{"*0", "foo"}, {"0", "a"}, {"1", "b"}}, false},
 		{"fail",
 			fields{values: nil,
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
-			args{true},
+			args{},
 			nil, true},
 	}
 	for _, tt := range tests {
@@ -3515,7 +3357,7 @@ func TestDataFrame_ToCSV(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			got := df.ToCSV(tt.args.includeLabels)
+			got := df.ToCSV(tt.args.options...)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.ToCSV() = %v, want %v", got, tt.want)
 			}
@@ -3523,7 +3365,7 @@ func TestDataFrame_ToCSV(t *testing.T) {
 	}
 }
 
-func TestDataFrame_ExportCSV(t *testing.T) {
+func TestDataFrame_WriteCSV(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -3532,24 +3374,34 @@ func TestDataFrame_ExportCSV(t *testing.T) {
 		colLevelNames []string
 	}
 	type args struct {
-		file          string
-		includeLabels bool
+		options []WriteOption
 	}
 	tests := []struct {
 		name    string
 		fields  fields
 		args    args
+		want    string
 		wantErr bool
 	}{
 		{"pass", fields{values: []*valueContainer{
 			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
 			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
-			args{"test_csv/output.csv", false}, false},
+			args{}, "*0,foo\n0,a\n1,b\n", false},
+		{"pass - delimiter", fields{values: []*valueContainer{
+			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+			args{[]WriteOption{WriteOptionDelimiter('|')}}, "*0|foo\n0|a\n1|b\n", false},
+		{"pass - exclude labels", fields{values: []*valueContainer{
+			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+			args{[]WriteOption{WriteOptionExcludeLabels()}}, "foo\na\nb\n", false},
 		{"fail - no df", fields{values: nil,
 			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
-			args{"test_csv/output.csv", false}, true},
+			args{}, "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3560,58 +3412,13 @@ func TestDataFrame_ExportCSV(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if err := df.ExportCSV(tt.args.file, tt.args.includeLabels); (err != nil) != tt.wantErr {
-				t.Errorf("DataFrame.ExportCSV() error = %v, wantErr %v", err, tt.wantErr)
+			w := new(bytes.Buffer)
+			if err := df.WriteCSV(w, tt.args.options...); (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.WriteCSV() error = %v, wantErr %v", err, tt.wantErr)
 			}
-		})
-	}
-}
-
-func TestDataFrame_ToInterface(t *testing.T) {
-	type fields struct {
-		labels        []*valueContainer
-		values        []*valueContainer
-		name          string
-		err           error
-		colLevelNames []string
-	}
-	type args struct {
-		includeLabels bool
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    [][]interface{}
-		wantErr bool
-	}{
-		{"pass",
-			fields{values: []*valueContainer{
-				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			args{includeLabels: true},
-			[][]interface{}{{"*0", "foo"}, {"0", "a"}, {"1", "b"}}, false},
-		{"fail",
-			fields{values: nil,
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			args{includeLabels: true},
-			nil, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			df := &DataFrame{
-				labels:        tt.fields.labels,
-				values:        tt.fields.values,
-				name:          tt.fields.name,
-				err:           tt.fields.err,
-				colLevelNames: tt.fields.colLevelNames,
-			}
-			got := df.ToInterface(tt.args.includeLabels)
-
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.ToInterface() = %v, want %v", got, tt.want)
+			if w.String() != tt.want {
+				t.Errorf("DataFrame.WriteCSV() -> w = %v, want %v", w.String(), tt.want)
+				fmt.Println(messagediff.PrettyDiff(w.String(), tt.want))
 			}
 		})
 	}

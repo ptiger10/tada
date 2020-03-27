@@ -3,6 +3,7 @@ package tada
 import (
 	"bytes"
 	"errors"
+	"io"
 	"log"
 	"os"
 	"reflect"
@@ -185,23 +186,25 @@ func TestSeries_EqualsCSV(t *testing.T) {
 		err    error
 	}
 	type args struct {
-		csv           [][]string
+		r             io.Reader
 		includeLabels bool
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   bool
-		want1  *tablediff.Differences
+		name    string
+		fields  fields
+		args    args
+		want    bool
+		want1   *tablediff.Differences
+		wantErr bool
 	}{
 		{name: "pass",
 			fields: fields{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}}},
-			args:  args{csv: [][]string{{"*0", "foo"}, {"0", "1"}}, includeLabels: true},
-			want:  true,
-			want1: nil},
+			args:    args{r: strings.NewReader("*0, foo\n 0, 1"), includeLabels: true},
+			want:    true,
+			want1:   nil,
+			wantErr: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -210,7 +213,11 @@ func TestSeries_EqualsCSV(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			got, got1 := s.EqualsCSV(tt.args.csv, tt.args.includeLabels)
+			got, got1, err := s.EqualsCSV(tt.args.r, tt.args.includeLabels)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Series.EqualsCSV() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
 			if got != tt.want {
 				t.Errorf("Series.EqualsCSV() got = %v, want %v", got, tt.want)
 			}
@@ -228,7 +235,7 @@ func TestSeries_ToCSV(t *testing.T) {
 		err    error
 	}
 	type args struct {
-		includeLabels bool
+		options []WriteOption
 	}
 	tests := []struct {
 		name    string
@@ -240,17 +247,17 @@ func TestSeries_ToCSV(t *testing.T) {
 		{"pass", fields{
 			values: &valueContainer{slice: []float64{1}, name: "foo", isNull: []bool{false}},
 			labels: []*valueContainer{{slice: []int{1}, name: "bar", isNull: []bool{false}}}},
-			args{true},
+			args{},
 			[][]string{{"bar", "foo"}, {"1", "1"}}, false},
 		{"with nulls", fields{
 			values: &valueContainer{slice: []float64{0}, name: "foo", isNull: []bool{true}},
 			labels: []*valueContainer{{slice: []int{1}, name: "bar", isNull: []bool{false}}}},
-			args{true},
+			args{},
 			[][]string{{"bar", "foo"}, {"1", "n/a"}}, false},
 		{"fail - empty", fields{
 			values: nil,
 			labels: nil},
-			args{true},
+			args{},
 			nil, true},
 	}
 	for _, tt := range tests {
@@ -260,7 +267,7 @@ func TestSeries_ToCSV(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			got, err := s.ToCSV(tt.args.includeLabels)
+			got, err := s.ToCSV(tt.args.options...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.ToCSV() error = %v, wantErr %v", err, tt.wantErr)
 				return

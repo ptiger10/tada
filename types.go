@@ -222,10 +222,25 @@ const (
 	DateTime
 )
 
+// A WriteOption configures a write function.
+// Available write options: WriteOptionExcludeLabels, WriteOptionDelimiter.
+type WriteOption func(*writeConfig)
+
+// A writeConfig configures a read function.
+// All write functions accept zero or more modifiers that alter the default write config, which is:
+// Include labels; "," as field delimiter; and rows as the major dimension of a nested slice.
+type writeConfig struct {
+	IncludeLabels bool
+	Delimiter     rune
+}
+
+// A ReadOption configures a read function.
+// Available read options: ReadOptionHeaders, ReadOptionLabels, ReadOptionDelimiter, and ReadOptionSwitchDims.
+type ReadOption func(*readConfig)
+
 // A readConfig configures a read function.
 // All read functions accept zero or more modifiers that alter the default read config, which is:
 // 1 header row, 0 label levels, "," as field delimiter, and rows as the major dimension of a nested slice.
-// A readConfig is modified by ReadOptionHeaders, ReadOptionLabels, ReadOptionDelimiter, and ReadOptionSwitchDims.
 type readConfig struct {
 	NumHeaderRows  int
 	NumLabelLevels int

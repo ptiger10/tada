@@ -465,13 +465,25 @@ func (df *DataFrame) toCSVByRows(includeLabels bool) ([][]string, error) {
 	return ret, nil
 }
 
-func setReadConfig(options []func(*readConfig)) *readConfig {
+func setReadConfig(options []ReadOption) *readConfig {
 	// default config
 	config := &readConfig{
 		NumHeaderRows:  1,
 		NumLabelLevels: 0,
 		Delimiter:      ',',
 		MajorDimIsCols: false,
+	}
+	for _, option := range options {
+		option(config)
+	}
+	return config
+}
+
+func setWriteConfig(options []WriteOption) *writeConfig {
+	// default config
+	config := &writeConfig{
+		IncludeLabels: true,
+		Delimiter:     ',',
 	}
 	for _, option := range options {
 		option(config)
@@ -2510,7 +2522,6 @@ func dataFrameEqualsDistinct(a, b *DataFrame) bool {
 	return true
 }
 
-// expects a final newline
 // does not skip comment lines or blank lines
 // parses the first row only to get number of fields
 func extractCSVDimensions(b []byte, comma rune) (numRows, numCols int, err error) {
@@ -2535,6 +2546,7 @@ func extractCSVDimensions(b []byte, comma rune) (numRows, numCols int, err error
 	return numRows, numCols, nil
 }
 
+// reads data from r into dstVals and dstNulls.
 // major dimension of input: rows
 // major dimension of output: columns
 // trims leading whitespace
@@ -2543,6 +2555,9 @@ func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune
 	br := bufio.NewReaderSize(r, 1024)
 	commaLen := utf8.RuneLen(comma)
 	lengthLineEnd := func(b []byte) int {
+		if len(b) == 0 {
+			return 0
+		}
 		if b[len(b)-1] == '\n' || b[len(b)-1] == '\r' {
 			return 1
 		}
