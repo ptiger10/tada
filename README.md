@@ -121,7 +121,7 @@ One of the biggest limitations of gophernotes is that it does not provide signat
 * Modify a Series or DataFrame in place (without returning a new copy) by first calling `InPlace()`.
 * If you expect to use a column as numeric, string, or time.Time values multiple times, `Cast()` it to `tada.Float64`, `tada.String`, or `tada.DateTime`, respectively.
 
-## Input-Output
+## Inter-process communication (IPC)
 * Apache Arrow
   * Read from existing Pandas dataframes using the Apache Arrow specification. 
   * Because the go/arrow library is still not v1.0, convenience functions and patterns are versioned in a [separate repo](https://github.com/ptiger10/tada-io).
