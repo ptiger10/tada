@@ -18,6 +18,8 @@
 //
 // * complete test coverage
 //
+// * interoperable with existing pandas dataframes via Apache Arrow
+//
 // The key data types are Series, DataFrames, and groupings of each.
 // A Series is analogous to one column of a spreadsheet, and a DataFrame is analogous to a whole spreadsheet.
 // Printing either data type will render an ASCII table.

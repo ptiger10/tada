@@ -21,6 +21,7 @@ Some notable features of tada:
 * advanced filtering, lookups and merging, grouping, sorting, and pivoting
 * multi-level labels and columns
 * complete test coverage
+* interoperable with existing pandas dataframes via Apache Arrow
 * comparable to pandas [performance](comparison_summary.txt) on key operations
 
 The key data types are Series, DataFrames, and groupings of each.
