@@ -58,16 +58,11 @@ func Test_TransformData(t *testing.T) {
            john doe, 6`
 
 
-  // this block is equivalent to tada.ReadCSVFromString(data)
-	r := strings.NewReader(data)
-	cr := csv.NewReader(r)
-	cr.TrimLeadingSpace = true
-	records, err := cr.ReadAll()
-	... handle err
-	df, _ := ReadCSV(records)
+	df, err := ReadCSV(strings.NewReader(data))
+  ... handle err
 
   ret := TransformData(df)
-  ok, diffs, err := ret.EqualsCSVFromString(want)
+  ok, diffs, err := ret.EqualsCSV(strings.NewReader(want))
   ... handle err
   if !ok {
     t.Errorf("TransformData(): got %v, want %v, has diffs: \n%v", ret, want, diffs)
