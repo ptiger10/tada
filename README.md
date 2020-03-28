@@ -91,14 +91,26 @@ Extended [tutorial](tutorial.ipynb)
 ## Usage
 ### Constructor:
 #### Series
-`s := tada.Series([]float{1,2,3})`
+`s := tada.NewSeries([]float{1,2,3})`
 ##### with one level of labels
-`s := tada.Series([]float{1,2,3}, []string{"foo", "bar", "baz"})`
+`s := tada.NewSeries([]float{1,2,3}, []string{"foo", "bar", "baz"})`
 #### DataFrame
-`df := tada.DataFrame([]interface{}{[]string{"foo"}, []float{2}})`
+```
+df := tada.NewDataFrame([]interface{}{
+  []string{"a"}, 
+  []float64{100},
+}).SetColNames([]string{"foo", "bar"})
+```
 
 ### Reading from CSV
-`df := tada.ImportCSV("foo.csv")`
+```
+f, err := os.Open("foo.csv")
+... handle err
+defer f.Close()
+df, err := tada.ReadCSV(f)
+... handle err
+```
+
 
 More [examples](https://godoc.org/github.com/ptiger10/tada#pkg-examples)
 
