@@ -52,27 +52,27 @@ You want to write and validate a function that discards erroneous data, groups b
 
 First you write a test:
 ```
-func Test_TransformData(t *testing.T) {
+func TestDataPipeline(t *testing.T) {
   want := `name, mean_score
            jane doe, 9
            john doe, 6`
 
 
-	df, err := ReadCSV(strings.NewReader(data))
-  ... handle err
+  df, err := tada.ReadCSV(strings.NewReader(data))
+    ... handle err
 
-  ret := TransformData(df)
+  ret := DataPipeline(df)
   ok, diffs, err := ret.EqualsCSV(strings.NewReader(want))
-  ... handle err
+    ... handle err
   if !ok {
-    t.Errorf("TransformData(): got %v, want %v, has diffs: \n%v", ret, want, diffs)
+    t.Errorf("DataPipeline(): got %v, want %v, has diffs: \n%v", ret, want, diffs)
   }
 }
 ```
 
-Then you write the transformation steps:
+Then you write the data pipeline:
 ```
-func TransformData(df *tada.DataFrame) *tada.DataFrame {
+func DataPipeline(df *tada.DataFrame) *tada.DataFrame {
   err := df.HasCols("name", "score")
     ... handle err
   df.InPlace().DropNull()
