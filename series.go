@@ -81,9 +81,9 @@ func (s *Series) ToDataFrame() *DataFrame {
 // If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
 //
 // If `includeLabels` is true, then the Series' labels are included as columns.
-func (s *Series) EqualsCSV(r io.Reader, includeLabels bool, options ...ReadOption) (bool, *tablediff.Differences, error) {
+func (s *Series) EqualsCSV(includeLabels bool, r io.Reader, options ...ReadOption) (bool, *tablediff.Differences, error) {
 	df := s.ToDataFrame()
-	return df.EqualsCSV(r, includeLabels, options...)
+	return df.EqualsCSV(includeLabels, r, options...)
 }
 
 // ToCSV converts a Series to a DataFrame and returns as [][]string.
@@ -601,30 +601,18 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 	return
 }
 
-// FilterIndex returns the index position of rows that satisfy all of the `filters`,
-// which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
-// Filter may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
-// For each container name in the map, the first field selected (i.e., not left blank)
-// in its FilterFn struct provides the filter logic for that container.
+// FilterIndex returns the index position of rows that satisfy `lambda`,
+// a tada.FilterFn struct that is applied to the Series values.
 //
-// Values are coerced from their original type to the selected field type for filtering, but after filtering retain their original type.
-// For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
-// applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
-// Rows with null values are always excluded from the filtered data.
+// Values are coerced from their original type to the selected field type for filtering.
+// For example, {FilterFn{Float64: lambda}} converts the Series values to float64,
+// applies the true/false lambda function to each row in the container, and returns the rows that return true.
+// Rows with null values are excluded.
 //
 // If an error occurs, returns nil.
 // -- FILTERS
-func (s *Series) FilterIndex(filters map[string]FilterFn) []int {
-	// replace "" with values container name
-	for k, v := range filters {
-		if k == "" {
-			filters[s.values.name] = v
-			delete(filters, k)
-		}
-	}
-
-	mergedLabelsAndValues := append(s.labels, s.values)
-	index, err := filter(mergedLabelsAndValues, filters)
+func (s *Series) FilterIndex(lambda FilterFn) []int {
+	index, err := filter([]*valueContainer{s.values}, map[string]FilterFn{s.values.name: lambda})
 	if err != nil {
 		return nil
 	}
@@ -730,9 +718,9 @@ func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{})
 	}, nil
 }
 
-// FilterByValue returns a cross section of the rows in the Series satisfying all `filters`,
+// FilterByValue returns the rows in the Series satisfying all `filters`,
 // which is a map of of container names (either the Series name or label name) to interface{} values.
-// A filter is satisfied for a given row value if the stringified value in that container matches the stringified interface{} value.
+// A filter is satisfied for a given row value if the stringified value in that container at that row matches the stringified interface{} value.
 // FilterByValue may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
 // Returns a new Series.
 func (s *Series) FilterByValue(filters map[string]interface{}) *Series {
@@ -741,9 +729,9 @@ func (s *Series) FilterByValue(filters map[string]interface{}) *Series {
 	return s
 }
 
-// FilterByValue returns a cross section of the rows in the Series satisfying all `filters`,
+// FilterByValue returns the rows in the Series satisfying all `filters`,
 // which is a map of of container names (either the Series name or label name) to interface{} values.
-// A filter is satisfied for a given row value if the stringified value in that container matches the stringified interface{} value.
+// A filter is satisfied for a given row value if the stringified value in that container at that row matches the stringified interface{} value.
 // FilterByValue may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) FilterByValue(filters map[string]interface{}) {

@@ -213,7 +213,7 @@ func TestSeries_EqualsCSV(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			got, got1, err := s.EqualsCSV(tt.args.r, tt.args.includeLabels)
+			got, got1, err := s.EqualsCSV(tt.args.includeLabels, tt.args.r)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Series.EqualsCSV() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1203,7 +1203,7 @@ func TestSeries_FilterIndex(t *testing.T) {
 		err        error
 	}
 	type args struct {
-		filters map[string]FilterFn
+		lambda FilterFn
 	}
 	tests := []struct {
 		name   string
@@ -1215,27 +1215,25 @@ func TestSeries_FilterIndex(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{map[string]FilterFn{"": {Float64: func(val float64) bool {
+			args{FilterFn{Float64: func(val float64) bool {
 				return val > 1
-			}}}},
+			}}},
 			[]int{2},
 		},
 		{"Float64 filter - no matches",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{map[string]FilterFn{"": {Float64: func(val float64) bool {
+			args{FilterFn{Float64: func(val float64) bool {
 				return val > 5
-			}}}},
+			}}},
 			[]int{},
 		},
 		{"Float64 filter - error",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{map[string]FilterFn{"corge": {Float64: func(val float64) bool {
-				return val > 5
-			}}}},
+			args{FilterFn{}},
 			nil,
 		},
 	}
@@ -1247,7 +1245,7 @@ func TestSeries_FilterIndex(t *testing.T) {
 				sharedData: tt.fields.sharedData,
 				err:        tt.fields.err,
 			}
-			if got := s.FilterIndex(tt.args.filters); !reflect.DeepEqual(got, tt.want) {
+			if got := s.FilterIndex(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.FilterIndex() = %v, want %v", got, tt.want)
 			}
 		})

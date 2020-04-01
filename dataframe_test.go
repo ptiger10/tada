@@ -3056,7 +3056,7 @@ func TestWriteMockCSV(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := &bytes.Buffer{}
-			if err := WriteMockCSV(tt.args.r, w, tt.args.outputRows, tt.args.config...); (err != nil) != tt.wantErr {
+			if err := WriteMockCSV(w, tt.args.outputRows, tt.args.r, tt.args.config...); (err != nil) != tt.wantErr {
 				t.Errorf("WriteMockCSV() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
@@ -3301,7 +3301,7 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			got, got1, err := df.EqualsCSV(tt.args.r, tt.args.includeLabels)
+			got, got1, err := df.EqualsCSV(tt.args.includeLabels, tt.args.r)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.EqualsCSV() error = %v, wantErr %v", err, tt.wantErr)
 				return

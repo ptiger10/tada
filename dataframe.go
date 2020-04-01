@@ -321,7 +321,7 @@ func (df *DataFrame) ToSeries() *Series {
 // If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
 //
 // If `includeLabels` is true, then `df`'s labels are included as columns.
-func (df *DataFrame) EqualsCSV(r io.Reader, includeLabels bool, options ...ReadOption) (bool, *tablediff.Differences, error) {
+func (df *DataFrame) EqualsCSV(includeLabels bool, r io.Reader, options ...ReadOption) (bool, *tablediff.Differences, error) {
 	config := setReadConfig(options)
 	df2, err := ReadCSV(r, options...)
 	if err != nil {
@@ -403,7 +403,7 @@ func (df *DataFrame) WriteCSV(w io.Writer, options ...WriteOption) error {
 //
 // Default if no options are supplied:
 // 1 header row, no labels, rows as major dimension
-func WriteMockCSV(r io.Reader, w io.Writer, n int, options ...ReadOption) error {
+func WriteMockCSV(w io.Writer, n int, r io.Reader, options ...ReadOption) error {
 	config := setReadConfig(options)
 	numSampleRows := 10
 	inferredTypes := make([]map[string]int, 0)
@@ -1675,9 +1675,9 @@ func (df *DataFrame) Where(filters map[string]FilterFn, ifTrue, ifFalse interfac
 	}, nil
 }
 
-// FilterByValue returns a cross section of the rows in the DataFrame satisfying all `filters`,
+// FilterByValue returns the rows in the DataFrame satisfying all `filters`,
 // which is a map of of container names (either column or label names) to interface{} values.
-// A filter is satisfied for a given row value if the stringified value in that container matches the stringified interface{} value.
+// A filter is satisfied for a given row value if the stringified value in that container at that row matches the stringified interface{} value.
 // Returns a new DataFrame.
 func (df *DataFrame) FilterByValue(filters map[string]interface{}) *DataFrame {
 	df = df.Copy()

@@ -23,7 +23,7 @@ func Test_sampleDataPipeline(t *testing.T) {
 	df, _ := ReadCSV(strings.NewReader(data))
 
 	ret := sampleDataPipeline(df)
-	ok, diffs, err := ret.EqualsCSV(strings.NewReader(want), true)
+	ok, diffs, err := ret.EqualsCSV(true, strings.NewReader(want))
 	if err != nil {
 		log.Fatal(err)
 	}
