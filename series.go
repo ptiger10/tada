@@ -601,7 +601,38 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 	return
 }
 
+// FilterIndex returns the index position of rows that satisfy all of the `filters`,
+// which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
+// Filter may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
+// For each container name in the map, the first field selected (i.e., not left blank)
+// in its FilterFn struct provides the filter logic for that container.
+//
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retain their original type.
+// For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
+// applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
+// Rows with null values are always excluded from the filtered data.
+//
+// If an error occurs, returns nil.
 // -- FILTERS
+func (s *Series) FilterIndex(filters map[string]FilterFn) []int {
+	// replace "" with values container name
+	for k, v := range filters {
+		if k == "" {
+			filters[s.values.name] = v
+			delete(filters, k)
+		}
+	}
+
+	mergedLabelsAndValues := append(s.labels, s.values)
+	index, err := filter(mergedLabelsAndValues, filters)
+	if err != nil {
+		return nil
+	}
+	if len(index) == 0 {
+		return []int{}
+	}
+	return index
+}
 
 // Filter returns all rows that satisfy all of the `filters`,
 // which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
@@ -609,7 +640,7 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container.
 //
-// Values are coerced from their original type to the selected field type for filtering, but after filtering retains their original type.
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retain their original type.
 // For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
@@ -628,7 +659,7 @@ func (s *Series) Filter(filters map[string]FilterFn) *Series {
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container
 //
-// Values are coerced from their original type to the selected field type for filtering, but after filtering retains their original type.
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retain their original type.
 // For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.

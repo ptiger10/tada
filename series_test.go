@@ -1195,6 +1195,65 @@ func TestSeries_Sort(t *testing.T) {
 	}
 }
 
+func TestSeries_FilterIndex(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		filters map[string]FilterFn
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"Float64 filter - default",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			args{map[string]FilterFn{"": {Float64: func(val float64) bool {
+				return val > 1
+			}}}},
+			[]int{2},
+		},
+		{"Float64 filter - no matches",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			args{map[string]FilterFn{"": {Float64: func(val float64) bool {
+				return val > 5
+			}}}},
+			[]int{},
+		},
+		{"Float64 filter - error",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			args{map[string]FilterFn{"corge": {Float64: func(val float64) bool {
+				return val > 5
+			}}}},
+			nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.FilterIndex(tt.args.filters); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Series.FilterIndex() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSeries_Filter(t *testing.T) {
 	type fields struct {
 		values *valueContainer

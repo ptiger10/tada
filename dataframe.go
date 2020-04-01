@@ -1592,7 +1592,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container.
 //
-// Values are coerced from their original type to the selected field type for filtering, but after filtering retains their original type.
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retain their original type.
 // For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
@@ -1610,7 +1610,7 @@ func (df *DataFrame) Filter(filters map[string]FilterFn) *DataFrame {
 // For each container name in the map, the first field selected (i.e., not left blank)
 // in its FilterFn struct provides the filter logic for that container.
 //
-// Values are coerced from their original type to the selected field type for filtering, but after filtering retains their original type.
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retain their original type.
 // For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
 // applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
 // Rows with null values are always excluded from the filtered data.
