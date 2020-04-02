@@ -349,9 +349,9 @@ func (g *GroupedSeries) ListGroups() []string {
 	return g.orderedKeys
 }
 
-// SliceLabels returns the grouped label levels as interface{} slices within an []interface returns the group's labels as slices within an []interface
+// GetLabels returns the grouped label levels as interface{} slices within an []interface returns the group's labels as slices within an []interface
 // that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
-func (g *GroupedSeries) SliceLabels() []interface{} {
+func (g *GroupedSeries) GetLabels() []interface{} {
 	var ret []interface{}
 	labels := copyContainers(g.labels)
 	for j := range labels {
@@ -617,9 +617,9 @@ func (g *GroupedDataFrame) ListGroups() []string {
 	return g.orderedKeys
 }
 
-// SliceLabels returns the grouped label levels as interface{} slices within an []interface
+// GetLabels returns the grouped label levels as interface{} slices within an []interface
 // that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
-func (g *GroupedDataFrame) SliceLabels() []interface{} {
+func (g *GroupedDataFrame) GetLabels() []interface{} {
 	var ret []interface{}
 	labels := copyContainers(g.labels)
 	for j := range g.labels {

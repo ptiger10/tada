@@ -165,7 +165,7 @@ func (df *DataFrame) Cast(containerAsType map[string]DType) {
 
 // -- READERS
 
-// ReadOptionHeaders configures a read function to expect `n` rows of column headers (default: 1).
+// ReadOptionHeaders configures a read function to expect `n` rows to be column headers (default: 1).
 func ReadOptionHeaders(n int) func(*readConfig) {
 	return func(r *readConfig) {
 		r.NumHeaderRows = n
