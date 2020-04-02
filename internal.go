@@ -2442,6 +2442,24 @@ func EqualSeries(a, b *Series) bool {
 	return true
 }
 
+func seriesIsDistinct(a, b *Series) bool {
+	if reflect.ValueOf(a.labels).Pointer() == reflect.ValueOf(b.labels).Pointer() {
+		return false
+	}
+	// compare individual label pointer addresses
+	for j := range a.labels {
+		if j < len(b.labels) {
+			if a.labels[j] == b.labels[j] {
+				return false
+			}
+		}
+	}
+	if a.values == b.values {
+		return false
+	}
+	return true
+}
+
 func equalGroupedSeries(a, b *GroupedSeries) bool {
 	if (a == nil) != (b == nil) {
 		return false
@@ -2477,7 +2495,7 @@ func equalGroupedSeries(a, b *GroupedSeries) bool {
 	return true
 }
 
-// EqualDataFrames returns whether two dataframes are identical or not
+// EqualDataFrames returns whether two dataframes are identical or not.
 func EqualDataFrames(a, b *DataFrame) bool {
 	if (a == nil) != (b == nil) {
 		return false
@@ -2543,28 +2561,31 @@ func equalGroupedDataFrames(a, b *GroupedDataFrame) bool {
 	return true
 }
 
-func dataFrameEqualsDistinct(a, b *DataFrame) bool {
-	if !EqualDataFrames(a, b) {
-		return false
-	}
+func dataFrameIsDistinct(a, b *DataFrame) bool {
 	if reflect.ValueOf(a.labels).Pointer() == reflect.ValueOf(b.labels).Pointer() {
 		return false
-	}
-	for j := range a.labels {
-		if a.labels[j] == b.labels[j] {
-			return false
-		}
 	}
 	if reflect.ValueOf(a.values).Pointer() == reflect.ValueOf(b.values).Pointer() {
 		return false
 	}
-	for k := range a.values {
-		if a.values[k] == b.values[k] {
-			return false
-		}
-	}
 	if reflect.ValueOf(a.colLevelNames).Pointer() == reflect.ValueOf(b.colLevelNames).Pointer() {
 		return false
+	}
+	// compare individual label pointer addresses
+	for j := range a.labels {
+		if j < len(b.labels) {
+			if a.labels[j] == b.labels[j] {
+				return false
+			}
+		}
+	}
+	// compare individual value pointer addresses
+	for k := range a.values {
+		if k < len(b.values) {
+			if a.values[k] == b.values[k] {
+				return false
+			}
+		}
 	}
 	return true
 }

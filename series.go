@@ -403,7 +403,7 @@ func (s *Series) InPlace() *SeriesMutator {
 //
 // In all cases, returns a new Series.
 func (s *Series) WithLabels(name string, input interface{}) *Series {
-	s.Copy()
+	s = s.Copy()
 	s.InPlace().WithLabels(name, input)
 	return s
 }
@@ -431,7 +431,7 @@ func (s *SeriesMutator) WithLabels(name string, input interface{}) {
 // `input` must be a supported slice type of the same length as the original Series.
 // Returns a new Series.
 func (s *Series) WithValues(input interface{}) *Series {
-	s.Copy()
+	s = s.Copy()
 	s.InPlace().WithValues(input)
 	return s
 }
@@ -453,7 +453,7 @@ func (s *SeriesMutator) WithValues(input interface{}) {
 // DropRow removes the row at the specified index.
 // Returns a new Series.
 func (s *Series) DropRow(index int) *Series {
-	s.Copy()
+	s = s.Copy()
 	s.InPlace().DropRow(index)
 	return s
 }
@@ -474,7 +474,7 @@ func (s *SeriesMutator) DropRow(index int) {
 // DropLabels removes the first label level matching `name`.
 // Returns a new Series.
 func (s *Series) DropLabels(name string) *Series {
-	s.Copy()
+	s = s.Copy()
 	s.InPlace().DropLabels(name)
 	return s
 }
@@ -495,7 +495,7 @@ func (s *SeriesMutator) DropLabels(name string) {
 // If the types of any container do not match, all the values in that container are coerced to string.
 // Returns a new Series.
 func (s *Series) Append(other *Series) *Series {
-	s.Copy()
+	s = s.Copy()
 	s.InPlace().Append(other)
 	return s
 }
@@ -569,7 +569,7 @@ func (s *Series) Name() string {
 // DType is only used for the process of sorting. Once it has been sorted, data retains its original type.
 // Returns a new Series.
 func (s *Series) Sort(by ...Sorter) *Series {
-	s.Copy()
+	s = s.Copy()
 	s.InPlace().Sort(by...)
 	return s
 }
@@ -636,7 +636,7 @@ func (s *Series) FilterIndex(lambda FilterFn) []int {
 // For equality filtering on one or more containers, see also s.FilterByValue().
 // Returns a new Series.
 func (s *Series) Filter(filters map[string]FilterFn) *Series {
-	s.Copy()
+	s = s.Copy()
 	s.InPlace().Filter(filters)
 	return s
 }
@@ -755,7 +755,7 @@ func (s *SeriesMutator) FilterByValue(filters map[string]interface{}) {
 // If a value is null either before or after the lambda function is applied, it is also null after.
 // Returns a new Series.
 func (s *Series) Apply(lambda ApplyFn) *Series {
-	s.Copy()
+	s = s.Copy()
 	s.InPlace().Apply(lambda)
 	return s
 }
@@ -789,7 +789,7 @@ func (s *SeriesMutator) Apply(lambda ApplyFn) {
 // If a value is null either before or after the lambda function is applied, it is also null after.
 // Returns a new Series.
 func (s *Series) ApplyFormat(lambda ApplyFormatFn) *Series {
-	s.Copy()
+	s = s.Copy()
 	s.InPlace().ApplyFormat(lambda)
 	return s
 }

@@ -263,9 +263,8 @@ func TestDataFrame_Copy(t *testing.T) {
 			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Copy() = %v, want %v", got, tt.want)
 			}
-			gotDistinct := got.Copy()
-			if !dataFrameEqualsDistinct(gotDistinct, got) {
-				t.Errorf("DataFrame.Copy() retained reference to original")
+			if !dataFrameIsDistinct(got, df) {
+				t.Errorf("DataFrame.Copy() retained reference to original, want copy")
 			}
 		})
 	}
@@ -875,10 +874,11 @@ func TestDataFrame_FilterCols(t *testing.T) {
 
 func TestDataFrame_WithCol(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		colLevelNames []string
+		name          string
+		err           error
 	}
 	type args struct {
 		name  string
@@ -895,47 +895,54 @@ func TestDataFrame_WithCol(t *testing.T) {
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 			labels: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name: "bar"},
+			colLevelNames: []string{"*0"},
+			name:          "bar"},
 			args{"foo", "qux"},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "qux"}},
 				labels: []*valueContainer{
 					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				name: "bar"},
+				colLevelNames: []string{"*0"},
+				name:          "bar"},
 		},
 		{"replace column", fields{
 			values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 			labels: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name: "bar"},
+			colLevelNames: []string{"*0"},
+			name:          "bar"},
 			args{"foo", []float64{10}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{10}, isNull: []bool{false}, name: "foo"}},
 				labels: []*valueContainer{
 					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				name: "bar"},
+				colLevelNames: []string{"*0"},
+				name:          "bar"},
 		},
 		{"append column", fields{
 			values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 			labels: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name: "bar"},
+			colLevelNames: []string{"*0"},
+			name:          "bar"},
 			args{"baz", []float64{10}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 				{slice: []float64{10}, isNull: []bool{false}, name: "baz"}},
 				labels: []*valueContainer{
 					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				name: "bar"},
+				colLevelNames: []string{"*0"},
+				name:          "bar"},
 		},
 		{"replace with Series", fields{
 			values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 			labels: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name: "bar"},
+			colLevelNames: []string{"*0"},
+			name:          "bar"},
 			args{"baz", &Series{
 				values: &valueContainer{slice: []float64{10}, isNull: []bool{false}, name: "baz"},
 				labels: []*valueContainer{
@@ -946,14 +953,16 @@ func TestDataFrame_WithCol(t *testing.T) {
 				{slice: []float64{10}, isNull: []bool{false}, name: "baz"}},
 				labels: []*valueContainer{
 					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				name: "bar"},
+				colLevelNames: []string{"*0"},
+				name:          "bar"},
 		},
 		{"fail - bad input", fields{
 			values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 			labels: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name: "bar"},
+			colLevelNames: []string{"*0"},
+			name:          "bar"},
 			args{"baz", []complex64{10}},
 			&DataFrame{err: fmt.Errorf("WithCol(): unable to calculate null values ([]complex64 not supported)")},
 		},
@@ -961,13 +970,18 @@ func TestDataFrame_WithCol(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				colLevelNames: tt.fields.colLevelNames,
+				err:           tt.fields.err,
 			}
-			if got := df.WithCol(tt.args.name, tt.args.input); !EqualDataFrames(got, tt.want) {
+			got := df.WithCol(tt.args.name, tt.args.input)
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.WithCol() = %v, want %v", got.values, tt.want.values)
+			}
+			if !dataFrameIsDistinct(got, df) {
+				t.Errorf("DataFrame.WithCol() changed underlying values, want copy")
 			}
 		})
 	}
@@ -975,10 +989,11 @@ func TestDataFrame_WithCol(t *testing.T) {
 
 func TestDataFrame_WithLabels(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		colLevelNames []string
+		name          string
+		err           error
 	}
 	type args struct {
 		name  string
@@ -995,47 +1010,54 @@ func TestDataFrame_WithLabels(t *testing.T) {
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 			labels: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name: "bar"},
+			colLevelNames: []string{"*0"},
+			name:          "bar"},
 			args{"*0", "qux"},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 				labels: []*valueContainer{
 					{slice: []int{0}, isNull: []bool{false}, name: "qux"}},
-				name: "bar"},
+				colLevelNames: []string{"*0"},
+				name:          "bar"},
 		},
 		{"replace column", fields{
 			values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 			labels: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name: "bar"},
+			colLevelNames: []string{"*0"},
+			name:          "bar"},
 			args{"*0", []int{10}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 				labels: []*valueContainer{
 					{slice: []int{10}, isNull: []bool{false}, name: "*0"}},
-				name: "bar"},
+				colLevelNames: []string{"*0"},
+				name:          "bar"},
 		},
 		{"append column", fields{
 			values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 			labels: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name: "bar"},
+			colLevelNames: []string{"*0"},
+			name:          "bar"},
 			args{"baz", []float64{10}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 				labels: []*valueContainer{
 					{slice: []int{0}, isNull: []bool{false}, name: "*0"},
 					{slice: []float64{10}, isNull: []bool{false}, name: "baz"}},
-				name: "bar"},
+				colLevelNames: []string{"*0"},
+				name:          "bar"},
 		},
 		{"fail - bad input", fields{
 			values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 			labels: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name: "bar"},
+			colLevelNames: []string{"*0"},
+			name:          "bar"},
 			args{"baz", []complex64{10}},
 			&DataFrame{err: fmt.Errorf("WithLabels(): unable to calculate null values ([]complex64 not supported)")},
 		},
@@ -1043,13 +1065,18 @@ func TestDataFrame_WithLabels(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				colLevelNames: tt.fields.colLevelNames,
+				err:           tt.fields.err,
 			}
-			if got := df.WithLabels(tt.args.name, tt.args.input); !EqualDataFrames(got, tt.want) {
-				t.Errorf("DataFrame.WithLabels() = %v, want %v", got.err, tt.want.err)
+			got := df.WithLabels(tt.args.name, tt.args.input)
+			if !EqualDataFrames(got, tt.want) {
+				t.Errorf("DataFrame.WithLabels() = %v, want %v", got, tt.want)
+			}
+			if !dataFrameIsDistinct(got, df) {
+				t.Errorf("DataFrame.WithLabels() changed underlying values, want copy")
 			}
 		})
 	}
@@ -1122,8 +1149,12 @@ func TestDataFrame_DropNull(t *testing.T) {
 				name:          tt.fields.name,
 				err:           tt.fields.err,
 			}
-			if got := df.DropNull(tt.args.subset...); !EqualDataFrames(got, tt.want) {
+			got := df.DropNull(tt.args.subset...)
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.DropNull() = %v, want %v", got.values, tt.want.values)
+			}
+			if !dataFrameIsDistinct(got, df) {
+				t.Errorf("DataFrame.DropNull() changed underlying values, want copy")
 			}
 		})
 	}
@@ -1197,19 +1228,24 @@ func TestDataFrame_Null(t *testing.T) {
 				name:          tt.fields.name,
 				err:           tt.fields.err,
 			}
-			if got := df.Null(tt.args.subset...); !EqualDataFrames(got, tt.want) {
+			got := df.Null(tt.args.subset...)
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Null() = %v, want %v", got, tt.want)
+			}
+			if !dataFrameIsDistinct(got, df) {
+				t.Errorf("DataFrame.Null() changed underlying values, want copy")
 			}
 		})
 	}
 }
 
-func TestDataFrame_SetLabels(t *testing.T) {
+func TestDataFrame_SetAsLabels(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		colLevelNames []string
+		err           error
 	}
 	type args struct {
 		colNames []string
@@ -1224,21 +1260,25 @@ func TestDataFrame_SetLabels(t *testing.T) {
 			values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 				{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name:   "baz"},
+			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:          "baz",
+			colLevelNames: []string{"*0"},
+		},
 			args{[]string{"bar"}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 				labels: []*valueContainer{
 					{slice: []int{0}, isNull: []bool{false}, name: "*0"},
 					{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
-				name: "baz"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"}},
 		{"fail - too many columns listed", fields{
 			values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 				{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name:   "baz"},
+			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:          "baz",
+			colLevelNames: []string{"*0"}},
 			args{[]string{"bar", "foo"}},
 			&DataFrame{
 				err: fmt.Errorf("SetAsLabels(): number of colNames must be less than number of columns (2 >= 2)")},
@@ -1247,8 +1287,9 @@ func TestDataFrame_SetLabels(t *testing.T) {
 			values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 				{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name:   "baz"},
+			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:          "baz",
+			colLevelNames: []string{"*0"}},
 			args{[]string{"corge"}},
 			&DataFrame{
 				err: fmt.Errorf("SetAsLabels(): `name` (corge) not found")},
@@ -1257,13 +1298,18 @@ func TestDataFrame_SetLabels(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				colLevelNames: tt.fields.colLevelNames,
+				err:           tt.fields.err,
 			}
-			if got := df.SetAsLabels(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
+			got := df.SetAsLabels(tt.args.colNames...)
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.SetAsLabels() = %v, want %v", got, tt.want)
+			}
+			if !dataFrameIsDistinct(got, df) {
+				t.Errorf("DataFrame.SetAsLabels() changed underlying values, want copy")
 			}
 		})
 	}
@@ -1271,10 +1317,11 @@ func TestDataFrame_SetLabels(t *testing.T) {
 
 func TestDataFrame_ResetLabels(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		colLevelNames []string
+		name          string
+		err           error
 	}
 	type args struct {
 		index []int
@@ -1291,7 +1338,8 @@ func TestDataFrame_ResetLabels(t *testing.T) {
 			labels: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
 				{slice: []int{1}, isNull: []bool{false}, name: "*1"}},
-			name: "baz"},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{[]int{1}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
@@ -1299,14 +1347,16 @@ func TestDataFrame_ResetLabels(t *testing.T) {
 			},
 				labels: []*valueContainer{
 					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				name: "baz"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"}},
 		{"pass - all levels", fields{
 			values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 			labels: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
 				{slice: []int{1}, isNull: []bool{false}, name: "*1"}},
-			name: "baz"},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{nil},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
@@ -1315,14 +1365,16 @@ func TestDataFrame_ResetLabels(t *testing.T) {
 			},
 				labels: []*valueContainer{
 					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				name: "baz"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"}},
 		{"fail - out of range ", fields{
 			values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
 			labels: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
 				{slice: []int{1}, isNull: []bool{false}, name: "*1"}},
-			name: "baz"},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{[]int{10}},
 			&DataFrame{err: fmt.Errorf("ResetLabels(): index out of range (10 > 2)")}},
 		{"fail - out of range after adjustment ", fields{
@@ -1331,20 +1383,26 @@ func TestDataFrame_ResetLabels(t *testing.T) {
 			labels: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
 				{slice: []int{1}, isNull: []bool{false}, name: "*1"}},
-			name: "baz"},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{[]int{1, 10}},
 			&DataFrame{err: fmt.Errorf("ResetLabels(): index out of range (10 > 2)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				colLevelNames: tt.fields.colLevelNames,
+				err:           tt.fields.err,
 			}
-			if got := df.ResetLabels(tt.args.index...); !EqualDataFrames(got, tt.want) {
+			got := df.ResetLabels(tt.args.index...)
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.ResetLabels() = %v, want %v", got.err, tt.want.err)
+			}
+			if !dataFrameIsDistinct(got, df) {
+				t.Errorf("DataFrame.ResetLabels() changed underlying values, want copy")
 			}
 		})
 	}
@@ -1577,10 +1635,11 @@ func TestDataFrame_SetColNames(t *testing.T) {
 
 func TestDataFrame_Filter(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		colLevelNames []string
+		name          string
+		err           error
 	}
 	type args struct {
 		filters map[string]FilterFn
@@ -1595,7 +1654,8 @@ func TestDataFrame_Filter(t *testing.T) {
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, false, false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
 			args{map[string]FilterFn{
 				"foo": {Float64: func(val float64) bool {
 					if val > 1 {
@@ -1614,13 +1674,15 @@ func TestDataFrame_Filter(t *testing.T) {
 				values: []*valueContainer{
 					{slice: []float64{2}, isNull: []bool{false}, name: "foo"},
 					{slice: []string{"bar"}, isNull: []bool{false}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{2}, isNull: []bool{false}, name: "*0"}}},
+				labels:        []*valueContainer{{slice: []int{2}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
 		},
 		{"no matches", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, false, false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
 			args{map[string]FilterFn{
 				"foo": {Float64: func(val float64) bool {
 					return val >= 10
@@ -1630,45 +1692,55 @@ func TestDataFrame_Filter(t *testing.T) {
 				values: []*valueContainer{
 					{slice: []float64{}, isNull: []bool{}, name: "foo"},
 					{slice: []string{}, isNull: []bool{}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{}, isNull: []bool{}, name: "*0"}}},
+				labels:        []*valueContainer{{slice: []int{}, isNull: []bool{}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
 		},
 		{"no filters - all rows", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, false, false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
 			args{nil},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 					{slice: []string{"foo", "", "bar"}, isNull: []bool{false, false, false}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+				labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
 		},
 		{"fail - empty filter", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
 			args{map[string]FilterFn{"*0": {}}},
 			&DataFrame{err: fmt.Errorf("Filter(): no filter function provided")}},
 		{"fail - bad column name", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
 				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
 			args{map[string]FilterFn{"corge": {Float64: func(float64) bool { return true }}}},
 			&DataFrame{err: fmt.Errorf("Filter(): `name` (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				colLevelNames: tt.fields.colLevelNames,
+				err:           tt.fields.err,
 			}
-			if got := df.Filter(tt.args.filters); !EqualDataFrames(got, tt.want) {
+			got := df.Filter(tt.args.filters)
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Filter() = %v, want %v", got, tt.want)
+			}
+			if !dataFrameIsDistinct(got, df) {
+				t.Errorf("DataFrame.Filter() changed underlying values, want copy")
 			}
 		})
 	}
@@ -1776,10 +1848,11 @@ func TestDataFrame_Where(t *testing.T) {
 
 func TestDataFrame_Apply(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		colLevelNames []string
+		err           error
 	}
 	type args struct {
 		lambdas map[string]ApplyFn
@@ -1794,8 +1867,9 @@ func TestDataFrame_Apply(t *testing.T) {
 			values: []*valueContainer{
 				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
 				{slice: []int{1}, isNull: []bool{false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name:   "baz"},
+			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{map[string]ApplyFn{"foo": {Float64: func(v float64) float64 {
 				return v + 1
 			}}}},
@@ -1803,15 +1877,17 @@ func TestDataFrame_Apply(t *testing.T) {
 				values: []*valueContainer{
 					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 					{slice: []int{1}, isNull: []bool{false}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-				name:   "baz"},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"},
 		},
 		{"fail - no function", fields{
 			values: []*valueContainer{
 				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
 				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name:   "baz"},
+			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{map[string]ApplyFn{"foo": {}}},
 			&DataFrame{
 				err: fmt.Errorf("Apply(): no apply function provided")},
@@ -1820,8 +1896,9 @@ func TestDataFrame_Apply(t *testing.T) {
 			values: []*valueContainer{
 				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
 				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name:   "baz"},
+			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{map[string]ApplyFn{"corge": {Float64: func(float64) float64 { return 0 }}}},
 			&DataFrame{
 				err: fmt.Errorf("Apply(): `name` (corge) not found")},
@@ -1830,10 +1907,11 @@ func TestDataFrame_Apply(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				colLevelNames: tt.fields.colLevelNames,
+				err:           tt.fields.err,
 			}
 			if got := df.Apply(tt.args.lambdas); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Apply() = %v, want %v", got, tt.want)

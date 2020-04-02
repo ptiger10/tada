@@ -4446,7 +4446,69 @@ func Test_subsetInterfaceSlice(t *testing.T) {
 	}
 }
 
-func Test_dataFrameEqualsDistinct(t *testing.T) {
+func Test_seriesIsDistinct(t *testing.T) {
+	vc := &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}
+	vcs := []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}}
+	type args struct {
+		a *Series
+		b *Series
+	}
+	tests := []struct {
+		name string
+		args args
+		want bool
+	}{
+		{"distinct", args{
+			&Series{
+				labels: []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+			},
+			&Series{
+				labels: vcs,
+				values: vc,
+			},
+		}, true},
+		{"not distinct - label containers", args{
+			&Series{
+				labels: vcs,
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+			},
+			&Series{
+				labels: vcs,
+				values: vc,
+			},
+		}, false},
+		{"not distinct - label", args{
+			&Series{
+				labels: []*valueContainer{vc},
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
+			},
+			&Series{
+				labels: []*valueContainer{vc},
+				values: vc,
+			},
+		}, false},
+		{"not distinct - values", args{
+			&Series{
+				labels: []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
+				values: vc,
+			},
+			&Series{
+				labels: vcs,
+				values: vc,
+			},
+		}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := seriesIsDistinct(tt.args.a, tt.args.b); got != tt.want {
+				t.Errorf("seriesIsDistinct() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_dataFrameIsDistinct(t *testing.T) {
 	vc := &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}
 	vcs := []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}}
 	colLevelNames := []string{"*0"}
@@ -4509,20 +4571,11 @@ func Test_dataFrameEqualsDistinct(t *testing.T) {
 			&DataFrame{values: []*valueContainer{vc}, labels: []*valueContainer{vc}, name: "foo", colLevelNames: colLevelNames}},
 			false,
 		},
-		{"not equal", args{
-			&DataFrame{
-				values:        []*valueContainer{{slice: []float64{4, 5, 6}, isNull: []bool{false, false, false}}},
-				labels:        []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
-				name:          "foo",
-				colLevelNames: colLevelNames},
-			&DataFrame{values: []*valueContainer{vc}, labels: []*valueContainer{vc}, name: "foo", colLevelNames: colLevelNames}},
-			false,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := dataFrameEqualsDistinct(tt.args.a, tt.args.b); got != tt.want {
-				t.Errorf("dataFrameEqualsDistinct() = %v, want %v", got, tt.want)
+			if got := dataFrameIsDistinct(tt.args.a, tt.args.b); got != tt.want {
+				t.Errorf("dataFrameIsDistinct() = %v, want %v", got, tt.want)
 			}
 		})
 	}

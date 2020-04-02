@@ -1124,7 +1124,7 @@ func (df *DataFrameMutator) FilterCols(lambda func(string) bool, level int) {
 //
 // In all cases, returns a new DataFrame.
 func (df *DataFrame) WithLabels(name string, input interface{}) *DataFrame {
-	df.Copy()
+	df = df.Copy()
 	df.InPlace().WithLabels(name, input)
 	return df
 }
@@ -1158,7 +1158,7 @@ func (df *DataFrameMutator) WithLabels(name string, input interface{}) {
 //
 // In all cases, returns a new DataFrame.
 func (df *DataFrame) WithCol(name string, input interface{}) *DataFrame {
-	df.Copy()
+	df = df.Copy()
 	df.InPlace().WithCol(name, input)
 	return df
 }
@@ -1184,7 +1184,7 @@ func (df *DataFrameMutator) WithCol(name string, input interface{}) {
 // DropLabels drops the first label level matching `name`.
 // Returns a new DataFrame.
 func (df *DataFrame) DropLabels(name string) *DataFrame {
-	df.Copy()
+	df = df.Copy()
 	df.InPlace().DropLabels(name)
 	return df
 }
@@ -1204,7 +1204,7 @@ func (df *DataFrameMutator) DropLabels(name string) {
 // DropCol drops the first column matching `name`.
 // Returns a new DataFrame.
 func (df *DataFrame) DropCol(name string) *DataFrame {
-	df.Copy()
+	df = df.Copy()
 	df.InPlace().DropCol(name)
 	return df
 }
@@ -1224,7 +1224,7 @@ func (df *DataFrameMutator) DropCol(name string) {
 // DropRow removes the row at the specified index.
 // Returns a new DataFrame.
 func (df *DataFrame) DropRow(index int) *DataFrame {
-	df.Copy()
+	df = df.Copy()
 	df.InPlace().DropRow(index)
 	return df
 }
@@ -1249,7 +1249,7 @@ func (df *DataFrameMutator) DropRow(index int) {
 // If the types of any container do not match, all the values in that container are coerced to string.
 // Returns a new DataFrame.
 func (df *DataFrame) Append(other *DataFrame) *DataFrame {
-	df.Copy()
+	df = df.Copy()
 	df.InPlace().Append(other)
 	return df
 }
@@ -1298,7 +1298,7 @@ func (df *DataFrameMutator) Relabel() {
 // The number of `colNames` supplied must be less than the number of columns in the Series.
 // Returns a new DataFrame.
 func (df *DataFrame) SetAsLabels(colNames ...string) *DataFrame {
-	df.Copy()
+	df = df.Copy()
 	df.InPlace().SetAsLabels(colNames...)
 	return df
 }
@@ -1328,7 +1328,7 @@ func (df *DataFrameMutator) SetAsLabels(colNames ...string) {
 // If no index levels are supplied, all label levels are appended as columns and dropped as levels, and replaced by a default label column.
 // Returns a new DataFrame.
 func (df *DataFrame) ResetLabels(index ...int) *DataFrame {
-	df.Copy()
+	df = df.Copy()
 	df.InPlace().ResetLabels(index...)
 	return df
 }
@@ -1601,7 +1601,7 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 // For equality filtering on one or more containers, see also df.FilterByValue().
 // Returns a new DataFrame.
 func (df *DataFrame) Filter(filters map[string]FilterFn) *DataFrame {
-	df.Copy()
+	df = df.Copy()
 	df.InPlace().Filter(filters)
 	return df
 }
@@ -1713,7 +1713,7 @@ func (df *DataFrameMutator) FilterByValue(filters map[string]interface{}) {
 // If a value is null either before or after the lambda function is applied, it is also null after.
 // Returns a new DataFrame.
 func (df *DataFrame) Apply(lambdas map[string]ApplyFn) *DataFrame {
-	df.Copy()
+	df = df.Copy()
 	df.InPlace().Apply(lambdas)
 	return df
 }
@@ -1759,7 +1759,7 @@ func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 // If a value is null either before or after the lambda function is applied, it is also null after.
 // Returns a new DataFrame.
 func (df *DataFrame) ApplyFormat(lambdas map[string]ApplyFormatFn) *DataFrame {
-	df.Copy()
+	df = df.Copy()
 	df.InPlace().ApplyFormat(lambdas)
 	return df
 }
@@ -1824,7 +1824,7 @@ func (df *DataFrameMutator) ApplyFormat(lambdas map[string]ApplyFormatFn) {
 // Finally, all container names (columns and label names) are deduplicated after the merge so that they are unique.
 // Returns a new DataFrame.
 func (df *DataFrame) Merge(other *DataFrame) *DataFrame {
-	df.Copy()
+	df = df.Copy()
 	df.InPlace().Merge(other)
 	return df
 }
@@ -1956,7 +1956,7 @@ func (df *DataFrame) LookupAdvanced(other *DataFrame, how string, leftOn []strin
 // DType is only used for the process of sorting. Once it has been sorted, data retains its original type.
 // Returns a new DataFrame.
 func (df *DataFrame) Sort(by ...Sorter) *DataFrame {
-	df.Copy()
+	df = df.Copy()
 	df.InPlace().Sort(by...)
 	return df
 }

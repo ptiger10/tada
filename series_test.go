@@ -81,14 +81,8 @@ func TestSeries_Copy(t *testing.T) {
 			if !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Copy() = %v, want %v", got, tt.want)
 			}
-			got.values.isNull[0] = true
-			if EqualSeries(got, s) {
-				t.Errorf("Series.Copy() = retained reference to original values")
-			}
-			got = s.Copy()
-			got.err = errors.New("foo")
-			if EqualSeries(got, s) {
-				t.Errorf("Series.Copy() retained reference to original error")
+			if !seriesIsDistinct(got, s) {
+				t.Errorf("Series.Copy() retained reference to original, want copy")
 			}
 		})
 	}
