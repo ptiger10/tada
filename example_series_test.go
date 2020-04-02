@@ -53,11 +53,11 @@ func ExampleSeries_nestedSlice() {
 	// +---++-----------+
 }
 
-func ExampleSeries_Cut() {
+func ExampleSeries_Bin() {
 	s := NewSeries([]float64{1, 3, 5}).SetName("foo")
 	fmt.Println(s)
 
-	fmt.Println(s.Cut([]float64{0, 2, 4}, nil))
+	fmt.Println(s.Bin([]float64{0, 2, 4}, nil))
 	// Output:
 	// +---++-----+
 	// | - || foo |
@@ -76,11 +76,11 @@ func ExampleSeries_Cut() {
 	// +---++-----+
 }
 
-func ExampleSeries_Cut_andMore() {
+func ExampleSeries_Bin_andMore() {
 	s := NewSeries([]float64{1, 3, 5}).SetName("foo")
 	fmt.Println(s)
 
-	fmt.Println(s.Cut([]float64{0, 2, 4}, &Cutter{AndMore: true}))
+	fmt.Println(s.Bin([]float64{0, 2, 4}, &Binner{AndMore: true}))
 	// Output:
 	// +---++-----+
 	// | - || foo |
@@ -99,11 +99,11 @@ func ExampleSeries_Cut_andMore() {
 	// +---++-----+
 }
 
-func ExampleSeries_Cut_customLabels() {
+func ExampleSeries_Bin_customLabels() {
 	s := NewSeries([]float64{1, 3}).SetName("foo")
 	fmt.Println(s)
 
-	fmt.Println(s.Cut([]float64{0, 2, 4}, &Cutter{Labels: []string{"low", "high"}}))
+	fmt.Println(s.Bin([]float64{0, 2, 4}, &Binner{Labels: []string{"low", "high"}}))
 	// Output:
 	// +---++-----+
 	// | - || foo |
@@ -120,11 +120,11 @@ func ExampleSeries_Cut_customLabels() {
 	// +---++------+
 }
 
-func ExampleSeries_PercentileCut() {
+func ExampleSeries_PercentileBin() {
 	s := NewSeries([]float64{1, 2, 3, 4}).SetName("foo")
 	fmt.Println(s)
 
-	fmt.Println(s.PercentileCut([]float64{0, .5, 1}, nil))
+	fmt.Println(s.PercentileBin([]float64{0, .5, 1}, nil))
 	// Output:
 	// +---++-----+
 	// | - || foo |
@@ -145,11 +145,11 @@ func ExampleSeries_PercentileCut() {
 	// +---++-------+
 }
 
-func ExampleSeries_PercentileCut_customLabels() {
+func ExampleSeries_PercentileBin_customLabels() {
 	s := NewSeries([]float64{1, 2, 3, 4}).SetName("foo")
 	fmt.Println(s)
 
-	fmt.Println(s.PercentileCut([]float64{0, .5, 1}, []string{"Bottom 50%", "Top 50%"}))
+	fmt.Println(s.PercentileBin([]float64{0, .5, 1}, &Binner{Labels: []string{"Bottom 50%", "Top 50%"}}))
 	// Output:
 	// +---++-----+
 	// | - || foo |

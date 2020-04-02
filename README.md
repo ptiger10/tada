@@ -10,7 +10,7 @@ tada (TAble DAta) is a package that enables test-driven data pipelines in pure G
 
 **DISCLAIMER: still under development. API subject to breaking changes until v1.**
 
-**If you still want to use this regardless of the disclaimer, congratulations, you are an alpha tester! Please DM your feedback to me on the Gophers slack channel (Dave Fort) or create an issue**
+**If you still want to use this regardless of the disclaimer, congratulations, you are an alpha tester! Please DM your feedback to me on the Gophers slack channel (Dave Fort) or create an issue.**
 
 tada combines concepts from pandas, spreadsheets, R, Apache Spark, and SQL.
 Its most common use cases are cleaning, aggregating, transforming, and analyzing data.
@@ -64,7 +64,7 @@ func TestDataPipeline(t *testing.T) {
     ... handle err
 
   ret := DataPipeline(df)
-  ok, diffs, err := ret.EqualsCSV(strings.NewReader(want))
+  ok, diffs, err := ret.EqualsCSV(true, strings.NewReader(want))
     ... handle err
   if !ok {
     t.Errorf("DataPipeline(): got %v, want %v, has diffs: \n%v", ret, want, diffs)

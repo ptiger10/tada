@@ -1178,20 +1178,23 @@ func (s *Series) Rank() *Series {
 	}
 }
 
-// Cut coerces the Series values to float64 and categorizes each row based on which `bin` interval it falls within.
+// Bin coerces the Series values to float64 and categorizes each row based on which `bin` interval it falls within.
 // `bins` should be a slice of sequential edges that form intervals (left exclusive, right inclusive).
 // For example, [1, 3, 5] represents the intervals 1-3 (excluding 1, including 3), and 3-5 (excluding 3, including 5).
 // If these bins were supplied for a Series with values [3, 4], the returned Series would have values ["1-3", "3-5"].
+// Null values are not categorized.
 // For default behavior, supply nil as `config`.
-// To categorize values below or above the bin range, or to supply custom labels, supply a tada.Cutter as `config`.
+//
+// To bin values below or above the bin intervals, or to supply custom labels, supply a tada.Binner as `config`.
 // If custom labels are supplied, the length must be 1 less than the total number of bin edges.
-func (s *Series) Cut(bins []float64, config *Cutter) *Series {
+// Otherwise, bin labels are auto-generated from the bin intervals.
+func (s *Series) Bin(bins []float64, config *Binner) *Series {
 	if config == nil {
-		config = &Cutter{}
+		config = &Binner{}
 	}
 	retSlice, err := s.values.cut(bins, config.AndLess, config.AndMore, config.Labels)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("Cut(): %v", err))
+		return seriesWithError(fmt.Errorf("Bin(): %v", err))
 	}
 	// ducks error because values are []string
 	nulls, _ := setNullsFromInterface(retSlice)
@@ -1206,7 +1209,8 @@ func (s *Series) Cut(bins []float64, config *Cutter) *Series {
 	}
 }
 
-// Percentile coerces the Series values to float64 returns the percentile rank of each value (i.e., the % of values in the Series that are below it).
+// Percentile coerces the Series values to float64 returns the percentile rank of each value.
+// Uses the "exclusive" definition: a value's percentile is the % of all non-null values in the Series (including itself) that are below it.
 func (s *Series) Percentile() *Series {
 	floats := s.values.float64()
 	floats.index = makeIntRange(0, s.Len())
@@ -1224,17 +1228,23 @@ func (s *Series) Percentile() *Series {
 	}
 }
 
-// PercentileCut coerces the Series values to float64 and categorizes each value based on which percentile `bin` interval it falls within.
+// PercentileBin coerces the Series values to float64 and categorizes each value based on which percentile `bin` interval it falls within.
+// Uses the "exclusive" definition: a value's percentile is the % of all non-null values in the Series (including itself) that are below it.
 // `bins` should be a slice of sequential percentile edges (between 0 and 1) that form intervals (left inclusive, right exclusive).
-// For example, [0, .5, 1] represents the percentile intervals 0-50% (excluding 50%) and 50%-100%.
-// If these bins were supplied for a Series with values [1, 1000], the returned Series would have values [0-.5, .5-1],
+// NB: left inclusive, right exclusive is the opposite of the interval inclusion rules for the Bin() function.
+// For example, [0, .5, 1] represents the percentile intervals 0-50% (including 0%, excluding 50%) and 50%-100% (including 50%, excluding 100%).
+// If these bins were supplied for a Series with values [1, 1000], the returned Series would have values [0-0.5, 0.5-1],
 // because 1 is in the bottom 50% of values and 1000 is in the top 50% of values.
-// If `labels` is not nil, then category names correspond to labels, and the number of labels must be one less than the number of bin values.
-// Otherwise, category names are auto-generated from the range of the bin intervals.
-func (s *Series) PercentileCut(bins []float64, labels []string) *Series {
-	retSlice, err := s.values.pcut(bins, labels)
+// Null values are not categorized.
+// For default behavior, supply nil as `config`.
+//
+// To bin values below or above the bin intervals, or to supply custom labels, supply a tada.Binner as `config`.
+// If custom labels are supplied, the length must be 1 less than the total number of bin edges.
+// Otherwise, bin labels are auto-generated from the bin intervals.
+func (s *Series) PercentileBin(bins []float64, config *Binner) *Series {
+	retSlice, err := s.values.pcut(bins, config)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("PercentileCut(): %v", err))
+		return seriesWithError(fmt.Errorf("PercentileBin(): %v", err))
 	}
 	// ducks error because values are []string
 	nulls, _ := setNullsFromInterface(retSlice)

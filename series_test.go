@@ -2275,7 +2275,7 @@ func TestSeries_Where(t *testing.T) {
 	}
 }
 
-func TestSeries_Cut(t *testing.T) {
+func TestSeries_Bin(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -2283,7 +2283,7 @@ func TestSeries_Cut(t *testing.T) {
 	}
 	type args struct {
 		bins   []float64
-		config *Cutter
+		config *Binner
 	}
 	tests := []struct {
 		name   string
@@ -2295,11 +2295,11 @@ func TestSeries_Cut(t *testing.T) {
 			values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{
-				bins: []float64{1, 2}, config: &Cutter{AndLess: false, AndMore: true, Labels: nil}},
+				bins: []float64{1, 2}, config: &Binner{AndLess: false, AndMore: true, Labels: nil}},
 			&Series{
 				values: &valueContainer{slice: []string{"", "1-2", ">2"}, isNull: []bool{true, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
-		{"pass - nil cutter", fields{
+		{"pass - nil binner", fields{
 			values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{
@@ -2311,9 +2311,9 @@ func TestSeries_Cut(t *testing.T) {
 			values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{
-				bins: []float64{1, 2}, config: &Cutter{AndLess: false, AndMore: false, Labels: []string{"foo", "bar"}}},
+				bins: []float64{1, 2}, config: &Binner{AndLess: false, AndMore: false, Labels: []string{"foo", "bar"}}},
 			&Series{
-				err: errors.New("Cut(): number of bin edges (+ includeLess + includeMore), must be one more than number of supplied labels: (2 + 0 + 0) != (2 + 1)")}},
+				err: errors.New("Bin(): number of bin edges (+ includeLess + includeMore), must be one more than number of supplied labels: (2 + 0 + 0) != (2 + 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2322,8 +2322,8 @@ func TestSeries_Cut(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Cut(tt.args.bins, tt.args.config); !EqualSeries(got, tt.want) {
-				t.Errorf("Series.Cut() = %v, want %v", got, tt.want)
+			if got := s.Bin(tt.args.bins, tt.args.config); !EqualSeries(got, tt.want) {
+				t.Errorf("Series.Bin() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -2393,7 +2393,7 @@ func TestSeries_Rank(t *testing.T) {
 	}
 }
 
-func TestSeries_PercentileCut(t *testing.T) {
+func TestSeries_PercentileBin(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -2401,7 +2401,7 @@ func TestSeries_PercentileCut(t *testing.T) {
 	}
 	type args struct {
 		bins   []float64
-		labels []string
+		config *Binner
 	}
 	tests := []struct {
 		name   string
@@ -2413,17 +2413,25 @@ func TestSeries_PercentileCut(t *testing.T) {
 			values: &valueContainer{slice: []float64{1, 3, 5}, isNull: []bool{false, false, false}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{
-				bins: []float64{0, .5, 1}, labels: []string{"Bottom 50%", "Top 50%"}},
+				bins: []float64{0, .5, 1}, config: &Binner{Labels: []string{"Bottom 50%", "Top 50%"}}},
 			&Series{
 				values: &valueContainer{slice: []string{"Bottom 50%", "Bottom 50%", "Top 50%"}, isNull: []bool{false, false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
+		{"pass - nil config", fields{
+			values: &valueContainer{slice: []float64{1, 3, 5}, isNull: []bool{false, false, false}},
+			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			args{
+				bins: []float64{0, .5, 1}, config: nil},
+			&Series{
+				values: &valueContainer{slice: []string{"0-0.5", "0-0.5", "0.5-1"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
 		{"fail - too many labels", fields{
 			values: &valueContainer{slice: []float64{1, 3, 5}, isNull: []bool{false, false, false}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{
-				bins: []float64{0, .5, 1}, labels: []string{"Bottom 50%", "Too Many Labels", "Top 50%"}},
+				bins: []float64{0, .5, 1}, config: &Binner{Labels: []string{"Bottom 50%", "Medium 50%", "Top 50%"}}},
 			&Series{
-				err: errors.New("PercentileCut(): number of bin edges (+ includeLess + includeMore), must be one more than number of supplied labels: (3 + 0 + 0) != (3 + 1)")}},
+				err: errors.New("PercentileBin(): number of bin edges (+ includeLess + includeMore), must be one more than number of supplied labels: (3 + 0 + 0) != (3 + 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2432,8 +2440,8 @@ func TestSeries_PercentileCut(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.PercentileCut(tt.args.bins, tt.args.labels); !EqualSeries(got, tt.want) {
-				t.Errorf("Series.PercentileCut() = %v, want %v", got, tt.want)
+			if got := s.PercentileBin(tt.args.bins, tt.args.config); !EqualSeries(got, tt.want) {
+				t.Errorf("Series.PercentileBin() = %v, want %v", got, tt.want)
 			}
 		})
 	}

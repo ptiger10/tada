@@ -277,12 +277,12 @@ type Resampler struct {
 	AsCivilTime bool // slice will be civil.Time after truncation
 }
 
-// Cutter supplies logic for the Cut() function.
+// Binner supplies logic for the Bin() function.
 // If `AndLess` is true, a bin is added that ranges between negative infinity and the first bin value.
 // If `AndMore` is true, a bin is added that ranges between the last bin value and positive infinity.
 // If `Labels` is not nil, then category names correspond to labels, and the number of labels must be one less than the number of bin values.
 // Otherwise, category names are auto-generated from the range of the bin intervals.
-type Cutter struct {
+type Binner struct {
 	AndLess bool
 	AndMore bool
 	Labels  []string

@@ -987,6 +987,173 @@ func Test_cumsum(t *testing.T) {
 	}
 }
 
+func Test_rank(t *testing.T) {
+	type args struct {
+		vals   []float64
+		isNull []bool
+		index  []int
+	}
+	tests := []struct {
+		name string
+		args args
+		want []float64
+	}{
+		{"no repeats", args{vals: []float64{4, 5, 3}, isNull: []bool{false, false, false}, index: []int{0, 1, 2}},
+			[]float64{2, 3, 1}},
+		{"no repeats, null", args{vals: []float64{4, 0, 5, 3}, isNull: []bool{false, true, false, false},
+			index: []int{0, 1, 2, 3}}, []float64{2, -999, 3, 1}},
+		{"repeats", args{vals: []float64{4, 5, 4, 3}, isNull: []bool{false, false, false, false}, index: []int{0, 1, 2, 3}},
+			[]float64{2, 3, 2, 1}},
+		{"more repeats", args{vals: []float64{3, 2, 0, 4, 1, 3}, isNull: []bool{false, false, true, false, false, false},
+			index: []int{0, 1, 2, 3, 4, 5}},
+			[]float64{3, 2, -999, 4, 1, 3}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := rank(tt.args.vals, tt.args.isNull, tt.args.index); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("rank() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_indexOfContainer(t *testing.T) {
+	type args struct {
+		name string
+		cols []*valueContainer
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    int
+		wantErr bool
+	}{
+		{"pass", args{"foo", []*valueContainer{
+			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+			{slice: []int{0}, isNull: []bool{false}, name: "foo"}}},
+			1, false},
+		{"pass - number as name", args{"1", []*valueContainer{
+			{slice: []int{0}, isNull: []bool{false}, name: "1"}}},
+			0, false},
+		{"fail - uppercase search", args{"FOO", []*valueContainer{
+			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+			{slice: []int{0}, isNull: []bool{false}, name: "foo"}}},
+			0, true},
+		{"fail - title case name", args{"foo", []*valueContainer{
+			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+			{slice: []int{0}, isNull: []bool{false}, name: "Foo"}}},
+			0, true},
+		{"fail - not found", args{"foo", []*valueContainer{
+			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+			{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
+			0, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := indexOfContainer(tt.args.name, tt.args.cols)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("indexOfContainer() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("indexOfContainer() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_cut(t *testing.T) {
+	type args struct {
+		vals           []float64
+		isNull         []bool
+		bins           []float64
+		leftInclusive  bool
+		rightExclusive bool
+		includeLess    bool
+		includeMore    bool
+		labels         []string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{"pass - default labels", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
+			leftInclusive: false, rightExclusive: false,
+			includeLess: false, includeMore: false,
+			labels: nil},
+			[]string{"", "1-2", ""}, false},
+		{"pass - supplied labels", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
+			leftInclusive: false, rightExclusive: false,
+			includeLess: false, includeMore: false,
+			labels: []string{"qualifies"}},
+			[]string{"", "qualifies", ""}, false},
+		{"skip nulls", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, true, false}, bins: []float64{1, 2},
+			leftInclusive: false, rightExclusive: false,
+			includeLess: false, includeMore: false,
+			labels: []string{"qualifies"}},
+			[]string{"", "", ""}, false},
+		{"inlcudeLeft - default labels", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
+			leftInclusive: false, rightExclusive: false,
+			includeLess: true, includeMore: false,
+			labels: nil},
+			[]string{"<=1", "1-2", ""}, false},
+		{"inlcudeLeft - default labels - leftInclusive/rightExclusive", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{2, 3},
+			leftInclusive: true, rightExclusive: true,
+			includeLess: true, includeMore: false,
+			labels: nil},
+			[]string{"<2", "2-3", ""}, false},
+		{"includeMore - default labels", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
+			leftInclusive: false, rightExclusive: false,
+			includeLess: false, includeMore: true,
+			labels: nil},
+			[]string{"", "1-2", ">2"}, false},
+		{"includeMore - default labels - leftInclusive/rightExclusive", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
+			leftInclusive: true, rightExclusive: true,
+			includeLess: false, includeMore: true,
+			labels: nil},
+			[]string{"1-2", ">=2", ">=2"}, false},
+		{"fail - no bins", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: nil,
+			leftInclusive: false, rightExclusive: false,
+			includeLess: false, includeMore: false,
+			labels: nil},
+			nil, true},
+		{"fail - bins/label mismatch", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2, 3},
+			leftInclusive: false, rightExclusive: false,
+			includeLess: false, includeMore: false,
+			labels: []string{"a", "b", "c"}},
+			nil, true},
+		{"fail - bad combination of inclusive/exclusive", args{
+			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2, 3},
+			leftInclusive: true, rightExclusive: false,
+			includeLess: false, includeMore: false,
+			labels: nil},
+			nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := cut(tt.args.vals, tt.args.isNull, tt.args.bins, tt.args.leftInclusive, tt.args.rightExclusive, tt.args.includeLess, tt.args.includeMore, tt.args.labels)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("cut() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("cut() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func Test_valueContainer_cut(t *testing.T) {
 	type fields struct {
 		slice  interface{}
@@ -1078,81 +1245,6 @@ func Test_valueContainer_cut(t *testing.T) {
 	}
 }
 
-func Test_rank(t *testing.T) {
-	type args struct {
-		vals   []float64
-		isNull []bool
-		index  []int
-	}
-	tests := []struct {
-		name string
-		args args
-		want []float64
-	}{
-		{"no repeats", args{vals: []float64{4, 5, 3}, isNull: []bool{false, false, false}, index: []int{0, 1, 2}},
-			[]float64{2, 3, 1}},
-		{"no repeats, null", args{vals: []float64{4, 0, 5, 3}, isNull: []bool{false, true, false, false},
-			index: []int{0, 1, 2, 3}}, []float64{2, -999, 3, 1}},
-		{"repeats", args{vals: []float64{4, 5, 4, 3}, isNull: []bool{false, false, false, false}, index: []int{0, 1, 2, 3}},
-			[]float64{2, 3, 2, 1}},
-		{"more repeats", args{vals: []float64{3, 2, 0, 4, 1, 3}, isNull: []bool{false, false, true, false, false, false},
-			index: []int{0, 1, 2, 3, 4, 5}},
-			[]float64{3, 2, -999, 4, 1, 3}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := rank(tt.args.vals, tt.args.isNull, tt.args.index); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("rank() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_indexOfContainer(t *testing.T) {
-	type args struct {
-		name string
-		cols []*valueContainer
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    int
-		wantErr bool
-	}{
-		{"pass", args{"foo", []*valueContainer{
-			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-			{slice: []int{0}, isNull: []bool{false}, name: "foo"}}},
-			1, false},
-		{"pass - number as name", args{"1", []*valueContainer{
-			{slice: []int{0}, isNull: []bool{false}, name: "1"}}},
-			0, false},
-		{"fail - uppercase search", args{"FOO", []*valueContainer{
-			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-			{slice: []int{0}, isNull: []bool{false}, name: "foo"}}},
-			0, true},
-		{"fail - title case name", args{"foo", []*valueContainer{
-			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-			{slice: []int{0}, isNull: []bool{false}, name: "Foo"}}},
-			0, true},
-		{"fail - not found", args{"foo", []*valueContainer{
-			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-			{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
-			0, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := indexOfContainer(tt.args.name, tt.args.cols)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("indexOfContainer() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("indexOfContainer() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_valueContainer_pcut(t *testing.T) {
 	type fields struct {
 		slice  interface{}
@@ -1161,7 +1253,7 @@ func Test_valueContainer_pcut(t *testing.T) {
 	}
 	type args struct {
 		bins   []float64
-		labels []string
+		config *Binner
 	}
 	tests := []struct {
 		name    string
@@ -1172,24 +1264,32 @@ func Test_valueContainer_pcut(t *testing.T) {
 	}{
 		{"default labels",
 			fields{slice: []float64{5, 6, 7, 8}, isNull: []bool{false, false, false, false}, name: "foo"},
-			args{bins: []float64{0, .5, 1}, labels: nil},
+			args{bins: []float64{0, .5, 1}, config: nil},
 			[]string{"0-0.5", "0-0.5", "0.5-1", "0.5-1"}, false},
 		{"supplied labels",
 			fields{slice: []float64{-1, 2, 6, 10, 12}, isNull: []bool{false, false, false, false, false}},
-			args{bins: []float64{0, .5, 1}, labels: []string{"Bottom 50%", "Top 50%"}},
+			args{bins: []float64{0, .5, 1}, config: &Binner{Labels: []string{"Bottom 50%", "Top 50%"}}},
 			[]string{"Bottom 50%", "Bottom 50%", "Bottom 50%", "Top 50%", "Top 50%"}, false},
+		{"default labels - andLess",
+			fields{slice: []float64{-1, 2, 6, 10, 12}, isNull: []bool{false, false, false, false, false}},
+			args{bins: []float64{.25, .5, 1}, config: &Binner{AndLess: true}},
+			[]string{"<0.25", "<0.25", "0.25-0.5", "0.5-1", "0.5-1"}, false},
+		{"default labels - andMore",
+			fields{slice: []float64{-1, 2, 6, 10, 12}, isNull: []bool{false, false, false, false, false}},
+			args{bins: []float64{0, .25, .5}, config: &Binner{AndMore: true}},
+			[]string{"0-0.25", "0-0.25", "0.25-0.5", ">=0.5", ">=0.5"}, false},
 		{"default labels, nulls, repeats",
 			fields{slice: []float64{5, 0, 6, 7, 7, 7, 8},
 				isNull: []bool{false, true, false, false, false, false, false}},
-			args{bins: []float64{0, .2, .4, .6, .8, 1}, labels: nil},
+			args{bins: []float64{0, .2, .4, .6, .8, 1}, config: nil},
 			[]string{"0-0.2", "", "0-0.2", "0.2-0.4", "0.2-0.4", "0.2-0.4", "0.8-1"}, false},
 		{"fail: above 1",
 			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
-			args{bins: []float64{0, .5, 1.5}, labels: []string{"Bottom 50%", "Top 50%"}},
+			args{bins: []float64{0, .5, 1.5}, config: nil},
 			nil, true},
 		{"fail: below 0",
 			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
-			args{bins: []float64{-0.1, .5, 1}, labels: []string{"Bottom 50%", "Top 50%"}},
+			args{bins: []float64{-0.1, .5, 1}, config: nil},
 			nil, true},
 	}
 	for _, tt := range tests {
@@ -1199,7 +1299,7 @@ func Test_valueContainer_pcut(t *testing.T) {
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
 			}
-			got, err := vc.pcut(tt.args.bins, tt.args.labels)
+			got, err := vc.pcut(tt.args.bins, tt.args.config)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("valueContainer.pcut() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1968,98 +2068,6 @@ func Test_readStruct(t *testing.T) {
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("readStruct() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_cut(t *testing.T) {
-	type args struct {
-		vals           []float64
-		isNull         []bool
-		bins           []float64
-		leftInclusive  bool
-		rightExclusive bool
-		includeLess    bool
-		includeMore    bool
-		labels         []string
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    []string
-		wantErr bool
-	}{
-		{"pass - default labels", args{
-			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
-			leftInclusive: false, rightExclusive: false,
-			includeLess: false, includeMore: false,
-			labels: nil},
-			[]string{"", "1-2", ""}, false},
-		{"pass - supplied labels", args{
-			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
-			leftInclusive: false, rightExclusive: false,
-			includeLess: false, includeMore: false,
-			labels: []string{"qualifies"}},
-			[]string{"", "qualifies", ""}, false},
-		{"skip nulls", args{
-			vals: []float64{1, 2, 3}, isNull: []bool{false, true, false}, bins: []float64{1, 2},
-			leftInclusive: false, rightExclusive: false,
-			includeLess: false, includeMore: false,
-			labels: []string{"qualifies"}},
-			[]string{"", "", ""}, false},
-		{"inlcudeLeft - default labels", args{
-			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
-			leftInclusive: false, rightExclusive: false,
-			includeLess: true, includeMore: false,
-			labels: nil},
-			[]string{"<=1", "1-2", ""}, false},
-		{"inlcudeLeft - default labels - leftInclusive/rightExclusive", args{
-			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{2, 3},
-			leftInclusive: true, rightExclusive: true,
-			includeLess: true, includeMore: false,
-			labels: nil},
-			[]string{"<2", "2-3", ""}, false},
-		{"includeMore - default labels", args{
-			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
-			leftInclusive: false, rightExclusive: false,
-			includeLess: false, includeMore: true,
-			labels: nil},
-			[]string{"", "1-2", ">2"}, false},
-		{"includeMore - default labels - leftInclusive/rightExclusive", args{
-			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
-			leftInclusive: true, rightExclusive: true,
-			includeLess: false, includeMore: true,
-			labels: nil},
-			[]string{"1-2", ">=2", ">=2"}, false},
-		{"fail - no bins", args{
-			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: nil,
-			leftInclusive: false, rightExclusive: false,
-			includeLess: false, includeMore: false,
-			labels: nil},
-			nil, true},
-		{"fail - bins/label mismatch", args{
-			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2, 3},
-			leftInclusive: false, rightExclusive: false,
-			includeLess: false, includeMore: false,
-			labels: []string{"a", "b", "c"}},
-			nil, true},
-		{"fail - bad combination of inclusive/exclusive", args{
-			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2, 3},
-			leftInclusive: true, rightExclusive: false,
-			includeLess: false, includeMore: false,
-			labels: nil},
-			nil, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := cut(tt.args.vals, tt.args.isNull, tt.args.bins, tt.args.leftInclusive, tt.args.rightExclusive, tt.args.includeLess, tt.args.includeMore, tt.args.labels)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("cut() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("cut() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -2176,9 +2176,9 @@ func cut(vals []float64, isNull []bool,
 
 // by default: leftExclusive, rightInclusive
 func (vc *valueContainer) cut(bins []float64, includeLess, includeMore bool, labels []string) ([]string, error) {
-	leftInclusive := false
-	rightExclusive := false
-	return cut(vc.float64().slice, vc.isNull, bins, leftInclusive, rightExclusive, includeLess, includeMore, labels)
+	leftInclusive := true
+	rightExclusive := true
+	return cut(vc.float64().slice, vc.isNull, bins, !leftInclusive, !rightExclusive, includeLess, includeMore, labels)
 }
 
 func (vc *floatValueContainer) rank() []float64 {
@@ -2271,11 +2271,14 @@ func (vc *floatValueContainer) percentile() []float64 {
 
 // exclusive definition: what % of all values are below this value
 // -999 for null values
-func (vc *valueContainer) pcut(bins []float64, labels []string) ([]string, error) {
+func (vc *valueContainer) pcut(bins []float64, config *Binner) ([]string, error) {
 	for i, edge := range bins {
 		if edge < 0 || edge > 1 {
 			return nil, fmt.Errorf("all bin edges must be between 0 and 1 (%v at edge %d", edge, i)
 		}
+	}
+	if config == nil {
+		config = &Binner{}
 	}
 	// copy to avoid sorting the underlying values
 	floats := vc.copy().float64()
@@ -2283,7 +2286,7 @@ func (vc *valueContainer) pcut(bins []float64, labels []string) ([]string, error
 	pctile := floats.percentile()
 	leftInclusive := true
 	rightExclusive := true
-	return cut(pctile, vc.isNull, bins, leftInclusive, rightExclusive, false, false, labels)
+	return cut(pctile, vc.isNull, bins, leftInclusive, rightExclusive, config.AndLess, config.AndMore, config.Labels)
 }
 
 func withinWindow(root time.Time, other time.Time, d time.Duration) bool {
