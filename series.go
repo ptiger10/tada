@@ -1124,6 +1124,7 @@ func (s *Series) alignedMath(alignedFunction func([]float64, []bool, []int) []fl
 }
 
 // Resample coerces the Series values to time.Time and truncates them `by` the logic supplied in tada.Resampler.
+// If `AsCivilDate` or `AsCivilTime` is true, saves slice values as []civil.Date or []civil.Time, respectively.
 // Returns a new Series.
 func (s *Series) Resample(by Resampler) *Series {
 	s = s.Copy()
@@ -1132,6 +1133,7 @@ func (s *Series) Resample(by Resampler) *Series {
 }
 
 // Resample coerces the Series values to time.Time and truncates them `by` the logic supplied in tada.Resampler.
+// If `AsCivilDate` or `AsCivilTime` is true, saves slice values as []civil.Date or []civil.Time, respectively.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Resample(by Resampler) {
 	s.series.values.resample(by)

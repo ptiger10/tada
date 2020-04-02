@@ -2079,8 +2079,9 @@ func (df *DataFrame) dropColLevel(level int) *DataFrame {
 
 // Resample coerces values to time.Time and truncates them by the logic supplied in `how`,
 // which is a map of of container names (either column or label names) to tada.Resampler structs.
-// For each container name in the map, the first field selected (i.e., not left blank)
+// For each container name in the map, the first `By` field selected (i.e., not left blank)
 // in its Resampler struct provides the resampling logic for that container.
+// If `AsCivilDate` or `AsCivilTime` is true, saves slice values as []civil.Date or []civil.Time, respectively.
 // Returns a new DataFrame.
 func (df *DataFrame) Resample(how map[string]Resampler) *DataFrame {
 	df = df.Copy()
@@ -2090,8 +2091,9 @@ func (df *DataFrame) Resample(how map[string]Resampler) *DataFrame {
 
 // Resample coerces values to time.Time and truncates them by the logic supplied in `how`,
 // which is a map of of container names (either column or label names) to tada.Resampler structs.
-// For each container name in the map, the first field selected (i.e., not left blank)
+// For each container name in the map, the first `By` field selected (i.e., not left blank)
 // in its Resampler struct provides the resampling logic for that container.
+// If `AsCivilDate` or `AsCivilTime` is true, saves slice values as []civil.Date or []civil.Time, respectively.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Resample(how map[string]Resampler) {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)

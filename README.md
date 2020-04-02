@@ -8,7 +8,9 @@
 # tada
 tada (TAble DAta) is a package that enables test-driven data pipelines in pure Go.
 
-**DISCLAIMER: still under development. API subject to breaking changes until v1. Use in production at your own risk.**
+**DISCLAIMER: still under development. API subject to breaking changes until v1.**
+
+**If you still want to use this regardless of the disclaimer, congratulations, you are an alpha tester! Please DM your feedback to me on the Gophers slack channel (Dave Fort) or create an issue**
 
 tada combines concepts from pandas, spreadsheets, R, Apache Spark, and SQL.
 Its most common use cases are cleaning, aggregating, transforming, and analyzing data.
