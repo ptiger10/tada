@@ -2764,7 +2764,7 @@ func TestSeries_Resample(t *testing.T) {
 	}
 }
 
-func TestSeries_SelectLabels(t *testing.T) {
+func TestSeries_LabelsToSeries(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -2794,7 +2794,7 @@ func TestSeries_SelectLabels(t *testing.T) {
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}},
 			args{"corge"},
 			&Series{
-				err: errors.New("SelectLabels(): `name` (corge) not found")},
+				err: errors.New("LabelsToSeries(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -2804,8 +2804,8 @@ func TestSeries_SelectLabels(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.SelectLabels(tt.args.name); !EqualSeries(got, tt.want) {
-				t.Errorf("Series.SelectLabels() = %v, want %v", got, tt.want)
+			if got := s.LabelsToSeries(tt.args.name); !EqualSeries(got, tt.want) {
+				t.Errorf("Series.LabelsToSeries() = %v, want %v", got, tt.want)
 			}
 		})
 	}

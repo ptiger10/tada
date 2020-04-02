@@ -3517,7 +3517,7 @@ func TestDataFrame_FilterByValue(t *testing.T) {
 	}
 }
 
-func TestDataFrame_SelectLabels(t *testing.T) {
+func TestDataFrame_LabelsToSeries(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -3553,7 +3553,7 @@ func TestDataFrame_SelectLabels(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{"corge"},
 			&Series{
-				err: fmt.Errorf("SelectLabels(): `name` (corge) not found")},
+				err: fmt.Errorf("LabelsToSeries(): `name` (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -3565,8 +3565,8 @@ func TestDataFrame_SelectLabels(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.SelectLabels(tt.args.name); !EqualSeries(got, tt.want) {
-				t.Errorf("DataFrame.SelectLabels() = %v, want %v", got, tt.want)
+			if got := df.LabelsToSeries(tt.args.name); !EqualSeries(got, tt.want) {
+				t.Errorf("DataFrame.LabelsToSeries() = %v, want %v", got, tt.want)
 			}
 		})
 	}

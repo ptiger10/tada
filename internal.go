@@ -2631,10 +2631,11 @@ func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *readC
 	numRows := len(values[0]) - config.NumHeaderRows
 	labelNames := make([]string, config.NumLabelLevels)
 	// iterate over all label levels to get header names
-	for j := 0; j < config.NumLabelLevels; j++ {
-		// write label header names, no offset
-		labelNames[j] = string(
-			strings.Join(values[j][:config.NumHeaderRows], optionLevelSeparator))
+	if config.NumHeaderRows > 0 {
+		for j := 0; j < config.NumLabelLevels; j++ {
+			// only read from last header row
+			labelNames[j] = values[j][config.NumHeaderRows-1]
+		}
 	}
 
 	colNames := make([]string, numCols)

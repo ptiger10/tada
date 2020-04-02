@@ -185,13 +185,13 @@ func (s *Series) IndexOfRows(name string, value interface{}) []int {
 	return mergedLabelsAndValues[i].indexOfRows(value)
 }
 
-// SelectLabels finds the first level with matching `name` and returns as a Series with all existing label levels (including itself).
+// LabelsToSeries finds the first level with matching `name` and returns as a Series with all existing label levels (including itself).
 // If label level name is default (prefixed with *), removes the prefix.
 // Returns a new Series with shared labels.
-func (s *Series) SelectLabels(name string) *Series {
+func (s *Series) LabelsToSeries(name string) *Series {
 	index, err := indexOfContainer(name, s.labels)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("SelectLabels(): %v", err))
+		return seriesWithError(fmt.Errorf("LabelsToSeries(): %v", err))
 	}
 	values := s.labels[index]
 	retValues := &valueContainer{
@@ -1306,6 +1306,7 @@ func (s *Series) ValueCounts() map[string]int {
 }
 
 // Unique returns the first appearance of all non-null values in the Series.
+// If `valuesOnly` is false, a row is considered unique only if its combination of labels and values is unique.
 // Returns a new Series.
 func (s *Series) Unique(valuesOnly bool) *Series {
 	var index []int

@@ -523,7 +523,8 @@ func (df *DataFrame) String() string {
 	}
 	// do not print *0-type label names
 	for j := 0; j < df.NumLevels(); j++ {
-		data[0][j] = suppressDefaultName(data[0][j])
+		row := df.numColLevels() - 1
+		data[row][j] = suppressDefaultName(data[row][j])
 	}
 
 	// truncate columns
@@ -855,15 +856,15 @@ func (df *DataFrame) GetLabels() []interface{} {
 	return ret
 }
 
-// SelectLabels finds the first label level with matching `name`
+// LabelsToSeries finds the first label level with matching `name`
 // and returns the values as a Series.
 // Similar to Col(), but selects label values instead of column values.
 // The labels in the Series are shared with the labels in the DataFrame.
 // If label level name is default (prefixed with *), the prefix is removed.
-func (df *DataFrame) SelectLabels(name string) *Series {
+func (df *DataFrame) LabelsToSeries(name string) *Series {
 	index, err := indexOfContainer(name, df.labels)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("SelectLabels(): %v", err))
+		return seriesWithError(fmt.Errorf("LabelsToSeries(): %v", err))
 	}
 	values := df.labels[index]
 	retValues := &valueContainer{

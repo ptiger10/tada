@@ -42,12 +42,25 @@ func ExampleReadCSV_multipleHeaders() {
 	df, _ := ReadCSV(strings.NewReader(data), ReadOptionHeaders(2))
 	fmt.Println(df)
 	// Output:
-	// +----++-------+------+
-	// |    ||  foo  | bar  |
-	// | *0 ||  baz  | qux  |
-	// |----||-------|------|
-	// |  0 || corge | fred |
-	// +----++-------+------+
+	// +---++-------+------+
+	// |   ||  foo  | bar  |
+	// | - ||  baz  | qux  |
+	// |---||-------|------|
+	// | 0 || corge | fred |
+	// +---++-------+------+
+}
+
+func ExampleReadCSV_multipleHeadersWithLabels() {
+	data := ", foo, bar\n labels, baz, qux\n 1, corge, fred"
+	df, _ := ReadCSV(strings.NewReader(data), ReadOptionHeaders(2), ReadOptionLabels(1))
+	fmt.Println(df)
+	// Output:
+	// +--------++-------+------+
+	// |        ||  foo  | bar  |
+	// | labels ||  baz  | qux  |
+	// |--------||-------|------|
+	// |      1 || corge | fred |
+	// +--------++-------+------+
 }
 
 func ExampleReadCSV_withLabels() {
