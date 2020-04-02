@@ -260,9 +260,10 @@ type readConfig struct {
 // Otherwise, truncates the timestamp `ByDuration`.
 // If `Location` is not provided, time.UTC is used as the default location.
 //
-// In addition, the first `To` field to be selected is used, following truncation.
-// `ToCivilDate` converts the timestamp to a civil (location and time-independent) date
-// `ToCivilTime` converts the timestamp to a civil (location and date-independent) time
+// In addition, the first `As` field to be selected is applied following truncation.
+// If neither `As` field is selected, slice will be time.Time timestamp.
+// If `AsCivilDate` is true, slice will be civil.Date (location and time-independent).
+// If `AsCivilTime` is true, slice will be civil.Time (location and date-independent).
 type Resampler struct {
 	ByYear      bool
 	ByMonth     bool
@@ -272,8 +273,8 @@ type Resampler struct {
 	ByDuration  time.Duration
 	Location    *time.Location
 
-	ToCivilDate bool // convert to civil.Date after resampling
-	ToCivilTime bool // convert to civil.Time after resampling
+	AsCivilDate bool // slice will be civil.Date after truncation
+	AsCivilTime bool // slice will be civil.Time after truncation
 }
 
 // Cutter supplies logic for the Cut() function.

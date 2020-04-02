@@ -512,6 +512,8 @@ func Test_convertStringToDateTime(t *testing.T) {
 		{"M/D/YYYY", args{"2/1/2020"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
 		{"M/D/YY", args{"2/1/20"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
 		{"not null", args{"2020-02-01 00:00:00 +0000 UTC"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
+		{"Kitchen", args{"12:30PM"}, time.Date(0, 1, 1, 12, 30, 0, 0, time.UTC), false},
+		{"Kitchen lower", args{"12:30pm"}, time.Date(0, 1, 1, 12, 30, 0, 0, time.UTC), false},
 		{"RFC3339", args{"2020-02-01T00:00:00Z"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
 		{"RFC3339Nano", args{"2020-02-01T00:00:00.0000000000Z"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},
 		{"RFC822", args{"01 Feb 20 00:00 UTC"}, time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC), false},

@@ -2320,10 +2320,6 @@ func resample(t time.Time, by Resampler) time.Time {
 	}
 }
 
-func (r Resampler) changeType() bool {
-	return r.ToCivilDate || r.ToCivilTime
-}
-
 func (vc *valueContainer) resample(by Resampler) {
 	vals := vc.dateTime().slice
 	truncatedVals := make([]time.Time, len(vals))
@@ -2335,13 +2331,13 @@ func (vc *valueContainer) resample(by Resampler) {
 		truncatedVals[i] = resample(t, by)
 	}
 
-	if by.ToCivilDate {
+	if by.AsCivilDate {
 		retVals := make([]civil.Date, len(vals))
 		for i := range truncatedVals {
 			retVals[i] = civil.DateOf(truncatedVals[i])
 		}
 		vc.slice = retVals
-	} else if by.ToCivilTime {
+	} else if by.AsCivilTime {
 		retVals := make([]civil.Time, len(vals))
 		for i := range vals {
 			retVals[i] = civil.TimeOf(truncatedVals[i])
