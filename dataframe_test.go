@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/d4l3k/messagediff"
 	"github.com/ptiger10/tablediff"
 )
 
@@ -3418,7 +3417,6 @@ func TestDataFrame_WriteCSV(t *testing.T) {
 			}
 			if w.String() != tt.want {
 				t.Errorf("DataFrame.WriteCSV() -> w = %v, want %v", w.String(), tt.want)
-				fmt.Println(messagediff.PrettyDiff(w.String(), tt.want))
 			}
 		})
 	}

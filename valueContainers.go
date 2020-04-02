@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strconv"
 	"time"
+
+	"cloud.google.com/go/civil"
 )
 
 func (vc floatValueContainer) Less(i, j int) bool {
@@ -68,11 +70,6 @@ func convertStringToFloat(val string, originalBool bool) (float64, bool) {
 	return 0, true
 }
 
-// may change in the future
-func convertDateTimeToFloat(val time.Time, originalBool bool) (float64, bool) {
-	return 0, true
-}
-
 func convertBoolToFloat(val bool) float64 {
 	if val {
 		return 1
@@ -124,10 +121,9 @@ func (vc *valueContainer) float64() floatValueContainer {
 			newVals[i], isNull[i] = convertStringToFloat(string(arr[i]), isNull[i])
 		}
 
-	case []time.Time:
-		arr := vc.slice.([]time.Time)
-		for i := range arr {
-			newVals[i], isNull[i] = convertDateTimeToFloat(arr[i], isNull[i])
+	case []time.Time, []civil.DateTime, []civil.Date, []civil.Time:
+		for i := range newVals {
+			newVals[i], isNull[i] = 0, true
 		}
 
 	case []bool:
@@ -148,8 +144,8 @@ func (vc *valueContainer) float64() floatValueContainer {
 				newVals[i] = float64(reflect.ValueOf(arr[i]).Int())
 			case uint, uint8, uint16, uint32, uint64:
 				newVals[i] = float64(reflect.ValueOf(arr[i]).Uint())
-			case time.Time:
-				newVals[i], isNull[i] = convertDateTimeToFloat(arr[i].(time.Time), isNull[i])
+			case time.Time, civil.DateTime, civil.Date, civil.Time:
+				newVals[i], isNull[i] = 0, true
 			case bool:
 				newVals[i] = convertBoolToFloat(arr[i].(bool))
 			}
@@ -191,6 +187,22 @@ func (vc *valueContainer) string() stringValueContainer {
 		arr := vc.slice.([]time.Time)
 		for i := range arr {
 			newVals[i] = convertDateTimeToString(arr[i])
+		}
+
+	case []civil.Date:
+		arr := vc.slice.([]civil.Date)
+		for i := range arr {
+			newVals[i] = arr[i].String()
+		}
+	case []civil.Time:
+		arr := vc.slice.([]civil.Time)
+		for i := range arr {
+			newVals[i] = arr[i].String()
+		}
+	case []civil.DateTime:
+		arr := vc.slice.([]civil.DateTime)
+		for i := range arr {
+			newVals[i] = arr[i].String()
 		}
 
 	case [][]byte:
@@ -265,6 +277,17 @@ func (vc *valueContainer) dateTime() dateTimeValueContainer {
 		}
 	case []time.Time:
 		newVals = vc.slice.([]time.Time)
+	case []civil.Date:
+		arr := vc.slice.([]civil.Date)
+		for i := range arr {
+			newVals[i] = arr[i].In(time.UTC)
+		}
+	case []civil.DateTime:
+		arr := vc.slice.([]civil.DateTime)
+		for i := range arr {
+			newVals[i] = arr[i].In(time.UTC)
+		}
+		// []civil.Time are all null when converted to time.Time
 	case []interface{}:
 		arr := vc.slice.([]interface{})
 		for i := range arr {

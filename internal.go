@@ -17,6 +17,8 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"cloud.google.com/go/civil"
 )
 
 func errorWarning(err error) {
@@ -1762,6 +1764,36 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 				ret[i] = false
 			}
 		}
+	case []civil.Date:
+		vals := input.([]civil.Date)
+		ret = make([]bool, len(vals))
+		for i := range ret {
+			if !vals[i].IsValid() {
+				ret[i] = true
+			} else {
+				ret[i] = false
+			}
+		}
+	case []civil.Time:
+		vals := input.([]civil.Time)
+		ret = make([]bool, len(vals))
+		for i := range ret {
+			if !vals[i].IsValid() {
+				ret[i] = true
+			} else {
+				ret[i] = false
+			}
+		}
+	case []civil.DateTime:
+		vals := input.([]civil.DateTime)
+		ret = make([]bool, len(vals))
+		for i := range ret {
+			if !vals[i].IsValid() {
+				ret[i] = true
+			} else {
+				ret[i] = false
+			}
+		}
 		// no null value possible
 	case []bool, []uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64, []float32:
 		l := reflect.ValueOf(input).Len()
@@ -2288,17 +2320,36 @@ func resample(t time.Time, by Resampler) time.Time {
 	}
 }
 
+func (r Resampler) changeType() bool {
+	return r.ToCivilDate || r.ToCivilTime
+}
+
 func (vc *valueContainer) resample(by Resampler) {
 	vals := vc.dateTime().slice
-	retVals := make([]time.Time, len(vals))
+	truncatedVals := make([]time.Time, len(vals))
 	if by.Location == nil {
 		by.Location = time.UTC
 	}
 	for i := range vals {
 		t := vals[i].In(by.Location)
-		retVals[i] = resample(t, by)
+		truncatedVals[i] = resample(t, by)
 	}
-	vc.slice = retVals
+
+	if by.ToCivilDate {
+		retVals := make([]civil.Date, len(vals))
+		for i := range truncatedVals {
+			retVals[i] = civil.DateOf(truncatedVals[i])
+		}
+		vc.slice = retVals
+	} else if by.ToCivilTime {
+		retVals := make([]civil.Time, len(vals))
+		for i := range vals {
+			retVals[i] = civil.TimeOf(truncatedVals[i])
+		}
+		vc.slice = retVals
+	} else {
+		vc.slice = truncatedVals
+	}
 	vc.resetCache()
 	return
 }

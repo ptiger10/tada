@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"cloud.google.com/go/civil"
 )
 
 func Test_floatValueContainer_Less(t *testing.T) {
@@ -384,6 +386,14 @@ func Test_valueContainer_float64(t *testing.T) {
 			floatValueContainer{slice: []float64{0, 0, 3.5}, isNull: []bool{true, true, false}}},
 		{"[]time.Time", fields{slice: []time.Time{{}, d}, isNull: []bool{true, false}},
 			floatValueContainer{slice: []float64{0, 0}, isNull: []bool{true, true}}},
+		{"[]civil.Date", fields{slice: []civil.Date{{}, {Year: 2020, Month: time.January, Day: 1}}, isNull: []bool{true, false}},
+			floatValueContainer{slice: []float64{0, 0}, isNull: []bool{true, true}}},
+		{"[]civil.Time", fields{slice: []civil.Time{{}, {Second: 1}}, isNull: []bool{true, false}},
+			floatValueContainer{slice: []float64{0, 0}, isNull: []bool{true, true}}},
+		{"[]civil.DateTime",
+			fields{slice: []civil.DateTime{{}, {Date: civil.Date{Year: 2020, Month: time.January, Day: 1}, Time: civil.Time{Second: 1}}},
+				isNull: []bool{true, false}},
+			floatValueContainer{slice: []float64{0, 0}, isNull: []bool{true, true}}},
 		{"[]bool", fields{slice: []bool{false, true, false}, isNull: []bool{false, false, true}},
 			floatValueContainer{slice: []float64{0, 1, 0}, isNull: []bool{false, false, true}}},
 		{"[]interface", fields{slice: []interface{}{"3.5", float64(1), int(1), uint(1), d, false}, isNull: []bool{false, false, false, false, false, false}},
@@ -432,6 +442,18 @@ func Test_valueContainer_string(t *testing.T) {
 			stringValueContainer{slice: []string{"0001-01-01T00:00:00Z", "2020-01-01T00:00:00Z"}, isNull: []bool{true, false}},
 			[]string{"0001-01-01T00:00:00Z", "2020-01-01T00:00:00Z"},
 		},
+		{"[]civil.Date", fields{slice: []civil.Date{{}, {Year: 2020, Month: time.January, Day: 1}}, isNull: []bool{true, false}},
+			stringValueContainer{slice: []string{"0000-00-00", "2020-01-01"}, isNull: []bool{true, false}},
+			[]string{"0000-00-00", "2020-01-01"}},
+		{"[]civil.Time", fields{slice: []civil.Time{{}, {Second: 1}}, isNull: []bool{true, false}},
+			stringValueContainer{slice: []string{"00:00:00", "00:00:01"}, isNull: []bool{true, false}},
+			[]string{"00:00:00", "00:00:01"}},
+		{"[]civil.DateTime",
+			fields{
+				slice:  []civil.DateTime{{}, {Date: civil.Date{Year: 2020, Month: time.January, Day: 1}, Time: civil.Time{Second: 1}}},
+				isNull: []bool{true, false}},
+			stringValueContainer{slice: []string{"0000-00-00T00:00:00", "2020-01-01T00:00:01"}, isNull: []bool{true, false}},
+			[]string{"0000-00-00T00:00:00", "2020-01-01T00:00:01"}},
 		{"[]bool", fields{slice: []bool{false, true, false}, isNull: []bool{false, false, true}},
 			stringValueContainer{slice: []string{"false", "true", "false"}, isNull: []bool{false, false, true}},
 			[]string{"false", "true", "false"},
@@ -528,6 +550,15 @@ func Test_valueContainer_dateTime(t *testing.T) {
 			dateTimeValueContainer{slice: []time.Time{{}, d, {}}, isNull: []bool{true, false, true}}},
 		{"[]time.Time", fields{slice: []time.Time{{}, d}, isNull: []bool{true, false}},
 			dateTimeValueContainer{slice: []time.Time{{}, d}, isNull: []bool{true, false}}},
+		{"[]civil.Date", fields{slice: []civil.Date{{}, {Year: 2020, Month: time.January, Day: 1}}, isNull: []bool{true, false}},
+			dateTimeValueContainer{slice: []time.Time{civil.Date{}.In(time.UTC), d}, isNull: []bool{true, false}}},
+		{"[]civil.Time", fields{slice: []civil.Time{{}, {Second: 1}}, isNull: []bool{true, false}},
+			dateTimeValueContainer{slice: []time.Time{{}, {}}, isNull: []bool{true, true}}},
+		{"[]civil.DateTime",
+			fields{
+				slice:  []civil.DateTime{{}, {Date: civil.Date{Year: 2020, Month: time.January, Day: 1}, Time: civil.Time{Second: 1}}},
+				isNull: []bool{true, false}},
+			dateTimeValueContainer{slice: []time.Time{civil.DateTime{}.In(time.UTC), d.Add(1 * time.Second)}, isNull: []bool{true, false}}},
 		{"[]bool", fields{slice: []bool{false, true, false}, isNull: []bool{false, false, true}},
 			dateTimeValueContainer{slice: []time.Time{{}, {}, {}}, isNull: []bool{true, true, true}}},
 		{"[]interface", fields{slice: []interface{}{"foo", float64(1), int(1), uint(1), d, false}, isNull: []bool{false, false, false, false, false, false}},

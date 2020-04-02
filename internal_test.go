@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"cloud.google.com/go/civil"
 )
 
 func TestMain(m *testing.M) {
@@ -249,6 +251,9 @@ func Test_setNullsFromInterface(t *testing.T) {
 		{"float", args{[]float64{1, math.NaN()}}, []bool{false, true}, false},
 		{"int", args{[]int{0}}, []bool{false}, false},
 		{"string", args{[]string{"foo", ""}}, []bool{false, true}, false},
+		{"civil.date", args{[]civil.Date{civil.DateOf(time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC)), {}}}, []bool{false, true}, false},
+		{"civil.time", args{[]civil.Time{civil.TimeOf(time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC)), civil.Time{Second: -1}}}, []bool{false, true}, false},
+		{"civil.datetime", args{[]civil.DateTime{civil.DateTimeOf(time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC)), {}}}, []bool{false, true}, false},
 		{"bytes", args{[][]byte{[]byte("foo"), []byte("")}}, []bool{false, true}, false},
 		{"dateTime", args{[]time.Time{time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC), {}}}, []bool{false, true, true}, false},
 		{"interface", args{[]interface{}{
@@ -2460,11 +2465,31 @@ func Test_valueContainer_resample(t *testing.T) {
 		args   args
 		want   *valueContainer
 	}{
-		{"year - reset cache",
+		{"resets cache",
 			fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo",
 				cache: []string{"2020-02-02 12:30:45 +0000 UTC"}},
 			args{Resampler{ByYear: true, Location: time.UTC}},
 			&valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
+				isNull: []bool{false}, name: "foo"}},
+		{"to civil date",
+			fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},
+			args{Resampler{ToCivilDate: true}},
+			&valueContainer{slice: []civil.Date{{Year: 2020, Month: 2, Day: 2}},
+				isNull: []bool{false}, name: "foo"}},
+		{"year - to civil date",
+			fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},
+			args{Resampler{ByYear: true, ToCivilDate: true}},
+			&valueContainer{slice: []civil.Date{{Year: 2020, Month: 1, Day: 1}},
+				isNull: []bool{false}, name: "foo"}},
+		{"to civil time",
+			fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},
+			args{Resampler{ToCivilTime: true}},
+			&valueContainer{slice: []civil.Time{{Hour: 12, Minute: 30, Second: 45}},
+				isNull: []bool{false}, name: "foo"}},
+		{"hour - to civil time",
+			fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},
+			args{Resampler{ByDuration: time.Hour, ToCivilTime: true}},
+			&valueContainer{slice: []civil.Time{{Hour: 12}},
 				isNull: []bool{false}, name: "foo"}},
 		{"year - string - sets Location automatically ", fields{slice: []string{"2020-02-02T12:30:45Z"}, isNull: []bool{false}, name: "foo"},
 			args{Resampler{ByYear: true}},
