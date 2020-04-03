@@ -35,17 +35,18 @@ func TestNewSeries(t *testing.T) {
 			&Series{values: &valueContainer{slice: []int{0}, isNull: []bool{false}, name: "0"},
 				labels: []*valueContainer{{slice: []string{"bar"}, isNull: []bool{false}, name: "*0"}}}},
 		{"unsupported input: nil slice, nil labels", args{slice: nil},
-			&Series{err: errors.New("NewSeries(): `slice` and `labels` cannot both be nil")}},
+			&Series{err: errors.New("constructing new Series: slice and labels cannot both be nil")}},
 		{"unsupported input: empty slice", args{slice: []float64{}},
-			&Series{err: errors.New("NewSeries(): `slice`: empty slice: cannot be empty")}},
+			&Series{err: errors.New("constructing new Series: slice: empty slice: cannot be empty")}},
 		{"unsupported label input: scalar", args{slice: []float64{1}, labels: []interface{}{"foo"}},
-			&Series{err: errors.New("NewSeries(): `labels`: error at position 0: unsupported kind (string); must be slice")}},
+			&Series{err: errors.New("constructing new Series: labels: error at position 0: unsupported kind (string); must be slice")}},
+		{"fail - different lengths", args{slice: []float64{1}, labels: []interface{}{[]int{0, 1}}},
+			&Series{err: errors.New("constructing new Series: labels: position 0: slice does not match required length (2 != 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := NewSeries(tt.args.slice, tt.args.labels...); !EqualSeries(got, tt.want) {
 				t.Errorf("NewSeries() = %v, want %v", got, tt.want)
-				t.Errorf("Error %v vs %v", got.err, tt.want.err)
 			}
 		})
 	}

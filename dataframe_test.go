@@ -108,6 +108,17 @@ func TestNewDataFrame(t *testing.T) {
 			&DataFrame{
 				err: errors.New("NewDataFrame(): `labels`: error at position 0: unsupported kind (string); must be slice")},
 		},
+		{"fail - wrong length labels", args{
+			[]interface{}{[]int{0}},
+			[]interface{}{[]string{"a", "b"}}},
+			&DataFrame{
+				err: errors.New("constructing new DataFrame: labels: position 0: slice does not match required length (2 != 1)")},
+		},
+		{"fail - wrong length columns", args{
+			[]interface{}{[]int{0}, []string{"a", "b"}}, nil},
+			&DataFrame{
+				err: errors.New("constructing new DataFrame: columns: position 1: slice does not match required length (2 != 1)")},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -5082,6 +5093,225 @@ func TestDataFrame_HasType(t *testing.T) {
 			}
 			if !reflect.DeepEqual(gotColumnIndex, tt.wantColumnIndex) {
 				t.Errorf("DataFrame.HasType() gotColumnIndex = %v, want %v", gotColumnIndex, tt.wantColumnIndex)
+			}
+		})
+	}
+}
+
+type testSchema struct {
+	Foo  []int `tada:"foo"`
+	skip []float64
+	Bar  []float64 `tada:"bar"`
+}
+
+type testSchema2 struct {
+	Foo  []int `tada:"foo"`
+	skip []float64
+	Bar  []float64
+}
+
+func TestReadSchema(t *testing.T) {
+	type args struct {
+		structPointer interface{}
+		options       []ReadOption
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *DataFrame
+		wantErr bool
+	}{
+		{"pass - default labels",
+			args{
+				&testSchema{
+					Foo: []int{1, 2},
+					Bar: []float64{3, 4},
+				}, nil},
+			&DataFrame{
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				values: []*valueContainer{
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"},
+					{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          ""},
+			false},
+		{"pass - default labels - mix of tags and no tags",
+			args{
+				&testSchema2{
+					Foo: []int{1, 2},
+					Bar: []float64{3, 4},
+				}, nil},
+			&DataFrame{
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				values: []*valueContainer{
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"},
+					{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "Bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          ""},
+			false},
+		{"pass - supplied labels",
+			args{
+				&testSchema{
+					Foo: []int{1, 2},
+					Bar: []float64{3, 4},
+				}, []ReadOption{ReadOptionLabels(1)}},
+			&DataFrame{
+				labels: []*valueContainer{{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"}},
+				values: []*valueContainer{
+					{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          ""},
+			false},
+		{"fail - nil values",
+			args{
+				&testSchema{
+					Foo: []int{1, 2},
+				}, nil},
+			nil,
+			true},
+		{"fail - not pointer",
+			args{
+				testSchema{
+					Foo: []int{1, 2},
+					Bar: []float64{3, 4},
+				}, nil},
+			nil,
+			true},
+		{"fail - not pointer to struct",
+			args{
+				&[]int{}, nil},
+			nil,
+			true},
+		{"fail - uneven lengths",
+			args{
+				&testSchema{
+					Foo: []int{1, 2},
+					Bar: []float64{3, 4, 5},
+				}, nil},
+			nil,
+			true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ReadSchema(tt.args.structPointer, tt.args.options...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReadSchema() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !EqualDataFrames(got, tt.want) {
+				t.Errorf("ReadSchema() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_ToSchema(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		structPointer interface{}
+		options       []WriteOption
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{"pass - match exported names", fields{
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Foo"}},
+			values: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "Bar"},
+			},
+			colLevelNames: []string{"*0"}},
+			args{&testSchema{}, nil},
+			false,
+		},
+		{"pass - match tag names", fields{
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+			values: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "bar"},
+			},
+			colLevelNames: []string{"*0"}},
+			args{&testSchema{}, nil},
+			false,
+		},
+		{"pass - ignore label names", fields{
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+			values: []*valueContainer{
+				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Foo"},
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "Bar"},
+			},
+			colLevelNames: []string{"*0"}},
+			args{&testSchema{}, []WriteOption{WriteOptionExcludeLabels()}},
+			false,
+		},
+		{"fail - not pointer", fields{
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Bar"}},
+			values: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "Foo"},
+			},
+			colLevelNames: []string{"*0"}},
+			args{testSchema{}, nil},
+			true,
+		},
+		{"fail - not pointer to struct", fields{
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Bar"}},
+			values: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "Foo"},
+			},
+			colLevelNames: []string{"*0"}},
+			args{&[]float64{}, nil},
+			true,
+		},
+		{"fail - wrong order", fields{
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Bar"}},
+			values: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "Foo"},
+			},
+			colLevelNames: []string{"*0"}},
+			args{&testSchema{}, nil},
+			true,
+		},
+		{"fail - does not match exported name or tag name", fields{
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "corge"}},
+			values: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "bar"},
+			},
+			colLevelNames: []string{"*0"}},
+			args{&testSchema{}, nil},
+			true,
+		},
+		{"fail - does not match field type", fields{
+			labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "Foo"}},
+			values: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "Bar"},
+			},
+			colLevelNames: []string{"*0"}},
+			args{&testSchema{}, nil},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			err := df.ToSchema(tt.args.structPointer, tt.args.options...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.ToSchema() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

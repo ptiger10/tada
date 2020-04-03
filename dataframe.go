@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"reflect"
+	"unicode"
 
 	"github.com/ptiger10/tablediff"
 	"github.com/ptiger10/tablewriter"
@@ -52,6 +53,14 @@ func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 		// default values
 		defaultValues := makeDefaultLabels(0, reflect.ValueOf(labels[0]).Len(), false)
 		values = append(values, defaultValues)
+	}
+	err = ensureEqualLengths(retLabels, values[0].len())
+	if err != nil {
+		return dataFrameWithError(fmt.Errorf("constructing new DataFrame: labels: %v", err))
+	}
+	err = ensureEqualLengths(values, values[0].len())
+	if err != nil {
+		return dataFrameWithError(fmt.Errorf("constructing new DataFrame: columns: %v", err))
 	}
 	return &DataFrame{values: values, labels: retLabels, colLevelNames: []string{"*0"}}
 }
@@ -198,7 +207,7 @@ func ReadOptionSwitchDims() func(*readConfig) {
 	}
 }
 
-// ReadCSVFromRecords reads `data` into a DataFrame (configured by `options`).
+// ReadCSVFromRecords reads records into a DataFrame (configured by options).
 // Often used with (encoding/csv) csv.NewReader().ReadAll()
 // Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionSwitchDims.
 //
@@ -210,10 +219,10 @@ func ReadOptionSwitchDims() func(*readConfig) {
 // Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
 func ReadCSVFromRecords(records [][]string, options ...ReadOption) (ret *DataFrame, err error) {
 	if len(records) == 0 {
-		return nil, fmt.Errorf("ReadCSVFromRecords(): `records` must have at least one row")
+		return nil, fmt.Errorf("reading csv from records: records must have at least one row")
 	}
 	if len(records[0]) == 0 {
-		return nil, fmt.Errorf("ReadCSVFromRecords(): `records` must have at least one column")
+		return nil, fmt.Errorf("reading csv from records: records must have at least one column")
 	}
 	config := setReadConfig(options)
 
@@ -223,7 +232,7 @@ func ReadCSVFromRecords(records [][]string, options ...ReadOption) (ret *DataFra
 		ret, err = readCSVByRows(records, config)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("ReadCSVFromRecords(): %v", err)
+		return nil, fmt.Errorf("reading csv from records: %v", err)
 	}
 	return ret, nil
 }
@@ -257,6 +266,61 @@ func ReadCSV(r io.Reader, options ...ReadOption) (*DataFrame, error) {
 		return nil, fmt.Errorf("ReadCSV(): %s", err)
 	}
 	return makeDataFrameFromMatrices(retVals, retNulls, config), nil
+}
+
+// ReadSchema reads the exported fields in structPointer into a DataFrame.
+// structPointer must be a pointer to a struct.
+// If any exported field in structPointer is nil, returns an error.
+// If a "tada" tag is present for a given field, that will be the name of the resulting label level or column.
+// Otherwise, the exported field name will be the name.
+func ReadSchema(structPointer interface{}, options ...ReadOption) (*DataFrame, error) {
+	config := setReadConfig(options)
+	if reflect.TypeOf(structPointer).Kind() != reflect.Ptr {
+		return nil, fmt.Errorf("reading struct as schema: structPointer must be pointer to struct, not %s", reflect.TypeOf(structPointer).Kind())
+	}
+	if reflect.TypeOf(structPointer).Elem().Kind() != reflect.Struct {
+		return nil, fmt.Errorf("reading struct as schema: structPointer must be pointer to struct, not to %s", reflect.TypeOf(structPointer).Elem().Kind())
+	}
+	labels := make([]interface{}, 0)
+	values := make([]interface{}, 0)
+	labelNames := make([]string, 0)
+	colNames := make([]string, 0)
+	v := reflect.ValueOf(structPointer).Elem()
+	var offset int
+	for k := 0; k < v.NumField(); k++ {
+		field := reflect.TypeOf(structPointer).Elem().Field(k)
+		// is unexported field?
+		if unicode.IsLower([]rune(field.Name)[0]) {
+			offset--
+			continue
+		}
+		// is nil?
+		if v.Field(k).IsZero() {
+			return nil, fmt.Errorf("reading struct as schema: field %s: structPointer cannot contain a nil exported field",
+				field.Name)
+		}
+		container := k + offset
+		var name string
+		if name = field.Tag.Get("tada"); name == "" {
+			name = field.Name
+		}
+		if container < config.NumLabelLevels {
+			labelNames = append(labelNames, name)
+			labels = append(labels, v.Field(k).Interface())
+		} else {
+			colNames = append(colNames, name)
+			values = append(values, v.Field(k).Interface())
+		}
+	}
+	df := NewDataFrame(values, labels...)
+	if df.err != nil {
+		return nil, fmt.Errorf("reading struct as schema: %v", df.err)
+	}
+	if config.NumLabelLevels > 0 {
+		df = df.SetLabelNames(labelNames)
+	}
+	df = df.SetColNames(colNames)
+	return df, nil
 }
 
 // ReadMatrix reads data satisfying the gonum Matrix interface into a DataFrame.
@@ -372,6 +436,53 @@ func (df *DataFrame) ToCSV(options ...WriteOption) [][]string {
 		}
 	}
 	return transposedStringValues
+}
+
+// ToSchema writes the values of the df containers into structPointer.
+// Returns an error if df does not contain, from left-to-right, the same container names and types
+// as the exported fields that appear, from top-to-bottom, in structPointer.
+// If df contains additional containers beyond those in structPointer, those are ignored.
+func (df *DataFrame) ToSchema(structPointer interface{}, options ...WriteOption) error {
+	config := setWriteConfig(options)
+	if reflect.TypeOf(structPointer).Kind() != reflect.Ptr {
+		return fmt.Errorf("writing to struct schema: structPointer must be pointer to struct, not %s", reflect.TypeOf(structPointer).Kind())
+	}
+	if reflect.TypeOf(structPointer).Elem().Kind() != reflect.Struct {
+		return fmt.Errorf("writing to struct schema: structPointer must be pointer to struct, not to %s", reflect.TypeOf(structPointer).Elem().Kind())
+	}
+	v := reflect.ValueOf(structPointer).Elem()
+	var mergedLabelsAndCols []*valueContainer
+	if config.IncludeLabels {
+		mergedLabelsAndCols = append(df.labels, df.values...)
+	} else {
+		mergedLabelsAndCols = df.values
+	}
+	var offset int
+	for k := 0; k < v.NumField(); k++ {
+		field := reflect.TypeOf(structPointer).Elem().Field(k)
+		// is unexported field?
+		if unicode.IsLower([]rune(field.Name)[0]) {
+			offset--
+			continue
+		}
+		container := k + offset
+		// container name == exported field name?
+		if name := mergedLabelsAndCols[container].name; name != field.Name {
+			// container name == tada tag name?
+			if name != field.Tag.Get("tada") {
+				return fmt.Errorf("ToStruct(): DataFrame has wrong field name (container %d): %s != %s",
+					container, name, field.Name)
+			}
+		}
+		if mergedLabelsAndCols[container].dtype() != field.Type {
+			return fmt.Errorf("ToStruct(): DataFrame has wrong type (container %s): %s != %s",
+				field.Name, mergedLabelsAndCols[container].dtype(), field.Type)
+		}
+		src := reflect.ValueOf(mergedLabelsAndCols[container].slice)
+		dst := v.FieldByName(field.Name)
+		dst.Set(src)
+	}
+	return nil
 }
 
 // WriteCSV converts a DataFrame to a csv with rows as the major dimension,

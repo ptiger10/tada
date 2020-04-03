@@ -24,7 +24,7 @@ import (
 // and 2-dimensional variants of each (e.g., [][]string, [][]float64).
 func NewSeries(slice interface{}, labels ...interface{}) *Series {
 	if slice == nil && labels == nil {
-		return seriesWithError(fmt.Errorf("NewSeries(): `slice` and `labels` cannot both be nil"))
+		return seriesWithError(fmt.Errorf("constructing new Series: slice and labels cannot both be nil"))
 	}
 	var values *valueContainer
 	var err error
@@ -32,14 +32,14 @@ func NewSeries(slice interface{}, labels ...interface{}) *Series {
 		// handle values
 		values, err = makeValueContainerFromInterface(slice, "0")
 		if err != nil {
-			return seriesWithError(fmt.Errorf("NewSeries(): `slice`: %v", err))
+			return seriesWithError(fmt.Errorf("constructing new Series: slice: %v", err))
 		}
 	}
 
 	// handle labels
 	retLabels, err := makeValueContainersFromInterfaces(labels, true)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("NewSeries(): `labels`: %v", err))
+		return seriesWithError(fmt.Errorf("constructing new Series: labels: %v", err))
 	}
 	// default labels?
 	if len(retLabels) == 0 {
@@ -51,7 +51,10 @@ func NewSeries(slice interface{}, labels ...interface{}) *Series {
 		defaultValues := makeDefaultLabels(0, reflect.ValueOf(labels[0]).Len(), false)
 		values = defaultValues
 	}
-
+	err = ensureEqualLengths(retLabels, values.len())
+	if err != nil {
+		return seriesWithError(fmt.Errorf("constructing new Series: labels: %v", err))
+	}
 	return &Series{values: values, labels: retLabels}
 }
 

@@ -110,6 +110,16 @@ func makeValueContainersFromInterfaces(slices []interface{}, usePrefix bool) ([]
 	return ret, nil
 }
 
+func ensureEqualLengths(containers []*valueContainer, length int) error {
+	for k := range containers {
+		if containers[k].len() != length {
+			return fmt.Errorf("position %d: slice does not match required length (%d != %d)",
+				k, containers[k].len(), length)
+		}
+	}
+	return nil
+}
+
 // makeDefaultLabels returns a valueContainer with a
 // sequential series of numbers (inclusive of min, exclusive of max), a companion isNull slice, and a name.
 func makeDefaultLabels(min, max int, prefixAsterisk bool) *valueContainer {
