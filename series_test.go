@@ -340,7 +340,7 @@ func TestSeries_Subset(t *testing.T) {
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
 			args{[]int{3}},
 			&Series{
-				err: errors.New("Subset(): index out of range (3 > 2)")}},
+				err: errors.New("subsetting rows: index out of range (3 > 2)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -385,7 +385,7 @@ func TestSeries_SubsetLabels(t *testing.T) {
 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}}, {slice: []int{10}, isNull: []bool{false}}, {slice: []int{20}, isNull: []bool{false}}}},
 			args{[]int{3}},
 			&Series{
-				err: errors.New("SubsetLabels(): index out of range (3 > 2)")}},
+				err: errors.New("subsetting labels: index out of range (3 > 2)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -523,21 +523,21 @@ func TestSeries_Range(t *testing.T) {
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
 			args{3, 4},
 			&Series{
-				err: errors.New("Range(): first index out of range (3 > 2)")}},
+				err: errors.New("range: first index out of range (3 > 2)")}},
 		{"fail - last",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
 			args{2, 4},
 			&Series{
-				err: errors.New("Range(): last index out of range (4 > 3)")}},
+				err: errors.New("range: last index out of range (4 > 3)")}},
 		{"fail - first > last",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
 			args{2, 1},
 			&Series{
-				err: errors.New("Range(): first is greater than last (2 > 1)")}},
+				err: errors.New("range: first is greater than last (2 > 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -723,28 +723,28 @@ func TestSeries_WithLabels(t *testing.T) {
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
 			args{"corge", "baz"},
-			&Series{err: errors.New("WithLabels(): cannot rename column: name (corge) not found")},
+			&Series{err: errors.New("with labels: cannot rename column: name (corge) not found")},
 		},
 		{"fail: unsupported slice type",
 			fields{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
 			args{"qux", []complex64{1}},
-			&Series{err: errors.New("WithLabels(): unable to calculate null values ([]complex64 not supported)")},
+			&Series{err: errors.New("with labels: unable to calculate null values ([]complex64 not supported)")},
 		},
 		{"fail: length of labels does not match length of series",
 			fields{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
 			args{"qux", []string{"waldo", "corge"}},
-			&Series{err: errors.New("WithLabels(): cannot replace items in column qux: length of input does not match existing length (2 != 1)")},
+			&Series{err: errors.New("with labels: cannot replace items in column qux: length of input does not match existing length (2 != 1)")},
 		},
 		{"fail: unsupported input",
 			fields{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
 			args{"qux", map[string]interface{}{"foo": "bar"}},
-			&Series{err: errors.New("WithLabels(): unsupported input kind: must be either slice, string, or Series")},
+			&Series{err: errors.New("with labels: unsupported input kind: must be either slice, string, or Series")},
 		},
 	}
 	for _, tt := range tests {
@@ -799,7 +799,7 @@ func TestSeries_WithValues(t *testing.T) {
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "qux"},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
 			args{[]float64{1, 2, 3}},
-			&Series{err: errors.New("WithValues(): cannot replace items in column qux: length of input does not match existing length (3 != 1)")},
+			&Series{err: errors.New("with values: cannot replace items in column qux: length of input does not match existing length (3 != 1)")},
 		},
 	}
 	for _, tt := range tests {
@@ -853,7 +853,7 @@ func TestSeries_Append(t *testing.T) {
 					{slice: []bool{true}, isNull: []bool{false}, name: "baz"},
 				}}},
 			&Series{
-				err: errors.New("Append(): other Series must have same number of label levels as original Series (2 != 1)")}},
+				err: errors.New("append: other Series must have same number of label levels as original Series (2 != 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -936,7 +936,7 @@ func TestSeries_SetLabelNames(t *testing.T) {
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"}}},
 			args{[]string{"bar", "qux"}},
 			&Series{
-				err: errors.New("SetLabelNames(): number of levelNames must match number of levels in Series (2 != 1)")},
+				err: errors.New("setting label names: number of levelNames must match number of levels in Series (2 != 1)")},
 		},
 		{"fail - too few", fields{
 			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
@@ -945,7 +945,7 @@ func TestSeries_SetLabelNames(t *testing.T) {
 				{slice: []float64{1}, isNull: []bool{false}, name: "*1"}}},
 			args{[]string{"qux"}},
 			&Series{
-				err: errors.New("SetLabelNames(): number of levelNames must match number of levels in Series (1 != 2)")},
+				err: errors.New("setting label names: number of levelNames must match number of levels in Series (1 != 2)")},
 		},
 	}
 	for _, tt := range tests {
@@ -1067,7 +1067,7 @@ func TestSeries_DropLabels(t *testing.T) {
 				}},
 			args{"corge"},
 			&Series{
-				err: errors.New("DropLabels(): name (corge) not found")}},
+				err: errors.New("dropping labels: name (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1113,7 +1113,7 @@ func TestSeries_DropRow(t *testing.T) {
 				labels: []*valueContainer{{slice: []string{"foo", "bar", ""}, isNull: []bool{false, false, true}}}},
 			args{3},
 			&Series{
-				err: errors.New("DropRow(): index out of range (3 > 2)")}},
+				err: errors.New("dropping row: index out of range (3 > 2)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1174,7 +1174,7 @@ func TestSeries_Sort(t *testing.T) {
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
 			args{[]Sorter{{Name: "corge", Descending: true}}},
 			&Series{
-				err: errors.New("Sort(): position 0: name (corge) not found")}},
+				err: errors.New("sort: position 0: name (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1320,14 +1320,14 @@ func TestSeries_Filter(t *testing.T) {
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
 			args{map[string]FilterFn{"*0": {}}},
-			&Series{err: errors.New("Filter(): no filter function provided")},
+			&Series{err: errors.New("filter: no filter function provided")},
 		},
 		{"fail: no matching col",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
 			args{map[string]FilterFn{"corge": {Float64: func(float64) bool { return true }}}},
-			&Series{err: errors.New("Filter(): name (corge) not found")},
+			&Series{err: errors.New("filter: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -1415,7 +1415,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "left",
 				leftOn: []string{"foo"}, rightOn: nil},
-			&Series{err: errors.New("LookupAdvanced(): if either leftOn or rightOn is empty, both must be empty")},
+			&Series{err: errors.New("lookup: if either leftOn or rightOn is empty, both must be empty")},
 		},
 		{"fail - no key supplied, and no matching key", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1425,7 +1425,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 					labels: []*valueContainer{{name: "corge", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "left",
 				leftOn: nil, rightOn: nil},
-			&Series{err: errors.New("LookupAdvanced(): no matching keys between containers")},
+			&Series{err: errors.New("lookup: no matching keys between containers")},
 		},
 		{"fail - no matching left key", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1435,7 +1435,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "left",
 				leftOn: []string{"corge"}, rightOn: []string{"foo"}},
-			&Series{err: errors.New("LookupAdvanced(): leftOn: name (corge) not found")},
+			&Series{err: errors.New("lookup: leftOn: name (corge) not found")},
 		},
 		{"fail - no matching right key", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1445,7 +1445,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "left",
 				leftOn: []string{"foo"}, rightOn: []string{"corge"}},
-			&Series{err: errors.New("LookupAdvanced(): rightOn: name (corge) not found")},
+			&Series{err: errors.New("lookup: rightOn: name (corge) not found")},
 		},
 		{"fail - unsupported how", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1455,7 +1455,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "other",
 				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
-			&Series{err: errors.New("LookupAdvanced(): how: must be left, right, or inner")},
+			&Series{err: errors.New("lookup: how: must be left, right, or inner")},
 		},
 	}
 	for _, tt := range tests {
@@ -1558,7 +1558,7 @@ func TestSeries_Apply(t *testing.T) {
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
 			args{ApplyFn{}},
 			&Series{
-				err: errors.New("Apply(): no apply function provided")}},
+				err: errors.New("apply: no apply function provided")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1603,7 +1603,7 @@ func TestSeries_ApplyFormat(t *testing.T) {
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
 			args{ApplyFormatFn{}},
 			&Series{
-				err: errors.New("ApplyFormat(): no apply function provided")}},
+				err: errors.New("apply format: no apply function provided")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2119,7 +2119,7 @@ func TestSeries_GroupBy(t *testing.T) {
 			}},
 			args{[]string{"corge"}},
 			&GroupedSeries{
-				err: errors.New("GroupBy(): name (corge) not found"),
+				err: errors.New("group by: name (corge) not found"),
 			}},
 	}
 	for _, tt := range tests {
@@ -2442,7 +2442,7 @@ func TestSeries_PercentileBin(t *testing.T) {
 			args{
 				bins: []float64{0, .5, 1}, config: &Binner{Labels: []string{"Bottom 50%", "Medium 50%", "Top 50%"}}},
 			&Series{
-				err: errors.New("PercentileBin(): number of bin edges (+ includeLess + includeMore), must be one more than number of supplied labels: (3 + 0 + 0) != (3 + 1)")}},
+				err: errors.New("percentile bin: number of bin edges (+ includeLess + includeMore), must be one more than number of supplied labels: (3 + 0 + 0) != (3 + 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2807,7 +2807,7 @@ func TestSeries_LabelsToSeries(t *testing.T) {
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}},
 			args{"corge"},
 			&Series{
-				err: errors.New("LabelsToSeries(): name (corge) not found")},
+				err: errors.New("converting labels to Series: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -3092,7 +3092,7 @@ func TestSeries_SwapLabels(t *testing.T) {
 			}},
 			args{"corge", "bar"},
 			&Series{
-				err: errors.New("SwapLabels(): i: name (corge) not found")},
+				err: errors.New("swapping labels: i: name (corge) not found")},
 		},
 		{"fail - j", fields{
 			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
@@ -3102,7 +3102,7 @@ func TestSeries_SwapLabels(t *testing.T) {
 			}},
 			args{"qux", "corge"},
 			&Series{
-				err: errors.New("SwapLabels(): j: name (corge) not found")},
+				err: errors.New("swapping labels: j: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -3311,7 +3311,7 @@ func TestSeries_FilterByValue(t *testing.T) {
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{map[string]interface{}{"corge": 0}},
 			&Series{
-				err: errors.New("FilterByValue(): name (corge) not found")},
+				err: errors.New("filter by value: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {

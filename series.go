@@ -182,7 +182,7 @@ func (s *Series) IndexOfLabel(name string) int {
 func (s *Series) LabelsToSeries(name string) *Series {
 	index, err := indexOfContainer(name, s.labels)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("LabelsToSeries(): %v", err))
+		return seriesWithError(fmt.Errorf("converting labels to Series: %v", err))
 	}
 	values := s.labels[index]
 	retValues := &valueContainer{
@@ -211,7 +211,7 @@ func (s *Series) Subset(index []int) *Series {
 func (s *SeriesMutator) Subset(index []int) {
 	err := s.series.values.subsetRows(index)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("Subset(): %v", err))
+		s.series.resetWithError(fmt.Errorf("subsetting rows: %v", err))
 		return
 	}
 	for j := range s.series.labels {
@@ -233,12 +233,12 @@ func (s *Series) SwapLabels(i, j string) *Series {
 func (s *SeriesMutator) SwapLabels(i, j string) {
 	index1, err := indexOfContainer(i, s.series.labels)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("SwapLabels(): i: %v", err))
+		s.series.resetWithError(fmt.Errorf("swapping labels: i: %v", err))
 		return
 	}
 	index2, err := indexOfContainer(j, s.series.labels)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("SwapLabels(): j: %v", err))
+		s.series.resetWithError(fmt.Errorf("swapping labels: j: %v", err))
 		return
 	}
 	s.series.labels[index1], s.series.labels[index2] = s.series.labels[index2], s.series.labels[index1]
@@ -258,7 +258,7 @@ func (s *Series) SubsetLabels(index []int) *Series {
 func (s *SeriesMutator) SubsetLabels(index []int) {
 	labels, err := subsetContainers(s.series.labels, index)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("SubsetLabels(): %v", err))
+		s.series.resetWithError(fmt.Errorf("subsetting labels: %v", err))
 		return
 	}
 	s.series.labels = labels
@@ -299,12 +299,12 @@ func (s *Series) Tail(n int) *Series {
 // In all cases, returns a new Series.
 func (s *Series) Range(first, last int) *Series {
 	if first > last {
-		return seriesWithError(fmt.Errorf("Range(): first is greater than last (%d > %d)", first, last))
+		return seriesWithError(fmt.Errorf("range: first is greater than last (%d > %d)", first, last))
 	}
 	if first >= s.Len() {
-		return seriesWithError(fmt.Errorf("Range(): first index out of range (%d > %d)", first, s.Len()-1))
+		return seriesWithError(fmt.Errorf("range: first index out of range (%d > %d)", first, s.Len()-1))
 	} else if last > s.Len() {
-		return seriesWithError(fmt.Errorf("Range(): last index out of range (%d > %d)", last, s.Len()))
+		return seriesWithError(fmt.Errorf("range: last index out of range (%d > %d)", last, s.Len()))
 	}
 	retVals := s.values.rangeSlice(first, last)
 	retLabels := make([]*valueContainer, s.numLevels())
@@ -412,7 +412,7 @@ func (s *Series) WithLabels(name string, input interface{}) *Series {
 func (s *SeriesMutator) WithLabels(name string, input interface{}) {
 	labels, err := withColumn(s.series.labels, name, input, s.series.Len())
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("WithLabels(): %v", err))
+		s.series.resetWithError(fmt.Errorf("with labels: %v", err))
 		return
 	}
 	s.series.labels = labels
@@ -434,7 +434,7 @@ func (s *SeriesMutator) WithValues(input interface{}) {
 	// synthesize a collection of valueContainers, ensuring that name already exists
 	vals, err := withColumn([]*valueContainer{s.series.values}, s.series.values.name, input, s.series.Len())
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("WithValues(): %v", err))
+		s.series.resetWithError(fmt.Errorf("with values: %v", err))
 		return
 	}
 	s.series.values = vals[0]
@@ -454,7 +454,7 @@ func (s *Series) DropRow(index int) *Series {
 func (s *SeriesMutator) DropRow(index int) {
 	err := s.series.values.dropRow(index)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("DropRow(): %v", err))
+		s.series.resetWithError(fmt.Errorf("dropping row: %v", err))
 		return
 	}
 	for j := range s.series.labels {
@@ -475,7 +475,7 @@ func (s *Series) DropLabels(name string) *Series {
 func (s *SeriesMutator) DropLabels(name string) {
 	newCols, err := dropFromContainers(name, s.series.labels)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("DropLabels(): %v", err))
+		s.series.resetWithError(fmt.Errorf("dropping labels: %v", err))
 		return
 	}
 	s.series.labels = newCols
@@ -497,7 +497,7 @@ func (s *Series) Append(other *Series) *Series {
 func (s *SeriesMutator) Append(other *Series) {
 	if len(other.labels) != len(s.series.labels) {
 		s.series.resetWithError(
-			fmt.Errorf("Append(): other Series must have same number of label levels as original Series (%d != %d)",
+			fmt.Errorf("append: other Series must have same number of label levels as original Series (%d != %d)",
 				len(other.labels), len(s.series.labels)))
 		return
 	}
@@ -533,7 +533,7 @@ func (s *SeriesMutator) Relabel() {
 func (s *Series) SetLabelNames(levelNames []string) *Series {
 	if len(levelNames) != len(s.labels) {
 		return seriesWithError(
-			fmt.Errorf("SetLabelNames(): number of levelNames must match number of levels in Series (%d != %d)", len(levelNames), len(s.labels)))
+			fmt.Errorf("setting label names: number of levelNames must match number of levels in Series (%d != %d)", len(levelNames), len(s.labels)))
 	}
 	for j := range levelNames {
 		s.labels[j].name = levelNames[j]
@@ -551,7 +551,7 @@ func (s *Series) HasLabels(labelNames ...string) error {
 	for _, name := range labelNames {
 		_, err := indexOfContainer(name, s.labels)
 		if err != nil {
-			return fmt.Errorf("HasLabels(): %v", err)
+			return fmt.Errorf("verifying labels: %v", err)
 		}
 	}
 	return nil
@@ -595,7 +595,7 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 	mergedLabelsAndValues := append(s.series.labels, s.series.values)
 	newIndex, err := sortContainers(mergedLabelsAndValues, by)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("Sort(): %v", err))
+		s.series.resetWithError(fmt.Errorf("sort: %v", err))
 		return
 	}
 	// rearrange the data in place with the final index
@@ -671,7 +671,7 @@ func (s *SeriesMutator) Filter(filters map[string]FilterFn) {
 	mergedLabelsAndValues := append(s.series.labels, s.series.values)
 	index, err := filter(mergedLabelsAndValues, filters)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("Filter(): %v", err))
+		s.series.resetWithError(fmt.Errorf("filter: %v", err))
 		return
 	}
 	s.Subset(index)
@@ -691,7 +691,7 @@ func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{})
 	mergedLabelsAndValues := append(s.labels, s.values)
 	index, err := filter(mergedLabelsAndValues, filters)
 	if err != nil {
-		return nil, fmt.Errorf("Where(): %v", err)
+		return nil, fmt.Errorf("where: %v", err)
 	}
 	for _, i := range index {
 		ret[i] = ifTrue
@@ -706,10 +706,10 @@ func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{})
 		_, err := setNullsFromInterface([]interface{}{ifTrue})
 		// ifTrue is unsupported?
 		if err != nil {
-			return nil, fmt.Errorf("Where(): ifTrue: %v", err)
+			return nil, fmt.Errorf("where: ifTrue: %v", err)
 		}
 		// ifFalse is unsupported?
-		return nil, fmt.Errorf("Where(): ifFalse: %v", err)
+		return nil, fmt.Errorf("where: ifFalse: %v", err)
 	}
 	return &Series{
 		values: &valueContainer{
@@ -740,7 +740,7 @@ func (s *SeriesMutator) FilterByValue(filters map[string]interface{}) {
 	mergedLabelsAndValues := append(s.series.labels, s.series.values)
 	index, err := filterByValue(mergedLabelsAndValues, filters)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("FilterByValue(): %v", err))
+		s.series.resetWithError(fmt.Errorf("filter by value: %v", err))
 		return
 	}
 	s.Subset(index)
@@ -772,7 +772,7 @@ func (s *Series) Apply(lambda ApplyFn) *Series {
 func (s *SeriesMutator) Apply(lambda ApplyFn) {
 	err := lambda.validate()
 	if err != nil {
-		s.series.resetWithError((fmt.Errorf("Apply(): %v", err)))
+		s.series.resetWithError((fmt.Errorf("apply: %v", err)))
 		return
 	}
 	s.series.values.apply(lambda)
@@ -806,7 +806,7 @@ func (s *Series) ApplyFormat(lambda ApplyFormatFn) *Series {
 func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
 	err := lambda.validate()
 	if err != nil {
-		s.series.resetWithError((fmt.Errorf("ApplyFormat(): %v", err)))
+		s.series.resetWithError((fmt.Errorf("apply format: %v", err)))
 		return
 	}
 	s.series.values.applyFormat(lambda)
@@ -875,28 +875,28 @@ func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, righ
 	var err error
 	if len(leftOn) == 0 || len(rightOn) == 0 {
 		if !(len(leftOn) == 0 && len(rightOn) == 0) {
-			return seriesWithError(fmt.Errorf("LookupAdvanced(): if either leftOn or rightOn is empty, both must be empty"))
+			return seriesWithError(fmt.Errorf("lookup: if either leftOn or rightOn is empty, both must be empty"))
 		}
 	}
 	if len(leftOn) == 0 {
 		leftKeys, rightKeys, err = findMatchingKeysBetweenTwoLabelContainers(s.labels, other.labels)
 		if err != nil {
-			return seriesWithError(fmt.Errorf("LookupAdvanced(): %v", err))
+			return seriesWithError(fmt.Errorf("lookup: %v", err))
 		}
 	} else {
 		leftKeys, err = convertColNamesToIndexPositions(leftOn, s.labels)
 		if err != nil {
-			return seriesWithError(fmt.Errorf("LookupAdvanced(): leftOn: %v", err))
+			return seriesWithError(fmt.Errorf("lookup: leftOn: %v", err))
 		}
 		rightKeys, err = convertColNamesToIndexPositions(rightOn, other.labels)
 		if err != nil {
-			return seriesWithError(fmt.Errorf("LookupAdvanced(): rightOn: %v", err))
+			return seriesWithError(fmt.Errorf("lookup: rightOn: %v", err))
 		}
 	}
 
 	ret, err := lookup(how, s.values, s.labels, leftKeys, other.values, other.labels, rightKeys)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("LookupAdvanced(): %v", err))
+		return seriesWithError(fmt.Errorf("lookup: %v", err))
 	}
 	return ret
 }
@@ -998,7 +998,7 @@ func (s *Series) GroupBy(names ...string) *GroupedSeries {
 	} else {
 		index, err = convertColNamesToIndexPositions(names, s.labels)
 		if err != nil {
-			return groupedSeriesWithError(fmt.Errorf("GroupBy(): %v", err))
+			return groupedSeriesWithError(fmt.Errorf("group by: %v", err))
 		}
 	}
 	containers, _ := subsetContainers(s.labels, index)
@@ -1249,7 +1249,7 @@ func (s *Series) Percentile() *Series {
 func (s *Series) PercentileBin(bins []float64, config *Binner) *Series {
 	retSlice, err := s.values.pcut(bins, config)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("PercentileBin(): %v", err))
+		return seriesWithError(fmt.Errorf("percentile bin: %v", err))
 	}
 	// ducks error because values are []string
 	nulls, _ := setNullsFromInterface(retSlice)
