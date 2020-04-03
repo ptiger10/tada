@@ -878,15 +878,18 @@ func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, righ
 		}
 	}
 	if len(leftOn) == 0 {
-		leftKeys, rightKeys = findMatchingKeysBetweenTwoLabelContainers(s.labels, other.labels)
-	} else {
-		leftKeys, err = convertColNamesToIndexPositions(leftOn, s.labels)
+		leftKeys, rightKeys, err = findMatchingKeysBetweenTwoLabelContainers(s.labels, other.labels)
 		if err != nil {
 			return seriesWithError(fmt.Errorf("LookupAdvanced(): %v", err))
 		}
+	} else {
+		leftKeys, err = convertColNamesToIndexPositions(leftOn, s.labels)
+		if err != nil {
+			return seriesWithError(fmt.Errorf("LookupAdvanced(): `leftOn`: %v", err))
+		}
 		rightKeys, err = convertColNamesToIndexPositions(rightOn, other.labels)
 		if err != nil {
-			return seriesWithError(fmt.Errorf("LookupAdvanced(): %v", err))
+			return seriesWithError(fmt.Errorf("LookupAdvanced(): `rightOn`: %v", err))
 		}
 	}
 

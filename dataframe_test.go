@@ -2380,6 +2380,18 @@ func TestDataFrame_Merge(t *testing.T) {
 				},
 				colLevelNames: []string{"*0"}},
 		},
+		{"fail - no shared merge key ",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{&DataFrame{
+				values:        []*valueContainer{{slice: []string{"c"}, isNull: []bool{false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "corge"}},
+				colLevelNames: []string{"anything"}}},
+			&DataFrame{
+				err: fmt.Errorf("Merge(): LookupAdvanced(): no matching keys between containers")},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -4143,20 +4155,21 @@ func TestConcatSeries(t *testing.T) {
 					labels: []*valueContainer{
 						{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"},
 					}},
-				{values: &valueContainer{slice: []int{3, 4}, isNull: []bool{false, false}, name: "qux"},
+				{values: &valueContainer{slice: []int{3}, isNull: []bool{false, false}, name: "qux"},
 					labels: []*valueContainer{
-						{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"},
+						{slice: []string{"a"}, isNull: []bool{false, false}, name: "*0"},
 					}}}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"},
-					{slice: []int{3, 4}, isNull: []bool{false, false}, name: "qux"},
+					{slice: []int{3, 0}, isNull: []bool{false, true}, name: "qux"},
 				},
-				labels:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"}},
+				labels: []*valueContainer{
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, cache: []string{"a", "b"}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
 			false,
 		},
-		{"fail - wrong number of rows", args{
+		{"fail - no shared key", args{
 			[]*Series{
 				{values: &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"},
 					labels: []*valueContainer{
@@ -4164,21 +4177,7 @@ func TestConcatSeries(t *testing.T) {
 					}},
 				{values: &valueContainer{slice: []int{3}, isNull: []bool{false}, name: "qux"},
 					labels: []*valueContainer{
-						{slice: []string{"a"}, isNull: []bool{false}, name: "*0"},
-					}}}},
-			nil,
-			true,
-		},
-		{"fail - wrong number of levels", args{
-			[]*Series{
-				{values: &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"},
-					labels: []*valueContainer{
-						{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"},
-					}},
-				{values: &valueContainer{slice: []int{3, 4}, isNull: []bool{false, false}, name: "qux"},
-					labels: []*valueContainer{
-						{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"},
-						{slice: []string{"c", "d"}, isNull: []bool{false, false}, name: "*0"},
+						{slice: []string{"a"}, isNull: []bool{false}, name: "corge"},
 					}}}},
 			nil,
 			true,

@@ -195,10 +195,11 @@ func Test_findMatchingKeysBetweenTwoLabelContainers(t *testing.T) {
 		labels2 []*valueContainer
 	}
 	tests := []struct {
-		name  string
-		args  args
-		want  []int
-		want1 []int
+		name    string
+		args    args
+		want    []int
+		want1   []int
+		wantErr bool
 	}{
 		{"1 match", args{
 			labels1: []*valueContainer{
@@ -207,7 +208,7 @@ func Test_findMatchingKeysBetweenTwoLabelContainers(t *testing.T) {
 			},
 			labels2: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-		}, []int{1}, []int{0}},
+		}, []int{1}, []int{0}, false},
 		{"duplicates", args{
 			labels1: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
@@ -216,18 +217,22 @@ func Test_findMatchingKeysBetweenTwoLabelContainers(t *testing.T) {
 			},
 			labels2: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-		}, []int{0}, []int{0}},
+		}, []int{0}, []int{0}, false},
 		{"no matches", args{
 			labels1: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*1"},
 			},
 			labels2: []*valueContainer{
 				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-		}, nil, nil},
+		}, nil, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1 := findMatchingKeysBetweenTwoLabelContainers(tt.args.labels1, tt.args.labels2)
+			got, got1, err := findMatchingKeysBetweenTwoLabelContainers(tt.args.labels1, tt.args.labels2)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("findMatchingKeysBetweenTwoLabelContainers() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("findMatchingKeysBetweenTwoLabelContainers() got = %v, want %v", got, tt.want)
 			}

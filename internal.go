@@ -140,7 +140,7 @@ func makeIntRange(min, max int) []int {
 }
 
 // search for a name only once. if it is found multiple times, return only the first
-func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels2 []*valueContainer) ([]int, []int) {
+func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels2 []*valueContainer) ([]int, []int, error) {
 	var leftKeys, rightKeys []int
 	searched := make(map[string]bool)
 	// add every level name to the map in order to skip duplicates
@@ -162,7 +162,10 @@ func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels
 			}
 		}
 	}
-	return leftKeys, rightKeys
+	if leftKeys == nil {
+		return nil, nil, fmt.Errorf("no matching keys between containers")
+	}
+	return leftKeys, rightKeys, nil
 }
 
 // nameOfContainer returns the name of the container at index position `n`.

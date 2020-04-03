@@ -1424,7 +1424,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "left",
 				leftOn: []string{"corge"}, rightOn: []string{"foo"}},
-			&Series{err: errors.New("LookupAdvanced(): `name` (corge) not found")},
+			&Series{err: errors.New("LookupAdvanced(): `leftOn`: `name` (corge) not found")},
 		},
 		{"fail - no matching right key", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1434,7 +1434,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "left",
 				leftOn: []string{"foo"}, rightOn: []string{"corge"}},
-			&Series{err: errors.New("LookupAdvanced(): `name` (corge) not found")},
+			&Series{err: errors.New("LookupAdvanced(): `rightOn`: `name` (corge) not found")},
 		},
 		{"fail - unsupported how", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},

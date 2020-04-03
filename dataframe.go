@@ -126,23 +126,19 @@ func (df *DataFrame) Copy() *DataFrame {
 	return ret
 }
 
-// ConcatSeries concatenates multiple Series with identical labels into a single DataFrame.
-// To join Series with different labels, use s.ToDataFrame() + df.Merge() (for simple cases)
-// or df.LookupAdvanced() + df.WithCol() (for advanced cases)
+// ConcatSeries merges multiple Series from left-to-right, one after the other, via left joins on shared keys.
+// For advanced cases, use df.LookupAdvanced() + df.WithCol().
 func ConcatSeries(series ...*Series) (*DataFrame, error) {
-	ret := &DataFrame{colLevelNames: []string{"*0"}}
+	var ret *DataFrame
 	for k, s := range series {
 		if k == 0 {
-			ret.labels = s.labels
+			ret = s.ToDataFrame()
 		} else {
-			if s.Len() != ret.Len() {
-				return nil, fmt.Errorf("ConcatSeries(): position %d: all series must have same number of rows (%v != %v)", k, s.Len(), ret.Len())
-			}
-			if !reflect.DeepEqual(s.labels, ret.labels) {
-				return nil, fmt.Errorf("ConcatSeries(): position %d: all series must have same labels", k)
-			}
+			ret.InPlace().Merge(s.ToDataFrame())
 		}
-		ret.values = append(ret.values, s.values)
+		if ret.Err() != nil {
+			return nil, ret.Err()
+		}
 	}
 	return ret, nil
 }
@@ -1857,6 +1853,9 @@ func (df *DataFrame) Merge(other *DataFrame) *DataFrame {
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Merge(other *DataFrame) {
 	lookupDF := df.dataframe.Lookup(other)
+	if lookupDF.Err() != nil {
+		df.dataframe.resetWithError(fmt.Errorf("Merge(): %v", lookupDF.Err()))
+	}
 	for k := range lookupDF.values {
 		df.dataframe.values = append(df.dataframe.values, lookupDF.values[k])
 	}
@@ -1926,8 +1925,11 @@ func (df *DataFrame) LookupAdvanced(other *DataFrame, how string, leftOn []strin
 		}
 	}
 	if len(leftOn) == 0 {
-		leftKeys, rightKeys = findMatchingKeysBetweenTwoLabelContainers(
+		leftKeys, rightKeys, err = findMatchingKeysBetweenTwoLabelContainers(
 			mergedLabelsAndCols, otherMergedLabelsAndCols)
+		if err != nil {
+			return dataFrameWithError(fmt.Errorf("LookupAdvanced(): %v", err))
+		}
 	} else {
 		leftKeys, err = convertColNamesToIndexPositions(leftOn, mergedLabelsAndCols)
 		if err != nil {
