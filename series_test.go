@@ -1416,6 +1416,16 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				leftOn: []string{"foo"}, rightOn: nil},
 			&Series{err: errors.New("LookupAdvanced(): if either leftOn or rightOn is empty, both must be empty")},
 		},
+		{"fail - no key supplied, and no matching key", fields{
+			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+			labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
+			args{
+				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
+					labels: []*valueContainer{{name: "corge", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
+				how:    "left",
+				leftOn: nil, rightOn: nil},
+			&Series{err: errors.New("LookupAdvanced(): no matching keys between containers")},
+		},
 		{"fail - no matching left key", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
 			labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}}},
@@ -3504,6 +3514,52 @@ func TestSeriesIterator_Row(t *testing.T) {
 			}
 			if got := iter.Row(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("SeriesIterator.Row() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_HasLabels(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		labelNames []string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{"pass",
+			fields{values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}},
+			},
+			args{[]string{"qux"}},
+			false,
+		},
+		{"fail",
+			fields{values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}},
+			},
+			args{[]string{"corge"}},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if err := s.HasLabels(tt.args.labelNames...); (err != nil) != tt.wantErr {
+				t.Errorf("Series.HasLabels() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

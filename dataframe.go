@@ -670,6 +670,17 @@ func (df *DataFrame) ListLabelNames() []string {
 	return listNames(df.labels)
 }
 
+// HasLabels returns an error if the DataFrame does not contain all of the `labelNames` supplied.
+func (df *DataFrame) HasLabels(labelNames ...string) error {
+	for _, name := range labelNames {
+		_, err := indexOfContainer(name, df.labels)
+		if err != nil {
+			return fmt.Errorf("HasLabels(): %v", err)
+		}
+	}
+	return nil
+}
+
 // HasCols returns an error if the DataFrame does not contain all of the `colNames` supplied.
 func (df *DataFrame) HasCols(colNames ...string) error {
 	for _, name := range colNames {

@@ -556,6 +556,17 @@ func (s *Series) ListLabelNames() []string {
 	return listNames(s.labels)
 }
 
+// HasLabels returns an error if the Series does not contain all of the `labelNames` supplied.
+func (s *Series) HasLabels(labelNames ...string) error {
+	for _, name := range labelNames {
+		_, err := indexOfContainer(name, s.labels)
+		if err != nil {
+			return fmt.Errorf("HasLabels(): %v", err)
+		}
+	}
+	return nil
+}
+
 // Name returns the name of the Series
 func (s *Series) Name() string {
 	return s.values.name

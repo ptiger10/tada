@@ -3328,6 +3328,53 @@ func TestDataFrame_HasCols(t *testing.T) {
 	}
 }
 
+func TestDataFrame_HasLabels(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		labelNames []string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "bar"},
+			},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:   "baz"},
+			args{[]string{"*0"}}, false},
+		{"fail", fields{
+			values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			name:   "baz"},
+			args{[]string{"corge"}}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if err := df.HasLabels(tt.args.labelNames...); (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.HasLabels() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestDataFrame_EqualsCSV(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
