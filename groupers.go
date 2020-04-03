@@ -31,7 +31,7 @@ func (g *GroupedSeries) GetGroup(group string) *Series {
 			return g.series.Subset(g.rowIndices[i])
 		}
 	}
-	return seriesWithError(fmt.Errorf("GetGroup(): group (%v) not in groups", group))
+	return seriesWithError(fmt.Errorf("getting group: group (%v) not in groups", group))
 }
 
 // Transform applies lambda to every group and returns the modified values in the same order as the original
@@ -43,7 +43,7 @@ func (g *GroupedSeries) Transform(name string, lambda func(interface{}) interfac
 	vals, err := groupedInterfaceTransformFunc(
 		g.series.values.slice, name, g.rowIndices, lambda)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("GroupedSeries.Transform(): %v", err))
+		return seriesWithError(fmt.Errorf("transforming grouped Series: %v", err))
 	}
 	return &Series{
 		values: vals,
@@ -136,11 +136,11 @@ func (g *GroupedSeries) Reduce(name string, lambda GroupReduceFn) *Series {
 	} else if lambda.Interface != nil {
 		newSeries, err := g.interfaceReduceFunc(name, lambda.Interface)
 		if err != nil {
-			return seriesWithError(fmt.Errorf("GroupedSeries.Reduce(): %v", err))
+			return seriesWithError(fmt.Errorf("reducing grouped Series: %v", err))
 		}
 		return newSeries
 	}
-	return seriesWithError(fmt.Errorf("Reduce(): no lambda function provided"))
+	return seriesWithError(fmt.Errorf("reducing grouped Series: no lambda function provided"))
 }
 
 // Sum coerces values to float64 and calculates the sum of each group.
@@ -279,7 +279,7 @@ func (g *GroupedSeries) Series() *Series {
 // RollingN iterates over each row in Series and groups each set of n subsequent rows after the current row.
 func (s *Series) RollingN(n int) *GroupedSeries {
 	if n < 1 {
-		return groupedSeriesWithError(fmt.Errorf("RollingN(): n must be greater than zero (not %v)", n))
+		return groupedSeriesWithError(fmt.Errorf("rolling n: n must be greater than zero (not %v)", n))
 	}
 	rowIndices := make([][]int, s.Len())
 	for i := 0; i < s.Len(); i++ {
@@ -302,7 +302,7 @@ func (s *Series) RollingN(n int) *GroupedSeries {
 func (s *Series) RollingDuration(d time.Duration) *GroupedSeries {
 	// assumes positive duration
 	if d < 0 {
-		return groupedSeriesWithError(fmt.Errorf("RollingDuration(): d must be greater than zero (not %v)", d))
+		return groupedSeriesWithError(fmt.Errorf("rolling duration: d must be greater than zero (not %v)", d))
 	}
 	vals := s.values.dateTime().slice
 	rowIndices := make([][]int, s.Len())
@@ -469,7 +469,7 @@ func (g *GroupedDataFrame) GetGroup(group string) *DataFrame {
 			return g.df.Subset(g.rowIndices[i])
 		}
 	}
-	return dataFrameWithError(fmt.Errorf("GetGroup(): group (%v) not in groups", group))
+	return dataFrameWithError(fmt.Errorf("getting group: group (%v) not in groups", group))
 }
 
 // Sum coerces the column values in colNames to float64 and calculates the sum of each group.
@@ -542,7 +542,7 @@ func (g *GroupedDataFrame) Last(colNames ...string) *DataFrame {
 func (g *GroupedDataFrame) Col(colName string) *GroupedSeries {
 	index, err := indexOfContainer(colName, g.df.values)
 	if err != nil {
-		return groupedSeriesWithError(fmt.Errorf("Col(): %v", err))
+		return groupedSeriesWithError(fmt.Errorf("getting column from grouped Series: %v", err))
 	}
 	series := &Series{
 		values:     g.df.values[index],
@@ -577,11 +577,11 @@ func (g *GroupedDataFrame) Reduce(name string, cols []string, lambda GroupReduce
 	} else if lambda.Interface != nil {
 		newDataFrame, err := g.interfaceReduceFunc(name, cols, lambda.Interface)
 		if err != nil {
-			return dataFrameWithError(fmt.Errorf("GroupedDataFrame.Reduce(): %v", err))
+			return dataFrameWithError(fmt.Errorf("reducing grouped DataFrame: %v", err))
 		}
 		return newDataFrame
 	}
-	return dataFrameWithError(fmt.Errorf("Reduce(): no lambda function provided"))
+	return dataFrameWithError(fmt.Errorf("reducing grouped DataFrame: no lambda function provided"))
 }
 
 // HavingCount removes any groups from g that do not satisfy the boolean function supplied in lambda.

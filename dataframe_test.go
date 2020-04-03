@@ -1233,7 +1233,7 @@ func TestDataFrame_Null(t *testing.T) {
 			name:          "baz"},
 			args{[]string{"corge"}},
 			&DataFrame{
-				err: fmt.Errorf("selecting null rows: name (corge) not found")},
+				err: fmt.Errorf("getting null rows: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -3761,7 +3761,7 @@ func TestDataFrame_Col(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{"corge"},
 			&Series{
-				err: fmt.Errorf("selecting column: name (corge) not found")},
+				err: fmt.Errorf("getting column: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -3815,7 +3815,7 @@ func TestDataFrame_Cols(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{[]string{"foo", "corge"}},
 			&DataFrame{
-				err: fmt.Errorf("selecting columns: name (corge) not found")},
+				err: fmt.Errorf("getting columns: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {

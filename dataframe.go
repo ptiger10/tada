@@ -1002,7 +1002,7 @@ func (df *DataFrame) LabelsToSeries(name string) *Series {
 func (df *DataFrame) Col(name string) *Series {
 	index, err := indexOfContainer(name, df.values)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("selecting column: %v", err))
+		return seriesWithError(fmt.Errorf("getting column: %v", err))
 	}
 	return &Series{
 		values:     df.values[index],
@@ -1017,7 +1017,7 @@ func (df *DataFrame) Cols(names ...string) *DataFrame {
 	for i, name := range names {
 		index, err := indexOfContainer(name, df.values)
 		if err != nil {
-			return dataFrameWithError(fmt.Errorf("selecting columns: %v", err))
+			return dataFrameWithError(fmt.Errorf("getting columns: %v", err))
 		}
 		vals[i] = df.values[index]
 	}
@@ -1173,7 +1173,7 @@ func (df *DataFrame) Null(subset ...string) *DataFrame {
 		for _, name := range subset {
 			i, err := indexOfContainer(name, df.values)
 			if err != nil {
-				return dataFrameWithError(fmt.Errorf("selecting null rows: %v", err))
+				return dataFrameWithError(fmt.Errorf("getting null rows: %v", err))
 			}
 			index = append(index, i)
 		}
