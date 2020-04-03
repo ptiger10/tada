@@ -27,7 +27,7 @@ import (
 // and 2-dimensional variants of each (e.g., [][]string, [][]float64).
 func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 	if slices == nil && labels == nil {
-		return dataFrameWithError(fmt.Errorf("NewSeries(): slices and labels cannot both be nil"))
+		return dataFrameWithError(fmt.Errorf("constructing new DataFrame: slices and labels cannot both be nil"))
 	}
 	var values []*valueContainer
 	var err error
@@ -35,13 +35,13 @@ func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 		// handle values
 		values, err = makeValueContainersFromInterfaces(slices, false)
 		if err != nil {
-			return dataFrameWithError(fmt.Errorf("NewDataFrame(): slices: %v", err))
+			return dataFrameWithError(fmt.Errorf("constructing new DataFrame: slices: %v", err))
 		}
 	}
 	// handle labels
 	retLabels, err := makeValueContainersFromInterfaces(labels, true)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("NewDataFrame(): labels: %v", err))
+		return dataFrameWithError(fmt.Errorf("constructing new DataFrame: labels: %v", err))
 	}
 	if len(retLabels) == 0 {
 		// handle default labels
@@ -74,7 +74,7 @@ func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 func MakeMultiLevelLabels(labels []interface{}) ([]interface{}, error) {
 	for k := range labels {
 		if !isSlice(labels[k]) {
-			return nil, fmt.Errorf("MakeSlicesFromCrossProduct(): position %d: must be slice", k)
+			return nil, fmt.Errorf("constructing multi level labels: position %d: must be slice", k)
 		}
 	}
 	var numNewRows int
@@ -160,7 +160,7 @@ func (df *DataFrame) Cast(containerAsType map[string]DType) {
 	for name, dtype := range containerAsType {
 		index, err := indexOfContainer(name, mergedLabelsAndCols)
 		if err != nil {
-			df.resetWithError(fmt.Errorf("Cast(): %v", err))
+			df.resetWithError(fmt.Errorf("type casting: %v", err))
 			return
 		}
 		mergedLabelsAndCols[index].cast(dtype)
@@ -252,18 +252,18 @@ func ReadCSV(r io.Reader, options ...ReadOption) (*DataFrame, error) {
 	config := setReadConfig(options)
 	b, err := ioutil.ReadAll(r)
 	if err != nil {
-		return nil, fmt.Errorf("ReadCSV(): %s", err)
+		return nil, fmt.Errorf("reading csv: %s", err)
 	}
 	numRows, numCols, err := extractCSVDimensions(b, config.Delimiter)
 	if err != nil {
-		return nil, fmt.Errorf("ReadCSV(): %v", err)
+		return nil, fmt.Errorf("reading csv: %v", err)
 	}
 	retVals := makeStringMatrix(numCols, numRows)
 	retNulls := makeBoolMatrix(numCols, numRows)
 	data := bytes.NewReader(b)
 	err = readCSVBytes(data, retVals, retNulls, config.Delimiter)
 	if err != nil {
-		return nil, fmt.Errorf("ReadCSV(): %s", err)
+		return nil, fmt.Errorf("reading csv: %s", err)
 	}
 	return makeDataFrameFromMatrices(retVals, retNulls, config), nil
 }
@@ -353,7 +353,7 @@ func ReadMatrix(mat Matrix) *DataFrame {
 func ReadStructSlice(slice interface{}) (*DataFrame, error) {
 	values, err := readStruct(slice)
 	if err != nil {
-		return nil, fmt.Errorf("ReadStruct(): %v", err)
+		return nil, fmt.Errorf("reading struct slice: %v", err)
 	}
 	defaultLabels := makeDefaultLabels(0, reflect.ValueOf(slice).Len(), true)
 	return &DataFrame{
@@ -366,7 +366,7 @@ func ReadStructSlice(slice interface{}) (*DataFrame, error) {
 // ToSeries converts a single-columned DataFrame to a Series that shares the same underlying values and labels.
 func (df *DataFrame) ToSeries() *Series {
 	if len(df.values) != 1 {
-		return seriesWithError(fmt.Errorf("ToSeries(): DataFrame must have a single column"))
+		return seriesWithError(fmt.Errorf("converting to Series: DataFrame must have a single column"))
 	}
 	return &Series{
 		values:     df.values[0],
@@ -385,7 +385,7 @@ func (df *DataFrame) EqualsCSV(includeLabels bool, want io.Reader, wantOptions .
 	config := setReadConfig(wantOptions)
 	df2, err := ReadCSV(want, wantOptions...)
 	if err != nil {
-		return false, nil, fmt.Errorf("EqualsCSV(): reading r: %v", err)
+		return false, nil, fmt.Errorf("comparing csv: reading want: %v", err)
 	}
 
 	got := df.ToCSV(writeOptionIncludeLabels(includeLabels))
@@ -445,10 +445,10 @@ func (df *DataFrame) ToCSV(options ...WriteOption) [][]string {
 func (df *DataFrame) ToStruct(structPointer interface{}, options ...WriteOption) error {
 	config := setWriteConfig(options)
 	if reflect.TypeOf(structPointer).Kind() != reflect.Ptr {
-		return fmt.Errorf("writing to struct schema: structPointer must be pointer to struct, not %s", reflect.TypeOf(structPointer).Kind())
+		return fmt.Errorf("writing to struct: structPointer must be pointer to struct, not %s", reflect.TypeOf(structPointer).Kind())
 	}
 	if reflect.TypeOf(structPointer).Elem().Kind() != reflect.Struct {
-		return fmt.Errorf("writing to struct schema: structPointer must be pointer to struct, not to %s", reflect.TypeOf(structPointer).Elem().Kind())
+		return fmt.Errorf("writing to struct: structPointer must be pointer to struct, not to %s", reflect.TypeOf(structPointer).Elem().Kind())
 	}
 	v := reflect.ValueOf(structPointer).Elem()
 	var mergedLabelsAndCols []*valueContainer
@@ -470,12 +470,12 @@ func (df *DataFrame) ToStruct(structPointer interface{}, options ...WriteOption)
 		if name := mergedLabelsAndCols[container].name; name != field.Name {
 			// container name == tada tag name?
 			if name != field.Tag.Get("tada") {
-				return fmt.Errorf("ToStruct(): DataFrame has wrong field name (container %d): %s != %s",
+				return fmt.Errorf("writing to struct: DataFrame has wrong field name (container %d): %s != %s",
 					container, name, field.Name)
 			}
 		}
 		if mergedLabelsAndCols[container].dtype() != field.Type {
-			return fmt.Errorf("ToStruct(): DataFrame has wrong type (container %s): %s != %s",
+			return fmt.Errorf("writing to struct: DataFrame has wrong type (container %s): %s != %s",
 				field.Name, mergedLabelsAndCols[container].dtype(), field.Type)
 		}
 		src := reflect.ValueOf(mergedLabelsAndCols[container].slice)
@@ -492,7 +492,7 @@ func (df *DataFrame) WriteCSV(w io.Writer, options ...WriteOption) error {
 	config := setWriteConfig(options)
 	ret := df.ToCSV(writeOptionIncludeLabels(config.IncludeLabels))
 	if len(ret) == 0 {
-		return fmt.Errorf("ExportCSV(): df cannot be empty")
+		return fmt.Errorf("writing csv: df cannot be empty")
 	}
 	var b bytes.Buffer
 	cw := csv.NewWriter(&b)
@@ -519,7 +519,7 @@ func WriteMockCSV(w io.Writer, n int, r io.Reader, options ...ReadOption) error 
 	var rowCount int
 	data, err := ReadCSV(r, options...)
 	if err != nil {
-		return fmt.Errorf("WriteMockCSV(): reading r: %v", err)
+		return fmt.Errorf("writing mock csv: reading r: %v", err)
 	}
 	// data has default labels? exclude them
 	src := data.ToCSV(writeOptionIncludeLabels(config.NumLabelLevels > 0))
@@ -786,7 +786,7 @@ func (df *DataFrame) HasLabels(labelNames ...string) error {
 	for _, name := range labelNames {
 		_, err := indexOfContainer(name, df.labels)
 		if err != nil {
-			return fmt.Errorf("HasLabels(): %v", err)
+			return fmt.Errorf("verifying labels: %v", err)
 		}
 	}
 	return nil
@@ -797,7 +797,7 @@ func (df *DataFrame) HasCols(colNames ...string) error {
 	for _, name := range colNames {
 		_, err := indexOfContainer(name, df.values)
 		if err != nil {
-			return fmt.Errorf("HasCols(): %v", err)
+			return fmt.Errorf("verifying columns: %v", err)
 		}
 	}
 	return nil
@@ -825,7 +825,7 @@ func (df *DataFrameMutator) Subset(index []int) {
 	for k := range df.dataframe.values {
 		err := df.dataframe.values[k].subsetRows(index)
 		if err != nil {
-			df.dataframe.resetWithError(fmt.Errorf("Subset(): %v", err))
+			df.dataframe.resetWithError(fmt.Errorf("subset: %v", err))
 			return
 		}
 	}
@@ -848,12 +848,12 @@ func (df *DataFrame) SwapLabels(i, j string) *DataFrame {
 func (df *DataFrameMutator) SwapLabels(i, j string) {
 	index1, err := indexOfContainer(i, df.dataframe.labels)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("SwapLabels(): i: %v", err))
+		df.dataframe.resetWithError(fmt.Errorf("swapping labels:i: %v", err))
 		return
 	}
 	index2, err := indexOfContainer(j, df.dataframe.labels)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("SwapLabels(): j: %v", err))
+		df.dataframe.resetWithError(fmt.Errorf("swapping labels:j: %v", err))
 		return
 	}
 	df.dataframe.labels[index1], df.dataframe.labels[index2] = df.dataframe.labels[index2], df.dataframe.labels[index1]
@@ -873,7 +873,7 @@ func (df *DataFrame) SubsetLabels(index []int) *DataFrame {
 func (df *DataFrameMutator) SubsetLabels(index []int) {
 	labels, err := subsetContainers(df.dataframe.labels, index)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("SubsetLabels(): %v", err))
+		df.dataframe.resetWithError(fmt.Errorf("subsetting labels: %v", err))
 		return
 	}
 	df.dataframe.labels = labels
@@ -893,7 +893,7 @@ func (df *DataFrame) SubsetCols(index []int) *DataFrame {
 func (df *DataFrameMutator) SubsetCols(index []int) {
 	cols, err := subsetContainers(df.dataframe.values, index)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("SubsetCols(): %v", err))
+		df.dataframe.resetWithError(fmt.Errorf("subsetting columns: %v", err))
 		return
 	}
 	df.dataframe.values = cols
@@ -955,7 +955,7 @@ func (df *DataFrame) IndexOfRows(name string, value interface{}) []int {
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	i, err := indexOfContainer(name, mergedLabelsAndCols)
 	if err != nil {
-		errorWarning(fmt.Errorf("IndexOfRows(): %v", err))
+		errorWarning(fmt.Errorf("index of rows: %v", err))
 		return nil
 	}
 	return mergedLabelsAndCols[i].indexOfRows(value)
@@ -982,7 +982,7 @@ func (df *DataFrame) GetLabels() []interface{} {
 func (df *DataFrame) LabelsToSeries(name string) *Series {
 	index, err := indexOfContainer(name, df.labels)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("LabelsToSeries(): %v", err))
+		return seriesWithError(fmt.Errorf("converting labels to Series: %v", err))
 	}
 	values := df.labels[index]
 	retValues := &valueContainer{
@@ -1002,7 +1002,7 @@ func (df *DataFrame) LabelsToSeries(name string) *Series {
 func (df *DataFrame) Col(name string) *Series {
 	index, err := indexOfContainer(name, df.values)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("Col(): %v", err))
+		return seriesWithError(fmt.Errorf("selecting column: %v", err))
 	}
 	return &Series{
 		values:     df.values[index],
@@ -1017,7 +1017,7 @@ func (df *DataFrame) Cols(names ...string) *DataFrame {
 	for i, name := range names {
 		index, err := indexOfContainer(name, df.values)
 		if err != nil {
-			return dataFrameWithError(fmt.Errorf("Cols(): %v", err))
+			return dataFrameWithError(fmt.Errorf("selecting columns: %v", err))
 		}
 		vals[i] = df.values[index]
 	}
@@ -1069,12 +1069,12 @@ func (df *DataFrame) Tail(n int) *DataFrame {
 // In all cases, returns a new DataFrame.
 func (df *DataFrame) Range(first, last int) *DataFrame {
 	if first > last {
-		return dataFrameWithError(fmt.Errorf("Range(): first is greater than last (%d > %d)", first, last))
+		return dataFrameWithError(fmt.Errorf("range: first is greater than last (%d > %d)", first, last))
 	}
 	if first >= df.Len() {
-		return dataFrameWithError(fmt.Errorf("Range(): first index out of range (%d > %d)", first, df.Len()-1))
+		return dataFrameWithError(fmt.Errorf("range: first index out of range (%d > %d)", first, df.Len()-1))
 	} else if last > df.Len() {
-		return dataFrameWithError(fmt.Errorf("Range(): last index out of range (%d > %d)", last, df.Len()))
+		return dataFrameWithError(fmt.Errorf("range: last index out of range (%d > %d)", last, df.Len()))
 	}
 	retVals := make([]*valueContainer, len(df.values))
 	for k := range df.values {
@@ -1118,7 +1118,7 @@ func (df *DataFrameMutator) FillNull(how map[string]NullFiller) {
 	for name, filler := range how {
 		index, err := indexOfContainer(name, mergedLabelsAndCols)
 		if err != nil {
-			df.dataframe.resetWithError(fmt.Errorf("FillNull(): %v", err))
+			df.dataframe.resetWithError(fmt.Errorf("filling null rows: %v", err))
 			return
 		}
 		mergedLabelsAndCols[index].fillnull(filler)
@@ -1146,7 +1146,7 @@ func (df *DataFrameMutator) DropNull(subset ...string) {
 		for _, name := range subset {
 			i, err := indexOfContainer(name, df.dataframe.values)
 			if err != nil {
-				df.dataframe.resetWithError(fmt.Errorf("DropNull(): %v", err))
+				df.dataframe.resetWithError(fmt.Errorf("dropping null rows: %v", err))
 				return
 			}
 			index = append(index, i)
@@ -1173,7 +1173,7 @@ func (df *DataFrame) Null(subset ...string) *DataFrame {
 		for _, name := range subset {
 			i, err := indexOfContainer(name, df.values)
 			if err != nil {
-				return dataFrameWithError(fmt.Errorf("Null(): %v", err))
+				return dataFrameWithError(fmt.Errorf("selecting null rows: %v", err))
 			}
 			index = append(index, i)
 		}
@@ -1193,10 +1193,10 @@ func (df *DataFrame) Null(subset ...string) *DataFrame {
 func (df *DataFrame) SetNulls(n int, nulls []bool) error {
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	if n >= len(mergedLabelsAndCols) {
-		return fmt.Errorf("SetNulls(): n cannot be greater than the number of labels and columns (%d)", len(mergedLabelsAndCols))
+		return fmt.Errorf("setting null slice: n cannot be greater than the number of labels and columns (%d)", len(mergedLabelsAndCols))
 	}
 	if len(nulls) != df.Len() {
-		return fmt.Errorf("SetNulls(): nulls must be same length as existing null slice (%d != %d)",
+		return fmt.Errorf("setting null slice: nulls must be same length as existing null slice (%d != %d)",
 			len(nulls), df.Len())
 	}
 	mergedLabelsAndCols[n].isNull = nulls
@@ -1217,7 +1217,7 @@ func (df *DataFrameMutator) FilterCols(lambda func(string) bool, level int) {
 	var subset []int
 	names, err := listNamesAtLevel(df.dataframe.values, level, df.dataframe.numColLevels())
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("FilterCols(): %v", err))
+		df.dataframe.resetWithError(fmt.Errorf("filter columns: %v", err))
 		return
 	}
 	for k := range names {
@@ -1260,7 +1260,7 @@ func (df *DataFrame) WithLabels(name string, input interface{}) *DataFrame {
 func (df *DataFrameMutator) WithLabels(name string, input interface{}) {
 	labels, err := withColumn(df.dataframe.labels, name, input, df.dataframe.Len())
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("WithLabels(): %v", err))
+		df.dataframe.resetWithError(fmt.Errorf("with labels: %v", err))
 	}
 	df.dataframe.labels = labels
 }
@@ -1294,7 +1294,7 @@ func (df *DataFrame) WithCol(name string, input interface{}) *DataFrame {
 func (df *DataFrameMutator) WithCol(name string, input interface{}) {
 	cols, err := withColumn(df.dataframe.values, name, input, df.dataframe.Len())
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("WithCol(): %v", err))
+		df.dataframe.resetWithError(fmt.Errorf("with column: %v", err))
 	}
 	df.dataframe.values = cols
 }
@@ -1312,7 +1312,7 @@ func (df *DataFrame) DropLabels(name string) *DataFrame {
 func (df *DataFrameMutator) DropLabels(name string) {
 	newCols, err := dropFromContainers(name, df.dataframe.labels)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("DropLabels(): %v", err))
+		df.dataframe.resetWithError(fmt.Errorf("dropping labels: %v", err))
 		return
 	}
 	df.dataframe.labels = newCols
@@ -1332,7 +1332,7 @@ func (df *DataFrame) DropCol(name string) *DataFrame {
 func (df *DataFrameMutator) DropCol(name string) {
 	newCols, err := dropFromContainers(name, df.dataframe.values)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("DropCol(): %v", err))
+		df.dataframe.resetWithError(fmt.Errorf("dropping column: %v", err))
 		return
 	}
 	df.dataframe.values = newCols
@@ -1353,7 +1353,7 @@ func (df *DataFrameMutator) DropRow(index int) {
 	for k := range df.dataframe.values {
 		err := df.dataframe.values[k].dropRow(index)
 		if err != nil {
-			df.dataframe.resetWithError(fmt.Errorf("DropRow(): %v", err))
+			df.dataframe.resetWithError(fmt.Errorf("dropping row: %v", err))
 			return
 		}
 	}
@@ -1378,13 +1378,13 @@ func (df *DataFrame) Append(other *DataFrame) *DataFrame {
 func (df *DataFrameMutator) Append(other *DataFrame) {
 	if len(other.labels) != len(df.dataframe.labels) {
 		df.dataframe.resetWithError(
-			fmt.Errorf("Append(): other DataFrame must have same number of label levels as original DataFrame (%d != %d)",
+			fmt.Errorf("append: other DataFrame must have same number of label levels as original DataFrame (%d != %d)",
 				len(other.labels), len(df.dataframe.labels)))
 		return
 	}
 	if len(other.values) != len(df.dataframe.values) {
 		df.dataframe.resetWithError(
-			fmt.Errorf("Append(): other DataFrame must have same number of columns as original DataFrame (%d != %d)",
+			fmt.Errorf("append: other DataFrame must have same number of columns as original DataFrame (%d != %d)",
 				len(other.values), len(df.dataframe.values)))
 		return
 	}
@@ -1426,14 +1426,14 @@ func (df *DataFrame) SetAsLabels(colNames ...string) *DataFrame {
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) SetAsLabels(colNames ...string) {
 	if len(colNames) >= len(df.dataframe.values) {
-		df.dataframe.resetWithError(fmt.Errorf("SetAsLabels(): number of colNames must be less than number of columns (%d >= %d)",
+		df.dataframe.resetWithError(fmt.Errorf("setting column as labels: number of colNames must be less than number of columns (%d >= %d)",
 			len(colNames), len(df.dataframe.values)))
 		return
 	}
 	for i := 0; i < len(colNames); i++ {
 		index, err := indexOfContainer(colNames[i], df.dataframe.values)
 		if err != nil {
-			df.dataframe.resetWithError(fmt.Errorf("SetAsLabels(): %v", err))
+			df.dataframe.resetWithError(fmt.Errorf("setting column as labels: %v", err))
 			return
 		}
 		df.dataframe.labels = append(df.dataframe.labels, df.dataframe.values[index])
@@ -1463,7 +1463,7 @@ func (df *DataFrameMutator) ResetLabels(labelLevels ...int) {
 		adjustedIndex := i - incrementor
 		if adjustedIndex >= df.dataframe.NumLevels() {
 			df.dataframe.resetWithError(fmt.Errorf(
-				"ResetLabels(): index out of range (%d > %d)", i, df.dataframe.NumLevels()+incrementor))
+				"resetting labels to column: index out of range (%d > %d)", i, df.dataframe.NumLevels()+incrementor))
 			return
 		}
 		newVal := df.dataframe.labels[adjustedIndex]
@@ -1495,7 +1495,7 @@ func (df *DataFrame) Name() string {
 func (df *DataFrame) SetLabelNames(levelNames []string) *DataFrame {
 	if len(levelNames) != len(df.labels) {
 		return dataFrameWithError(
-			fmt.Errorf("SetLabelNames(): number of levelNames must match number of levels in DataFrame (%d != %d)", len(levelNames), len(df.labels)))
+			fmt.Errorf("setting label names: number of levelNames must match number of levels in DataFrame (%d != %d)", len(levelNames), len(df.labels)))
 	}
 	for j := range levelNames {
 		df.labels[j].name = levelNames[j]
@@ -1507,7 +1507,7 @@ func (df *DataFrame) SetLabelNames(levelNames []string) *DataFrame {
 func (df *DataFrame) SetColNames(colNames []string) *DataFrame {
 	if len(colNames) != len(df.values) {
 		return dataFrameWithError(
-			fmt.Errorf("SetColNames(): number of colNames must match number of columns in DataFrame (%d != %d)",
+			fmt.Errorf("setting column names: number of colNames must match number of columns in DataFrame (%d != %d)",
 				len(colNames), len(df.values)))
 	}
 	for k := range colNames {
@@ -1605,18 +1605,18 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	index, err := indexOfContainer(name, mergedLabelsAndCols)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("PromoteToColLevel(): %v", err))
+		return dataFrameWithError(fmt.Errorf("promoting to column level: %v", err))
 	}
 	// by default, include all original label levels in new labels
 	residualLabelIndex := makeIntRange(0, len(df.labels))
 	// check whether container refers to label or column
 	if index >= len(df.labels) {
 		if len(df.values) <= 1 {
-			return dataFrameWithError(fmt.Errorf("PromoteToColLevel(): cannot stack only column"))
+			return dataFrameWithError(fmt.Errorf("promoting to column level: cannot stack only column"))
 		}
 	} else {
 		if len(df.labels) <= 1 {
-			return dataFrameWithError(fmt.Errorf("PromoteToColLevel(): cannot stack only label level"))
+			return dataFrameWithError(fmt.Errorf("promoting to column level: cannot stack only label level"))
 		}
 		// if a label level is being promoted, exclude it from new labels
 		residualLabelIndex = excludeFromIndex(len(df.labels), index)
@@ -1744,7 +1744,7 @@ func (df *DataFrameMutator) Filter(filters map[string]FilterFn) {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
 	index, err := filter(mergedLabelsAndCols, filters)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("Filter(): %v", err))
+		df.dataframe.resetWithError(fmt.Errorf("filter: %v", err))
 		return
 	}
 	df.Subset(index)
@@ -1765,7 +1765,7 @@ func (df *DataFrame) Where(filters map[string]FilterFn, ifTrue, ifFalse interfac
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	index, err := filter(mergedLabelsAndCols, filters)
 	if err != nil {
-		return nil, fmt.Errorf("Where(): %v", err)
+		return nil, fmt.Errorf("where: %v", err)
 	}
 	for _, i := range index {
 		ret[i] = ifTrue
@@ -1780,10 +1780,10 @@ func (df *DataFrame) Where(filters map[string]FilterFn, ifTrue, ifFalse interfac
 		_, err := setNullsFromInterface([]interface{}{ifTrue})
 		// ifTrue is unsupported?
 		if err != nil {
-			return nil, fmt.Errorf("Where(): ifTrue: %v", err)
+			return nil, fmt.Errorf("where: ifTrue: %v", err)
 		}
 		// ifFalse is unsupported?
-		return nil, fmt.Errorf("Where(): ifFalse: %v", err)
+		return nil, fmt.Errorf("where: ifFalse: %v", err)
 	}
 	return &Series{
 		values: &valueContainer{
@@ -1812,7 +1812,7 @@ func (df *DataFrameMutator) FilterByValue(filters map[string]interface{}) {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
 	index, err := filterByValue(mergedLabelsAndCols, filters)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("FilterByValue(): %v", err))
+		df.dataframe.resetWithError(fmt.Errorf("filter by value: %v", err))
 		return
 	}
 	df.Subset(index)
@@ -1850,12 +1850,12 @@ func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 	for containerName, lambda := range lambdas {
 		err := lambda.validate()
 		if err != nil {
-			df.dataframe.resetWithError((fmt.Errorf("Apply(): %v", err)))
+			df.dataframe.resetWithError((fmt.Errorf("apply: %v", err)))
 			return
 		}
 		index, err := indexOfContainer(containerName, mergedLabelsAndCols)
 		if err != nil {
-			df.dataframe.resetWithError((fmt.Errorf("Apply(): %v", err)))
+			df.dataframe.resetWithError((fmt.Errorf("apply: %v", err)))
 		}
 		mergedLabelsAndCols[index].apply(lambda)
 		// if either prior or new value is null, new value is null
@@ -1896,12 +1896,12 @@ func (df *DataFrameMutator) ApplyFormat(lambdas map[string]ApplyFormatFn) {
 	for containerName, lambda := range lambdas {
 		err := lambda.validate()
 		if err != nil {
-			df.dataframe.resetWithError((fmt.Errorf("ApplyFormat(): %v", err)))
+			df.dataframe.resetWithError((fmt.Errorf("apply format: %v", err)))
 			return
 		}
 		index, err := indexOfContainer(containerName, mergedLabelsAndCols)
 		if err != nil {
-			df.dataframe.resetWithError((fmt.Errorf("ApplyFormat(): %v", err)))
+			df.dataframe.resetWithError((fmt.Errorf("apply format: %v", err)))
 		}
 		mergedLabelsAndCols[index].applyFormat(lambda)
 		// if either prior or new value is null, new value is null
@@ -1976,7 +1976,7 @@ func (df *DataFrame) Merge(other *DataFrame) *DataFrame {
 func (df *DataFrameMutator) Merge(other *DataFrame) {
 	lookupDF := df.dataframe.Lookup(other)
 	if lookupDF.Err() != nil {
-		df.dataframe.resetWithError(fmt.Errorf("Merge(): %v", lookupDF.Err()))
+		df.dataframe.resetWithError(fmt.Errorf("merge: %v", lookupDF.Err()))
 	}
 	for k := range lookupDF.values {
 		df.dataframe.values = append(df.dataframe.values, lookupDF.values[k])
@@ -2043,23 +2043,23 @@ func (df *DataFrame) LookupAdvanced(other *DataFrame, how string, leftOn []strin
 	if len(leftOn) == 0 || len(rightOn) == 0 {
 		if !(len(leftOn) == 0 && len(rightOn) == 0) {
 			return dataFrameWithError(
-				fmt.Errorf("LookupAdvanced(): if either leftOn or rightOn is empty, both must be empty"))
+				fmt.Errorf("lookup: if either leftOn or rightOn is empty, both must be empty"))
 		}
 	}
 	if len(leftOn) == 0 {
 		leftKeys, rightKeys, err = findMatchingKeysBetweenTwoLabelContainers(
 			mergedLabelsAndCols, otherMergedLabelsAndCols)
 		if err != nil {
-			return dataFrameWithError(fmt.Errorf("LookupAdvanced(): %v", err))
+			return dataFrameWithError(fmt.Errorf("lookup: %v", err))
 		}
 	} else {
 		leftKeys, err = convertColNamesToIndexPositions(leftOn, mergedLabelsAndCols)
 		if err != nil {
-			return dataFrameWithError(fmt.Errorf("LookupAdvanced(): leftOn: %v", err))
+			return dataFrameWithError(fmt.Errorf("lookup: leftOn: %v", err))
 		}
 		rightKeys, err = convertColNamesToIndexPositions(rightOn, otherMergedLabelsAndCols)
 		if err != nil {
-			return dataFrameWithError(fmt.Errorf("LookupAdvanced(): rightOn: %v", err))
+			return dataFrameWithError(fmt.Errorf("lookup: rightOn: %v", err))
 		}
 	}
 	ret, err := lookupDataFrame(
@@ -2067,7 +2067,7 @@ func (df *DataFrame) LookupAdvanced(other *DataFrame, how string, leftOn []strin
 		df.values, df.labels, leftKeys,
 		other.values, other.labels, rightKeys, leftOn, rightOn)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("LookupAdvanced(): %v", err))
+		return dataFrameWithError(fmt.Errorf("lookup: %v", err))
 	}
 	return ret
 }
@@ -2092,7 +2092,7 @@ func (df *DataFrame) Sort(by ...Sorter) *DataFrame {
 func (df *DataFrameMutator) Sort(by ...Sorter) {
 	if len(by) == 0 {
 		df.dataframe.resetWithError(fmt.Errorf(
-			"Sort(): must supply at least one Sorter"))
+			"sort: must supply at least one Sorter"))
 		return
 	}
 
@@ -2100,7 +2100,7 @@ func (df *DataFrameMutator) Sort(by ...Sorter) {
 	// sortContainers iteratively updates the index
 	newIndex, err := sortContainers(mergedLabelsAndValues, by)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("Sort(): %v", err))
+		df.dataframe.resetWithError(fmt.Errorf("sort: %v", err))
 		return
 	}
 	// rearrange the data in place with the final index
@@ -2121,7 +2121,7 @@ func (df *DataFrame) GroupBy(names ...string) *GroupedDataFrame {
 	} else {
 		index, err = convertColNamesToIndexPositions(names, mergedLabelsAndCols)
 		if err != nil {
-			return groupedDataFrameWithError(fmt.Errorf("GroupBy(): %v", err))
+			return groupedDataFrameWithError(fmt.Errorf("group by: %v", err))
 		}
 	}
 	return df.groupby(index)
@@ -2155,15 +2155,15 @@ func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFr
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	labelIndex, err := indexOfContainer(labels, mergedLabelsAndCols)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("PivotTable(): labels: %v", err))
+		return dataFrameWithError(fmt.Errorf("pivot table: labels: %v", err))
 	}
 	colIndex, err := indexOfContainer(columns, mergedLabelsAndCols)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("PivotTable(): columns: %v", err))
+		return dataFrameWithError(fmt.Errorf("pivot table: columns: %v", err))
 	}
 	_, err = indexOfContainer(values, mergedLabelsAndCols)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("PivotTable(): values: %v", err))
+		return dataFrameWithError(fmt.Errorf("pivot table: values: %v", err))
 	}
 	grouper := df.groupby([]int{labelIndex, colIndex})
 	var ret *DataFrame
@@ -2183,7 +2183,7 @@ func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFr
 	case "max":
 		ret = grouper.Max(values)
 	default:
-		return dataFrameWithError(fmt.Errorf("PivotTable(): aggFunc: unsupported (%v)", aggFunc))
+		return dataFrameWithError(fmt.Errorf("pivot table: aggFunc: unsupported (%v)", aggFunc))
 	}
 	ret = ret.PromoteToColLevel(columns)
 	ret.dropColLevel(1)
@@ -2224,7 +2224,7 @@ func (df *DataFrameMutator) Resample(how map[string]Resampler) {
 	for name, resampler := range how {
 		index, err := indexOfContainer(name, mergedLabelsAndCols)
 		if err != nil {
-			df.dataframe.resetWithError(fmt.Errorf("Resample(): %v", err))
+			df.dataframe.resetWithError(fmt.Errorf("resample: %v", err))
 			return
 		}
 		mergedLabelsAndCols[index].resample(resampler)
@@ -2309,18 +2309,18 @@ func (df *DataFrame) math(name string, mathFunction func([]float64, []bool, []in
 	}
 }
 
-// SumColumns finds each column matching a supplied colName, coerces its values to float64, and adds them row-wise.
+// SumCols finds each column matching a supplied colName, coerces its values to float64, and adds them row-wise.
 // The resulting Series is named name.
 // If any column has a null value for a given row, that row is considered null.
-func (df *DataFrame) SumColumns(name string, colNames ...string) *Series {
+func (df *DataFrame) SumCols(name string, colNames ...string) *Series {
 	if len(colNames) == 0 {
-		return seriesWithError(fmt.Errorf("SumColumns(): colNames cannot be empty"))
+		return seriesWithError(fmt.Errorf("sum columns: colNames cannot be empty"))
 	}
 	var ret *Series
 	for i, name := range colNames {
 		_, err := indexOfContainer(name, df.values)
 		if err != nil {
-			return seriesWithError(fmt.Errorf("SumColumns(): %v", err))
+			return seriesWithError(fmt.Errorf("sum columns: %v", err))
 		}
 		if i == 0 {
 			ret = df.Col(name)

@@ -96,17 +96,17 @@ func TestNewDataFrame(t *testing.T) {
 		},
 		{"fail - slices and labels nil", args{nil, nil},
 			&DataFrame{
-				err: errors.New("NewSeries(): slices and labels cannot both be nil")},
+				err: errors.New("constructing new DataFrame: slices and labels cannot both be nil")},
 		},
 		{"fail - unsupported kind", args{
 			[]interface{}{"foo"}, nil},
 			&DataFrame{
-				err: errors.New("NewDataFrame(): slices: error at position 0: unsupported kind (string); must be slice")},
+				err: errors.New("constructing new DataFrame: slices: error at position 0: unsupported kind (string); must be slice")},
 		},
 		{"fail - unsupported label kind", args{
 			[]interface{}{[]float64{1}}, []interface{}{"foo"}},
 			&DataFrame{
-				err: errors.New("NewDataFrame(): labels: error at position 0: unsupported kind (string); must be slice")},
+				err: errors.New("constructing new DataFrame: labels: error at position 0: unsupported kind (string); must be slice")},
 		},
 		{"fail - wrong length labels", args{
 			[]interface{}{[]int{0}},
@@ -171,7 +171,7 @@ func TestDataFrame_Cast(t *testing.T) {
 			name:          "qux"},
 			args{map[string]DType{"corge": Float64}},
 			&DataFrame{
-				err: fmt.Errorf("Cast(): name (corge) not found")},
+				err: fmt.Errorf("type casting: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -217,7 +217,7 @@ func TestDataFrame_ToSeries(t *testing.T) {
 				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "0"}},
 			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}},
 			&Series{
-				err: fmt.Errorf("ToSeries(): DataFrame must have a single column")},
+				err: fmt.Errorf("converting to Series: DataFrame must have a single column")},
 		},
 	}
 	for _, tt := range tests {
@@ -321,7 +321,7 @@ func TestDataFrame_Subset(t *testing.T) {
 			name:          "baz"},
 			args{[]int{10}},
 			&DataFrame{err: fmt.Errorf(
-				"Subset(): index out of range (10 > 1)")}},
+				"subset: index out of range (10 > 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -550,7 +550,7 @@ func TestDataFrame_SubsetLabels(t *testing.T) {
 			colLevelNames: []string{"*0"},
 			name:          "baz"},
 			args{[]int{10}},
-			&DataFrame{err: fmt.Errorf("SubsetLabels(): index out of range (10 > 1)")}},
+			&DataFrame{err: fmt.Errorf("subsetting labels: index out of range (10 > 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -614,7 +614,7 @@ func TestDataFrame_SubsetCols(t *testing.T) {
 			colLevelNames: []string{"*0"},
 			name:          "baz"},
 			args{[]int{10}},
-			&DataFrame{err: fmt.Errorf("SubsetCols(): index out of range (10 > 1)")}},
+			&DataFrame{err: fmt.Errorf("subsetting columns: index out of range (10 > 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -779,7 +779,7 @@ func TestDataFrame_Range(t *testing.T) {
 			},
 			name: "baz"},
 			args{3, 2},
-			&DataFrame{err: fmt.Errorf("Range(): first is greater than last (3 > 2)")}},
+			&DataFrame{err: fmt.Errorf("range: first is greater than last (3 > 2)")}},
 		{"fail - first out of range", fields{
 			values: []*valueContainer{
 				{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "0"}},
@@ -788,7 +788,7 @@ func TestDataFrame_Range(t *testing.T) {
 			},
 			name: "baz"},
 			args{3, 3},
-			&DataFrame{err: fmt.Errorf("Range(): first index out of range (3 > 2)")}},
+			&DataFrame{err: fmt.Errorf("range: first index out of range (3 > 2)")}},
 		{"fail - last out of range", fields{
 			values: []*valueContainer{
 				{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "0"}},
@@ -797,7 +797,7 @@ func TestDataFrame_Range(t *testing.T) {
 			},
 			name: "baz"},
 			args{2, 4},
-			&DataFrame{err: fmt.Errorf("Range(): last index out of range (4 > 3)")}},
+			&DataFrame{err: fmt.Errorf("range: last index out of range (4 > 3)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -870,7 +870,7 @@ func TestDataFrame_FilterCols(t *testing.T) {
 				return false
 			}, 10},
 			&DataFrame{
-				err: fmt.Errorf("FilterCols(): level out of range: 10 >= 0")},
+				err: fmt.Errorf("filter columns: level out of range: 10 >= 0")},
 		},
 	}
 	for _, tt := range tests {
@@ -981,7 +981,7 @@ func TestDataFrame_WithCol(t *testing.T) {
 			colLevelNames: []string{"*0"},
 			name:          "bar"},
 			args{"baz", []complex64{10}},
-			&DataFrame{err: fmt.Errorf("WithCol(): unable to calculate null values ([]complex64 not supported)")},
+			&DataFrame{err: fmt.Errorf("with column: unable to calculate null values ([]complex64 not supported)")},
 		},
 	}
 	for _, tt := range tests {
@@ -995,7 +995,7 @@ func TestDataFrame_WithCol(t *testing.T) {
 			}
 			got := df.WithCol(tt.args.name, tt.args.input)
 			if !EqualDataFrames(got, tt.want) {
-				t.Errorf("DataFrame.WithCol() = %v, want %v", got.values, tt.want.values)
+				t.Errorf("DataFrame.WithCol() = %v, want %v", got, tt.want)
 			}
 			if !dataFrameIsDistinct(got, df) {
 				t.Errorf("DataFrame.WithCol() changed underlying values, want copy")
@@ -1076,7 +1076,7 @@ func TestDataFrame_WithLabels(t *testing.T) {
 			colLevelNames: []string{"*0"},
 			name:          "bar"},
 			args{"baz", []complex64{10}},
-			&DataFrame{err: fmt.Errorf("WithLabels(): unable to calculate null values ([]complex64 not supported)")},
+			&DataFrame{err: fmt.Errorf("with labels: unable to calculate null values ([]complex64 not supported)")},
 		},
 	}
 	for _, tt := range tests {
@@ -1154,7 +1154,7 @@ func TestDataFrame_DropNull(t *testing.T) {
 			colLevelNames: []string{"*0"},
 			name:          "baz"},
 			args{[]string{"corge"}},
-			&DataFrame{err: fmt.Errorf("DropNull(): name (corge) not found")},
+			&DataFrame{err: fmt.Errorf("dropping null rows: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -1168,7 +1168,7 @@ func TestDataFrame_DropNull(t *testing.T) {
 			}
 			got := df.DropNull(tt.args.subset...)
 			if !EqualDataFrames(got, tt.want) {
-				t.Errorf("DataFrame.DropNull() = %v, want %v", got.values, tt.want.values)
+				t.Errorf("DataFrame.DropNull() = %v, want %v", got, tt.want)
 			}
 			if !dataFrameIsDistinct(got, df) {
 				t.Errorf("DataFrame.DropNull() changed underlying values, want copy")
@@ -1233,7 +1233,7 @@ func TestDataFrame_Null(t *testing.T) {
 			name:          "baz"},
 			args{[]string{"corge"}},
 			&DataFrame{
-				err: fmt.Errorf("Null(): name (corge) not found")},
+				err: fmt.Errorf("selecting null rows: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -1298,7 +1298,7 @@ func TestDataFrame_SetAsLabels(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{[]string{"bar", "foo"}},
 			&DataFrame{
-				err: fmt.Errorf("SetAsLabels(): number of colNames must be less than number of columns (2 >= 2)")},
+				err: fmt.Errorf("setting column as labels: number of colNames must be less than number of columns (2 >= 2)")},
 		},
 		{"fail - no matching col", fields{
 			values: []*valueContainer{
@@ -1309,7 +1309,7 @@ func TestDataFrame_SetAsLabels(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{[]string{"corge"}},
 			&DataFrame{
-				err: fmt.Errorf("SetAsLabels(): name (corge) not found")},
+				err: fmt.Errorf("setting column as labels: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -1393,7 +1393,7 @@ func TestDataFrame_ResetLabels(t *testing.T) {
 			colLevelNames: []string{"*0"},
 			name:          "baz"},
 			args{[]int{10}},
-			&DataFrame{err: fmt.Errorf("ResetLabels(): index out of range (10 > 2)")}},
+			&DataFrame{err: fmt.Errorf("resetting labels to column: index out of range (10 > 2)")}},
 		{"fail - out of range after adjustment ", fields{
 			values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
@@ -1403,7 +1403,7 @@ func TestDataFrame_ResetLabels(t *testing.T) {
 			colLevelNames: []string{"*0"},
 			name:          "baz"},
 			args{[]int{1, 10}},
-			&DataFrame{err: fmt.Errorf("ResetLabels(): index out of range (10 > 2)")}},
+			&DataFrame{err: fmt.Errorf("resetting labels to column: index out of range (10 > 2)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1546,7 +1546,7 @@ func TestDataFrame_SetLabelNames(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{[]string{"bar", "qux"}},
 			&DataFrame{
-				err: fmt.Errorf("SetLabelNames(): number of levelNames must match number of levels in DataFrame (2 != 1)")},
+				err: fmt.Errorf("setting label names: number of levelNames must match number of levels in DataFrame (2 != 1)")},
 		},
 		{"fail - too few", fields{
 			values: []*valueContainer{
@@ -1558,7 +1558,7 @@ func TestDataFrame_SetLabelNames(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{[]string{"qux"}},
 			&DataFrame{
-				err: fmt.Errorf("SetLabelNames(): number of levelNames must match number of levels in DataFrame (1 != 2)")},
+				err: fmt.Errorf("setting label names: number of levelNames must match number of levels in DataFrame (1 != 2)")},
 		},
 	}
 	for _, tt := range tests {
@@ -1619,7 +1619,7 @@ func TestDataFrame_SetColNames(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{[]string{"bar", "qux"}},
 			&DataFrame{
-				err: fmt.Errorf("SetColNames(): number of colNames must match number of columns in DataFrame (2 != 1)")},
+				err: fmt.Errorf("setting column names: number of colNames must match number of columns in DataFrame (2 != 1)")},
 		},
 		{"fail - too few", fields{
 			values: []*valueContainer{
@@ -1631,7 +1631,7 @@ func TestDataFrame_SetColNames(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{[]string{"qux"}},
 			&DataFrame{
-				err: fmt.Errorf("SetColNames(): number of colNames must match number of columns in DataFrame (1 != 2)")},
+				err: fmt.Errorf("setting column names: number of colNames must match number of columns in DataFrame (1 != 2)")},
 		},
 	}
 	for _, tt := range tests {
@@ -1733,7 +1733,7 @@ func TestDataFrame_Filter(t *testing.T) {
 			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
 			args{map[string]FilterFn{"*0": {}}},
-			&DataFrame{err: fmt.Errorf("Filter(): no filter function provided")}},
+			&DataFrame{err: fmt.Errorf("filter: no filter function provided")}},
 		{"fail - bad column name", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
@@ -1741,7 +1741,7 @@ func TestDataFrame_Filter(t *testing.T) {
 			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
 			args{map[string]FilterFn{"corge": {Float64: func(float64) bool { return true }}}},
-			&DataFrame{err: fmt.Errorf("Filter(): name (corge) not found")}},
+			&DataFrame{err: fmt.Errorf("filter: name (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1907,7 +1907,7 @@ func TestDataFrame_Apply(t *testing.T) {
 			name:          "baz"},
 			args{map[string]ApplyFn{"foo": {}}},
 			&DataFrame{
-				err: fmt.Errorf("Apply(): no apply function provided")},
+				err: fmt.Errorf("apply: no apply function provided")},
 		},
 		{"fail - no matching column", fields{
 			values: []*valueContainer{
@@ -1918,7 +1918,7 @@ func TestDataFrame_Apply(t *testing.T) {
 			name:          "baz"},
 			args{map[string]ApplyFn{"corge": {Float64: func(float64) float64 { return 0 }}}},
 			&DataFrame{
-				err: fmt.Errorf("Apply(): name (corge) not found")},
+				err: fmt.Errorf("apply: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -1982,7 +1982,7 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 			name:   "baz"},
 			args{map[string]ApplyFormatFn{"foo": {}}},
 			&DataFrame{
-				err: fmt.Errorf("ApplyFormat(): no apply function provided")},
+				err: fmt.Errorf("apply format: no apply function provided")},
 		},
 		{"fail - no matching column", fields{
 			values: []*valueContainer{
@@ -1992,7 +1992,7 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 			name:   "baz"},
 			args{map[string]ApplyFormatFn{"corge": {Float64: func(float64) string { return "" }}}},
 			&DataFrame{
-				err: fmt.Errorf("ApplyFormat(): name (corge) not found")},
+				err: fmt.Errorf("apply format: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -2049,7 +2049,7 @@ func TestDataFrame_Sort(t *testing.T) {
 			name:   "baz"},
 			args{nil},
 			&DataFrame{
-				err: fmt.Errorf("Sort(): must supply at least one Sorter")},
+				err: fmt.Errorf("sort: must supply at least one Sorter")},
 		},
 		{"fail - bad colName", fields{
 			values: []*valueContainer{
@@ -2058,7 +2058,7 @@ func TestDataFrame_Sort(t *testing.T) {
 			name:   "baz"},
 			args{[]Sorter{{Name: "corge"}}},
 			&DataFrame{
-				err: fmt.Errorf("Sort(): position 0: name (corge) not found")},
+				err: fmt.Errorf("sort: position 0: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -2401,7 +2401,7 @@ func TestDataFrame_Merge(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "corge"}},
 				colLevelNames: []string{"anything"}}},
 			&DataFrame{
-				err: fmt.Errorf("Merge(): LookupAdvanced(): no matching keys between containers")},
+				err: fmt.Errorf("merge: lookup: no matching keys between containers")},
 		},
 	}
 	for _, tt := range tests {
@@ -2504,7 +2504,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "left",
 				leftOn: []string{"foo"}, rightOn: nil},
-			&DataFrame{err: fmt.Errorf("LookupAdvanced(): if either leftOn or rightOn is empty, both must be empty")},
+			&DataFrame{err: fmt.Errorf("lookup: if either leftOn or rightOn is empty, both must be empty")},
 		},
 		{"fail - bad leftOn", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
@@ -2516,7 +2516,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "left",
 				leftOn: []string{"corge"}, rightOn: []string{"foo"}},
-			&DataFrame{err: fmt.Errorf("LookupAdvanced(): leftOn: name (corge) not found")},
+			&DataFrame{err: fmt.Errorf("lookup: leftOn: name (corge) not found")},
 		},
 		{"fail - bad rightOn", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
@@ -2528,7 +2528,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "left",
 				leftOn: []string{"foo"}, rightOn: []string{"corge"}},
-			&DataFrame{err: fmt.Errorf("LookupAdvanced(): rightOn: name (corge) not found")},
+			&DataFrame{err: fmt.Errorf("lookup: rightOn: name (corge) not found")},
 		},
 		{"fail - unsupported lookup", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
@@ -2540,7 +2540,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				how:    "special",
 				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
-			&DataFrame{err: fmt.Errorf("LookupAdvanced(): how: must be left, right, or inner")},
+			&DataFrame{err: fmt.Errorf("lookup: how: must be left, right, or inner")},
 		},
 	}
 	for _, tt := range tests {
@@ -2651,7 +2651,7 @@ func TestDataFrame_GroupBy(t *testing.T) {
 			}},
 			args{[]string{"corge"}},
 			&GroupedDataFrame{
-				err: fmt.Errorf("GroupBy(): name (corge) not found"),
+				err: fmt.Errorf("group by: name (corge) not found"),
 			},
 		},
 	}
@@ -2752,7 +2752,7 @@ func TestDataFrame_PromoteToColLevel(t *testing.T) {
 			colLevelNames: []string{"*0"},
 		}, args{"corge"},
 			&DataFrame{
-				err: fmt.Errorf("PromoteToColLevel(): name (corge) not found")},
+				err: fmt.Errorf("promoting to column level: name (corge) not found")},
 		},
 		{"fail - only column", fields{
 			values: []*valueContainer{
@@ -2764,7 +2764,7 @@ func TestDataFrame_PromoteToColLevel(t *testing.T) {
 			colLevelNames: []string{"*0"},
 		}, args{"foo"},
 			&DataFrame{
-				err: fmt.Errorf("PromoteToColLevel(): cannot stack only column")},
+				err: fmt.Errorf("promoting to column level: cannot stack only column")},
 		},
 		{"fail - only label level", fields{
 			values: []*valueContainer{
@@ -2775,7 +2775,7 @@ func TestDataFrame_PromoteToColLevel(t *testing.T) {
 			colLevelNames: []string{"*0"},
 		}, args{"bar"},
 			&DataFrame{
-				err: fmt.Errorf("PromoteToColLevel(): cannot stack only label level")},
+				err: fmt.Errorf("promoting to column level: cannot stack only label level")},
 		},
 	}
 	for _, tt := range tests {
@@ -2951,7 +2951,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{labels: "corge", columns: "year", values: "amount", aggFn: "std"},
 			&DataFrame{
-				err: fmt.Errorf("PivotTable(): labels: name (corge) not found")}},
+				err: fmt.Errorf("pivot table: labels: name (corge) not found")}},
 		{"fail - no matching columns", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -2962,7 +2962,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{labels: "type", columns: "corge", values: "amount", aggFn: "std"},
 			&DataFrame{
-				err: fmt.Errorf("PivotTable(): columns: name (corge) not found")}},
+				err: fmt.Errorf("pivot table: columns: name (corge) not found")}},
 		{"fail - no matching values", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -2973,7 +2973,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{labels: "type", columns: "year", values: "corge", aggFn: "std"},
 			&DataFrame{
-				err: fmt.Errorf("PivotTable(): values: name (corge) not found")}},
+				err: fmt.Errorf("pivot table: values: name (corge) not found")}},
 		{"fail - unsupported aggfunc", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -2984,7 +2984,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{labels: "type", columns: "year", values: "amount", aggFn: "other"},
 			&DataFrame{
-				err: fmt.Errorf("PivotTable(): aggFunc: unsupported (other)")}},
+				err: fmt.Errorf("pivot table: aggFunc: unsupported (other)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3651,7 +3651,7 @@ func TestDataFrame_FilterByValue(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{map[string]interface{}{"corge": "a"}},
 			&DataFrame{
-				err: fmt.Errorf("FilterByValue(): name (corge) not found")},
+				err: fmt.Errorf("filter by value: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -3706,7 +3706,7 @@ func TestDataFrame_LabelsToSeries(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{"corge"},
 			&Series{
-				err: fmt.Errorf("LabelsToSeries(): name (corge) not found")},
+				err: fmt.Errorf("converting labels to Series: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -3761,7 +3761,7 @@ func TestDataFrame_Col(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{"corge"},
 			&Series{
-				err: fmt.Errorf("Col(): name (corge) not found")},
+				err: fmt.Errorf("selecting column: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -3815,7 +3815,7 @@ func TestDataFrame_Cols(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{[]string{"foo", "corge"}},
 			&DataFrame{
-				err: fmt.Errorf("Cols(): name (corge) not found")},
+				err: fmt.Errorf("selecting columns: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -3869,7 +3869,7 @@ func TestDataFrame_DropRow(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{10},
 			&DataFrame{
-				err: fmt.Errorf("DropRow(): index out of range (10 > 1)")},
+				err: fmt.Errorf("dropping row: index out of range (10 > 1)")},
 		},
 	}
 	for _, tt := range tests {
@@ -3933,7 +3933,7 @@ func TestDataFrame_Append(t *testing.T) {
 				},
 				colLevelNames: []string{"anything"}}},
 			&DataFrame{
-				err: fmt.Errorf("Append(): other DataFrame must have same number of label levels as original DataFrame (2 != 1)")},
+				err: fmt.Errorf("append: other DataFrame must have same number of label levels as original DataFrame (2 != 1)")},
 		},
 		{"fail - wrong num columns",
 			fields{values: []*valueContainer{
@@ -3948,7 +3948,7 @@ func TestDataFrame_Append(t *testing.T) {
 					{slice: []int{2}, isNull: []bool{false}, name: "anything"}},
 				colLevelNames: []string{"anything"}}},
 			&DataFrame{
-				err: fmt.Errorf("Append(): other DataFrame must have same number of columns as original DataFrame (2 != 1)")},
+				err: fmt.Errorf("append: other DataFrame must have same number of columns as original DataFrame (2 != 1)")},
 		},
 	}
 	for _, tt := range tests {
@@ -4006,7 +4006,7 @@ func TestDataFrame_DropCol(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{"corge"},
 			&DataFrame{
-				err: errors.New("DropCol(): name (corge) not found")},
+				err: errors.New("dropping column: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -4070,7 +4070,7 @@ func TestDataFrame_DropLabels(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{"corge"},
 			&DataFrame{
-				err: errors.New("DropLabels(): name (corge) not found")},
+				err: errors.New("dropping labels: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -4179,7 +4179,7 @@ func TestDataFrame_FillNull(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{map[string]NullFiller{"corge": {FillZero: true}}},
 			&DataFrame{
-				err: fmt.Errorf("FillNull(): name (corge) not found")},
+				err: fmt.Errorf("filling null rows: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -4475,7 +4475,7 @@ func TestDataFrame_SwapLabels(t *testing.T) {
 			}},
 			args{"corge", "bar"},
 			&DataFrame{
-				err: errors.New("SwapLabels(): i: name (corge) not found")},
+				err: errors.New("swapping labels:i: name (corge) not found")},
 		},
 		{"fail - j", fields{
 			values: []*valueContainer{{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
@@ -4485,7 +4485,7 @@ func TestDataFrame_SwapLabels(t *testing.T) {
 			}},
 			args{"qux", "corge"},
 			&DataFrame{
-				err: errors.New("SwapLabels(): j: name (corge) not found")},
+				err: errors.New("swapping labels:j: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -4666,7 +4666,7 @@ func TestDataFrame_NameOfCol(t *testing.T) {
 	}
 }
 
-func TestDataFrame_SumColumns(t *testing.T) {
+func TestDataFrame_SumCols(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -4707,7 +4707,7 @@ func TestDataFrame_SumColumns(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{"", []string{"corge", "qux"}},
 			&Series{
-				err: fmt.Errorf("SumColumns(): name (corge) not found"),
+				err: fmt.Errorf("sum columns: name (corge) not found"),
 			}},
 		{"fail - no columns",
 			fields{
@@ -4719,7 +4719,7 @@ func TestDataFrame_SumColumns(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{"", nil},
 			&Series{
-				err: fmt.Errorf("SumColumns(): colNames cannot be empty"),
+				err: fmt.Errorf("sum columns: colNames cannot be empty"),
 			}},
 	}
 	for _, tt := range tests {
@@ -4731,8 +4731,8 @@ func TestDataFrame_SumColumns(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.SumColumns(tt.args.name, tt.args.colNames...); !EqualSeries(got, tt.want) {
-				t.Errorf("DataFrame.SumColumns() = %v, want %v", got, tt.want)
+			if got := df.SumCols(tt.args.name, tt.args.colNames...); !EqualSeries(got, tt.want) {
+				t.Errorf("DataFrame.SumCols() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -4949,7 +4949,7 @@ func TestDataFrame_Resample(t *testing.T) {
 			colLevelNames: []string{"*0"},
 		},
 			args{map[string]Resampler{"corge": {ByYear: true}}},
-			&DataFrame{err: fmt.Errorf("Resample(): name (corge) not found")},
+			&DataFrame{err: fmt.Errorf("resample: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {

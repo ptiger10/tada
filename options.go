@@ -19,19 +19,19 @@ var optionDateTimeFormats = []string{
 	time.RFC3339, time.RFC3339Nano, time.RFC822}
 var randSeed = time.Now().Unix()
 
-// SetOptionDefaultSeparator changes the separator used in group names and multi-level column names to `sep`
+// SetOptionDefaultSeparator changes the separator used in group names and multi-level column names to sep
 // (default: "|").
 func SetOptionDefaultSeparator(sep string) {
 	optionLevelSeparator = sep
 }
 
-// PrintOptionMaxRows changes the max number of rows displayed when printing a Series or DataFrame to `n`
+// PrintOptionMaxRows changes the max number of rows displayed when printing a Series or DataFrame to n
 // (default: 50).
 func PrintOptionMaxRows(n int) {
 	optionMaxRows = n
 }
 
-// PrintOptionMaxColumns changes the max number of columns displayed when printing a Series or DataFrame to `n`
+// PrintOptionMaxColumns changes the max number of columns displayed when printing a Series or DataFrame to n
 // (default: 20).
 func PrintOptionMaxColumns(n int) {
 	optionMaxColumns = n
@@ -59,7 +59,7 @@ func EnableWarnings() {
 	optionWarnings = true
 }
 
-// SetOptionAddTimeFormat adds `format` to the list of time formats that
+// SetOptionAddTimeFormat adds format to the list of time formats that
 // can be parsed when converting values from string to time.Time
 func SetOptionAddTimeFormat(format string) {
 	optionDateTimeFormats = append(optionDateTimeFormats, format)
