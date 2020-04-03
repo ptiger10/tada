@@ -85,7 +85,7 @@ func TestGroupedSeries_GetGroup(t *testing.T) {
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
 			args: args{"corge"},
-			want: &Series{err: fmt.Errorf("GetGroup(): `group` (corge) not in groups")},
+			want: &Series{err: fmt.Errorf("GetGroup(): group (corge) not in groups")},
 		},
 	}
 	for _, tt := range tests {
@@ -2582,7 +2582,7 @@ func TestGroupedDataFrame_Col(t *testing.T) {
 					name:          "qux"}},
 			args: args{"corge"},
 			want: &GroupedSeries{
-				err: fmt.Errorf("Col(): `name` (corge) not found")}},
+				err: fmt.Errorf("Col(): name (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2666,7 +2666,7 @@ func TestSeries_RollingN(t *testing.T) {
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
 			}}, args{0},
 			&GroupedSeries{
-				err: fmt.Errorf("RollingN(): `n` must be greater than zero (not 0)"),
+				err: fmt.Errorf("RollingN(): n must be greater than zero (not 0)"),
 			}},
 	}
 	for _, tt := range tests {
@@ -2719,7 +2719,7 @@ func TestSeries_RollingDuration(t *testing.T) {
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
 			}}, args{-1},
 			&GroupedSeries{
-				err: fmt.Errorf("RollingDuration(): `d` must be greater than zero (not -1ns)"),
+				err: fmt.Errorf("RollingDuration(): d must be greater than zero (not -1ns)"),
 			}},
 	}
 	for _, tt := range tests {
@@ -2974,7 +2974,7 @@ func TestGroupedDataFrame_GetGroup(t *testing.T) {
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
 					colLevelNames: []string{"*0"}}},
 			args: args{"corge"},
-			want: &DataFrame{err: fmt.Errorf("GetGroup(): `group` (corge) not in groups")},
+			want: &DataFrame{err: fmt.Errorf("GetGroup(): group (corge) not in groups")},
 		},
 	}
 	for _, tt := range tests {

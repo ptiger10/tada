@@ -178,7 +178,7 @@ func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels
 	return leftKeys, rightKeys, nil
 }
 
-// nameOfContainer returns the name of the container at index position `n`.
+// nameOfContainer returns the name of the container at index position n.
 // If n is out of range, returns "-out of range-"
 func nameOfContainer(containers []*valueContainer, n int) string {
 	if n >= len(containers) {
@@ -187,7 +187,7 @@ func nameOfContainer(containers []*valueContainer, n int) string {
 	return containers[n].name
 }
 
-// indexOfContainer returns the position of the first level within `cols` with a name matching `name`, or an error if no level matches
+// indexOfContainer returns the position of the first level within cols with a name matching name, or an error if no level matches
 // case-sensitive
 func indexOfContainer(name string, containers []*valueContainer) (int, error) {
 	for j := range containers {
@@ -195,7 +195,7 @@ func indexOfContainer(name string, containers []*valueContainer) (int, error) {
 			return j, nil
 		}
 	}
-	return 0, fmt.Errorf("`name` (%v) not found", name)
+	return 0, fmt.Errorf("name (%v) not found", name)
 }
 
 func (vc *valueContainer) indexOfRows(value interface{}) []int {
@@ -214,7 +214,7 @@ func (vc *valueContainer) indexOfRows(value interface{}) []int {
 
 func withColumn(cols []*valueContainer, name string, input interface{}, requiredLen int) ([]*valueContainer, error) {
 	switch reflect.TypeOf(input).Kind() {
-	// `input` is string? rename label level
+	// input is string? rename label level
 	case reflect.String:
 		lvl, err := indexOfContainer(name, cols)
 		if err != nil {
@@ -231,13 +231,13 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 				"cannot replace items in column %s: length of input does not match existing length (%d != %d)",
 				name, l, requiredLen)
 		}
-		// `input` is supported slice? append or overwrite
+		// input is supported slice? append or overwrite
 		lvl, err := indexOfContainer(name, cols)
 		if err != nil {
-			// `name` does not already exist: append new label level
+			// name does not already exist: append new label level
 			cols = append(cols, &valueContainer{slice: input, name: name, isNull: isNull})
 		} else {
-			// `name` already exists: overwrite existing label level
+			// name already exists: overwrite existing label level
 			cols[lvl].slice = input
 			cols[lvl].isNull = isNull
 			cols[lvl].resetCache()
@@ -254,13 +254,13 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 				"cannot replace items in column %s: length of input Series does not match existing length (%d != %d)",
 				name, v.Len(), requiredLen)
 		}
-		// `name` does not already exist: append new level
+		// name does not already exist: append new level
 		lvl, err := indexOfContainer(name, cols)
 		if err != nil {
 			cols = append(cols, v.values)
 			cols[len(cols)-1].name = name
 		} else {
-			// `name` already exists: overwrite existing level
+			// name already exists: overwrite existing level
 			cols[lvl] = v.values
 			cols[lvl].name = name
 			cols[lvl].resetCache()
@@ -274,8 +274,8 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 
 // -- MATRIX MANIPULATION
 
-// expects every item in `slices` to be a slice, and for len(slices) to equal len(isNull) and len(names)
-// if isNull is nil, sets null values from `slices`
+// expects every item in slices to be a slice, and for len(slices) to equal len(isNull) and len(names)
+// if isNull is nil, sets null values from slices
 func copyInterfaceIntoValueContainers(slices []interface{}, isNull [][]bool, names []string) []*valueContainer {
 	ret := make([]*valueContainer, len(names))
 	if isNull == nil {
@@ -295,7 +295,7 @@ func copyInterfaceIntoValueContainers(slices []interface{}, isNull [][]bool, nam
 	return ret
 }
 
-// convert strings to interface. if isNull is nil, sets null values from `slices`
+// convert strings to interface. if isNull is nil, sets null values from slices
 func copyStringsIntoValueContainers(slices [][]string, isNull [][]bool, names []string) []*valueContainer {
 	slicesInterface := make([]interface{}, len(slices))
 	for k := range slices {
@@ -304,7 +304,7 @@ func copyStringsIntoValueContainers(slices [][]string, isNull [][]bool, names []
 	return copyInterfaceIntoValueContainers(slicesInterface, isNull, names)
 }
 
-// convert Floats to interface. if isNull is nil, sets null values from `slices`
+// convert Floats to interface. if isNull is nil, sets null values from slices
 func copyFloatsIntoValueContainers(slices [][]float64, isNull [][]bool, names []string) []*valueContainer {
 	slicesInterface := make([]interface{}, len(slices))
 	for k := range slices {
@@ -978,7 +978,7 @@ func subsetContainers(containers []*valueContainer, index []int) ([]*valueContai
 	return retLabels, nil
 }
 
-// head returns the first number of rows specified by `n`
+// head returns the first number of rows specified by n
 func (vc *valueContainer) head(n int) *valueContainer {
 	v := reflect.ValueOf(vc.slice)
 	var retIsNull []bool
@@ -992,7 +992,7 @@ func (vc *valueContainer) head(n int) *valueContainer {
 	}
 }
 
-// tail returns the last number of rows specified by `n`
+// tail returns the last number of rows specified by n
 func (vc *valueContainer) tail(n int) *valueContainer {
 	v := reflect.ValueOf(vc.slice)
 	var retIsNull []bool
@@ -1475,7 +1475,7 @@ func lookup(how string,
 		s = s.DropNull()
 		return s, nil
 	default:
-		return nil, fmt.Errorf("`how`: must be `left`, `right`, or `inner`")
+		return nil, fmt.Errorf("how: must be left, right, or inner")
 	}
 }
 
@@ -1505,14 +1505,14 @@ func lookupDataFrame(how string,
 		df = df.DropNull()
 		return df, nil
 	default:
-		return nil, fmt.Errorf("`how`: must be `left`, `right`, or `inner`")
+		return nil, fmt.Errorf("how: must be left, right, or inner")
 	}
 }
 
-// lookupWithAnchor subsets `sourceLabels` by leftOn and `lookupLabels` by rightOn,
+// lookupWithAnchor subsets sourceLabels by leftOn and lookupLabels by rightOn,
 // and finds aligned rows between the containers.
-// for every aligned row, looks up the value in `lookupValues`.
-// returns a Series that is anchored on `sourceLabels` and is named `name`.
+// for every aligned row, looks up the value in lookupValues.
+// returns a Series that is anchored on sourceLabels and is named name.
 func lookupWithAnchor(
 	name string, sourceLabels []*valueContainer, leftOn []int,
 	lookupValues *valueContainer, lookupLabels []*valueContainer, rightOn []int) *Series {
@@ -1551,11 +1551,11 @@ func lookupWithAnchor(
 	}
 }
 
-// lookupDataFrameWithAnchor subsets `sourceContainers` by leftOn and `lookupContainers` by rightOn,
+// lookupDataFrameWithAnchor subsets sourceContainers by leftOn and lookupContainers by rightOn,
 // and finds aligned rows between the containers.
-// for every aligned row, looks up the value in every column in `lookupColumns` (excluding colNames within `exclude`).
-// returns a dataframe that is anchored on `originalLabels`, preserves the column names from `lookupColumns`,
-// preserves the original column level names, and is named `name`.
+// for every aligned row, looks up the value in every column in lookupColumns (excluding colNames within exclude).
+// returns a dataframe that is anchored on originalLabels, preserves the column names from lookupColumns,
+// preserves the original column level names, and is named name.
 func lookupDataFrameWithAnchor(
 	name string, colLevelNames []string, originalLabels []*valueContainer,
 	sourceContainers []*valueContainer, leftOn []int,
@@ -1870,7 +1870,7 @@ func isNullString(s string) bool {
 
 // math
 
-// sum sums the non-null values at the index positions in `vals`. If all values are null, the final result is null.
+// sum sums the non-null values at the index positions in vals. If all values are null, the final result is null.
 // Compatible with Grouped calculations as well as Series
 func sum(vals []float64, isNull []bool, index []int) (float64, bool) {
 	var sum float64
@@ -1887,7 +1887,7 @@ func sum(vals []float64, isNull []bool, index []int) (float64, bool) {
 	return sum, false
 }
 
-// mean calculates the mean of the non-null values at the index positions in `vals`.
+// mean calculates the mean of the non-null values at the index positions in vals.
 // If all values are null, the final result is null.
 // Compatible with Grouped calculations as well as Series
 func mean(vals []float64, isNull []bool, index []int) (float64, bool) {
@@ -1907,7 +1907,7 @@ func mean(vals []float64, isNull []bool, index []int) (float64, bool) {
 	return sum / counter, false
 }
 
-// median calculates the median of the non-null values at the index positions in `vals`.
+// median calculates the median of the non-null values at the index positions in vals.
 // If all values are null, the final result is null.
 // Compatible with Grouped calculations as well as Series
 func median(vals []float64, isNull []bool, index []int) (float64, bool) {
@@ -1932,7 +1932,7 @@ func median(vals []float64, isNull []bool, index []int) (float64, bool) {
 	return (data[mNumber-1] + data[mNumber]) / 2, false
 }
 
-// std calculates the standard deviation of the non-null values at the index positions in `vals`.
+// std calculates the standard deviation of the non-null values at the index positions in vals.
 // If all values are null, the final result is null.
 // Compatible with Grouped calculations as well as Series
 func std(vals []float64, isNull []bool, index []int) (float64, bool) {
@@ -1952,7 +1952,7 @@ func std(vals []float64, isNull []bool, index []int) (float64, bool) {
 	return math.Pow(variance/counter, 0.5), false
 }
 
-// count counts the non-null values at the `index` positions in `vals`.
+// count counts the non-null values at the index positions in vals.
 // Compatible with Grouped calculations as well as Series
 func count(vals interface{}, isNull []bool, index []int) (int, bool) {
 	var counter int
@@ -1989,7 +1989,7 @@ func nunique(vals interface{}, isNull []bool, index []int) (int, bool) {
 	return len(m), false
 }
 
-// min returns the min of the non-null values at the `index` positions in `vals`.
+// min returns the min of the non-null values at the index positions in vals.
 // Compatible with Grouped calculations as well as Series
 func min(vals []float64, isNull []bool, index []int) (float64, bool) {
 	min := math.Inf(0)
@@ -2008,7 +2008,7 @@ func min(vals []float64, isNull []bool, index []int) (float64, bool) {
 	return min, false
 }
 
-// max returns the max of the non-null values at the `index` positions in `vals`.
+// max returns the max of the non-null values at the index positions in vals.
 // Compatible with Grouped calculations as well as Series
 func max(vals []float64, isNull []bool, index []int) (float64, bool) {
 	max := math.Inf(-1)
@@ -2027,7 +2027,7 @@ func max(vals []float64, isNull []bool, index []int) (float64, bool) {
 	return max, false
 }
 
-// earliest returns the earliest of the non-null values at the `index` positions in `vals`.
+// earliest returns the earliest of the non-null values at the index positions in vals.
 // Compatible with Grouped calculations as well as Series
 func earliest(vals []time.Time, isNull []bool, index []int) (time.Time, bool) {
 	min := time.Date(10000, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -2046,7 +2046,7 @@ func earliest(vals []time.Time, isNull []bool, index []int) (time.Time, bool) {
 	return min, false
 }
 
-// latest returns the latest of the non-null values at the `index` positions in `vals`.
+// latest returns the latest of the non-null values at the index positions in vals.
 // Compatible with Grouped calculations as well as Series
 func latest(vals []time.Time, isNull []bool, index []int) (time.Time, bool) {
 	max := time.Time{}

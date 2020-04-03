@@ -12,10 +12,10 @@ import (
 
 // -- CONSTRUCTORS
 
-// NewSeries constructs a Series from a `slice` of values and optional `label` slices.
-// // `Slice` and all `labels` must be supported slices.
+// NewSeries constructs a Series from a slice of values and optional label slices.
+// // Slice and all labels must be supported slices.
 //
-// If no `labels` are supplied, a default label level is inserted ([]int incrementing from 0).
+// If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
 // Series values are named 0 by default. The default values name is displayed on printing.
 // Label levels are named *n (e.g., *0, *1, etc) by default. Default label names are hidden on printing.
 //
@@ -79,12 +79,12 @@ func (s *Series) ToDataFrame() *DataFrame {
 	}
 }
 
-// EqualsCSV reads `want` (configured by `wantOptions`) into a dataframe,
-// converts both `s` and `want` into [][]string records,
+// EqualsCSV reads want (configured by wantOptions) into a dataframe,
+// converts both s and want into [][]string records,
 // and evaluates whether the stringified values match.
 // If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
 //
-// If `includeLabels` is true, then `s`'s labels are included as columns.
+// If includeLabels is true, then s's labels are included as columns.
 func (s *Series) EqualsCSV(includeLabels bool, want io.Reader, wantOptions ...ReadOption) (bool, *tablediff.Differences, error) {
 	df := s.ToDataFrame()
 	return df.EqualsCSV(includeLabels, want, wantOptions...)
@@ -119,7 +119,7 @@ func (s *Series) Err() error {
 	return s.err
 }
 
-// At returns the Element at the `index` position. If `index` is out of range, returns an empty Element.
+// At returns the Element at the index position. If index is out of range, returns an empty Element.
 func (s *Series) At(index int) Element {
 	if index >= s.Len() {
 		return Element{}
@@ -160,14 +160,14 @@ func (s *Series) Cast(containerAsType map[string]DType) {
 	return
 }
 
-// NameOfLabel returns the name of the label level at index position `n`.
+// NameOfLabel returns the name of the label level at index position n.
 // If n is out of range, returns "-out of range-"
 func (s *Series) NameOfLabel(n int) string {
 	return nameOfContainer(s.labels, n)
 }
 
-// IndexOfLabel returns the index position of the first label level with a name matching `name` (case-sensitive).
-// If `name` does not match any container, -1 is returned.
+// IndexOfLabel returns the index position of the first label level with a name matching name (case-sensitive).
+// If name does not match any container, -1 is returned.
 func (s *Series) IndexOfLabel(name string) int {
 	i, err := indexOfContainer(name, s.labels)
 	if err != nil {
@@ -176,9 +176,9 @@ func (s *Series) IndexOfLabel(name string) int {
 	return i
 }
 
-// IndexOfRows returns the index positions of the rows with stringified value matching `value`
-// in the container named `name`.
-// To search Series values, supply either the Series name or an empty string ("") as `name`.
+// IndexOfRows returns the index positions of the rows with stringified value matching value
+// in the container named name.
+// To search Series values, supply either the Series name or an empty string ("") as name.
 func (s *Series) IndexOfRows(name string, value interface{}) []int {
 	mergedLabelsAndValues := append(s.labels, s.values)
 	i, err := indexOfContainer(name, mergedLabelsAndValues)
@@ -189,7 +189,7 @@ func (s *Series) IndexOfRows(name string, value interface{}) []int {
 	return mergedLabelsAndValues[i].indexOfRows(value)
 }
 
-// LabelsToSeries finds the first level with matching `name` and returns as a Series with all existing label levels (including itself).
+// LabelsToSeries finds the first level with matching name and returns as a Series with all existing label levels (including itself).
 // If label level name is default (prefixed with *), removes the prefix.
 // Returns a new Series with shared labels.
 func (s *Series) LabelsToSeries(name string) *Series {
@@ -233,7 +233,7 @@ func (s *SeriesMutator) Subset(index []int) {
 	return
 }
 
-// SwapLabels swaps the label levels with names `i` and `j`.
+// SwapLabels swaps the label levels with names i and j.
 // Returns a new Series.
 func (s *Series) SwapLabels(i, j string) *Series {
 	s = s.Copy()
@@ -241,17 +241,17 @@ func (s *Series) SwapLabels(i, j string) *Series {
 	return s
 }
 
-// SwapLabels swaps the label levels with names `i` and `j`.
+// SwapLabels swaps the label levels with names i and j.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) SwapLabels(i, j string) {
 	index1, err := indexOfContainer(i, s.series.labels)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("SwapLabels(): `i`: %v", err))
+		s.series.resetWithError(fmt.Errorf("SwapLabels(): i: %v", err))
 		return
 	}
 	index2, err := indexOfContainer(j, s.series.labels)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("SwapLabels(): `j`: %v", err))
+		s.series.resetWithError(fmt.Errorf("SwapLabels(): j: %v", err))
 		return
 	}
 	s.series.labels[index1], s.series.labels[index2] = s.series.labels[index2], s.series.labels[index1]
@@ -278,7 +278,7 @@ func (s *SeriesMutator) SubsetLabels(index []int) {
 	return
 }
 
-// Head returns the first `n` rows of the Series. If `n` is greater than the length of the Series, returns the entire Series.
+// Head returns the first n rows of the Series. If n is greater than the length of the Series, returns the entire Series.
 // In either case, returns a new Series.
 func (s *Series) Head(n int) *Series {
 	if s.Len() < n {
@@ -292,7 +292,7 @@ func (s *Series) Head(n int) *Series {
 	return &Series{values: retVals, labels: retLabels}
 }
 
-// Tail returns the last `n` rows of the Series. If `n` is greater than the length of the Series, returns the entire Series.
+// Tail returns the last n rows of the Series. If n is greater than the length of the Series, returns the entire Series.
 // In either case, returns a new Series.
 func (s *Series) Tail(n int) *Series {
 	if s.Len() < n {
@@ -307,8 +307,8 @@ func (s *Series) Tail(n int) *Series {
 	return &Series{values: retVals, labels: retLabels}
 }
 
-// Range returns the rows of the Series starting at `first` and `ending` immediately prior to last (left-inclusive, right-exclusive).
-// If either `first` or `last` is out of range, a Series error is returned.
+// Range returns the rows of the Series starting at first and ending immediately prior to last (left-inclusive, right-exclusive).
+// If either first or last is out of range, a Series error is returned.
 // In all cases, returns a new Series.
 func (s *Series) Range(first, last int) *Series {
 	if first > last {
@@ -364,7 +364,7 @@ func (s *Series) Null() *Series {
 	return s.Subset(index)
 }
 
-// Shift replaces the value in row i with the value in row i - `n`, or null if that index is out of range.
+// Shift replaces the value in row i with the value in row i - n, or null if that index is out of range.
 // Returns a new Series.
 func (s *Series) Shift(n int) *Series {
 	s = s.Copy()
@@ -372,7 +372,7 @@ func (s *Series) Shift(n int) *Series {
 	return s
 }
 
-// Shift replaces the value in row i with the value in row i - `n`, or null if that index is out of range.
+// Shift replaces the value in row i with the value in row i - n, or null if that index is out of range.
 // // Modifies the underlying Series.
 func (s *SeriesMutator) Shift(n int) {
 	if s.series.Len() < n {
@@ -398,12 +398,12 @@ func (s *Series) InPlace() *SeriesMutator {
 
 // WithLabels resolves as follows:
 //
-// If a scalar string is supplied as `input` and a label level exists that matches `name`: rename the level to match `input`.
-// In this case, `name` must already exist.
+// If a scalar string is supplied as input and a label level exists that matches name: rename the level to match input.
+// In this case, name must already exist.
 //
-// If a slice is supplied as `input` and a label level exists that matches `name`: replace the values at this level to match `input`.
-// If a slice is supplied as `input` and a label level does not exist that matches `name`: append a new level named `name` and values matching `input`.
-// If `input` is a slice, it must be the same length as the underlying Series.
+// If a slice is supplied as input and a label level exists that matches name: replace the values at this level to match input.
+// If a slice is supplied as input and a label level does not exist that matches name: append a new level named name and values matching input.
+// If input is a slice, it must be the same length as the underlying Series.
 //
 // In all cases, returns a new Series.
 func (s *Series) WithLabels(name string, input interface{}) *Series {
@@ -414,12 +414,12 @@ func (s *Series) WithLabels(name string, input interface{}) *Series {
 
 // WithLabels resolves as follows:
 //
-// If a scalar string is supplied as `input` and a label level exists that matches `name`: rename the level to match `input`.
-// In this case, `name` must already exist.
+// If a scalar string is supplied as input and a label level exists that matches name: rename the level to match input.
+// In this case, name must already exist.
 //
-// If a slice is supplied as `input` and a label level exists that matches `name`: replace the values at this level to match `input`.
-// If a slice is supplied as `input` and a label level does not exist that matches `name`: append a new level named `name` and values matching `input`.
-// If `input` is a slice, it must be the same length as the underlying Series.
+// If a slice is supplied as input and a label level exists that matches name: replace the values at this level to match input.
+// If a slice is supplied as input and a label level does not exist that matches name: append a new level named name and values matching input.
+// If input is a slice, it must be the same length as the underlying Series.
 //
 // In all cases, modifies the underlying Series in place.
 func (s *SeriesMutator) WithLabels(name string, input interface{}) {
@@ -431,8 +431,8 @@ func (s *SeriesMutator) WithLabels(name string, input interface{}) {
 	s.series.labels = labels
 }
 
-// WithValues replaces the Series values with `input`.
-// `input` must be a supported slice type of the same length as the original Series.
+// WithValues replaces the Series values with input.
+// input must be a supported slice type of the same length as the original Series.
 // Returns a new Series.
 func (s *Series) WithValues(input interface{}) *Series {
 	s = s.Copy()
@@ -440,8 +440,8 @@ func (s *Series) WithValues(input interface{}) *Series {
 	return s
 }
 
-// WithValues replaces the Series values with `input`.
-// `input` must be a supported slice type of the same length as the original Series.
+// WithValues replaces the Series values with input.
+// input must be a supported slice type of the same length as the original Series.
 // Modifies the underlying Series.
 func (s *SeriesMutator) WithValues(input interface{}) {
 	// synthesize a collection of valueContainers, ensuring that name already exists
@@ -475,7 +475,7 @@ func (s *SeriesMutator) DropRow(index int) {
 	}
 }
 
-// DropLabels removes the first label level matching `name`.
+// DropLabels removes the first label level matching name.
 // Returns a new Series.
 func (s *Series) DropLabels(name string) *Series {
 	s = s.Copy()
@@ -483,7 +483,7 @@ func (s *Series) DropLabels(name string) *Series {
 	return s
 }
 
-// DropLabels removes the first label level matching `name`.
+// DropLabels removes the first label level matching name.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) DropLabels(name string) {
 	newCols, err := dropFromContainers(name, s.series.labels)
@@ -495,7 +495,7 @@ func (s *SeriesMutator) DropLabels(name string) {
 	return
 }
 
-// Append adds the `other` labels and values as new rows to the Series.
+// Append adds the other labels and values as new rows to the Series.
 // If the types of any container do not match, all the values in that container are coerced to string.
 // Returns a new Series.
 func (s *Series) Append(other *Series) *Series {
@@ -504,7 +504,7 @@ func (s *Series) Append(other *Series) *Series {
 	return s
 }
 
-// Append adds the `other` labels and values as new rows to the Series.
+// Append adds the other labels and values as new rows to the Series.
 // If the types of any container do not match, all the values in that container are coerced to string.
 // Returns a new Series.
 func (s *SeriesMutator) Append(other *Series) {
@@ -546,7 +546,7 @@ func (s *SeriesMutator) Relabel() {
 func (s *Series) SetLabelNames(levelNames []string) *Series {
 	if len(levelNames) != len(s.labels) {
 		return seriesWithError(
-			fmt.Errorf("SetLabelNames(): number of `levelNames` must match number of levels in Series (%d != %d)", len(levelNames), len(s.labels)))
+			fmt.Errorf("SetLabelNames(): number of levelNames must match number of levels in Series (%d != %d)", len(levelNames), len(s.labels)))
 	}
 	for j := range levelNames {
 		s.labels[j].name = levelNames[j]
@@ -559,7 +559,7 @@ func (s *Series) ListLabelNames() []string {
 	return listNames(s.labels)
 }
 
-// HasLabels returns an error if the Series does not contain all of the `labelNames` supplied.
+// HasLabels returns an error if the Series does not contain all of the labelNames supplied.
 func (s *Series) HasLabels(labelNames ...string) error {
 	for _, name := range labelNames {
 		_, err := indexOfContainer(name, s.labels)
@@ -577,9 +577,9 @@ func (s *Series) Name() string {
 
 // -- SORT
 
-// Sort sorts the values `by` zero or more Sorter specifications.
+// Sort sorts the values by zero or more Sorter specifications.
 // If no Sorter is supplied, sorts by Series values (as float64) in ascending order.
-// If a Sorter is supplied without a `Name` or with a name matching the Series name, sorts by Series values.
+// If a Sorter is supplied without a Name or with a name matching the Series name, sorts by Series values.
 // If no DType is supplied in a Sorter, sorts as float64.
 // DType is only used for the process of sorting. Once it has been sorted, data retains its original type.
 // Returns a new Series.
@@ -589,9 +589,9 @@ func (s *Series) Sort(by ...Sorter) *Series {
 	return s
 }
 
-// Sort sorts the values `by` zero or more Sorter specifications.
+// Sort sorts the values by zero or more Sorter specifications.
 // If no Sorter is supplied, sorts by Series values (as float64) in ascending order.
-// If a Sorter is supplied without a `Name` or with a name matching the Series name, sorts by Series values.
+// If a Sorter is supplied without a Name or with a name matching the Series name, sorts by Series values.
 // If no DType is supplied in a Sorter, sorts as float64.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Sort(by ...Sorter) {
@@ -616,7 +616,7 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 	return
 }
 
-// FilterIndex returns the index position of rows that satisfy `lambda`,
+// FilterIndex returns the index position of rows that satisfy lambda,
 // a tada.FilterFn struct that is applied to the Series values.
 //
 // Values are coerced from their original type to the selected field type for filtering.
@@ -637,7 +637,7 @@ func (s *Series) FilterIndex(lambda FilterFn) []int {
 	return index
 }
 
-// Filter returns all rows that satisfy all of the `filters`,
+// Filter returns all rows that satisfy all of the filters,
 // which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
 // Filter may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
 // For each container name in the map, the first field selected (i.e., not left blank)
@@ -656,7 +656,7 @@ func (s *Series) Filter(filters map[string]FilterFn) *Series {
 	return s
 }
 
-// Filter returns all rows that satisfy all of the `filters`,
+// Filter returns all rows that satisfy all of the filters,
 // which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
 // Filter may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
 // For each container name in the map, the first field selected (i.e., not left blank)
@@ -690,10 +690,10 @@ func (s *SeriesMutator) Filter(filters map[string]FilterFn) {
 	s.Subset(index)
 }
 
-// Where iterates over the rows in `s` and evaluates whether each one satisfies `filters`,
+// Where iterates over the rows in s and evaluates whether each one satisfies filters,
 // which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
-// If yes, returns `ifTrue` at that row position.
-// If not, returns `ifFalse` at that row position.
+// If yes, returns ifTrue at that row position.
+// If not, returns ifFalse at that row position.
 // Values are coerced from their original type to the selected field type for filtering, but after filtering retains their original type.
 //
 // Returns an unnamed Series a copy of the labels from the original Series and null status based on the supplied values.
@@ -733,7 +733,7 @@ func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{})
 	}, nil
 }
 
-// FilterByValue returns the rows in the Series satisfying all `filters`,
+// FilterByValue returns the rows in the Series satisfying all filters,
 // which is a map of of container names (either the Series name or label name) to interface{} values.
 // A filter is satisfied for a given row value if the stringified value in that container at that row matches the stringified interface{} value.
 // FilterByValue may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
@@ -744,7 +744,7 @@ func (s *Series) FilterByValue(filters map[string]interface{}) *Series {
 	return s
 }
 
-// FilterByValue returns the rows in the Series satisfying all `filters`,
+// FilterByValue returns the rows in the Series satisfying all filters,
 // which is a map of of container names (either the Series name or label name) to interface{} values.
 // A filter is satisfied for a given row value if the stringified value in that container at that row matches the stringified interface{} value.
 // FilterByValue may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
@@ -762,7 +762,7 @@ func (s *SeriesMutator) FilterByValue(filters map[string]interface{}) {
 
 // -- APPLY
 
-// Apply applies a user-defined function to every row in the Series based on `lambda`.
+// Apply applies a user-defined function to every row in the Series based on lambda.
 // The first field selected (i.e., not left blank) in the ApplyFn struct provides the apply logic.
 // Values are converted from their original type to the selected field type.
 // For example, {ApplyFn{Float64: lambda}} converts the Series values to float64 and
@@ -775,7 +775,7 @@ func (s *Series) Apply(lambda ApplyFn) *Series {
 	return s
 }
 
-// Apply applies a user-defined function to every row in the Series based on `lambda`.
+// Apply applies a user-defined function to every row in the Series based on lambda.
 // The first field selected (i.e., not left blank) in the ApplyFn struct provides the apply logic.
 // Values are converted from their original type to the selected field type.
 // For example, {ApplyFn{Float64: lambda}} converts the Series values to float64 and
@@ -796,7 +796,7 @@ func (s *SeriesMutator) Apply(lambda ApplyFn) {
 	return
 }
 
-// ApplyFormat applies a user-defined formatting function to every row in the Series based on `lambda`.
+// ApplyFormat applies a user-defined formatting function to every row in the Series based on lambda.
 // The first field selected (i.e., not left blank) in the ApplyFormatFn struct provides the formatting logic.
 // Values are converted from their original type to the selected field type and then to string.
 // For example, {ApplyFn{Float64: lambda}} converts the Series values to float64 and
@@ -809,7 +809,7 @@ func (s *Series) ApplyFormat(lambda ApplyFormatFn) *Series {
 	return s
 }
 
-// ApplyFormat applies a user-defined formatting function to every row in the Series based on `lambda`.
+// ApplyFormat applies a user-defined formatting function to every row in the Series based on lambda.
 // The first field selected (i.e., not left blank) in the ApplyFormatFn struct provides the formatting logic.
 // Values are converted from their original type to the selected field type and then to string.
 // For example, {ApplyFn{Float64: lambda}} converts the Series values to float64 and
@@ -832,21 +832,21 @@ func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
 
 // -- MERGERS
 
-// Lookup performs the lookup portion of a left join of `other` onto `s` using containers with matching names as keys.
+// Lookup performs the lookup portion of a left join of other onto s using containers with matching names as keys.
 // To perform a different type of lookup or specify the matching keys, use s.LookupAdvanced().
 //
-// Lookup identifies the row alignment between `s` and `other` and returns the aligned values.
+// Lookup identifies the row alignment between s and other and returns the aligned values.
 // Rows are aligned when:
-// 1) one or more containers (either column or label level) in `other` share the same name as one or more containers in `s`,
-// and 2) the stringified values in the `other` containers match the values in the `s` containers.
+// 1) one or more containers (either column or label level) in other share the same name as one or more containers in s,
+// and 2) the stringified values in the other containers match the values in the s containers.
 // For the following dataframes:
 //
-// `s`    	`other`
+// s    	other
 // FOO BAR	FOO QUX
 // bar 0	baz corge
 // baz 1	qux waldo
 //
-// Row 1 in `s` is "aligned" with row 0 in `other`, because those are the rows in which
+// Row 1 in s is "aligned" with row 0 in other, because those are the rows in which
 // both share the same value ("baz") in a container with the same name ("foo").
 // The result of a lookup will be:
 //
@@ -859,22 +859,22 @@ func (s *Series) Lookup(other *Series) *Series {
 	return s.LookupAdvanced(other, "left", nil, nil)
 }
 
-// LookupAdvanced performs the lookup portion of a join of `other` onto `s` matching on the container keys specified.
-// Supported `how` options: left, right, inner.
+// LookupAdvanced performs the lookup portion of a join of other onto s matching on the container keys specified.
+// Supported how options: left, right, inner.
 //
-// LookupAdvanced identifies the row alignment between `s` and `other` and returns the aligned values.
+// LookupAdvanced identifies the row alignment between s and other and returns the aligned values.
 // Rows are aligned when:
-// 1) one or more containers (either values or label level) in `other` share the same name as one or more containers in `s`,
-// and 2) the stringified values in the `other` containers match the values in the `s` containers.
+// 1) one or more containers (either values or label level) in other share the same name as one or more containers in s,
+// and 2) the stringified values in the other containers match the values in the s containers.
 // For the following dataframes:
 //
-// `s`    	`other`
+// s    	other
 // FOO BAR	FRED QUX
 // bar 0	baz  corge
 // baz 1	qux  waldo
 //
 // In LookupAdvanced(other, "left", ["foo"], ["fred"]),
-// row 1 in `s` is "aligned" with row 0 in `other`, because those are the rows in which
+// row 1 in s is "aligned" with row 0 in other, because those are the rows in which
 // both share the same value ("baz") in the keyed containers.
 // The result of this lookup will be:
 //
@@ -899,11 +899,11 @@ func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, righ
 	} else {
 		leftKeys, err = convertColNamesToIndexPositions(leftOn, s.labels)
 		if err != nil {
-			return seriesWithError(fmt.Errorf("LookupAdvanced(): `leftOn`: %v", err))
+			return seriesWithError(fmt.Errorf("LookupAdvanced(): leftOn: %v", err))
 		}
 		rightKeys, err = convertColNamesToIndexPositions(rightOn, other.labels)
 		if err != nil {
-			return seriesWithError(fmt.Errorf("LookupAdvanced(): `rightOn`: %v", err))
+			return seriesWithError(fmt.Errorf("LookupAdvanced(): rightOn: %v", err))
 		}
 	}
 
@@ -914,26 +914,26 @@ func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, righ
 	return ret
 }
 
-// Merge converts `s` and `other` to dataframes. and then performs a left join of `other` onto `df` using containers with matching names as keys.
+// Merge converts s and other to dataframes. and then performs a left join of other onto df using containers with matching names as keys.
 // To perform a different type of join or specify the matching keys,
-// use s.ToDataFrame() + df.LookupAdvanced() to isolate values in `other`, and append them with df.WithCol().
+// use s.ToDataFrame() + df.LookupAdvanced() to isolate values in other, and append them with df.WithCol().
 //
-// Merge identifies the row alignment between `s` and `other` and appends aligned values as new columns on `s`.
+// Merge identifies the row alignment between s and other and appends aligned values as new columns on s.
 // Rows are aligned when:
-// 1) one or more containers (either column or label level) in `other` share the same name as one or more containers in `s`,
-// and 2) the stringified values in the `other` containers match the values in the `s` containers.
+// 1) one or more containers (either column or label level) in other share the same name as one or more containers in s,
+// and 2) the stringified values in the other containers match the values in the s containers.
 // For the following dataframes:
 //
-// `s`    	`other`
+// s    	other
 // FOO BAR	FOO QUX
 // bar 0	baz corge
 // baz 1	qux waldo
 //
-// Row 1 in `s` is "aligned" with row 0 in `other`, because those are the rows in which
+// Row 1 in s is "aligned" with row 0 in other, because those are the rows in which
 // both share the same value ("baz") in a container with the same name ("foo").
 // After merging, the result will be:
 //
-// `s`
+// s
 // FOO BAR QUX
 // bar 0   n/a
 // baz 1   corge
@@ -944,10 +944,10 @@ func (s *Series) Merge(other *Series) *DataFrame {
 	return s.ToDataFrame().Merge(other.ToDataFrame())
 }
 
-// Add coerces `other` and `s` to float64 values, aligns `other` with `s`, and adds the values in aligned rows,
-// using the labels in `s` as an anchor.
-// If `ignoreNulls` is true, then missing or null values are treated as 0.
-// Otherwise, if a row in `s` does not align with any row in `other`,
+// Add coerces other and s to float64 values, aligns other with s, and adds the values in aligned rows,
+// using the labels in s as an anchor.
+// If ignoreNulls is true, then missing or null values are treated as 0.
+// Otherwise, if a row in s does not align with any row in other,
 // or if row does align but either value is null, then the resulting value is null.
 func (s *Series) Add(other *Series, ignoreNulls bool) *Series {
 	fn := func(v1 float64, v2 float64) float64 {
@@ -956,11 +956,11 @@ func (s *Series) Add(other *Series, ignoreNulls bool) *Series {
 	return s.combineMath(other, ignoreNulls, fn)
 }
 
-// Subtract coerces `other` and `s` to float64 values, aligns `other` with `s`,
-// and subtracts the aligned values of `other` from `s`,
-// using the labels in `s` as an anchor.
-// If `ignoreNulls` is true, then missing or null values are treated as 0.
-// Otherwise, if a row in `s` does not align with any row in `other`,
+// Subtract coerces other and s to float64 values, aligns other with s,
+// and subtracts the aligned values of other from s,
+// using the labels in s as an anchor.
+// If ignoreNulls is true, then missing or null values are treated as 0.
+// Otherwise, if a row in s does not align with any row in other,
 // or if row does align but either value is null, then the resulting value is null.
 func (s *Series) Subtract(other *Series, ignoreNulls bool) *Series {
 	fn := func(v1 float64, v2 float64) float64 {
@@ -969,10 +969,10 @@ func (s *Series) Subtract(other *Series, ignoreNulls bool) *Series {
 	return s.combineMath(other, ignoreNulls, fn)
 }
 
-// Multiply coerces `other` and `s` to float64 values, aligns `other` with `s`, and multiplies the values in aligned rows,
-// using the labels in `s` as an anchor.
-// If `ignoreNulls` is true, then missing or null values are treated as 0.
-// Otherwise, if a row in `s` does not align with any row in `other`,
+// Multiply coerces other and s to float64 values, aligns other with s, and multiplies the values in aligned rows,
+// using the labels in s as an anchor.
+// If ignoreNulls is true, then missing or null values are treated as 0.
+// Otherwise, if a row in s does not align with any row in other,
 // or if row does align but either value is null, then the resulting value is null.
 func (s *Series) Multiply(other *Series, ignoreNulls bool) *Series {
 	fn := func(v1 float64, v2 float64) float64 {
@@ -981,12 +981,12 @@ func (s *Series) Multiply(other *Series, ignoreNulls bool) *Series {
 	return s.combineMath(other, ignoreNulls, fn)
 }
 
-// Divide coerces `other` and `s` to float64 values, aligns `other` with `s`,
-// and divides the aligned values of `s` by `s`,
-// using the labels in `s` as an anchor.
+// Divide coerces other and s to float64 values, aligns other with s,
+// and divides the aligned values of s by s,
+// using the labels in s as an anchor.
 // Dividing by 0 always returns a null value.
-// If `ignoreNulls` is true, then missing or null values are treated as 0.
-// Otherwise, if a row in `s` does not align with any row in `other`,
+// If ignoreNulls is true, then missing or null values are treated as 0.
+// Otherwise, if a row in s does not align with any row in other,
 // or if row does align but either value is null, then the resulting value is null.
 func (s *Series) Divide(other *Series, ignoreNulls bool) *Series {
 	fn := func(v1 float64, v2 float64) float64 {
@@ -1001,7 +1001,7 @@ func (s *Series) Divide(other *Series, ignoreNulls bool) *Series {
 // -- GROUPERS
 
 // GroupBy groups the Series rows that share the same stringified value
-// in the container(s) (columns or labels) specified by `names`.
+// in the container(s) (columns or labels) specified by names.
 func (s *Series) GroupBy(names ...string) *GroupedSeries {
 	var index []int
 	var err error
@@ -1141,8 +1141,8 @@ func (s *Series) alignedMath(alignedFunction func([]float64, []bool, []int) []fl
 	return retVals
 }
 
-// Resample coerces the Series values to time.Time and truncates them `by` the logic supplied in tada.Resampler.
-// If `AsCivilDate` or `AsCivilTime` is true, saves slice values as []civil.Date or []civil.Time, respectively.
+// Resample coerces the Series values to time.Time and truncates them by the logic supplied in tada.Resampler.
+// If AsCivilDate or AsCivilTime is true, saves slice values as []civil.Date or []civil.Time, respectively.
 // Returns a new Series.
 func (s *Series) Resample(by Resampler) *Series {
 	s = s.Copy()
@@ -1150,8 +1150,8 @@ func (s *Series) Resample(by Resampler) *Series {
 	return s
 }
 
-// Resample coerces the Series values to time.Time and truncates them `by` the logic supplied in tada.Resampler.
-// If `AsCivilDate` or `AsCivilTime` is true, saves slice values as []civil.Date or []civil.Time, respectively.
+// Resample coerces the Series values to time.Time and truncates them by the logic supplied in tada.Resampler.
+// If AsCivilDate or AsCivilTime is true, saves slice values as []civil.Date or []civil.Time, respectively.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Resample(by Resampler) {
 	s.series.values.resample(by)
@@ -1196,14 +1196,14 @@ func (s *Series) Rank() *Series {
 	}
 }
 
-// Bin coerces the Series values to float64 and categorizes each row based on which `bin` interval it falls within.
-// `bins` should be a slice of sequential edges that form intervals (left exclusive, right inclusive).
+// Bin coerces the Series values to float64 and categorizes each row based on which bin interval it falls within.
+// bins should be a slice of sequential edges that form intervals (left exclusive, right inclusive).
 // For example, [1, 3, 5] represents the intervals 1-3 (excluding 1, including 3), and 3-5 (excluding 3, including 5).
 // If these bins were supplied for a Series with values [3, 4], the returned Series would have values ["1-3", "3-5"].
 // Null values are not categorized.
-// For default behavior, supply nil as `config`.
+// For default behavior, supply nil as config.
 //
-// To bin values below or above the bin intervals, or to supply custom labels, supply a tada.Binner as `config`.
+// To bin values below or above the bin intervals, or to supply custom labels, supply a tada.Binner as config.
 // If custom labels are supplied, the length must be 1 less than the total number of bin edges.
 // Otherwise, bin labels are auto-generated from the bin intervals.
 func (s *Series) Bin(bins []float64, config *Binner) *Series {
@@ -1246,17 +1246,17 @@ func (s *Series) Percentile() *Series {
 	}
 }
 
-// PercentileBin coerces the Series values to float64 and categorizes each value based on which percentile `bin` interval it falls within.
+// PercentileBin coerces the Series values to float64 and categorizes each value based on which percentile bin interval it falls within.
 // Uses the "exclusive" definition: a value's percentile is the % of all non-null values in the Series (including itself) that are below it.
-// `bins` should be a slice of sequential percentile edges (between 0 and 1) that form intervals (left inclusive, right exclusive).
+// bins should be a slice of sequential percentile edges (between 0 and 1) that form intervals (left inclusive, right exclusive).
 // NB: left inclusive, right exclusive is the opposite of the interval inclusion rules for the Bin() function.
 // For example, [0, .5, 1] represents the percentile intervals 0-50% (including 0%, excluding 50%) and 50%-100% (including 50%, excluding 100%).
 // If these bins were supplied for a Series with values [1, 1000], the returned Series would have values [0-0.5, 0.5-1],
 // because 1 is in the bottom 50% of values and 1000 is in the top 50% of values.
 // Null values are not categorized.
-// For default behavior, supply nil as `config`.
+// For default behavior, supply nil as config.
 //
-// To bin values below or above the bin intervals, or to supply custom labels, supply a tada.Binner as `config`.
+// To bin values below or above the bin intervals, or to supply custom labels, supply a tada.Binner as config.
 // If custom labels are supplied, the length must be 1 less than the total number of bin edges.
 // Otherwise, bin labels are auto-generated from the bin intervals.
 func (s *Series) PercentileBin(bins []float64, config *Binner) *Series {
@@ -1315,7 +1315,7 @@ func (s *Series) GetValues() interface{} {
 }
 
 // GetLabels returns label levels as interface{} slices within an []interface
-// that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
+// that may be supplied as optional labels argument to NewSeries() or NewDataFrame().
 func (s *Series) GetLabels() []interface{} {
 	var ret []interface{}
 	labels := copyContainers(s.labels)
@@ -1336,7 +1336,7 @@ func (s *Series) ValueCounts() map[string]int {
 }
 
 // Unique returns the first appearance of all non-null values in the Series.
-// If `includeLabels` is true, a row is considered unique only if its combination of labels and values is unique.
+// If includeLabels is true, a row is considered unique only if its combination of labels and values is unique.
 // Returns a new Series.
 func (s *Series) Unique(includeLabels bool) *Series {
 	var index []int

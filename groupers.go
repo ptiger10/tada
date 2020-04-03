@@ -24,20 +24,20 @@ func (g *GroupedSeries) String() string {
 	return g.Series().String()
 }
 
-// GetGroup returns the grouped rows sharing the same `group` key as a new Series.
+// GetGroup returns the grouped rows sharing the same group key as a new Series.
 func (g *GroupedSeries) GetGroup(group string) *Series {
 	for i, key := range g.orderedKeys {
 		if key == group {
 			return g.series.Subset(g.rowIndices[i])
 		}
 	}
-	return seriesWithError(fmt.Errorf("GetGroup(): `group` (%v) not in groups", group))
+	return seriesWithError(fmt.Errorf("GetGroup(): group (%v) not in groups", group))
 }
 
-// Transform applies `lambda` to every group and returns the modified values in the same order as the original
-// Series values, preserving the original Series labels and named `name`.
-// Each input into each `lambda` call will be a slice of values that may then be type-asserted by the user.
-// The output of each `lambda` call must be a slice that is the same length as the input.
+// Transform applies lambda to every group and returns the modified values in the same order as the original
+// Series values, preserving the original Series labels and named name.
+// Each input into each lambda call will be a slice of values that may then be type-asserted by the user.
+// The output of each lambda call must be a slice that is the same length as the input.
 // All outputs must be of the same type (though this may be a different type than the input).
 func (g *GroupedSeries) Transform(name string, lambda func(interface{}) interface{}) *Series {
 	vals, err := groupedInterfaceTransformFunc(
@@ -118,10 +118,10 @@ func (g *GroupedSeries) countReduceFunc(name string, fn func(interface{}, []bool
 	}
 }
 
-// Reduce iterates over the groups in `g` and reduces each group of values into a single value
-// using the function supplied in `lambda`.
+// Reduce iterates over the groups in g and reduces each group of values into a single value
+// using the function supplied in lambda.
 // Reduce returns a new Series named "name_originalColName" where each reduced group is represented by a single row.
-// The reduction `lambda` function is the first field selected (i.e., not left blank) in the GroupReduceFn.
+// The reduction lambda function is the first field selected (i.e., not left blank) in the GroupReduceFn.
 func (g *GroupedSeries) Reduce(name string, lambda GroupReduceFn) *Series {
 	// remove all nulls before running each set of values through custom user function
 	if lambda.Float64 != nil {
@@ -193,7 +193,7 @@ func (g *GroupedSeries) Latest() *Series {
 	return g.dateTimeReduceFunc("latest", latest)
 }
 
-// Nth returns the row at position `n` (if it exists) within each group.
+// Nth returns the row at position n (if it exists) within each group.
 func (g *GroupedSeries) Nth(n int) *Series {
 	return g.indexReduceFunc("nth", n)
 }
@@ -236,8 +236,8 @@ func (g *GroupedSeries) Align() *GroupedSeries {
 	return g
 }
 
-// HavingCount removes any groups from `g` that do not satisfy the boolean function supplied in `lambda`.
-// For each group, the input into `lambda` is the total number of values in the group (null or not-null).
+// HavingCount removes any groups from g that do not satisfy the boolean function supplied in lambda.
+// For each group, the input into lambda is the total number of values in the group (null or not-null).
 func (g *GroupedSeries) HavingCount(lambda func(int) bool) *GroupedSeries {
 	indexToKeep := make([]int, 0)
 	retRowIndices := make([][]int, 0)
@@ -276,10 +276,10 @@ func (g *GroupedSeries) Series() *Series {
 	return s
 }
 
-// RollingN iterates over each row in Series and groups each set of `n` subsequent rows after the current row.
+// RollingN iterates over each row in Series and groups each set of n subsequent rows after the current row.
 func (s *Series) RollingN(n int) *GroupedSeries {
 	if n < 1 {
-		return groupedSeriesWithError(fmt.Errorf("RollingN(): `n` must be greater than zero (not %v)", n))
+		return groupedSeriesWithError(fmt.Errorf("RollingN(): n must be greater than zero (not %v)", n))
 	}
 	rowIndices := make([][]int, s.Len())
 	for i := 0; i < s.Len(); i++ {
@@ -298,11 +298,11 @@ func (s *Series) RollingN(n int) *GroupedSeries {
 	}
 }
 
-// RollingDuration iterates over each row in Series, coerces the values to time.Time, and groups each set of subsequent rows that are within `d` of the current row.
+// RollingDuration iterates over each row in Series, coerces the values to time.Time, and groups each set of subsequent rows that are within d of the current row.
 func (s *Series) RollingDuration(d time.Duration) *GroupedSeries {
 	// assumes positive duration
 	if d < 0 {
-		return groupedSeriesWithError(fmt.Errorf("RollingDuration(): `d` must be greater than zero (not %v)", d))
+		return groupedSeriesWithError(fmt.Errorf("RollingDuration(): d must be greater than zero (not %v)", d))
 	}
 	vals := s.values.dateTime().slice
 	rowIndices := make([][]int, s.Len())
@@ -360,7 +360,7 @@ func (g *GroupedSeries) ListGroups() []string {
 }
 
 // GetLabels returns the grouped label levels as interface{} slices within an []interface returns the group's labels as slices within an []interface
-// that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
+// that may be supplied as optional labels argument to NewSeries() or NewDataFrame().
 func (g *GroupedSeries) GetLabels() []interface{} {
 	var ret []interface{}
 	labels := copyContainers(g.labels)
@@ -462,82 +462,82 @@ func (g *GroupedDataFrame) countReduceFunc(name string, cols []string, fn func(i
 	}
 }
 
-// GetGroup returns the grouped rows sharing the same `group` key as a new DataFrame.
+// GetGroup returns the grouped rows sharing the same group key as a new DataFrame.
 func (g *GroupedDataFrame) GetGroup(group string) *DataFrame {
 	for i, key := range g.orderedKeys {
 		if key == group {
 			return g.df.Subset(g.rowIndices[i])
 		}
 	}
-	return dataFrameWithError(fmt.Errorf("GetGroup(): `group` (%v) not in groups", group))
+	return dataFrameWithError(fmt.Errorf("GetGroup(): group (%v) not in groups", group))
 }
 
-// Sum coerces the column values in `colNames` to float64 and calculates the sum of each group.
+// Sum coerces the column values in colNames to float64 and calculates the sum of each group.
 func (g *GroupedDataFrame) Sum(colNames ...string) *DataFrame {
 	return g.float64ReduceFunc("sum", colNames, sum)
 }
 
-// Mean coerces the column values in `colNames` to float64 and calculates the mean of each group.
+// Mean coerces the column values in colNames to float64 and calculates the mean of each group.
 func (g *GroupedDataFrame) Mean(colNames ...string) *DataFrame {
 	return g.float64ReduceFunc("mean", colNames, mean)
 }
 
-// Median coerces the column values in `colNames` to float64 and calculates the median of each group.
+// Median coerces the column values in colNames to float64 and calculates the median of each group.
 func (g *GroupedDataFrame) Median(colNames ...string) *DataFrame {
 	return g.float64ReduceFunc("median", colNames, median)
 }
 
-// Std coerces the column values in `colNames` to float64 and calculates the standard deviation of each group.
+// Std coerces the column values in colNames to float64 and calculates the standard deviation of each group.
 func (g *GroupedDataFrame) Std(colNames ...string) *DataFrame {
 	return g.float64ReduceFunc("std", colNames, std)
 }
 
-// Min coerces the column values in `colNames` to float64 and calculates the minimum of each group.
+// Min coerces the column values in colNames to float64 and calculates the minimum of each group.
 func (g *GroupedDataFrame) Min(colNames ...string) *DataFrame {
 	return g.float64ReduceFunc("min", colNames, min)
 }
 
-// Max coerces the column values in `colNames` to float64 and calculates the maximum of each group.
+// Max coerces the column values in colNames to float64 and calculates the maximum of each group.
 func (g *GroupedDataFrame) Max(colNames ...string) *DataFrame {
 	return g.float64ReduceFunc("max", colNames, max)
 }
 
-// Count returns the number of non-null values in each group for the columns in `colNames`.
+// Count returns the number of non-null values in each group for the columns in colNames.
 func (g *GroupedDataFrame) Count(colNames ...string) *DataFrame {
 	return g.countReduceFunc("count", colNames, count)
 }
 
-// NUnique returns the number of unique, non-null values in each group for the columns in `colNames`.
+// NUnique returns the number of unique, non-null values in each group for the columns in colNames.
 func (g *GroupedDataFrame) NUnique(colNames ...string) *DataFrame {
 	return g.countReduceFunc("nunique", colNames, nunique)
 }
 
-// Earliest coerces the column values in `colNames` to time.Time and calculates the earliest timestamp of each group.
+// Earliest coerces the column values in colNames to time.Time and calculates the earliest timestamp of each group.
 func (g *GroupedDataFrame) Earliest(colNames ...string) *DataFrame {
 	return g.dateTimeReduceFunc("earliest", colNames, earliest)
 }
 
-// Latest coerces the column values in `colNames` to time.Time and calculates the latest timestamp of each group.
+// Latest coerces the column values in colNames to time.Time and calculates the latest timestamp of each group.
 func (g *GroupedDataFrame) Latest(colNames ...string) *DataFrame {
 	return g.dateTimeReduceFunc("latest", colNames, latest)
 }
 
-// Nth returns the row at position `n` (if it exists) within each group for the columns in `colNames`.
+// Nth returns the row at position n (if it exists) within each group for the columns in colNames.
 func (g *GroupedDataFrame) Nth(index int, colNames ...string) *DataFrame {
 	return g.indexReduceFunc("nth", colNames, index)
 }
 
-// First returns the first row within each group for the columns in `colNames`.
+// First returns the first row within each group for the columns in colNames.
 func (g *GroupedDataFrame) First(colNames ...string) *DataFrame {
 	return g.indexReduceFunc("first", colNames, 0)
 }
 
-// Last returns the last row within each group for the columns in `colNames`.
+// Last returns the last row within each group for the columns in colNames.
 func (g *GroupedDataFrame) Last(colNames ...string) *DataFrame {
 	return g.indexReduceFunc("last", colNames, -1)
 }
 
-// Col isolates the Series at `containerName`, which may be either a label level or column in the underlying DataFrame.
+// Col isolates the Series at containerName, which may be either a label level or column in the underlying DataFrame.
 // Returns a GroupedSeries with the same groups and labels as in the GroupedDataFrame.
 func (g *GroupedDataFrame) Col(colName string) *GroupedSeries {
 	index, err := indexOfContainer(colName, g.df.values)
@@ -557,12 +557,12 @@ func (g *GroupedDataFrame) Col(colName string) *GroupedSeries {
 	}
 }
 
-// Reduce iterates over the groups in `g` and reduces each group of values into a single value
-// applying the function supplied in `lambda` to the column values in `cols`.
+// Reduce iterates over the groups in g and reduces each group of values into a single value
+// applying the function supplied in lambda to the column values in cols.
 // Reduce returns a new DataFrame named "name_originalDataFrameName",
 // with columns named "name_originalColName",
 // where each reduced group is represented by a single row.
-// The reduction `lambda` function is the first field selected (i.e., not left blank) in the GroupReduceFn.
+// The reduction lambda function is the first field selected (i.e., not left blank) in the GroupReduceFn.
 func (g *GroupedDataFrame) Reduce(name string, cols []string, lambda GroupReduceFn) *DataFrame {
 	// remove all nulls before running each set of values through custom user function
 	if lambda.Float64 != nil {
@@ -584,8 +584,8 @@ func (g *GroupedDataFrame) Reduce(name string, cols []string, lambda GroupReduce
 	return dataFrameWithError(fmt.Errorf("Reduce(): no lambda function provided"))
 }
 
-// HavingCount removes any groups from `g` that do not satisfy the boolean function supplied in `lambda`.
-// For each group, the input into `lambda` is the total number of values in the group (null or not-null).
+// HavingCount removes any groups from g that do not satisfy the boolean function supplied in lambda.
+// For each group, the input into lambda is the total number of values in the group (null or not-null).
 func (g *GroupedDataFrame) HavingCount(lambda func(int) bool) *GroupedDataFrame {
 	indexToKeep := make([]int, 0)
 	retRowIndices := make([][]int, 0)
@@ -647,7 +647,7 @@ func (g *GroupedDataFrame) ListGroups() []string {
 }
 
 // GetLabels returns the grouped label levels as interface{} slices within an []interface
-// that may be supplied as optional `labels` argument to NewSeries() or NewDataFrame().
+// that may be supplied as optional labels argument to NewSeries() or NewDataFrame().
 func (g *GroupedDataFrame) GetLabels() []interface{} {
 	var ret []interface{}
 	labels := copyContainers(g.labels)
@@ -780,7 +780,7 @@ func groupedIndexReduceFunc(
 			retNulls[i] = true
 			continue
 		}
-		// look up the row position contained at `modifiedIndex`
+		// look up the row position contained at modifiedIndex
 		toLookup := rowIndex[modifiedIndex]
 		output, isNull := v.Index(toLookup), nulls[toLookup]
 		if !aligned {
