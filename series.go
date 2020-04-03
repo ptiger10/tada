@@ -675,7 +675,7 @@ func (s *SeriesMutator) Filter(filters map[string]FilterFn) {
 	s.Subset(index)
 }
 
-// Where iterates over the rows in `s` and evaluates whether each one satisifes `filters`,
+// Where iterates over the rows in `s` and evaluates whether each one satisfies `filters`,
 // which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
 // If yes, returns `ifTrue` at that row position.
 // If not, returns `ifFalse` at that row position.

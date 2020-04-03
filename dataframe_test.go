@@ -428,6 +428,12 @@ func TestReadCSV_String(t *testing.T) {
 		{"fail - bad reader",
 			args{badReader{}, nil},
 			nil, true},
+		{"fail - bad delimiter",
+			args{strings.NewReader("Name, Age\n foo, 1\n bar, 2"), []ReadOption{ReadOptionDelimiter(0)}},
+			nil, true},
+		{"fail - empty",
+			args{strings.NewReader(""), nil},
+			nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -4826,7 +4832,7 @@ func TestDataFrameIterator_Row(t *testing.T) {
 					labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 					name:          "foo",
 					colLevelNames: []string{"*0"}}},
-			map[string]Element{"foo": Element{int(0), true}, "qux": Element{float64(1), false}, "*0": Element{int(0), false}},
+			map[string]Element{"foo": {int(0), true}, "qux": {float64(1), false}, "*0": {int(0), false}},
 		},
 	}
 	for _, tt := range tests {
@@ -4868,7 +4874,7 @@ func TestDataFrame_Resample(t *testing.T) {
 			name:          "baz",
 			colLevelNames: []string{"*0"},
 		},
-			args{map[string]Resampler{"foo": Resampler{ByYear: true}, "bar": Resampler{ByMonth: true}}},
+			args{map[string]Resampler{"foo": {ByYear: true}, "bar": {ByMonth: true}}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, isNull: []bool{false}, name: "foo"},
 				{slice: []time.Time{time.Date(2019, 12, 1, 0, 0, 0, 0, time.UTC)}, isNull: []bool{false}, name: "bar"}},
@@ -4884,7 +4890,7 @@ func TestDataFrame_Resample(t *testing.T) {
 			name:          "baz",
 			colLevelNames: []string{"*0"},
 		},
-			args{map[string]Resampler{"corge": Resampler{ByYear: true}}},
+			args{map[string]Resampler{"corge": {ByYear: true}}},
 			&DataFrame{err: fmt.Errorf("Resample(): `name` (corge) not found")},
 		},
 	}

@@ -3493,7 +3493,7 @@ func TestSeriesIterator_Row(t *testing.T) {
 			fields{0, &Series{values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}},
 			}},
-			map[string]Element{"foo": Element{float64(0), false}, "qux": Element{int(0), false}},
+			map[string]Element{"foo": {float64(0), false}, "qux": {int(0), false}},
 		},
 	}
 	for _, tt := range tests {

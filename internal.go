@@ -2606,9 +2606,7 @@ func extractCSVDimensions(b []byte, comma rune) (numRows, numCols int, err error
 	numRows -= emptyRows
 	r := bytes.NewReader(b)
 	csvReader := csv.NewReader(r)
-	if comma != 0 {
-		csvReader.Comma = comma
-	}
+	csvReader.Comma = comma
 	fields, err := csvReader.Read()
 	if err != nil {
 		return 0, 0, err

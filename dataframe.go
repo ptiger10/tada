@@ -250,8 +250,8 @@ func ReadCSV(r io.Reader, options ...ReadOption) (*DataFrame, error) {
 		return nil, fmt.Errorf("ReadCSV(): %s", err)
 	}
 	numRows, numCols, err := extractCSVDimensions(b, config.Delimiter)
-	if numRows == 0 {
-		return nil, fmt.Errorf("ReadCSV(): must have at least one row")
+	if err != nil {
+		return nil, fmt.Errorf("ReadCSV(): %v", err)
 	}
 	retVals := makeStringMatrix(numCols, numRows)
 	retNulls := makeBoolMatrix(numCols, numRows)
@@ -1633,7 +1633,7 @@ func (df *DataFrameMutator) Filter(filters map[string]FilterFn) {
 	return
 }
 
-// Where iterates over the rows in `df` and evaluates whether each one satisifes `filters`,
+// Where iterates over the rows in `df` and evaluates whether each one satisfies `filters`,
 // which is a map of container names (either column or label names) and tada.FilterFn structs.
 // If yes, returns `ifTrue` at that row position.
 // If not, returns `ifFalse` at that row position.

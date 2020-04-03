@@ -3616,7 +3616,7 @@ func Test_extractCSVDimensions(t *testing.T) {
 		wantNumCols int
 		wantErr     bool
 	}{
-		{"pass", args{[]byte("foo, bar, 1\n baz, qux, 2\n"), 0}, 2, 3, false},
+		{"pass", args{[]byte("foo, bar, 1\n baz, qux, 2\n"), ','}, 2, 3, false},
 		{"custom delimiter", args{[]byte("foo| bar| 1\n baz| qux| 2\n"), '|'}, 2, 3, false},
 		{"no final \n", args{[]byte("foo| bar| 1\n baz| qux| 2"), '|'}, 2, 3, false},
 		{"subtract empty row", args{[]byte("foo| bar| 1\n\n baz| qux| 2"), '|'}, 2, 3, false},
