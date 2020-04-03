@@ -315,23 +315,23 @@ func (df *DataFrame) ToSeries() *Series {
 	}
 }
 
-// EqualsCSV reads `r` into df2 (configured by `options`),
-// converts both df and df2 into [][]string records.
+// EqualsCSV reads `want` (configured by `wantOptions`) into a dataframe,
+// converts both `df` and `want` into [][]string records,
 // and evaluates whether the stringified values match.
 // If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
 //
 // If `includeLabels` is true, then `df`'s labels are included as columns.
-func (df *DataFrame) EqualsCSV(includeLabels bool, r io.Reader, options ...ReadOption) (bool, *tablediff.Differences, error) {
-	config := setReadConfig(options)
-	df2, err := ReadCSV(r, options...)
+func (df *DataFrame) EqualsCSV(includeLabels bool, want io.Reader, wantOptions ...ReadOption) (bool, *tablediff.Differences, error) {
+	config := setReadConfig(wantOptions)
+	df2, err := ReadCSV(want, wantOptions...)
 	if err != nil {
 		return false, nil, fmt.Errorf("EqualsCSV(): reading `r`: %v", err)
 	}
 
-	compare := df.ToCSV(writeOptionIncludeLabels(includeLabels))
+	got := df.ToCSV(writeOptionIncludeLabels(includeLabels))
 	// df2 has default labels? exclude them
-	compare2 := df2.ToCSV(writeOptionIncludeLabels(config.NumLabelLevels > 0))
-	diffs, eq := tablediff.Diff(compare, compare2)
+	wantDF := df2.ToCSV(writeOptionIncludeLabels(config.NumLabelLevels > 0))
+	diffs, eq := tablediff.Diff(got, wantDF)
 	return eq, diffs, nil
 }
 

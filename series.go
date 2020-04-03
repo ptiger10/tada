@@ -76,14 +76,15 @@ func (s *Series) ToDataFrame() *DataFrame {
 	}
 }
 
-// EqualsCSV converts `s` to csv, compares it to the records read from `r`,
+// EqualsCSV reads `want` (configured by `wantOptions`) into a dataframe,
+// converts both `s` and `want` into [][]string records,
 // and evaluates whether the stringified values match.
 // If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
 //
-// If `includeLabels` is true, then the Series' labels are included as columns.
-func (s *Series) EqualsCSV(includeLabels bool, r io.Reader, options ...ReadOption) (bool, *tablediff.Differences, error) {
+// If `includeLabels` is true, then `s`'s labels are included as columns.
+func (s *Series) EqualsCSV(includeLabels bool, want io.Reader, wantOptions ...ReadOption) (bool, *tablediff.Differences, error) {
 	df := s.ToDataFrame()
-	return df.EqualsCSV(includeLabels, r, options...)
+	return df.EqualsCSV(includeLabels, want, wantOptions...)
 }
 
 // ToCSV converts a Series to a DataFrame and returns as [][]string.
