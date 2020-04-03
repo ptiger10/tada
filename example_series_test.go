@@ -437,17 +437,76 @@ func ExampleSeries_Resample_byHalfHour() {
 	// +---++----------------------+
 }
 
-func ExampleSeries_GroupBy() {
-	s := NewSeries([]float64{1, 2, 3, 4}, []string{"foo", "foo", "bar", "bar"})
-	fmt.Println(s.GroupBy("*0"))
+func ExampleSeries_Resample_asCivilDate() {
+	s := NewSeries([]time.Time{
+		time.Date(2020, 1, 15, 12, 15, 0, 0, time.UTC),
+	}).SetName("foo")
+	fmt.Println(s)
+
+	asCivilDate := Resampler{AsCivilDate: true}
+	fmt.Println(s.Resample(asCivilDate))
 	// Output:
-	// Groups: foo,bar
+	// +---++----------------------+
+	// | - ||         foo          |
+	// |---||----------------------|
+	// | 0 || 2020-01-15T12:15:00Z |
+	// +---++----------------------+
+	//
+	// +---++------------+
+	// | - ||    foo     |
+	// |---||------------|
+	// | 0 || 2020-01-15 |
+	// +---++------------+
+}
+
+func ExampleSeries_Resample_asCivilTime() {
+	s := NewSeries([]time.Time{
+		time.Date(2020, 1, 15, 12, 15, 0, 0, time.UTC),
+	}).SetName("foo")
+	fmt.Println(s)
+
+	asCivilTime := Resampler{AsCivilTime: true}
+	fmt.Println(s.Resample(asCivilTime))
+	// Output:
+	// +---++----------------------+
+	// | - ||         foo          |
+	// |---||----------------------|
+	// | 0 || 2020-01-15T12:15:00Z |
+	// +---++----------------------+
+	//
+	// +---++----------+
+	// | - ||   foo    |
+	// |---||----------|
+	// | 0 || 12:15:00 |
+	// +---++----------+
+}
+
+func ExampleSeries_GroupBy() {
+	s := NewSeries([]float64{1, 2, 3, 4}, []string{"foo", "bar", "foo", "bar"})
+	g := s.GroupBy()
+	fmt.Println(g)
+	// Output:
+	// 	+-----++---+
+	// |  -  || 0 |
+	// |-----||---|
+	// | foo || 1 |
+	// |     || 3 |
+	// | bar || 2 |
+	// |     || 4 |
+	// +-----++---+
 }
 func ExampleSeries_GroupBy_compoundGroup() {
-	s := NewSeries([]float64{1, 2}, []string{"foo", "foo"}, []string{"bar", "bar"})
-	fmt.Println(s.GroupBy("*0", "*1"))
-	// Output:
-	// Groups: foo|bar
+	s := NewSeries([]float64{1, 2, 3, 4}, []string{"foo", "baz", "foo", "baz"}, []string{"bar", "qux", "bar", "qux"})
+	g := s.GroupBy()
+	fmt.Println(g)
+	// +-----+-----++---+
+	// |  -  |  -  || 0 |
+	// |-----|-----||---|
+	// | foo | bar || 1 |
+	// |     |     || 3 |
+	// | baz | qux || 2 |
+	// |     |     || 4 |
+	// +-----+-----++---+
 }
 
 func ExampleGroupedSeries_Mean() {

@@ -3,7 +3,6 @@ package tada
 import (
 	"fmt"
 	"reflect"
-	"strings"
 	"time"
 )
 
@@ -22,11 +21,7 @@ func (g *GroupedSeries) Err() error {
 }
 
 func (g *GroupedSeries) String() string {
-	groups := make([]string, len(g.orderedKeys))
-	for i, k := range g.orderedKeys {
-		groups[i] = k
-	}
-	return "Groups: " + strings.Join(groups, ",")
+	return g.Series().String()
 }
 
 // GetGroup returns the grouped rows sharing the same `group` key as a new Series.
@@ -125,7 +120,7 @@ func (g *GroupedSeries) countReduceFunc(name string, fn func(interface{}, []bool
 
 // Reduce iterates over the groups in `g` and reduces each group of values into a single value
 // using the function supplied in `lambda`.
-// Reduce returns a new Series named `name` where each reduced group is represented by a single row.
+// Reduce returns a new Series named "name_originalColName" where each reduced group is represented by a single row.
 // The reduction `lambda` function is the first field selected (i.e., not left blank) in the GroupReduceFn.
 func (g *GroupedSeries) Reduce(name string, lambda GroupReduceFn) *Series {
 	// remove all nulls before running each set of values through custom user function
@@ -266,6 +261,21 @@ func (g *GroupedSeries) HavingCount(lambda func(int) bool) *GroupedSeries {
 	}
 }
 
+// Series returns the GroupedSeries as a Series, sorted by group, with groups in the order in which they appear in the original Series.
+func (g *GroupedSeries) Series() *Series {
+	index := make([]int, g.series.Len())
+	var counter int
+	for _, group := range g.rowIndices {
+		for _, i := range group {
+			index[counter] = i
+			counter++
+		}
+	}
+	s := g.series.Subset(index).Copy()
+	s.sharedData = false
+	return s
+}
+
 // RollingN iterates over each row in Series and groups each set of `n` subsequent rows after the current row.
 func (s *Series) RollingN(n int) *GroupedSeries {
 	if n < 1 {
@@ -365,6 +375,10 @@ func (g *GroupedSeries) GetLabels() []interface{} {
 // Err returns the underlying error, if any
 func (g *GroupedDataFrame) Err() error {
 	return g.err
+}
+
+func (g *GroupedDataFrame) String() string {
+	return g.DataFrame().String()
 }
 
 func (g *GroupedDataFrame) indexReduceFunc(name string, cols []string, index int) *DataFrame {
@@ -545,7 +559,9 @@ func (g *GroupedDataFrame) Col(colName string) *GroupedSeries {
 
 // Reduce iterates over the groups in `g` and reduces each group of values into a single value
 // applying the function supplied in `lambda` to the column values in `cols`.
-// Reduce returns a new DataFrame named `name` where each reduced group is represented by a single row.
+// Reduce returns a new DataFrame named "name_originalDataFrameName",
+// with columns named "name_originalColName",
+// where each reduced group is represented by a single row.
 // The reduction `lambda` function is the first field selected (i.e., not left blank) in the GroupReduceFn.
 func (g *GroupedDataFrame) Reduce(name string, cols []string, lambda GroupReduceFn) *DataFrame {
 	// remove all nulls before running each set of values through custom user function
@@ -590,6 +606,19 @@ func (g *GroupedDataFrame) HavingCount(lambda func(int) bool) *GroupedDataFrame 
 		labels:      labels,
 		df:          g.df,
 	}
+}
+
+// DataFrame returns the GroupedDataFrame as a DataFrame, sorted by group, with groups in the order in which they appear in the original DataFrame.
+func (g *GroupedDataFrame) DataFrame() *DataFrame {
+	index := make([]int, g.df.Len())
+	var counter int
+	for _, group := range g.rowIndices {
+		for _, i := range group {
+			index[counter] = i
+			counter++
+		}
+	}
+	return g.df.Subset(index).Copy()
 }
 
 // Next advances to next grouped DataFrame. Returns false at end of iteration.

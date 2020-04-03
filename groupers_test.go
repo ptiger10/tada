@@ -2762,12 +2762,7 @@ func TestGroupedSeries_HavingCount(t *testing.T) {
 				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "bar", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			args: args{func(v int) bool {
-				if v >= 2 {
-					return true
-				}
-				return false
-			}},
+			args: args{func(v int) bool { return v >= 2 }},
 			want: &GroupedSeries{
 				orderedKeys: []string{"bar"},
 				rowIndices:  [][]int{{1, 2, 3}},
@@ -2791,6 +2786,49 @@ func TestGroupedSeries_HavingCount(t *testing.T) {
 			}
 			if got := g.HavingCount(tt.args.lambda); !equalGroupedSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.HavingCount() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGroupedSeries_Series(t *testing.T) {
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		series      *Series
+		aligned     bool
+		err         error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *Series
+	}{
+		{"pass",
+			fields{
+				orderedKeys: []string{"foo", "bar"},
+				rowIndices:  [][]int{{0, 2}, {1, 3}},
+				labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			&Series{values: &valueContainer{slice: []float64{1, 3, 2, 4}, isNull: []bool{false, false, false, false}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeries{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				series:      tt.fields.series,
+				aligned:     tt.fields.aligned,
+				err:         tt.fields.err,
+			}
+			if got := g.Series(); !EqualSeries(got, tt.want) {
+				t.Errorf("GroupedSeries.Series() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -2821,12 +2859,7 @@ func TestGroupedDataFrame_HavingCount(t *testing.T) {
 				df: &DataFrame{values: []*valueContainer{{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}}},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "bar", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			args: args{func(v int) bool {
-				if v >= 2 {
-					return true
-				}
-				return false
-			}},
+			args: args{func(v int) bool { return v >= 2 }},
 			want: &GroupedDataFrame{
 				orderedKeys: []string{"bar"},
 				rowIndices:  [][]int{{1, 2, 3}},
@@ -2849,6 +2882,47 @@ func TestGroupedDataFrame_HavingCount(t *testing.T) {
 			}
 			if got := g.HavingCount(tt.args.lambda); !equalGroupedDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.HavingCount() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGroupedDataFrame_DataFrame(t *testing.T) {
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		df          *DataFrame
+		err         error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   *DataFrame
+	}{
+		{name: "pass",
+			fields: fields{
+				orderedKeys: []string{"foo", "bar"},
+				rowIndices:  [][]int{{0, 2}, {1, 3}},
+				labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				df: &DataFrame{values: []*valueContainer{{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			want: &DataFrame{values: []*valueContainer{{slice: []float64{1, 3, 2, 4}, isNull: []bool{false, false, false, false}}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedDataFrame{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				df:          tt.fields.df,
+				err:         tt.fields.err,
+			}
+			if got := g.DataFrame(); EqualDataFrames(got, tt.want) {
+				t.Errorf("GroupedDataFrame.DataFrame() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -514,3 +514,22 @@ func ExamplePrintOptionMaxColumns() {
 	// | 1 || 2 |     | 6 |
 	// +---++---+-----+---+
 }
+
+func ExampleDataFrame_GroupBy() {
+	df := NewDataFrame([]interface{}{
+		[]float64{1, 2, 3, 4},
+	},
+		[]string{"foo", "bar", "foo", "bar"}).
+		SetColNames([]string{"baz"})
+	g := df.GroupBy()
+	fmt.Println(g)
+	// Output:
+	// +-----++-----+
+	// |  -  || baz |
+	// |-----||-----|
+	// | foo ||   1 |
+	// |     ||   3 |
+	// | bar ||   2 |
+	// |     ||   4 |
+	// +-----++-----+
+}
