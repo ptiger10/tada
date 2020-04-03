@@ -252,7 +252,7 @@ func Test_setNullsFromInterface(t *testing.T) {
 		{"int", args{[]int{0}}, []bool{false}, false},
 		{"string", args{[]string{"foo", ""}}, []bool{false, true}, false},
 		{"civil.date", args{[]civil.Date{civil.DateOf(time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC)), {}}}, []bool{false, true}, false},
-		{"civil.time", args{[]civil.Time{civil.TimeOf(time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC)), civil.Time{Second: -1}}}, []bool{false, true}, false},
+		{"civil.time", args{[]civil.Time{civil.TimeOf(time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC)), {Second: -1}}}, []bool{false, true}, false},
 		{"civil.datetime", args{[]civil.DateTime{civil.DateTimeOf(time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC)), {}}}, []bool{false, true}, false},
 		{"bytes", args{[][]byte{[]byte("foo"), []byte("")}}, []bool{false, true}, false},
 		{"dateTime", args{[]time.Time{time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC), {}}}, []bool{false, true, true}, false},
