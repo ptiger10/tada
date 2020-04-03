@@ -1318,11 +1318,11 @@ func (s *Series) ValueCounts() map[string]int {
 }
 
 // Unique returns the first appearance of all non-null values in the Series.
-// If `valuesOnly` is false, a row is considered unique only if its combination of labels and values is unique.
+// If `includeLabels` is true, a row is considered unique only if its combination of labels and values is unique.
 // Returns a new Series.
-func (s *Series) Unique(valuesOnly bool) *Series {
+func (s *Series) Unique(includeLabels bool) *Series {
 	var index []int
-	if valuesOnly {
+	if !includeLabels {
 		index = s.values.uniqueIndex()
 	} else {
 		mergedLabelsAndValues := append(s.labels, s.values)

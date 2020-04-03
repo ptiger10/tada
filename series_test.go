@@ -2883,7 +2883,7 @@ func TestSeries_Unique(t *testing.T) {
 		err        error
 	}
 	type args struct {
-		valuesOnly bool
+		includeLabels bool
 	}
 	tests := []struct {
 		name   string
@@ -2894,7 +2894,7 @@ func TestSeries_Unique(t *testing.T) {
 		{"values only", fields{
 			values: &valueContainer{slice: []float64{1, 1, 2, 1}, isNull: []bool{false, false, false, false}, name: "foo"},
 			labels: []*valueContainer{{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "qux"}}},
-			args{true},
+			args{includeLabels: false},
 			&Series{
 				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 2}, isNull: []bool{false, false}, name: "qux"}}},
@@ -2902,7 +2902,7 @@ func TestSeries_Unique(t *testing.T) {
 		{"values and labels", fields{
 			values: &valueContainer{slice: []float64{1, 1, 2, 2}, isNull: []bool{false, false, false, false}, name: "foo"},
 			labels: []*valueContainer{{slice: []int{0, 0, 2, 2}, isNull: []bool{false, false, false, false}, name: "qux"}}},
-			args{false},
+			args{includeLabels: true},
 			&Series{
 				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 2}, isNull: []bool{false, false}, name: "qux"}}},
@@ -2916,7 +2916,7 @@ func TestSeries_Unique(t *testing.T) {
 				sharedData: tt.fields.sharedData,
 				err:        tt.fields.err,
 			}
-			if got := s.Unique(tt.args.valuesOnly); !EqualSeries(got, tt.want) {
+			if got := s.Unique(tt.args.includeLabels); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Unique() = %v, want %v", got, tt.want)
 			}
 		})
