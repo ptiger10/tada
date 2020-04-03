@@ -93,7 +93,7 @@ func (s *Series) EqualsCSV(includeLabels bool, want io.Reader, wantOptions ...Re
 // ToCSV converts a Series to a DataFrame and returns as [][]string.
 func (s *Series) ToCSV(options ...WriteOption) ([][]string, error) {
 	if s.values == nil {
-		return nil, fmt.Errorf("ToCSV(): cannot export empty Series")
+		return nil, fmt.Errorf("converting to csv: cannot export empty Series")
 	}
 	df := &DataFrame{
 		values:        []*valueContainer{s.values},
@@ -152,7 +152,7 @@ func (s *Series) Cast(containerAsType map[string]DType) {
 		}
 		index, err := indexOfContainer(name, mergedLabelsAndValues)
 		if err != nil {
-			s.resetWithError(fmt.Errorf("Cast(): %v", err))
+			s.resetWithError(fmt.Errorf("type casting: %v", err))
 			return
 		}
 		mergedLabelsAndValues[index].cast(dtype)
@@ -174,19 +174,6 @@ func (s *Series) IndexOfLabel(name string) int {
 		return -1
 	}
 	return i
-}
-
-// IndexOfRows returns the index positions of the rows with stringified value matching value
-// in the container named name.
-// To search Series values, supply either the Series name or an empty string ("") as name.
-func (s *Series) IndexOfRows(name string, value interface{}) []int {
-	mergedLabelsAndValues := append(s.labels, s.values)
-	i, err := indexOfContainer(name, mergedLabelsAndValues)
-	if err != nil {
-		errorWarning(fmt.Errorf("IndexOfRows(): %v", err))
-		return nil
-	}
-	return mergedLabelsAndValues[i].indexOfRows(value)
 }
 
 // LabelsToSeries finds the first level with matching name and returns as a Series with all existing label levels (including itself).

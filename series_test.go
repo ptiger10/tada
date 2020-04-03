@@ -116,7 +116,7 @@ func TestSeries_Cast(t *testing.T) {
 			labels: []*valueContainer{{slice: []float64{1}, name: "bar", isNull: []bool{false}}}},
 			args{map[string]DType{"corge": Float64}},
 			&Series{
-				err: errors.New("Cast(): name (corge) not found")}},
+				err: errors.New("type casting: name (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3048,49 +3048,6 @@ func TestSeries_IndexOfLabel(t *testing.T) {
 			}
 			if got := s.IndexOfLabel(tt.args.name); got != tt.want {
 				t.Errorf("Series.IndexOfLabel() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestSeries_IndexOfRows(t *testing.T) {
-	type fields struct {
-		values     *valueContainer
-		labels     []*valueContainer
-		sharedData bool
-		err        error
-	}
-	type args struct {
-		name  string
-		value interface{}
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   []int
-	}{
-		{"pass", fields{
-			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
-			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
-			args{"foo", 1}, []int{0},
-		},
-		{"fail", fields{
-			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
-			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
-			args{"corge", 1}, nil,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values:     tt.fields.values,
-				labels:     tt.fields.labels,
-				sharedData: tt.fields.sharedData,
-				err:        tt.fields.err,
-			}
-			if got := s.IndexOfRows(tt.args.name, tt.args.value); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.IndexOfRows() = %v, want %v", got, tt.want)
 			}
 		})
 	}

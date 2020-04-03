@@ -948,19 +948,6 @@ func (df *DataFrame) IndexOfContainer(name string, columns bool) int {
 	return i
 }
 
-// IndexOfRows returns the index positions of the rows with stringified value matching value
-// in the container named name.
-// To search Series values, supply either the Series name or an empty string ("") as name.
-func (df *DataFrame) IndexOfRows(name string, value interface{}) []int {
-	mergedLabelsAndCols := append(df.labels, df.values...)
-	i, err := indexOfContainer(name, mergedLabelsAndCols)
-	if err != nil {
-		errorWarning(fmt.Errorf("index of rows: %v", err))
-		return nil
-	}
-	return mergedLabelsAndCols[i].indexOfRows(value)
-}
-
 // GetLabels returns label levels as interface{} slices within an []interface
 // that may be supplied as optional labels argument to NewSeries() or NewDataFrame().
 // NB: If supplying this output to either of these constructors,
