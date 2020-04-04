@@ -286,12 +286,23 @@ func ReadStruct(structPointer interface{}, options ...ReadOption) (*DataFrame, e
 	labelNames := make([]string, 0)
 	colNames := make([]string, 0)
 	v := reflect.ValueOf(structPointer).Elem()
+	var hasNullTable bool
+	nullTableFieldName := "NullTable"
 	var offset int
 	for k := 0; k < v.NumField(); k++ {
 		field := reflect.TypeOf(structPointer).Elem().Field(k)
 		// is unexported field?
 		if unicode.IsLower([]rune(field.Name)[0]) {
 			offset--
+			continue
+		}
+		// has NullTable?
+		if field.Name == nullTableFieldName {
+			offset--
+			if field.Type.String() != "[][]bool" {
+				return nil, fmt.Errorf("reading struct as schema: struct field NullTable must be type [][]bool, not %s", field.Type.String())
+			}
+			hasNullTable = true
 			continue
 		}
 		// is nil?
@@ -301,12 +312,15 @@ func ReadStruct(structPointer interface{}, options ...ReadOption) (*DataFrame, e
 		}
 		container := k + offset
 		var name string
+		// check tada tag first, then default to exported name
 		if name = field.Tag.Get("tada"); name == "" {
 			name = field.Name
 		}
+		// write to label
 		if container < config.NumLabelLevels {
 			labelNames = append(labelNames, name)
 			labels = append(labels, v.Field(k).Interface())
+			// write to column
 		} else {
 			colNames = append(colNames, name)
 			values = append(values, v.Field(k).Interface())
@@ -316,10 +330,28 @@ func ReadStruct(structPointer interface{}, options ...ReadOption) (*DataFrame, e
 	if df.err != nil {
 		return nil, fmt.Errorf("reading struct as schema: %v", df.err)
 	}
+	// not default labels? apply label names
 	if config.NumLabelLevels > 0 {
 		df = df.SetLabelNames(labelNames)
 	}
 	df = df.SetColNames(colNames)
+
+	if hasNullTable {
+		var min int
+		// default labels? do not change nulls
+		if config.NumLabelLevels == 0 {
+			min = 1
+		}
+		containers := makeIntRange(min, df.NumLevels()+df.NumColumns())
+		nullTable := v.FieldByName(nullTableFieldName).Interface().([][]bool)
+		for incrementor, k := range containers {
+			err := df.SetNulls(k, nullTable[incrementor])
+			if err != nil {
+				return nil, fmt.Errorf("reading struct as schema: writing null table: position %d: %v", incrementor, err)
+			}
+		}
+
+	}
 	return df, nil
 }
 
@@ -441,6 +473,10 @@ func (df *DataFrame) ToCSV(options ...WriteOption) [][]string {
 // ToStruct writes the values of the df containers into structPointer.
 // Returns an error if df does not contain, from left-to-right, the same container names and types
 // as the exported fields that appear, from top-to-bottom, in structPointer.
+// Exported struct fields must be types that are supported by NewDataFrame().
+// If structPointer contains a [][]bool field named "NullTable",
+// then a slice is written into NullTable for each exported field in structPointer
+// recording the null status of each value (true -> value is null).
 // If df contains additional containers beyond those in structPointer, those are ignored.
 func (df *DataFrame) ToStruct(structPointer interface{}, options ...WriteOption) error {
 	config := setWriteConfig(options)
@@ -458,11 +494,22 @@ func (df *DataFrame) ToStruct(structPointer interface{}, options ...WriteOption)
 		mergedLabelsAndCols = df.values
 	}
 	var offset int
+	var hasNullTable bool
+	nullTableFieldName := "NullTable"
 	for k := 0; k < v.NumField(); k++ {
 		field := reflect.TypeOf(structPointer).Elem().Field(k)
 		// is unexported field?
 		if unicode.IsLower([]rune(field.Name)[0]) {
 			offset--
+			continue
+		}
+		// has NullTable?
+		if field.Name == nullTableFieldName {
+			offset--
+			if field.Type.String() != "[][]bool" {
+				return fmt.Errorf("writing to struct: struct field NullTable must be type [][]bool, not %s", field.Type.String())
+			}
+			hasNullTable = true
 			continue
 		}
 		container := k + offset
@@ -482,6 +529,17 @@ func (df *DataFrame) ToStruct(structPointer interface{}, options ...WriteOption)
 		dst := v.FieldByName(field.Name)
 		dst.Set(src)
 	}
+	if hasNullTable {
+		copiedFields := v.NumField() + offset
+		nullTable := make([][]bool, copiedFields)
+		for k := 0; k < copiedFields; k++ {
+			nullTable[k] = mergedLabelsAndCols[k].isNull
+		}
+		src := reflect.ValueOf(nullTable).Interface()
+		dst := v.FieldByName(nullTableFieldName)
+		dst.Set(reflect.ValueOf(src))
+	}
+
 	return nil
 }
 

@@ -5060,6 +5060,17 @@ type testSchema2 struct {
 	Bar  []float64
 }
 
+type testSchema3 struct {
+	Foo       []int
+	NullTable [][]bool
+	Bar       []float64
+}
+
+type testSchema4 struct {
+	Foo       []int
+	NullTable [][]int
+}
+
 func TestReadStruct(t *testing.T) {
 	type args struct {
 		structPointer interface{}
@@ -5115,6 +5126,54 @@ func TestReadStruct(t *testing.T) {
 				colLevelNames: []string{"*0"},
 				name:          ""},
 			false},
+		{"pass - null table",
+			args{
+				&testSchema3{
+					Foo:       []int{0, 2},
+					Bar:       []float64{3, 4},
+					NullTable: [][]bool{{true, false}, {false, false}},
+				}, nil},
+			&DataFrame{
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				values: []*valueContainer{
+					{slice: []int{0, 2}, isNull: []bool{true, false}, name: "Foo"},
+					{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "Bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          ""},
+			false},
+		{"pass - null table - with index",
+			args{
+				&testSchema3{
+					Foo:       []int{0, 2},
+					Bar:       []float64{3, 4},
+					NullTable: [][]bool{{true, false}, {false, false}},
+				}, []ReadOption{ReadOptionLabels(1)}},
+			&DataFrame{
+				labels: []*valueContainer{{slice: []int{0, 2}, isNull: []bool{true, false}, name: "Foo"}},
+				values: []*valueContainer{
+					{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "Bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          ""},
+			false},
+		{"fail - null table of wrong type",
+			args{
+				&testSchema4{
+					Foo:       []int{0, 2},
+					NullTable: [][]int{{0, 1}, {1, 2}},
+				}, nil},
+			nil,
+			true},
+		{"fail - null table with wrong length",
+			args{
+				&testSchema3{
+					Foo:       []int{0, 2},
+					Bar:       []float64{3, 4},
+					NullTable: [][]bool{{true, false}, {false}},
+				}, nil},
+			nil,
+			true},
 		{"fail - nil values",
 			args{
 				&testSchema{
@@ -5174,6 +5233,7 @@ func TestDataFrame_ToStruct(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
+		want    interface{}
 		wantErr bool
 	}{
 		{"pass - match exported names", fields{
@@ -5183,36 +5243,64 @@ func TestDataFrame_ToStruct(t *testing.T) {
 			},
 			colLevelNames: []string{"*0"}},
 			args{&testSchema{}, nil},
+			&testSchema{
+				Foo: []int{0, 1},
+				Bar: []float64{0, 1},
+			},
 			false,
 		},
 		{"pass - match tag names", fields{
 			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"}},
 			values: []*valueContainer{
-				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "bar"},
+				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "bar"},
 			},
 			colLevelNames: []string{"*0"}},
 			args{&testSchema{}, nil},
+			&testSchema{
+				Foo: []int{0, 1},
+				Bar: []float64{0, 1},
+			},
 			false,
 		},
 		{"pass - ignore label names", fields{
 			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 			values: []*valueContainer{
 				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Foo"},
-				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "Bar"},
+				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "Bar"},
 			},
 			colLevelNames: []string{"*0"}},
 			args{&testSchema{}, []WriteOption{WriteOptionExcludeLabels()}},
+			&testSchema{
+				Foo: []int{0, 1},
+				Bar: []float64{0, 1},
+			},
+			false,
+		},
+		{"pass - null table", fields{
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Foo"}},
+			values: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "Bar"},
+			},
+			colLevelNames: []string{"*0"}},
+			args{&testSchema3{}, nil},
+			&testSchema3{
+				Foo:       []int{0, 1},
+				NullTable: [][]bool{{false, false}, {true, false}},
+				Bar:       []float64{0, 1},
+			},
 			false,
 		},
 		{"fail - not pointer", fields{
 			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Bar"}},
 			values: []*valueContainer{
-				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "Foo"},
+				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "Foo"},
 			},
 			colLevelNames: []string{"*0"}},
 			args{testSchema{}, nil},
+			testSchema{},
 			true,
 		},
+
 		{"fail - not pointer to struct", fields{
 			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Bar"}},
 			values: []*valueContainer{
@@ -5220,6 +5308,7 @@ func TestDataFrame_ToStruct(t *testing.T) {
 			},
 			colLevelNames: []string{"*0"}},
 			args{&[]float64{}, nil},
+			&[]float64{},
 			true,
 		},
 		{"fail - wrong order", fields{
@@ -5229,6 +5318,7 @@ func TestDataFrame_ToStruct(t *testing.T) {
 			},
 			colLevelNames: []string{"*0"}},
 			args{&testSchema{}, nil},
+			&testSchema{},
 			true,
 		},
 		{"fail - does not match exported name or tag name", fields{
@@ -5238,6 +5328,7 @@ func TestDataFrame_ToStruct(t *testing.T) {
 			},
 			colLevelNames: []string{"*0"}},
 			args{&testSchema{}, nil},
+			&testSchema{},
 			true,
 		},
 		{"fail - does not match field type", fields{
@@ -5247,8 +5338,19 @@ func TestDataFrame_ToStruct(t *testing.T) {
 			},
 			colLevelNames: []string{"*0"}},
 			args{&testSchema{}, nil},
+			&testSchema{},
 			true,
 		},
+		{"fail - null table of wrong type",
+			fields{
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Foo"}},
+				values: []*valueContainer{
+					{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "Bar"},
+				},
+				colLevelNames: []string{"*0"}},
+			args{&testSchema4{}, nil},
+			&testSchema4{Foo: []int{0, 1}},
+			true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -5262,6 +5364,10 @@ func TestDataFrame_ToStruct(t *testing.T) {
 			err := df.ToStruct(tt.args.structPointer, tt.args.options...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.ToStruct() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(tt.args.structPointer, tt.want) {
+				t.Errorf("DataFrame.ToStruct() -> %v, want %v", tt.args.structPointer, tt.want)
+
 			}
 		})
 	}
