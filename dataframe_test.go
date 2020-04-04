@@ -191,7 +191,7 @@ func TestDataFrame_Cast(t *testing.T) {
 	}
 }
 
-func TestDataFrame_ToSeries(t *testing.T) {
+func TestDataFrame_Series(t *testing.T) {
 	type fields struct {
 		labels []*valueContainer
 		values []*valueContainer
@@ -228,8 +228,8 @@ func TestDataFrame_ToSeries(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.ToSeries(); !EqualSeries(got, tt.want) {
-				t.Errorf("DataFrame.ToSeries() = %v, want %v", got, tt.want)
+			if got := df.Series(); !EqualSeries(got, tt.want) {
+				t.Errorf("DataFrame.Series() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -3470,7 +3470,7 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 	}
 }
 
-func TestDataFrame_ToCSV(t *testing.T) {
+func TestDataFrame_CSV(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -3511,9 +3511,9 @@ func TestDataFrame_ToCSV(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			got := df.ToCSV(tt.args.options...)
+			got := df.CSV(tt.args.options...)
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.ToCSV() = %v, want %v", got, tt.want)
+				t.Errorf("DataFrame.CSV() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -3670,7 +3670,7 @@ func TestDataFrame_FilterByValue(t *testing.T) {
 	}
 }
 
-func TestDataFrame_LabelsToSeries(t *testing.T) {
+func TestDataFrame_LabelsSeries(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -3718,8 +3718,8 @@ func TestDataFrame_LabelsToSeries(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.LabelsToSeries(tt.args.name); !EqualSeries(got, tt.want) {
-				t.Errorf("DataFrame.LabelsToSeries() = %v, want %v", got, tt.want)
+			if got := df.LabelsSeries(tt.args.name); !EqualSeries(got, tt.want) {
+				t.Errorf("DataFrame.LabelsSeries() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -5217,7 +5217,7 @@ func TestReadStruct(t *testing.T) {
 	}
 }
 
-func TestDataFrame_ToStruct(t *testing.T) {
+func TestDataFrame_Struct(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -5361,12 +5361,12 @@ func TestDataFrame_ToStruct(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			err := df.ToStruct(tt.args.structPointer, tt.args.options...)
+			err := df.Struct(tt.args.structPointer, tt.args.options...)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("DataFrame.ToStruct() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("DataFrame.Struct() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			if !reflect.DeepEqual(tt.args.structPointer, tt.want) {
-				t.Errorf("DataFrame.ToStruct() -> %v, want %v", tt.args.structPointer, tt.want)
+				t.Errorf("DataFrame.Struct() -> %v, want %v", tt.args.structPointer, tt.want)
 
 			}
 		})

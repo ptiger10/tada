@@ -68,8 +68,8 @@ func (s *Series) Copy() *Series {
 	}
 }
 
-// ToDataFrame converts a Series to a 1-column DataFrame.
-func (s *Series) ToDataFrame() *DataFrame {
+// DataFrame converts a Series to a 1-column DataFrame.
+func (s *Series) DataFrame() *DataFrame {
 	s = s.Copy()
 	return &DataFrame{
 		values:        []*valueContainer{s.values},
@@ -86,12 +86,12 @@ func (s *Series) ToDataFrame() *DataFrame {
 //
 // If includeLabels is true, then s's labels are included as columns.
 func (s *Series) EqualsCSV(includeLabels bool, want io.Reader, wantOptions ...ReadOption) (bool, *tablediff.Differences, error) {
-	df := s.ToDataFrame()
+	df := s.DataFrame()
 	return df.EqualsCSV(includeLabels, want, wantOptions...)
 }
 
-// ToCSV converts a Series to a DataFrame and returns as [][]string.
-func (s *Series) ToCSV(options ...WriteOption) ([][]string, error) {
+// CSV converts a Series to a DataFrame and returns as [][]string.
+func (s *Series) CSV(options ...WriteOption) ([][]string, error) {
 	if s.values == nil {
 		return nil, fmt.Errorf("converting to csv: cannot export empty Series")
 	}
@@ -101,7 +101,7 @@ func (s *Series) ToCSV(options ...WriteOption) ([][]string, error) {
 		colLevelNames: []string{"*0"},
 		err:           s.err,
 	}
-	csv := df.ToCSV(options...)
+	csv := df.CSV(options...)
 	return csv, nil
 }
 
@@ -111,7 +111,7 @@ func (s *Series) String() string {
 	if s.err != nil {
 		return fmt.Sprintf("Error: %v", s.err)
 	}
-	return s.ToDataFrame().String()
+	return s.DataFrame().String()
 }
 
 // Err returns the most recent error attached to the Series, if any.
@@ -176,10 +176,10 @@ func (s *Series) IndexOfLabel(name string) int {
 	return i
 }
 
-// LabelsToSeries finds the first level with matching name and returns as a Series with all existing label levels (including itself).
+// LabelsAsSeries finds the first level with matching name and returns as a Series with all existing label levels (including itself).
 // If label level name is default (prefixed with *), removes the prefix.
 // Returns a new Series with shared labels.
-func (s *Series) LabelsToSeries(name string) *Series {
+func (s *Series) LabelsAsSeries(name string) *Series {
 	index, err := indexOfContainer(name, s.labels)
 	if err != nil {
 		return seriesWithError(fmt.Errorf("converting labels to Series: %v", err))
@@ -903,7 +903,7 @@ func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, righ
 
 // Merge converts s and other to dataframes. and then performs a left join of other onto df using containers with matching names as keys.
 // To perform a different type of join or specify the matching keys,
-// use s.ToDataFrame() + df.LookupAdvanced() to isolate values in other, and append them with df.WithCol().
+// use s.DataFrame() + df.LookupAdvanced() to isolate values in other, and append them with df.WithCol().
 //
 // Merge identifies the row alignment between s and other and appends aligned values as new columns on s.
 // Rows are aligned when:
@@ -928,7 +928,7 @@ func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, righ
 // Finally, all container names (either the Series name or label name) are deduplicated after the merge so that they are unique.
 // Returns a new DataFrame.
 func (s *Series) Merge(other *Series) *DataFrame {
-	return s.ToDataFrame().Merge(other.ToDataFrame())
+	return s.DataFrame().Merge(other.DataFrame())
 }
 
 // Add coerces other and s to float64 values, aligns other with s, and adds the values in aligned rows,

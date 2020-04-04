@@ -133,7 +133,7 @@ func TestSeries_Cast(t *testing.T) {
 	}
 }
 
-func TestSeries_ToDataFrame(t *testing.T) {
+func TestSeries_DataFrame(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -162,13 +162,13 @@ func TestSeries_ToDataFrame(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			got := s.ToDataFrame()
+			got := s.DataFrame()
 			if !EqualDataFrames(got, tt.want) {
-				t.Errorf("Series.ToDataFrame() = %v, want %v", got, tt.want)
+				t.Errorf("Series.DataFrame() = %v, want %v", got, tt.want)
 			}
 			got.labels[0] = &valueContainer{slice: []float64{10}, name: "baz", isNull: []bool{false}}
 			if reflect.DeepEqual(got.labels, s.labels) {
-				t.Errorf("Series.ToDataFrame() retained reference to original labels")
+				t.Errorf("Series.DataFrame() retained reference to original labels")
 			}
 		})
 	}
@@ -223,7 +223,7 @@ func TestSeries_EqualsCSV(t *testing.T) {
 	}
 }
 
-func TestSeries_ToCSV(t *testing.T) {
+func TestSeries_CSV(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -262,13 +262,13 @@ func TestSeries_ToCSV(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			got, err := s.ToCSV(tt.args.options...)
+			got, err := s.CSV(tt.args.options...)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("DataFrame.ToCSV() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("DataFrame.CSV() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.ToCSV() = %v, want %v", got, tt.want)
+				t.Errorf("Series.CSV() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -2777,7 +2777,7 @@ func TestSeries_Resample(t *testing.T) {
 	}
 }
 
-func TestSeries_LabelsToSeries(t *testing.T) {
+func TestSeries_LabelsAsSeries(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -2817,8 +2817,8 @@ func TestSeries_LabelsToSeries(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.LabelsToSeries(tt.args.name); !EqualSeries(got, tt.want) {
-				t.Errorf("Series.LabelsToSeries() = %v, want %v", got, tt.want)
+			if got := s.LabelsAsSeries(tt.args.name); !EqualSeries(got, tt.want) {
+				t.Errorf("Series.LabelsAsSeries() = %v, want %v", got, tt.want)
 			}
 		})
 	}

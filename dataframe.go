@@ -141,9 +141,9 @@ func ConcatSeries(series ...*Series) (*DataFrame, error) {
 	var ret *DataFrame
 	for k, s := range series {
 		if k == 0 {
-			ret = s.ToDataFrame()
+			ret = s.DataFrame()
 		} else {
-			ret.InPlace().Merge(s.ToDataFrame())
+			ret.InPlace().Merge(s.DataFrame())
 		}
 		if ret.Err() != nil {
 			return nil, ret.Err()
@@ -395,8 +395,8 @@ func ReadStructSlice(slice interface{}) (*DataFrame, error) {
 	}, nil
 }
 
-// ToSeries converts a single-columned DataFrame to a Series that shares the same underlying values and labels.
-func (df *DataFrame) ToSeries() *Series {
+// Series converts a single-columned DataFrame to a Series that shares the same underlying values and labels.
+func (df *DataFrame) Series() *Series {
 	if len(df.values) != 1 {
 		return seriesWithError(fmt.Errorf("converting to Series: DataFrame must have a single column"))
 	}
@@ -420,9 +420,9 @@ func (df *DataFrame) EqualsCSV(includeLabels bool, want io.Reader, wantOptions .
 		return false, nil, fmt.Errorf("comparing csv: reading want: %v", err)
 	}
 
-	got := df.ToCSV(writeOptionIncludeLabels(includeLabels))
+	got := df.CSV(writeOptionIncludeLabels(includeLabels))
 	// df2 has default labels? exclude them
-	wantDF := df2.ToCSV(writeOptionIncludeLabels(config.NumLabelLevels > 0))
+	wantDF := df2.CSV(writeOptionIncludeLabels(config.NumLabelLevels > 0))
 	diffs, eq := tablediff.Diff(got, wantDF)
 	return eq, diffs, nil
 }
@@ -450,9 +450,9 @@ func WriteOptionDelimiter(sep rune) func(*writeConfig) {
 	}
 }
 
-// ToCSV writes a DataFrame to a [][]string with rows as the major dimension.
+// CSV writes a DataFrame to a [][]string with rows as the major dimension.
 // Null values are replaced with "n/a".
-func (df *DataFrame) ToCSV(options ...WriteOption) [][]string {
+func (df *DataFrame) CSV(options ...WriteOption) [][]string {
 	config := setWriteConfig(options)
 	transposedStringValues, err := df.toCSVByRows(config.IncludeLabels)
 	if err != nil {
@@ -470,7 +470,7 @@ func (df *DataFrame) ToCSV(options ...WriteOption) [][]string {
 	return transposedStringValues
 }
 
-// ToStruct writes the values of the df containers into structPointer.
+// Struct writes the values of the df containers into structPointer.
 // Returns an error if df does not contain, from left-to-right, the same container names and types
 // as the exported fields that appear, from top-to-bottom, in structPointer.
 // Exported struct fields must be types that are supported by NewDataFrame().
@@ -478,7 +478,7 @@ func (df *DataFrame) ToCSV(options ...WriteOption) [][]string {
 // then a slice is written into NullTable for each exported field in structPointer
 // recording the null status of each value (true -> value is null).
 // If df contains additional containers beyond those in structPointer, those are ignored.
-func (df *DataFrame) ToStruct(structPointer interface{}, options ...WriteOption) error {
+func (df *DataFrame) Struct(structPointer interface{}, options ...WriteOption) error {
 	config := setWriteConfig(options)
 	if reflect.TypeOf(structPointer).Kind() != reflect.Ptr {
 		return fmt.Errorf("writing to struct: structPointer must be pointer to struct, not %s", reflect.TypeOf(structPointer).Kind())
@@ -548,7 +548,7 @@ func (df *DataFrame) ToStruct(structPointer interface{}, options ...WriteOption)
 // Null values are replaced with "n/a".
 func (df *DataFrame) WriteCSV(w io.Writer, options ...WriteOption) error {
 	config := setWriteConfig(options)
-	ret := df.ToCSV(writeOptionIncludeLabels(config.IncludeLabels))
+	ret := df.CSV(writeOptionIncludeLabels(config.IncludeLabels))
 	if len(ret) == 0 {
 		return fmt.Errorf("writing csv: df cannot be empty")
 	}
@@ -580,7 +580,7 @@ func WriteMockCSV(w io.Writer, n int, r io.Reader, options ...ReadOption) error 
 		return fmt.Errorf("writing mock csv: reading r: %v", err)
 	}
 	// data has default labels? exclude them
-	src := data.ToCSV(writeOptionIncludeLabels(config.NumLabelLevels > 0))
+	src := data.CSV(writeOptionIncludeLabels(config.NumLabelLevels > 0))
 
 	if !config.MajorDimIsCols {
 		rowCount = len(src)
@@ -672,12 +672,12 @@ func (df *DataFrame) String() string {
 	}
 	var data [][]string
 	if df.Len() <= optionMaxRows {
-		data = df.ToCSV()
+		data = df.CSV()
 	} else {
 		// truncate rows
 		n := optionMaxRows / 2
-		topHalf := df.Head(n).ToCSV()
-		bottomHalf := df.Tail(n).ToCSV()[df.numColLevels():]
+		topHalf := df.Head(n).CSV()
+		bottomHalf := df.Tail(n).CSV()[df.numColLevels():]
 		filler := make([]string, df.NumLevels()+df.NumColumns())
 		for k := range filler {
 			filler[k] = "..."
@@ -1019,12 +1019,12 @@ func (df *DataFrame) GetLabels() []interface{} {
 	return ret
 }
 
-// LabelsToSeries finds the first label level with matching name
+// LabelsSeries finds the first label level with matching name
 // and returns the values as a Series.
 // Similar to Col(), but selects label values instead of column values.
 // The labels in the Series are shared with the labels in the DataFrame.
 // If label level name is default (prefixed with *), the prefix is removed.
-func (df *DataFrame) LabelsToSeries(name string) *Series {
+func (df *DataFrame) LabelsSeries(name string) *Series {
 	index, err := indexOfContainer(name, df.labels)
 	if err != nil {
 		return seriesWithError(fmt.Errorf("converting labels to Series: %v", err))
