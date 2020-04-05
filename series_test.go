@@ -1977,7 +1977,7 @@ func TestSeries_Median(t *testing.T) {
 	}
 }
 
-func TestSeries_Std(t *testing.T) {
+func TestSeries_StdDev(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer

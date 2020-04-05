@@ -160,7 +160,7 @@ func (g *GroupedSeries) Median() *Series {
 
 // StdDev coerces values to float64 and calculates the standard deviation of each group.
 func (g *GroupedSeries) StdDev() *Series {
-	return g.float64ReduceFunc("std", std)
+	return g.float64ReduceFunc("stdDev", std)
 }
 
 // Count returns the number of non-null values in each group.
@@ -489,7 +489,7 @@ func (g *GroupedDataFrame) Median(colNames ...string) *DataFrame {
 
 // StdDev coerces the column values in colNames to float64 and calculates the standard deviation of each group.
 func (g *GroupedDataFrame) StdDev(colNames ...string) *DataFrame {
-	return g.float64ReduceFunc("std", colNames, std)
+	return g.float64ReduceFunc("stdDev", colNames, std)
 }
 
 // Min coerces the column values in colNames to float64 and calculates the minimum of each group.

@@ -2188,7 +2188,7 @@ func (df *DataFrame) groupby(index []int) *GroupedDataFrame {
 // reducing the values in values using an aggFunc aggregation function, then
 // promoting the unique values in columns to be new columns.
 // labels, columns, and values should all refer to existing container names (either columns or labels).
-// Supported aggFuncs: sum, mean, median, std, count, min, max.
+// Supported aggFuncs: sum, mean, median, stdDev, count, min, max.
 func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFrame {
 
 	mergedLabelsAndCols := append(df.labels, df.values...)
@@ -2213,7 +2213,7 @@ func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFr
 		ret = grouper.Mean(values)
 	case "median":
 		ret = grouper.Median(values)
-	case "std":
+	case "stdDev":
 		ret = grouper.StdDev(values)
 	case "count":
 		ret = grouper.Count(values)
@@ -2388,7 +2388,7 @@ func (df *DataFrame) Median() *Series {
 
 // StdDev coerces the values in each column to float64 and calculates the standard deviation of each column.
 func (df *DataFrame) StdDev() *Series {
-	return df.math("std", std)
+	return df.math("stdDev", std)
 }
 
 // Count counts the number of non-null values in each column.

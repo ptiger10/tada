@@ -2174,7 +2174,7 @@ func Test_median(t *testing.T) {
 	}
 }
 
-func Test_std(t *testing.T) {
+func Test_StdDev(t *testing.T) {
 	type args struct {
 		vals   []float64
 		isNull []bool

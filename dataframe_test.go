@@ -2231,7 +2231,7 @@ func TestDataFrame_Median(t *testing.T) {
 	}
 }
 
-func TestDataFrame_Std(t *testing.T) {
+func TestDataFrame_StdDev(t *testing.T) {
 	type fields struct {
 		labels []*valueContainer
 		values []*valueContainer
@@ -2252,7 +2252,7 @@ func TestDataFrame_Std(t *testing.T) {
 			name:   "corge",
 		},
 			&Series{
-				values: &valueContainer{slice: []float64{.5, .5}, isNull: []bool{false, false}, name: "std"},
+				values: &valueContainer{slice: []float64{.5, .5}, isNull: []bool{false, false}, name: "stdDev"},
 				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
 			}},
 	}
@@ -2902,7 +2902,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
 				name:          "median_foo"}},
-		{"std", fields{
+		{"stdDev", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
 				{slice: []float64{2018, 2018, 2019, 2019}, isNull: []bool{false, false, false, false}, name: "year"},
@@ -2911,7 +2911,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"},
 			name:          "foo"},
-			args{labels: "type", columns: "year", values: "amount", aggFn: "std"},
+			args{labels: "type", columns: "year", values: "amount", aggFn: "stdDev"},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{0, 0}, isNull: []bool{false, false}, name: "2018"},
 				{slice: []float64{0, 0.5}, isNull: []bool{true, false}, name: "2019"},
@@ -2919,7 +2919,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
-				name:          "std_foo"}},
+				name:          "stdDev_foo"}},
 		{"count", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -2983,7 +2983,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
-			args{labels: "corge", columns: "year", values: "amount", aggFn: "std"},
+			args{labels: "corge", columns: "year", values: "amount", aggFn: "stdDev"},
 			&DataFrame{
 				err: fmt.Errorf("pivot table: labels: name (corge) not found")}},
 		{"fail - no matching columns", fields{
@@ -2994,7 +2994,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
-			args{labels: "type", columns: "corge", values: "amount", aggFn: "std"},
+			args{labels: "type", columns: "corge", values: "amount", aggFn: "stdDev"},
 			&DataFrame{
 				err: fmt.Errorf("pivot table: columns: name (corge) not found")}},
 		{"fail - no matching values", fields{
@@ -3005,7 +3005,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
-			args{labels: "type", columns: "year", values: "corge", aggFn: "std"},
+			args{labels: "type", columns: "year", values: "corge", aggFn: "stdDev"},
 			&DataFrame{
 				err: fmt.Errorf("pivot table: values: name (corge) not found")}},
 		{"fail - unsupported aggfunc", fields{

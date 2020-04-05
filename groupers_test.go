@@ -765,7 +765,7 @@ func TestGroupedSeries_Median(t *testing.T) {
 	}
 }
 
-func TestGroupedSeries_Std(t *testing.T) {
+func TestGroupedSeries_StdDev(t *testing.T) {
 	type fields struct {
 		orderedKeys []string
 		rowIndices  [][]int
@@ -788,7 +788,7 @@ func TestGroupedSeries_Std(t *testing.T) {
 				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			want: &Series{values: &valueContainer{slice: []float64{0.5, 0.5}, isNull: []bool{false, false}, name: "std"},
+			want: &Series{values: &valueContainer{slice: []float64{0.5, 0.5}, isNull: []bool{false, false}, name: "stdDev"},
 				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}}}},
 		{
 			name: "single level - aligned",
@@ -804,7 +804,7 @@ func TestGroupedSeries_Std(t *testing.T) {
 			want: &Series{
 				sharedData: true,
 				values: &valueContainer{
-					slice: []float64{0.5, 0.5, 0.5, 0.5}, isNull: []bool{false, false, false, false}, name: "std_qux"},
+					slice: []float64{0.5, 0.5, 0.5, 0.5}, isNull: []bool{false, false, false, false}, name: "stdDev_qux"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 				}}},
@@ -821,7 +821,7 @@ func TestGroupedSeries_Std(t *testing.T) {
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 						{slice: []int{0, 0, 0, 0}, isNull: []bool{false, false, false, false}, name: "*1"}}}},
-			want: &Series{values: &valueContainer{slice: []float64{0.5, 0.5}, isNull: []bool{false, false}, name: "std"},
+			want: &Series{values: &valueContainer{slice: []float64{0.5, 0.5}, isNull: []bool{false, false}, name: "stdDev"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
 					{slice: []int{0, 0}, isNull: []bool{false, false}, name: "*1"}}}},
@@ -2015,7 +2015,7 @@ func TestGroupedDataFrame_Median(t *testing.T) {
 	}
 }
 
-func TestGroupedDataFrame_Std(t *testing.T) {
+func TestGroupedDataFrame_StdDev(t *testing.T) {
 	type fields struct {
 		orderedKeys []string
 		rowIndices  [][]int
@@ -2050,13 +2050,13 @@ func TestGroupedDataFrame_Std(t *testing.T) {
 			args: args{nil},
 			want: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{0.5, 0.5}, isNull: []bool{false, false}, name: "std_corge"},
-					{slice: []float64{0.5, 0.5}, isNull: []bool{false, false}, name: "std_waldo"},
+					{slice: []float64{0.5, 0.5}, isNull: []bool{false, false}, name: "stdDev_corge"},
+					{slice: []float64{0.5, 0.5}, isNull: []bool{false, false}, name: "stdDev_waldo"},
 				},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "baz"}},
 				colLevelNames: []string{"*0"},
-				name:          "std_qux",
+				name:          "stdDev_qux",
 			}},
 	}
 	for _, tt := range tests {
