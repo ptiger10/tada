@@ -23,11 +23,8 @@ func Test_sampleDataPipeline(t *testing.T) {
 	df, _ := ReadCSV(strings.NewReader(data))
 
 	ret := sampleDataPipeline(df)
-	ok, diffs, err := ret.EqualsCSV(true, strings.NewReader(want))
-	if err != nil {
-		log.Fatal(err)
-	}
-	if !ok {
+	eq, diffs, _ := ret.EqualsCSV(true, strings.NewReader(want))
+	if !eq {
 		t.Errorf("sampleDataPipeline(): got %v, want %v, has diffs: \n%v", ret, want, diffs)
 	}
 }

@@ -836,8 +836,8 @@ func TestGroupedSeries_Std(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.Std(); !EqualSeries(got, tt.want) {
-				t.Errorf("GroupedSeries.Std() = %v, want %v", got, tt.want)
+			if got := g.StdDev(); !EqualSeries(got, tt.want) {
+				t.Errorf("GroupedSeries.StdDev() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -2068,8 +2068,8 @@ func TestGroupedDataFrame_Std(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			if got := g.Std(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
-				t.Errorf("GroupedDataFrame.Std() = %v, want %v", got, tt.want)
+			if got := g.StdDev(tt.args.colNames...); !EqualDataFrames(got, tt.want) {
+				t.Errorf("GroupedDataFrame.StdDev() = %v, want %v", got, tt.want)
 			}
 		})
 	}

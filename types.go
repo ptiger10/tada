@@ -152,7 +152,7 @@ type Sorter struct {
 	DType      DType
 }
 
-// An Element is one value in either a Series or DataFrame.
+// An Element is one {value, null status} pair in either a Series or DataFrame.
 type Element struct {
 	Val    interface{}
 	IsNull bool

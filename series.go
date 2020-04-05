@@ -119,13 +119,13 @@ func (s *Series) Err() error {
 	return s.err
 }
 
-// At returns the Element at the index position. If index is out of range, returns an empty Element.
-func (s *Series) At(index int) Element {
+// At returns the Element at the index position. If index is out of range, returns nil.
+func (s *Series) At(index int) *Element {
 	if index >= s.Len() {
-		return Element{}
+		return nil
 	}
 	v := reflect.ValueOf(s.values.slice)
-	return Element{
+	return &Element{
 		Val:    v.Index(index).Interface(),
 		IsNull: s.values.isNull[index],
 	}
@@ -884,11 +884,11 @@ func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, righ
 			return seriesWithError(fmt.Errorf("lookup: %v", err))
 		}
 	} else {
-		leftKeys, err = convertColNamesToIndexPositions(leftOn, s.labels)
+		leftKeys, err = indexOfContainers(leftOn, s.labels)
 		if err != nil {
 			return seriesWithError(fmt.Errorf("lookup: leftOn: %v", err))
 		}
-		rightKeys, err = convertColNamesToIndexPositions(rightOn, other.labels)
+		rightKeys, err = indexOfContainers(rightOn, other.labels)
 		if err != nil {
 			return seriesWithError(fmt.Errorf("lookup: rightOn: %v", err))
 		}
@@ -996,7 +996,7 @@ func (s *Series) GroupBy(names ...string) *GroupedSeries {
 	if len(names) == 0 {
 		index = makeIntRange(0, s.numLevels())
 	} else {
-		index, err = convertColNamesToIndexPositions(names, s.labels)
+		index, err = indexOfContainers(names, s.labels)
 		if err != nil {
 			return groupedSeriesWithError(fmt.Errorf("group by: %v", err))
 		}
@@ -1058,8 +1058,8 @@ func (s *Series) Median() float64 {
 	return s.floatFunc(median)
 }
 
-// Std coerces the Series values to float64 and calculates the standard deviation.
-func (s *Series) Std() float64 {
+// StdDev coerces the Series values to float64 and calculates the standard deviation.
+func (s *Series) StdDev() float64 {
 	return s.floatFunc(std)
 }
 

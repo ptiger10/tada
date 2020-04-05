@@ -1,7 +1,6 @@
 package tada
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -138,13 +137,6 @@ func ExampleDataFrame() {
 	// | 0 || 1 | baz |
 	// | 1 || 2 | qux |
 	// +---++---+-----+
-}
-
-func ExampleDataFrame_withError() {
-	df := &DataFrame{err: errors.New("foo")}
-	fmt.Println(df)
-	// Output:
-	// Error: foo
 }
 
 func ExampleDataFrame_withNullValues() {

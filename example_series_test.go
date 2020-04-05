@@ -1,7 +1,6 @@
 package tada
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -18,13 +17,6 @@ func ExampleSeries() {
 	// | 0 ||   1 |
 	// | 1 ||   2 |
 	// +---++-----+
-}
-
-func ExampleSeries_withError() {
-	s := &Series{err: errors.New("foo")}
-	fmt.Println(s)
-	// Output:
-	// Error: foo
 }
 
 func ExampleSeries_withNullValues() {
@@ -612,7 +604,7 @@ func ExampleSeries_zscore() {
 	vals := s.GetValuesFloat64()
 	ret := make([]float64, s.Len())
 	mean := s.Mean()
-	std := s.Std()
+	std := s.StdDev()
 	for i := range vals {
 		ret[i] = (vals[i] - mean) / std
 	}

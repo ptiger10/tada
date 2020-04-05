@@ -129,6 +129,40 @@ func TestNewDataFrame(t *testing.T) {
 	}
 }
 
+func TestDataFrame_Err_String(t *testing.T) {
+	type fields struct {
+		values        []*valueContainer
+		labels        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{"pass",
+			fields{
+				err: fmt.Errorf("foo")},
+			"Error: foo"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if df.String() != tt.want {
+				t.Errorf("Series.Err().String() -> %v, want %v", df, tt.want)
+			}
+		})
+	}
+}
+
 func TestDataFrame_Cast(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
@@ -2230,8 +2264,8 @@ func TestDataFrame_Std(t *testing.T) {
 				name:   tt.fields.name,
 				err:    tt.fields.err,
 			}
-			if got := df.Std(); !EqualSeries(got, tt.want) {
-				t.Errorf("DataFrame.Std() = %v, want %v", got, tt.want)
+			if got := df.StdDev(); !EqualSeries(got, tt.want) {
+				t.Errorf("DataFrame.StdDev() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -3067,8 +3101,8 @@ func TestReadMatrix(t *testing.T) {
 			args: args{mat: testMatrix{values: [][]float64{{1, 2}}}},
 			want: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "0", cache: []string{"1"}},
-					{slice: []float64{2}, isNull: []bool{false}, name: "1", cache: []string{"2"}}},
+					{slice: []float64{1}, isNull: []bool{false}, name: "0"},
+					{slice: []float64{2}, isNull: []bool{false}, name: "1"}},
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				name:          "",
 				colLevelNames: []string{"*0"}},
@@ -4272,7 +4306,7 @@ func TestDataFrame_At(t *testing.T) {
 		name   string
 		fields fields
 		args   args
-		want   Element
+		want   *Element
 	}{
 		{"pass", fields{
 			values: []*valueContainer{
@@ -4282,7 +4316,7 @@ func TestDataFrame_At(t *testing.T) {
 			labels:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
 			args{0, 0},
-			Element{Val: 0, IsNull: true},
+			&Element{Val: 0, IsNull: true},
 		},
 		{"fail - row out of range", fields{
 			values: []*valueContainer{
@@ -4292,7 +4326,7 @@ func TestDataFrame_At(t *testing.T) {
 			labels:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
 			args{10, 0},
-			Element{},
+			nil,
 		},
 		{"fail - column out of range", fields{
 			values: []*valueContainer{
@@ -4302,7 +4336,7 @@ func TestDataFrame_At(t *testing.T) {
 			labels:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
 			args{0, 10},
-			Element{},
+			nil,
 		},
 	}
 	for _, tt := range tests {
@@ -4314,8 +4348,15 @@ func TestDataFrame_At(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.At(tt.args.row, tt.args.column); !reflect.DeepEqual(got, tt.want) {
+			got := df.At(tt.args.row, tt.args.column)
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("DataFrame.At() = %v, want %v", got, tt.want)
+			}
+			if got != nil {
+				got.Val = "foobar"
+				if got == df.At(tt.args.row, tt.args.column) {
+					t.Errorf("DataFrame.At() retained reference to underlying value, want copy")
+				}
 			}
 		})
 	}

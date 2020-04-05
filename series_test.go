@@ -3,6 +3,7 @@ package tada
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -47,6 +48,37 @@ func TestNewSeries(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := NewSeries(tt.args.slice, tt.args.labels...); !EqualSeries(got, tt.want) {
 				t.Errorf("NewSeries() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_Err_String(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{"pass",
+			fields{
+				err: fmt.Errorf("foo")},
+			"Error: foo"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values: tt.fields.values,
+				labels: tt.fields.labels,
+				err:    tt.fields.err,
+			}
+			if s.String() != tt.want {
+				t.Errorf("Series.Err().String() -> %v, want %v", s, tt.want)
 			}
 		})
 	}
@@ -1965,8 +1997,8 @@ func TestSeries_Std(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Std(); got != tt.want {
-				t.Errorf("Series.Std() = %v, want %v", got, tt.want)
+			if got := s.StdDev(); got != tt.want {
+				t.Errorf("Series.StdDev() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -2948,19 +2980,19 @@ func TestSeries_At(t *testing.T) {
 		name   string
 		fields fields
 		args   args
-		want   Element
+		want   *Element
 	}{
 		{"pass", fields{
 			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
 			args{0},
-			Element{Val: float64(1), IsNull: false},
+			&Element{Val: float64(1), IsNull: false},
 		},
 		{"out of range", fields{
 			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
 			args{1},
-			Element{},
+			nil,
 		},
 	}
 	for _, tt := range tests {

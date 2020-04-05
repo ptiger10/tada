@@ -158,8 +158,8 @@ func (g *GroupedSeries) Median() *Series {
 	return g.float64ReduceFunc("median", median)
 }
 
-// Std coerces values to float64 and calculates the standard deviation of each group.
-func (g *GroupedSeries) Std() *Series {
+// StdDev coerces values to float64 and calculates the standard deviation of each group.
+func (g *GroupedSeries) StdDev() *Series {
 	return g.float64ReduceFunc("std", std)
 }
 
@@ -487,8 +487,8 @@ func (g *GroupedDataFrame) Median(colNames ...string) *DataFrame {
 	return g.float64ReduceFunc("median", colNames, median)
 }
 
-// Std coerces the column values in colNames to float64 and calculates the standard deviation of each group.
-func (g *GroupedDataFrame) Std(colNames ...string) *DataFrame {
+// StdDev coerces the column values in colNames to float64 and calculates the standard deviation of each group.
+func (g *GroupedDataFrame) StdDev(colNames ...string) *DataFrame {
 	return g.float64ReduceFunc("std", colNames, std)
 }
 

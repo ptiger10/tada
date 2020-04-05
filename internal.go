@@ -1234,12 +1234,12 @@ func sortContainers(containers []*valueContainer, sorters []Sorter) ([]int, erro
 	return originalIndex, nil
 }
 
-// convertColNamesToIndexPositions converts a slice of label or column names to index positions.
-// If any name is not in the set of columns, returns an error
-func convertColNamesToIndexPositions(names []string, columns []*valueContainer) ([]int, error) {
+// indexOfContainers converts a slice of label or column names to index positions.
+// If any name is not in the set of containers, returns an error
+func indexOfContainers(names []string, containers []*valueContainer) ([]int, error) {
 	ret := make([]int, len(names))
 	for i, name := range names {
-		lvl, err := indexOfContainer(name, columns)
+		lvl, err := indexOfContainer(name, containers)
 		if err != nil {
 			return nil, err
 		}

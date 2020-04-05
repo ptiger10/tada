@@ -360,21 +360,15 @@ func ReadStruct(structPointer interface{}, options ...ReadOption) (*DataFrame, e
 func ReadMatrix(mat Matrix) *DataFrame {
 	numRows, numCols := mat.Dims()
 	// major dimension: columns
-	data := make([][]string, numCols)
+	data := make([]interface{}, numCols)
 	for k := range data {
-		data[k] = make([]string, numRows)
+		floats := make([]float64, numRows)
 		for i := 0; i < numRows; i++ {
-			data[k][i] = fmt.Sprint(mat.At(i, k))
+			floats[i] = mat.At(i, k)
 		}
+		data[k] = floats
 	}
-	// ducks error because expects all slices to be the same length
-	ret, _ := readCSVByCols(data, &readConfig{})
-	// convert back to float64
-	casters := make(map[string]DType)
-	for _, name := range ret.ListColNames() {
-		casters[name] = Float64
-	}
-	ret.Cast(casters)
+	ret := NewDataFrame(data)
 	return ret
 }
 
@@ -736,16 +730,16 @@ func (df *DataFrame) String() string {
 }
 
 // At returns the Element at the row and column index positions.
-// If row or column is out of range, returns an empty Element.
-func (df *DataFrame) At(row, column int) Element {
+// If row or column is out of range, returns nil.
+func (df *DataFrame) At(row, column int) *Element {
 	if row >= df.Len() {
-		return Element{}
+		return nil
 	}
 	if column >= df.NumColumns() {
-		return Element{}
+		return nil
 	}
 	v := reflect.ValueOf(df.values[column].slice)
-	return Element{
+	return &Element{
 		Val:    v.Index(row).Interface(),
 		IsNull: df.values[column].isNull[row],
 	}
@@ -2098,11 +2092,11 @@ func (df *DataFrame) LookupAdvanced(other *DataFrame, how string, leftOn []strin
 			return dataFrameWithError(fmt.Errorf("lookup: %v", err))
 		}
 	} else {
-		leftKeys, err = convertColNamesToIndexPositions(leftOn, mergedLabelsAndCols)
+		leftKeys, err = indexOfContainers(leftOn, mergedLabelsAndCols)
 		if err != nil {
 			return dataFrameWithError(fmt.Errorf("lookup: leftOn: %v", err))
 		}
-		rightKeys, err = convertColNamesToIndexPositions(rightOn, otherMergedLabelsAndCols)
+		rightKeys, err = indexOfContainers(rightOn, otherMergedLabelsAndCols)
 		if err != nil {
 			return dataFrameWithError(fmt.Errorf("lookup: rightOn: %v", err))
 		}
@@ -2164,7 +2158,7 @@ func (df *DataFrame) GroupBy(names ...string) *GroupedDataFrame {
 	if len(names) == 0 {
 		index = makeIntRange(0, df.NumLevels())
 	} else {
-		index, err = convertColNamesToIndexPositions(names, mergedLabelsAndCols)
+		index, err = indexOfContainers(names, mergedLabelsAndCols)
 		if err != nil {
 			return groupedDataFrameWithError(fmt.Errorf("group by: %v", err))
 		}
@@ -2220,7 +2214,7 @@ func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFr
 	case "median":
 		ret = grouper.Median(values)
 	case "std":
-		ret = grouper.Std(values)
+		ret = grouper.StdDev(values)
 	case "count":
 		ret = grouper.Count(values)
 	case "min":
@@ -2293,10 +2287,10 @@ func (iter *DataFrameIterator) Next() bool {
 	return iter.current < iter.df.Len()
 }
 
-// Row returns the current row in the DataFrame as map[string]Element.
+// Row returns the current row in the DataFrame as a map.
 // The map keys are the names of containers (including label levels).
 // The value in each map is an Element containing an interface value and a boolean denoting if the value is null.
-// If multiple columns have the same header, only the Elements of the left-most column are returned.
+// If multiple columns have the same header, only the Element of the left-most column are returned.
 func (iter *DataFrameIterator) Row() map[string]Element {
 	ret := make(map[string]Element)
 	for k := iter.df.NumColumns() - 1; k >= 0; k-- {
@@ -2392,8 +2386,8 @@ func (df *DataFrame) Median() *Series {
 	return df.math("median", median)
 }
 
-// Std coerces the values in each column to float64 and calculates the standard deviation of each column.
-func (df *DataFrame) Std() *Series {
+// StdDev coerces the values in each column to float64 and calculates the standard deviation of each column.
+func (df *DataFrame) StdDev() *Series {
 	return df.math("std", std)
 }
 

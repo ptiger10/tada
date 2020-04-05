@@ -64,9 +64,9 @@ func TestDataPipeline(t *testing.T) {
     ... handle err
 
   ret := DataPipeline(df)
-  ok, diffs, err := ret.EqualsCSV(true, strings.NewReader(want))
+  eq, diffs, err := ret.EqualsCSV(true, strings.NewReader(want))
     ... handle err
-  if !ok {
+  if !eq {
     t.Errorf("DataPipeline(): got %v, want %v, has diffs: \n%v", ret, want, diffs)
   }
 }
