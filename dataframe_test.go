@@ -2743,7 +2743,7 @@ func TestDataFrame_PromoteToColLevel(t *testing.T) {
 		{"stack column - nulls", fields{
 			values: []*valueContainer{
 				{slice: []int{2018, 2018, 2019, 2019}, isNull: []bool{false, false, false, false}, name: "year"},
-				{slice: []string{"a", "b", "c", "n/a"}, isNull: []bool{false, false, false, true}, name: "foo"}},
+				{slice: []string{"a", "b", "c", "null"}, isNull: []bool{false, false, false, true}, name: "foo"}},
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
 			},
@@ -2752,7 +2752,7 @@ func TestDataFrame_PromoteToColLevel(t *testing.T) {
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []string{"a", "b", "", ""}, isNull: []bool{false, false, true, true}, name: "2018|foo"},
-					{slice: []string{"", "", "c", "n/a"}, isNull: []bool{true, true, false, true}, name: "2019|foo"}},
+					{slice: []string{"", "", "c", "null"}, isNull: []bool{true, true, false, true}, name: "2019|foo"}},
 				labels: []*valueContainer{
 					{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"},
 				},
@@ -3504,7 +3504,7 @@ func TestDataFrame_EqualsCSV(t *testing.T) {
 	}
 }
 
-func TestDataFrame_CSV(t *testing.T) {
+func TestDataFrame_CSVRecords(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -3545,12 +3545,18 @@ func TestDataFrame_CSV(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			got := df.CSV(tt.args.options...)
+			got := df.CSVRecords(tt.args.options...)
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("DataFrame.CSV() = %v, want %v", got, tt.want)
+				t.Errorf("DataFrame.CSVRecords() = %v, want %v", got, tt.want)
 			}
 		})
 	}
+}
+
+type badWriter struct{}
+
+func (w badWriter) Write([]byte) (int, error) {
+	return 0, fmt.Errorf("foo")
 }
 
 func TestDataFrame_WriteCSV(t *testing.T) {
@@ -3562,6 +3568,7 @@ func TestDataFrame_WriteCSV(t *testing.T) {
 		colLevelNames []string
 	}
 	type args struct {
+		w       io.Writer
 		options []WriteOption
 	}
 	tests := []struct {
@@ -3571,25 +3578,34 @@ func TestDataFrame_WriteCSV(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{"pass", fields{values: []*valueContainer{
-			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+		{"pass",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{new(bytes.Buffer), nil},
+			"*0,foo\n0,a\n1,b\n",
+			false},
+		{"pass - delimiter",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{new(bytes.Buffer), []WriteOption{WriteOptionDelimiter('|')}},
+			"*0|foo\n0|a\n1|b\n",
+			false},
+		{"pass - exclude labels",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{new(bytes.Buffer), []WriteOption{WriteOptionExcludeLabels()}},
+			"foo\na\nb\n",
+			false},
+		{"fail - bad writer", fields{values: nil,
 			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
-			args{}, "*0,foo\n0,a\n1,b\n", false},
-		{"pass - delimiter", fields{values: []*valueContainer{
-			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
-			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-			colLevelNames: []string{"*0"}},
-			args{[]WriteOption{WriteOptionDelimiter('|')}}, "*0|foo\n0|a\n1|b\n", false},
-		{"pass - exclude labels", fields{values: []*valueContainer{
-			{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
-			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-			colLevelNames: []string{"*0"}},
-			args{[]WriteOption{WriteOptionExcludeLabels()}}, "foo\na\nb\n", false},
-		{"fail - no df", fields{values: nil,
-			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-			colLevelNames: []string{"*0"}},
-			args{}, "", true},
+			args{badWriter{}, nil}, "", true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3600,13 +3616,17 @@ func TestDataFrame_WriteCSV(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			w := new(bytes.Buffer)
-			if err := df.WriteCSV(w, tt.args.options...); (err != nil) != tt.wantErr {
+			w := tt.args.w
+			err := df.WriteCSV(w, tt.args.options...)
+			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.WriteCSV() error = %v, wantErr %v", err, tt.wantErr)
 			}
-			if w.String() != tt.want {
-				t.Errorf("DataFrame.WriteCSV() -> w = %v, want %v", w.String(), tt.want)
+			if tt.wantErr == false {
+				if w.(*bytes.Buffer).String() != tt.want {
+					t.Errorf("DataFrame.WriteCSV() -> w = %v, want %v", w.(*bytes.Buffer).String(), tt.want)
+				}
 			}
+
 		})
 	}
 }
@@ -5102,14 +5122,14 @@ type testSchema2 struct {
 }
 
 type testSchema3 struct {
-	Foo       []int
-	NullTable [][]bool
-	Bar       []float64
+	Foo     []int    `tada:"foo"`
+	NullMap [][]bool `tada:"isNull"`
+	Bar     []float64
 }
 
 type testSchema4 struct {
-	Foo       []int
-	NullTable [][]int
+	Foo     []int
+	NullMap [][]int `tada:"isNull"`
 }
 
 func TestReadStruct(t *testing.T) {
@@ -5170,14 +5190,14 @@ func TestReadStruct(t *testing.T) {
 		{"pass - null table",
 			args{
 				&testSchema3{
-					Foo:       []int{0, 2},
-					Bar:       []float64{3, 4},
-					NullTable: [][]bool{{true, false}, {false, false}},
+					Foo:     []int{0, 2},
+					Bar:     []float64{3, 4},
+					NullMap: [][]bool{{true, false}, {false, false}},
 				}, nil},
 			&DataFrame{
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				values: []*valueContainer{
-					{slice: []int{0, 2}, isNull: []bool{true, false}, name: "Foo"},
+					{slice: []int{0, 2}, isNull: []bool{true, false}, name: "foo"},
 					{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "Bar"},
 				},
 				colLevelNames: []string{"*0"},
@@ -5186,12 +5206,12 @@ func TestReadStruct(t *testing.T) {
 		{"pass - null table - with index",
 			args{
 				&testSchema3{
-					Foo:       []int{0, 2},
-					Bar:       []float64{3, 4},
-					NullTable: [][]bool{{true, false}, {false, false}},
+					Foo:     []int{0, 2},
+					Bar:     []float64{3, 4},
+					NullMap: [][]bool{{true, false}, {false, false}},
 				}, []ReadOption{ReadOptionLabels(1)}},
 			&DataFrame{
-				labels: []*valueContainer{{slice: []int{0, 2}, isNull: []bool{true, false}, name: "Foo"}},
+				labels: []*valueContainer{{slice: []int{0, 2}, isNull: []bool{true, false}, name: "foo"}},
 				values: []*valueContainer{
 					{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "Bar"},
 				},
@@ -5201,17 +5221,17 @@ func TestReadStruct(t *testing.T) {
 		{"fail - null table of wrong type",
 			args{
 				&testSchema4{
-					Foo:       []int{0, 2},
-					NullTable: [][]int{{0, 1}, {1, 2}},
+					Foo:     []int{0, 2},
+					NullMap: [][]int{{0, 1}, {1, 2}},
 				}, nil},
 			nil,
 			true},
 		{"fail - null table with wrong length",
 			args{
 				&testSchema3{
-					Foo:       []int{0, 2},
-					Bar:       []float64{3, 4},
-					NullTable: [][]bool{{true, false}, {false}},
+					Foo:     []int{0, 2},
+					Bar:     []float64{3, 4},
+					NullMap: [][]bool{{true, false}, {false}},
 				}, nil},
 			nil,
 			true},
@@ -5325,9 +5345,9 @@ func TestDataFrame_Struct(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{&testSchema3{}, nil},
 			&testSchema3{
-				Foo:       []int{0, 1},
-				NullTable: [][]bool{{false, false}, {true, false}},
-				Bar:       []float64{0, 1},
+				Foo:     []int{0, 1},
+				NullMap: [][]bool{{false, false}, {true, false}},
+				Bar:     []float64{0, 1},
 			},
 			false,
 		},

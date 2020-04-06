@@ -1,14 +1,16 @@
-package tada
+package tada_test
 
 import (
 	"fmt"
 	"math"
 	"strconv"
 	"time"
+
+	"github.com/ptiger10/tada"
 )
 
 func ExampleSeries() {
-	s := NewSeries([]float64{1, 2}).SetName("foo")
+	s := tada.NewSeries([]float64{1, 2}).SetName("foo")
 	fmt.Println(s)
 	// Output:
 	// +---++-----+
@@ -19,20 +21,38 @@ func ExampleSeries() {
 	// +---++-----+
 }
 
-func ExampleSeries_withNullValues() {
-	s := NewSeries([]string{"foo", ""})
-	fmt.Println(s)
+func ExampleSeries_setNaNStatus() {
+	s := tada.NewSeries([]float64{0, math.NaN()})
+	fmt.Println("isNull:", s.GetNulls())
+
+	tada.SetOptionNaNStatus(false)
+	s = tada.NewSeries([]float64{0, math.NaN()})
+	fmt.Println("isNull:", s.GetNulls())
+
+	tada.SetOptionNaNStatus(true)
 	// Output:
-	// +---++-----+
-	// | - ||  0  |
-	// |---||-----|
-	// | 0 || foo |
-	// | 1 || n/a |
-	// +---++-----+
+	// isNull: [false true]
+	// isNull: [false false]
+}
+
+func ExampleSeries_setSentinelNulls() {
+	s := tada.NewSeries([]string{"foo", "", "(null)"})
+	fmt.Println("default sentinel null values\n isNull:", s.GetNulls())
+
+	tada.SetOptionNullStrings(nil)
+	s = tada.NewSeries([]string{"foo", "", "(null)"})
+	fmt.Println("remove defaults\n isNull:", s.GetNulls())
+
+	tada.SetOptionNullStrings(tada.GetOptionDefaultNullStrings())
+	// Output:
+	// default sentinel null values
+	//  isNull: [false true true]
+	// remove defaults
+	//  isNull: [false false false]
 }
 
 func ExampleSeries_nestedSlice() {
-	s := NewSeries([][]string{{"foo", "bar"}, {"baz"}, {}}).
+	s := tada.NewSeries([][]string{{"foo", "bar"}, {"baz"}, {}}).
 		SetName("a")
 	fmt.Println(s)
 	// Output:
@@ -41,12 +61,12 @@ func ExampleSeries_nestedSlice() {
 	// |---||-----------|
 	// | 0 || [foo bar] |
 	// | 1 ||     [baz] |
-	// | 2 ||       n/a |
+	// | 2 ||    (null) |
 	// +---++-----------+
 }
 
 func ExampleSeries_Bin() {
-	s := NewSeries([]float64{1, 3, 5}).SetName("foo")
+	s := tada.NewSeries([]float64{1, 3, 5}).SetName("foo")
 	fmt.Println(s)
 
 	fmt.Println(s.Bin([]float64{0, 2, 4}, nil))
@@ -59,20 +79,20 @@ func ExampleSeries_Bin() {
 	// | 2 ||   5 |
 	// +---++-----+
 	//
-	// +---++-----+
-	// | - || foo |
-	// |---||-----|
-	// | 0 || 0-2 |
-	// | 1 || 2-4 |
-	// | 2 || n/a |
-	// +---++-----+
+	// +---++--------+
+	// | - ||  foo   |
+	// |---||--------|
+	// | 0 ||    0-2 |
+	// | 1 ||    2-4 |
+	// | 2 || (null) |
+	// +---++--------+
 }
 
 func ExampleSeries_Bin_andMore() {
-	s := NewSeries([]float64{1, 3, 5}).SetName("foo")
+	s := tada.NewSeries([]float64{1, 3, 5}).SetName("foo")
 	fmt.Println(s)
 
-	fmt.Println(s.Bin([]float64{0, 2, 4}, &Binner{AndMore: true}))
+	fmt.Println(s.Bin([]float64{0, 2, 4}, &tada.Binner{AndMore: true}))
 	// Output:
 	// +---++-----+
 	// | - || foo |
@@ -92,10 +112,10 @@ func ExampleSeries_Bin_andMore() {
 }
 
 func ExampleSeries_Bin_customLabels() {
-	s := NewSeries([]float64{1, 3}).SetName("foo")
+	s := tada.NewSeries([]float64{1, 3}).SetName("foo")
 	fmt.Println(s)
 
-	fmt.Println(s.Bin([]float64{0, 2, 4}, &Binner{Labels: []string{"low", "high"}}))
+	fmt.Println(s.Bin([]float64{0, 2, 4}, &tada.Binner{Labels: []string{"low", "high"}}))
 	// Output:
 	// +---++-----+
 	// | - || foo |
@@ -113,7 +133,7 @@ func ExampleSeries_Bin_customLabels() {
 }
 
 func ExampleSeries_PercentileBin() {
-	s := NewSeries([]float64{1, 2, 3, 4}).SetName("foo")
+	s := tada.NewSeries([]float64{1, 2, 3, 4}).SetName("foo")
 	fmt.Println(s)
 
 	fmt.Println(s.PercentileBin([]float64{0, .5, 1}, nil))
@@ -138,10 +158,10 @@ func ExampleSeries_PercentileBin() {
 }
 
 func ExampleSeries_PercentileBin_customLabels() {
-	s := NewSeries([]float64{1, 2, 3, 4}).SetName("foo")
+	s := tada.NewSeries([]float64{1, 2, 3, 4}).SetName("foo")
 	fmt.Println(s)
 
-	fmt.Println(s.PercentileBin([]float64{0, .5, 1}, &Binner{Labels: []string{"Bottom 50%", "Top 50%"}}))
+	fmt.Println(s.PercentileBin([]float64{0, .5, 1}, &tada.Binner{Labels: []string{"Bottom 50%", "Top 50%"}}))
 	// Output:
 	// +---++-----+
 	// | - || foo |
@@ -163,11 +183,11 @@ func ExampleSeries_PercentileBin_customLabels() {
 }
 
 func ExampleSeries_Lookup() {
-	s := NewSeries([]float64{1, 2}, []int{0, 1}).SetName("foo")
+	s := tada.NewSeries([]float64{1, 2}, []int{0, 1}).SetName("foo")
 	fmt.Println("--original Series--")
 	fmt.Println(s)
 
-	s2 := NewSeries([]float64{4, 5}, []int{0, 10})
+	s2 := tada.NewSeries([]float64{4, 5}, []int{0, 10})
 	fmt.Println("--Series to lookup--")
 	fmt.Println(s2)
 
@@ -191,20 +211,20 @@ func ExampleSeries_Lookup() {
 	// +----++---+
 	//
 	// --result--
-	// +---++-----+
-	// | - || foo |
-	// |---||-----|
-	// | 0 ||   4 |
-	// | 1 || n/a |
-	// +---++-----+
+	// +---++--------+
+	// | - ||  foo   |
+	// |---||--------|
+	// | 0 ||      4 |
+	// | 1 || (null) |
+	// +---++--------+
 }
 
 func ExampleSeries_LookupAdvanced() {
-	s := NewSeries([]float64{1, 2}, []string{"foo", "bar"}, []int{0, 1})
+	s := tada.NewSeries([]float64{1, 2}, []string{"foo", "bar"}, []int{0, 1})
 	fmt.Println("--original Series--")
 	fmt.Println(s)
 
-	s2 := NewSeries([]float64{4, 5}, []int{0, 10}, []string{"baz", "bar"})
+	s2 := tada.NewSeries([]float64{4, 5}, []int{0, 10}, []string{"baz", "bar"})
 	fmt.Println("--Series to lookup--")
 	fmt.Println(s2)
 
@@ -236,11 +256,11 @@ func ExampleSeries_LookupAdvanced() {
 }
 
 func ExampleSeries_Merge() {
-	s := NewSeries([]float64{1, 2}, []int{0, 1}).SetName("foo")
+	s := tada.NewSeries([]float64{1, 2}, []int{0, 1}).SetName("foo")
 	fmt.Println("--original Series--")
 	fmt.Println(s)
 
-	s2 := NewSeries([]float64{4, 5}, []int{0, 10}).SetName("bar")
+	s2 := tada.NewSeries([]float64{4, 5}, []int{0, 10}).SetName("bar")
 	fmt.Println("--Series to merge--")
 	fmt.Println(s2)
 
@@ -264,20 +284,20 @@ func ExampleSeries_Merge() {
 	// +----++-----+
 	//
 	// --result--
-	// +---++-----+-----+
-	// | - || foo | bar |
-	// |---||-----|-----|
-	// | 0 ||   1 |   4 |
-	// | 1 ||   2 | n/a |
-	// +---++-----+-----+
+	// +---++-----+--------+
+	// | - || foo |  bar   |
+	// |---||-----|--------|
+	// | 0 ||   1 |      4 |
+	// | 1 ||   2 | (null) |
+	// +---++-----+--------+
 }
 
 func ExampleSeries_Apply_float64() {
-	s := NewSeries([]int{1, 2, 3}).SetName("foo")
+	s := tada.NewSeries([]int{1, 2, 3}).SetName("foo")
 	fmt.Println(s)
 
 	// coerces to float64, applies func
-	times2 := ApplyFn{Float64: func(v float64) float64 { return v * 2 }}
+	times2 := tada.ApplyFn{Float64: func(v float64) float64 { return v * 2 }}
 	fmt.Println(s.Apply(times2))
 
 	// Output:
@@ -299,10 +319,10 @@ func ExampleSeries_Apply_float64() {
 }
 
 func ExampleSeries_ApplyFormat_float64() {
-	s := NewSeries([]float64{1, 2.5, 3.1415}).SetName("foo")
+	s := tada.NewSeries([]float64{1, 2.5, 3.1415}).SetName("foo")
 	fmt.Println(s)
 
-	decimalFormat := ApplyFormatFn{Float64: func(v float64) string { return strconv.FormatFloat(v, 'f', 2, 64) }}
+	decimalFormat := tada.ApplyFormatFn{Float64: func(v float64) string { return strconv.FormatFloat(v, 'f', 2, 64) }}
 	fmt.Println(s.ApplyFormat(decimalFormat))
 
 	// Output:
@@ -324,10 +344,10 @@ func ExampleSeries_ApplyFormat_float64() {
 }
 
 func ExampleSeries_ApplyFormat_dateTime() {
-	s := NewSeries([]time.Time{time.Date(2020, 1, 15, 0, 0, 0, 0, time.UTC)}).SetName("foo")
+	s := tada.NewSeries([]time.Time{time.Date(2020, 1, 15, 0, 0, 0, 0, time.UTC)}).SetName("foo")
 	fmt.Println(s)
 
-	monthFormat := ApplyFormatFn{DateTime: func(v time.Time) string { return v.Format("2006-01") }}
+	monthFormat := tada.ApplyFormatFn{DateTime: func(v time.Time) string { return v.Format("2006-01") }}
 	fmt.Println(s.ApplyFormat(monthFormat))
 
 	// Output:
@@ -345,10 +365,10 @@ func ExampleSeries_ApplyFormat_dateTime() {
 }
 
 func ExampleSeries_Resample_byMonth() {
-	s := NewSeries([]time.Time{time.Date(2020, 1, 15, 12, 30, 0, 0, time.UTC)}).SetName("foo")
+	s := tada.NewSeries([]time.Time{time.Date(2020, 1, 15, 12, 30, 0, 0, time.UTC)}).SetName("foo")
 	fmt.Println(s)
 
-	byMonth := Resampler{ByMonth: true}
+	byMonth := tada.Resampler{ByMonth: true}
 	fmt.Println(s.Resample(byMonth))
 	// Output:
 	// +---++----------------------+
@@ -365,10 +385,10 @@ func ExampleSeries_Resample_byMonth() {
 }
 
 func ExampleSeries_Resample_byWeek() {
-	s := NewSeries([]time.Time{time.Date(2020, 1, 15, 12, 30, 0, 0, time.UTC)}).SetName("foo")
+	s := tada.NewSeries([]time.Time{time.Date(2020, 1, 15, 12, 30, 0, 0, time.UTC)}).SetName("foo")
 	fmt.Println(s)
 
-	byWeek := Resampler{ByWeek: true, StartOfWeek: time.Sunday}
+	byWeek := tada.Resampler{ByWeek: true, StartOfWeek: time.Sunday}
 	fmt.Println(s.Resample(byWeek))
 	// Output:
 	// +---++----------------------+
@@ -385,10 +405,10 @@ func ExampleSeries_Resample_byWeek() {
 }
 
 func ExampleSeries_Resample_byHour() {
-	s := NewSeries([]time.Time{time.Date(2020, 1, 15, 12, 30, 0, 0, time.UTC)}).SetName("foo")
+	s := tada.NewSeries([]time.Time{time.Date(2020, 1, 15, 12, 30, 0, 0, time.UTC)}).SetName("foo")
 	fmt.Println(s)
 
-	byHour := Resampler{ByDuration: time.Hour}
+	byHour := tada.Resampler{ByDuration: time.Hour}
 	fmt.Println(s.Resample(byHour))
 	// Output:
 	// +---++----------------------+
@@ -405,13 +425,13 @@ func ExampleSeries_Resample_byHour() {
 }
 
 func ExampleSeries_Resample_byHalfHour() {
-	s := NewSeries([]time.Time{
+	s := tada.NewSeries([]time.Time{
 		time.Date(2020, 1, 15, 12, 15, 0, 0, time.UTC),
 		time.Date(2020, 1, 15, 12, 45, 0, 0, time.UTC),
 	}).SetName("foo")
 	fmt.Println(s)
 
-	byHalfHour := Resampler{ByDuration: 30 * time.Minute}
+	byHalfHour := tada.Resampler{ByDuration: 30 * time.Minute}
 	fmt.Println(s.Resample(byHalfHour))
 	// Output:
 	// +---++----------------------+
@@ -430,12 +450,12 @@ func ExampleSeries_Resample_byHalfHour() {
 }
 
 func ExampleSeries_Resample_asCivilDate() {
-	s := NewSeries([]time.Time{
+	s := tada.NewSeries([]time.Time{
 		time.Date(2020, 1, 15, 12, 15, 0, 0, time.UTC),
 	}).SetName("foo")
 	fmt.Println(s)
 
-	asCivilDate := Resampler{AsCivilDate: true}
+	asCivilDate := tada.Resampler{AsCivilDate: true}
 	fmt.Println(s.Resample(asCivilDate))
 	// Output:
 	// +---++----------------------+
@@ -452,12 +472,12 @@ func ExampleSeries_Resample_asCivilDate() {
 }
 
 func ExampleSeries_Resample_asCivilTime() {
-	s := NewSeries([]time.Time{
+	s := tada.NewSeries([]time.Time{
 		time.Date(2020, 1, 15, 12, 15, 0, 0, time.UTC),
 	}).SetName("foo")
 	fmt.Println(s)
 
-	asCivilTime := Resampler{AsCivilTime: true}
+	asCivilTime := tada.Resampler{AsCivilTime: true}
 	fmt.Println(s.Resample(asCivilTime))
 	// Output:
 	// +---++----------------------+
@@ -474,7 +494,7 @@ func ExampleSeries_Resample_asCivilTime() {
 }
 
 func ExampleSeries_GroupBy() {
-	s := NewSeries([]float64{1, 2, 3, 4}, []string{"foo", "bar", "foo", "bar"})
+	s := tada.NewSeries([]float64{1, 2, 3, 4}, []string{"foo", "bar", "foo", "bar"})
 	g := s.GroupBy()
 	fmt.Println(g)
 	// Output:
@@ -488,7 +508,7 @@ func ExampleSeries_GroupBy() {
 	// +-----++---+
 }
 func ExampleSeries_GroupBy_compoundGroup() {
-	s := NewSeries([]float64{1, 2, 3, 4}, []string{"foo", "baz", "foo", "baz"}, []string{"bar", "qux", "bar", "qux"})
+	s := tada.NewSeries([]float64{1, 2, 3, 4}, []string{"foo", "baz", "foo", "baz"}, []string{"bar", "qux", "bar", "qux"})
 	g := s.GroupBy()
 	fmt.Println(g)
 	// +-----+-----++---+
@@ -502,7 +522,7 @@ func ExampleSeries_GroupBy_compoundGroup() {
 }
 
 func ExampleGroupedSeries_Mean() {
-	s := NewSeries([]float64{1, 2, 3, 4}, []int{0, 1, 0, 1}).
+	s := tada.NewSeries([]float64{1, 2, 3, 4}, []int{0, 1, 0, 1}).
 		SetName("foo").
 		SetLabelNames([]string{"baz"})
 	fmt.Println(s)
@@ -530,7 +550,7 @@ func ExampleGroupedSeries_Mean() {
 }
 
 func ExampleGroupedSeries_Align_mean() {
-	s := NewSeries([]float64{1, 2, 3, 4}, []int{0, 1, 0, 1}).
+	s := tada.NewSeries([]float64{1, 2, 3, 4}, []int{0, 1, 0, 1}).
 		SetName("foo").
 		SetLabelNames([]string{"baz"})
 	fmt.Println(s)
@@ -560,13 +580,13 @@ func ExampleGroupedSeries_Align_mean() {
 }
 
 func ExampleGroupedSeries_Reduce_float64() {
-	s := NewSeries([]float64{1, 2, 3, 4, 5, 6}, []int{0, 0, 0, 1, 1, 1}).
+	s := tada.NewSeries([]float64{1, 2, 3, 4, 5, 6}, []int{0, 0, 0, 1, 1, 1}).
 		SetName("foo").
 		SetLabelNames([]string{"baz"})
 	fmt.Println(s)
 
 	g := s.GroupBy("baz")
-	maxOdd := GroupReduceFn{Float64: func(vals []float64) float64 {
+	maxOdd := tada.GroupReduceFn{Float64: func(vals []float64) float64 {
 		max := math.Inf(-1)
 		for i := range vals {
 			if int(vals[i])%2 == 1 && vals[i] > max {
@@ -598,7 +618,7 @@ func ExampleGroupedSeries_Reduce_float64() {
 }
 
 func ExampleSeries_zscore() {
-	s := NewSeries([]float64{1, 2, 3, 4, 5}).SetName("foo")
+	s := tada.NewSeries([]float64{1, 2, 3, 4, 5}).SetName("foo")
 	fmt.Println(s)
 
 	vals := s.GetValuesFloat64()
@@ -609,8 +629,8 @@ func ExampleSeries_zscore() {
 		ret[i] = (vals[i] - mean) / std
 	}
 
-	newS := NewSeries(ret, s.GetLabels()...).SetName("zscore_foo")
-	decimalFormat := ApplyFormatFn{Float64: func(v float64) string { return strconv.FormatFloat(v, 'f', 2, 64) }}
+	newS := tada.NewSeries(ret, s.GetLabels()...).SetName("zscore_foo")
+	decimalFormat := tada.ApplyFormatFn{Float64: func(v float64) string { return strconv.FormatFloat(v, 'f', 2, 64) }}
 	newS.InPlace().ApplyFormat(decimalFormat)
 	fmt.Println(newS)
 	// Output:
@@ -636,7 +656,7 @@ func ExampleSeries_zscore() {
 }
 
 func ExampleGroupedSeries_Transform_zscore() {
-	s := NewSeries([]float64{1, 2, 3, 4}, []int{0, 0, 1, 1}).
+	s := tada.NewSeries([]float64{1, 2, 3, 4}, []int{0, 0, 1, 1}).
 		SetName("foo").
 		SetLabelNames([]string{"baz"})
 	fmt.Println(s)
@@ -686,7 +706,7 @@ func ExampleGroupedSeries_Transform_zscore() {
 }
 
 func ExampleGroupedSeries_HavingCount_sum() {
-	s := NewSeries([]float64{1, 2, 3, 4}, []int{0, 1, 1, 1}).
+	s := tada.NewSeries([]float64{1, 2, 3, 4}, []int{0, 1, 1, 1}).
 		SetName("foo").
 		SetLabelNames([]string{"baz"})
 	fmt.Println(s)

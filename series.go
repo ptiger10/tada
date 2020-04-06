@@ -101,8 +101,28 @@ func (s *Series) CSV(options ...WriteOption) ([][]string, error) {
 		colLevelNames: []string{"*0"},
 		err:           s.err,
 	}
-	csv := df.CSV(options...)
+	csv := df.CSVRecords(options...)
 	return csv, nil
+}
+
+// Struct writes the values of the df containers into structPointer.
+// Returns an error if df does not contain, from left-to-right, the same container names and types
+// as the exported fields that appear, from top-to-bottom, in structPointer.
+// Exported struct fields must be types that are supported by NewDataFrame().
+// If a "tada" tag is present with the value "isNull", this field must be [][]bool.
+// The null status of each value container in the DataFrame, from left-to-right, will be written into this field in equal-lengthed slices.
+// If df contains additional containers beyond those in structPointer, those are ignored.
+func (s *Series) Struct(structPointer interface{}, options ...WriteOption) error {
+	df := s.DataFrame()
+	return df.Struct(structPointer, options...)
+}
+
+// WriteCSV converts a DataFrame to a csv with rows as the major dimension,
+// and writes the output to w.
+// Null values are replaced with "(null)".
+func (s *Series) WriteCSV(w io.Writer, options ...WriteOption) error {
+	df := s.DataFrame()
+	return df.WriteCSV(w, options...)
 }
 
 // -- GETTERS
@@ -838,7 +858,7 @@ func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
 // The result of a lookup will be:
 //
 // FOO BAR
-// bar n/a
+// bar null
 // baz corge
 //
 // Returns a new DataFrame.
@@ -866,7 +886,7 @@ func (s *Series) Lookup(other *Series) *Series {
 // The result of this lookup will be:
 //
 // FOO BAR
-// bar n/a
+// bar null
 // baz corge
 //
 // Returns a new Series.
@@ -922,7 +942,7 @@ func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, righ
 //
 // s
 // FOO BAR QUX
-// bar 0   n/a
+// bar 0   null
 // baz 1   corge
 //
 // Finally, all container names (either the Series name or label name) are deduplicated after the merge so that they are unique.

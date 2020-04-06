@@ -3597,7 +3597,7 @@ func Test_isNullString(t *testing.T) {
 		want bool
 	}{
 		{"is null", args{""}, true},
-		{"is null", args{"n/a"}, true},
+		{"is null", args{"(null)"}, true},
 		{"not null", args{"foo"}, false},
 	}
 	for _, tt := range tests {

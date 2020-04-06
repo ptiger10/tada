@@ -1715,6 +1715,15 @@ func copyCache(input []string) []string {
 	return ret
 }
 
+func isNullFloat(v float64) bool {
+	if optionNaNIsNull {
+		if math.IsNaN(v) {
+			return true
+		}
+	}
+	return false
+}
+
 func setNullsFromInterface(input interface{}) ([]bool, error) {
 	var ret []bool
 	if k := reflect.TypeOf(input).Kind(); k != reflect.Slice {
@@ -1725,11 +1734,7 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 		vals := input.([]float64)
 		ret = make([]bool, len(vals))
 		for i := range ret {
-			if math.IsNaN(vals[i]) {
-				ret[i] = true
-			} else {
-				ret[i] = false
-			}
+			ret[i] = isNullFloat(vals[i])
 		}
 
 	case []string:
@@ -1836,7 +1841,7 @@ func isNullInterface(i interface{}) (bool, error) {
 	switch i.(type) {
 	case float64:
 		f := i.(float64)
-		if math.IsNaN(f) {
+		if isNullFloat(f) {
 			return true, nil
 		}
 		return false, nil

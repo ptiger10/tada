@@ -271,8 +271,11 @@ func ReadCSV(r io.Reader, options ...ReadOption) (*DataFrame, error) {
 // ReadStruct reads the exported fields in structPointer into a DataFrame.
 // structPointer must be a pointer to a struct.
 // If any exported field in structPointer is nil, returns an error.
-// If a "tada" tag is present for a given field, that will be the name of the resulting label level or column.
-// Otherwise, the exported field name will be the name.
+//
+// If a "tada" tag is present with the value "isNull", this field must be [][]bool with one equal-lengthed slice for each exported field.
+// These values will set the null status for each of the resulting value containers in the DataFrame, from left-to-right.
+// If a "tada" tag has any other value, the resulting value container will have the same name as the tag value.
+// Otherwise, the value container will have the same name as the exported field.
 func ReadStruct(structPointer interface{}, options ...ReadOption) (*DataFrame, error) {
 	config := setReadConfig(options)
 	if reflect.TypeOf(structPointer).Kind() != reflect.Ptr {
@@ -286,8 +289,9 @@ func ReadStruct(structPointer interface{}, options ...ReadOption) (*DataFrame, e
 	labelNames := make([]string, 0)
 	colNames := make([]string, 0)
 	v := reflect.ValueOf(structPointer).Elem()
-	var hasNullTable bool
-	nullTableFieldName := "NullTable"
+	var hasNullTag bool
+	var nullField string
+	nullTag := "isNull"
 	var offset int
 	for k := 0; k < v.NumField(); k++ {
 		field := reflect.TypeOf(structPointer).Elem().Field(k)
@@ -296,13 +300,15 @@ func ReadStruct(structPointer interface{}, options ...ReadOption) (*DataFrame, e
 			offset--
 			continue
 		}
-		// has NullTable?
-		if field.Name == nullTableFieldName {
+		// has null tag?
+		if field.Tag.Get("tada") == nullTag {
 			offset--
 			if field.Type.String() != "[][]bool" {
-				return nil, fmt.Errorf("reading struct as schema: struct field NullTable must be type [][]bool, not %s", field.Type.String())
+				return nil, fmt.Errorf("reading struct as schema: field with tag %v must be type [][]bool, not %s",
+					nullTag, field.Type.String())
 			}
-			hasNullTable = true
+			hasNullTag = true
+			nullField = field.Name
 			continue
 		}
 		// is nil?
@@ -336,14 +342,14 @@ func ReadStruct(structPointer interface{}, options ...ReadOption) (*DataFrame, e
 	}
 	df = df.SetColNames(colNames)
 
-	if hasNullTable {
+	if hasNullTag {
 		var min int
 		// default labels? do not change nulls
 		if config.NumLabelLevels == 0 {
 			min = 1
 		}
 		containers := makeIntRange(min, df.NumLevels()+df.NumColumns())
-		nullTable := v.FieldByName(nullTableFieldName).Interface().([][]bool)
+		nullTable := v.FieldByName(nullField).Interface().([][]bool)
 		for incrementor, k := range containers {
 			err := df.SetNulls(k, nullTable[incrementor])
 			if err != nil {
@@ -414,9 +420,9 @@ func (df *DataFrame) EqualsCSV(includeLabels bool, want io.Reader, wantOptions .
 		return false, nil, fmt.Errorf("comparing csv: reading want: %v", err)
 	}
 
-	got := df.CSV(writeOptionIncludeLabels(includeLabels))
+	got := df.CSVRecords(writeOptionIncludeLabels(includeLabels))
 	// df2 has default labels? exclude them
-	wantDF := df2.CSV(writeOptionIncludeLabels(config.NumLabelLevels > 0))
+	wantDF := df2.CSVRecords(writeOptionIncludeLabels(config.NumLabelLevels > 0))
 	diffs, eq := tablediff.Diff(got, wantDF)
 	return eq, diffs, nil
 }
@@ -444,9 +450,9 @@ func WriteOptionDelimiter(sep rune) func(*writeConfig) {
 	}
 }
 
-// CSV writes a DataFrame to a [][]string with rows as the major dimension.
-// Null values are replaced with "n/a".
-func (df *DataFrame) CSV(options ...WriteOption) [][]string {
+// CSVRecords writes a DataFrame to a [][]string with rows as the major dimension.
+// Null values are replaced with "(null)".
+func (df *DataFrame) CSVRecords(options ...WriteOption) [][]string {
 	config := setWriteConfig(options)
 	transposedStringValues, err := df.toCSVByRows(config.IncludeLabels)
 	if err != nil {
@@ -457,7 +463,7 @@ func (df *DataFrame) CSV(options ...WriteOption) [][]string {
 	for i := range transposedStringValues[df.numColLevels():] {
 		for k := range transposedStringValues[i] {
 			if mergedLabelsAndCols[k].isNull[i] {
-				transposedStringValues[i+df.numColLevels()][k] = "n/a"
+				transposedStringValues[i+df.numColLevels()][k] = "(null)"
 			}
 		}
 	}
@@ -468,9 +474,8 @@ func (df *DataFrame) CSV(options ...WriteOption) [][]string {
 // Returns an error if df does not contain, from left-to-right, the same container names and types
 // as the exported fields that appear, from top-to-bottom, in structPointer.
 // Exported struct fields must be types that are supported by NewDataFrame().
-// If structPointer contains a [][]bool field named "NullTable",
-// then a slice is written into NullTable for each exported field in structPointer
-// recording the null status of each value (true -> value is null).
+// If a "tada" tag is present with the value "isNull", this field must be [][]bool.
+// The null status of each value container in the DataFrame, from left-to-right, will be written into this field in equal-lengthed slices.
 // If df contains additional containers beyond those in structPointer, those are ignored.
 func (df *DataFrame) Struct(structPointer interface{}, options ...WriteOption) error {
 	config := setWriteConfig(options)
@@ -488,8 +493,9 @@ func (df *DataFrame) Struct(structPointer interface{}, options ...WriteOption) e
 		mergedLabelsAndCols = df.values
 	}
 	var offset int
-	var hasNullTable bool
-	nullTableFieldName := "NullTable"
+	var hasNullTag bool
+	var nullField string
+	nullTag := "isNull"
 	for k := 0; k < v.NumField(); k++ {
 		field := reflect.TypeOf(structPointer).Elem().Field(k)
 		// is unexported field?
@@ -497,13 +503,14 @@ func (df *DataFrame) Struct(structPointer interface{}, options ...WriteOption) e
 			offset--
 			continue
 		}
-		// has NullTable?
-		if field.Name == nullTableFieldName {
+		// has null tag?
+		if field.Tag.Get("tada") == nullTag {
 			offset--
 			if field.Type.String() != "[][]bool" {
-				return fmt.Errorf("writing to struct: struct field NullTable must be type [][]bool, not %s", field.Type.String())
+				return fmt.Errorf("writing to struct: field with tag %v must be type [][]bool, not %s", nullTag, field.Type.String())
 			}
-			hasNullTable = true
+			hasNullTag = true
+			nullField = field.Name
 			continue
 		}
 		container := k + offset
@@ -523,14 +530,14 @@ func (df *DataFrame) Struct(structPointer interface{}, options ...WriteOption) e
 		dst := v.FieldByName(field.Name)
 		dst.Set(src)
 	}
-	if hasNullTable {
+	if hasNullTag {
 		copiedFields := v.NumField() + offset
 		nullTable := make([][]bool, copiedFields)
 		for k := 0; k < copiedFields; k++ {
 			nullTable[k] = mergedLabelsAndCols[k].isNull
 		}
 		src := reflect.ValueOf(nullTable).Interface()
-		dst := v.FieldByName(nullTableFieldName)
+		dst := v.FieldByName(nullField)
 		dst.Set(reflect.ValueOf(src))
 	}
 
@@ -539,20 +546,16 @@ func (df *DataFrame) Struct(structPointer interface{}, options ...WriteOption) e
 
 // WriteCSV converts a DataFrame to a csv with rows as the major dimension,
 // and writes the output to w.
-// Null values are replaced with "n/a".
+// Null values are replaced with "(null)".
 func (df *DataFrame) WriteCSV(w io.Writer, options ...WriteOption) error {
 	config := setWriteConfig(options)
-	ret := df.CSV(writeOptionIncludeLabels(config.IncludeLabels))
-	if len(ret) == 0 {
-		return fmt.Errorf("writing csv: df cannot be empty")
-	}
+	ret := df.CSVRecords(writeOptionIncludeLabels(config.IncludeLabels))
 	var b bytes.Buffer
 	cw := csv.NewWriter(&b)
-	// duck error because csv is controlled
 	cw.Comma = config.Delimiter
 	cw.WriteAll(ret)
-	w.Write(b.Bytes())
-	return nil
+	_, err := w.Write(b.Bytes())
+	return err
 }
 
 // WriteMockCSV reads r (configured by options) and writes n mock rows to w,
@@ -574,7 +577,7 @@ func WriteMockCSV(w io.Writer, n int, r io.Reader, options ...ReadOption) error 
 		return fmt.Errorf("writing mock csv: reading r: %v", err)
 	}
 	// data has default labels? exclude them
-	src := data.CSV(writeOptionIncludeLabels(config.NumLabelLevels > 0))
+	src := data.CSVRecords(writeOptionIncludeLabels(config.NumLabelLevels > 0))
 
 	if !config.MajorDimIsCols {
 		rowCount = len(src)
@@ -666,12 +669,12 @@ func (df *DataFrame) String() string {
 	}
 	var data [][]string
 	if df.Len() <= optionMaxRows {
-		data = df.CSV()
+		data = df.CSVRecords()
 	} else {
 		// truncate rows
 		n := optionMaxRows / 2
-		topHalf := df.Head(n).CSV()
-		bottomHalf := df.Tail(n).CSV()[df.numColLevels():]
+		topHalf := df.Head(n).CSVRecords()
+		bottomHalf := df.Tail(n).CSVRecords()[df.numColLevels():]
 		filler := make([]string, df.NumLevels()+df.NumColumns())
 		for k := range filler {
 			filler[k] = "..."
@@ -1975,7 +1978,7 @@ func (df *DataFrameMutator) ApplyFormat(lambdas map[string]ApplyFormatFn) {
 //
 // df
 // FOO BAR QUX
-// bar 0   n/a
+// bar 0   null
 // baz 1   corge
 //
 // Finally, all container names (columns and label names) are deduplicated after the merge so that they are unique.
@@ -2007,7 +2010,7 @@ func (df *DataFrame) Merge(other *DataFrame) *DataFrame {
 //
 // df
 // FOO BAR QUX
-// bar 0   n/a
+// bar 0   null
 // baz 1   corge
 //
 // Finally, all container names (columns and label names) are deduplicated after the merge so that they are unique.
@@ -2042,7 +2045,7 @@ func (df *DataFrameMutator) Merge(other *DataFrame) {
 // The result of a lookup will be:
 //
 // FOO BAR
-// bar n/a
+// bar null
 // baz corge
 //
 // Returns a new DataFrame.
@@ -2070,7 +2073,7 @@ func (df *DataFrame) Lookup(other *DataFrame) *DataFrame {
 // The result of this lookup will be:
 //
 // FOO BAR
-// bar n/a
+// bar null
 // baz corge
 //
 // Returns a new DataFrame.

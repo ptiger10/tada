@@ -11,7 +11,8 @@ var optionMaxColumns = 20
 var optionMergeRepeats = true
 var optionWrapLines = false
 var optionWarnings = true
-var optionNullStrings = map[string]bool{"NaN": true, "n/a": true, "N/A": true, "": true, "nil": true}
+var optionNullStrings = map[string]bool{"": true, "(null)": true}
+var optionNaNIsNull = true
 var optionPrefix = "*"
 var optionDateTimeFormats = []string{
 	"2006-01-02", "01-02-2006", "01/02/2006", "1/2/06", "1/2/2006", "2006-01-02 15:04:05 -0700 MST",
@@ -23,6 +24,31 @@ var randSeed = time.Now().Unix()
 // (default: "|").
 func SetOptionDefaultSeparator(sep string) {
 	optionLevelSeparator = sep
+}
+
+// SetOptionAddTimeFormat adds format to the list of time formats that
+// can be parsed when converting values from string to time.Time.
+func SetOptionAddTimeFormat(format string) {
+	optionDateTimeFormats = append(optionDateTimeFormats, format)
+}
+
+// GetOptionDefaultNullStrings returns the default list of strings that tada considers null.
+func GetOptionDefaultNullStrings() []string {
+	return []string{"", "(null)"}
+}
+
+// SetOptionNullStrings replaces the default list of strings that tada considers null with list.
+func SetOptionNullStrings(list []string) {
+	newList := make(map[string]bool, 0)
+	for _, s := range list {
+		newList[s] = true
+	}
+	optionNullStrings = newList
+}
+
+// SetOptionNaNStatus sets whether math.NaN() is considered a null value or not (default: true).
+func SetOptionNaNStatus(set bool) {
+	optionNaNIsNull = set
 }
 
 // PrintOptionMaxRows changes the max number of rows displayed when printing a Series or DataFrame to n
@@ -57,10 +83,4 @@ func DisableWarnings() {
 // EnableWarnings allows tada to write warning messages to the default log writer.
 func EnableWarnings() {
 	optionWarnings = true
-}
-
-// SetOptionAddTimeFormat adds format to the list of time formats that
-// can be parsed when converting values from string to time.Time
-func SetOptionAddTimeFormat(format string) {
-	optionDateTimeFormats = append(optionDateTimeFormats, format)
 }

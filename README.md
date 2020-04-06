@@ -18,7 +18,6 @@ Its most common use cases are cleaning, aggregating, transforming, and analyzing
 Some notable features of tada:
 * flexible constructor that supports most primitive data types
 * seamlessly handles null data and type conversions
-* well-suited to conventional IDE-based programming, but also supports exploratory notebook usage
 * robust datetime support
 * advanced filtering, lookups and merging, grouping, sorting, and pivoting
 * multi-level labels and columns
@@ -52,7 +51,8 @@ var data = `name, score
 ```
 You want to write and validate a function that discards erroneous data, groups by the `name` column, and returns the mean of the groups. 
 
-First you write a test:
+First you write a test. You can test in two ways:
+### Comparing to stringified csv (compares stringified values, regardless of type)
 ```
 func TestDataPipeline(t *testing.T) {
   want := `name, mean_score
@@ -60,34 +60,54 @@ func TestDataPipeline(t *testing.T) {
            john doe, 6`
 
 
-  df, err := tada.ReadCSV(strings.NewReader(data))
-    ... handle err
-
-  ret := DataPipeline(df)
-  eq, diffs, err := ret.EqualsCSV(true, strings.NewReader(want))
-    ... handle err
+  df, _ := tada.ReadCSV(strings.NewReader(data))
+  ret := sampleDataPipeline(df)
+  eq, diffs, _ := ret.EqualsCSV(true, strings.NewReader(want))
   if !eq {
-    t.Errorf("DataPipeline(): got %v, want %v, has diffs: \n%v", ret, want, diffs)
+    t.Errorf("sampleDataPipeline(): got %v, want %v, has diffs: \n%v", ret, want, diffs)
   }
+}
+```
+
+### Comparing to struct (comapres typed values)
+```
+func Test_sampleDataPipelineTyped(t *testing.T) {
+	type output struct {
+		Name      []string  `tada:"name"`
+		MeanScore []float64 `tada:"mean_score"`
+	}
+	want := output{
+		Name:      []string{"jane doe", "john doe"},
+		MeanScore: []float64{9, 5},
+	}
+
+	df, _ := ReadCSV(strings.NewReader(data))
+
+	out := sampleDataPipeline(df)
+	var got output
+	out.Struct(&got)
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("sampleDataPipelineTyped(): got %v, want %v", got, want)
+	}
 }
 ```
 
 Then you write the data pipeline:
 ```
-func DataPipeline(df *tada.DataFrame) *tada.DataFrame {
-  err := df.HasCols("name", "score")
-    ... handle err
-  df.InPlace().DropNull()
-  validScore := tada.FilterFn{Float64: func(v float64) bool { return v >= 0 && v <= 10 }}
-	
-  df.InPlace().Filter(map[string]tada.FilterFn{"score": validScore})
-  df.InPlace().Sort(tada.Sorter{Name: "name", DType: tada.String})
-  return df.GroupBy("name").Mean("score")
+func sampleDataPipeline(df *DataFrame) *DataFrame {
+	err := df.HasCols("name", "score")
+	if err != nil {
+		log.Fatal(err)
+	}
+	df.InPlace().DropNull()
+	validScore := FilterFn{Float64: func(v float64) bool { return v >= 0 && v <= 10 }}
+	df.InPlace().Filter(map[string]FilterFn{"score": validScore})
+	df.InPlace().Sort(Sorter{Name: "name", DType: String})
+	return df.GroupBy("name").Mean("score")
 }
 ```
 More [examples](https://godoc.org/github.com/ptiger10/tada#pkg-examples)
 
-Extended [tutorial](tutorial.ipynb)
 
 
 ## Usage
@@ -113,19 +133,7 @@ df, err := tada.ReadCSV(f)
 ... handle err
 ```
 
-
 More [examples](https://godoc.org/github.com/ptiger10/tada#pkg-examples)
-
-## Using with Jupyter notebooks
-* Follow the instructions for installing [gophernotes](https://github.com/gopherdata/gophernotes), including jupyter.
-* Install `tada` from anywhere using Go modules (this will install the latest version to `$GOPATH/pkg/mod/ptiger10/tada`, which is what gophernotes references to import 3rd party packages): `$ GO111MODULE=on go get -u github.com/ptiger10/tada`
-* Run the same snippet whenever you want gophernotes to have access to the latest version of `tada`. 
-* `$ jupyter notebook` (should launch a window in your default browser)
-* From Home screen -> New -> Go
-
-One of the biggest limitations of gophernotes is that it does not provide signature hinting. This is a [known issue](https://github.com/gopherdata/gophernotes/issues/173).
-
-[Sample Notebook](tutorial.ipynb)
 
 ## Performance Tuning
 * Modify a Series or DataFrame in place (without returning a new copy) by first calling `InPlace()`.

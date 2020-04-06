@@ -1,17 +1,18 @@
-package tada
+package tada_test
 
 import (
 	"fmt"
 	"log"
-	"math"
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/ptiger10/tada"
 )
 
 func ExampleReadCSV() {
 	data := "foo, bar\n baz, qux\n corge, fred"
-	df, _ := ReadCSV(strings.NewReader(data))
+	df, _ := tada.ReadCSV(strings.NewReader(data))
 	fmt.Println(df)
 	// Output:
 	// +---++-------+------+
@@ -24,7 +25,7 @@ func ExampleReadCSV() {
 
 func ExampleReadCSV_noHeaders() {
 	data := "foo, bar\n baz, qux\n corge, fred"
-	df, _ := ReadCSV(strings.NewReader(data), ReadOptionHeaders(0))
+	df, _ := tada.ReadCSV(strings.NewReader(data), tada.ReadOptionHeaders(0))
 	fmt.Println(df)
 	// Output:
 	// +---++-------+------+
@@ -38,7 +39,7 @@ func ExampleReadCSV_noHeaders() {
 
 func ExampleReadCSV_multipleHeaders() {
 	data := "foo, bar\n baz, qux\n corge, fred"
-	df, _ := ReadCSV(strings.NewReader(data), ReadOptionHeaders(2))
+	df, _ := tada.ReadCSV(strings.NewReader(data), tada.ReadOptionHeaders(2))
 	fmt.Println(df)
 	// Output:
 	// +---++-------+------+
@@ -51,7 +52,7 @@ func ExampleReadCSV_multipleHeaders() {
 
 func ExampleReadCSV_multipleHeadersWithLabels() {
 	data := ", foo, bar\n labels, baz, qux\n 1, corge, fred"
-	df, _ := ReadCSV(strings.NewReader(data), ReadOptionHeaders(2), ReadOptionLabels(1))
+	df, _ := tada.ReadCSV(strings.NewReader(data), tada.ReadOptionHeaders(2), tada.ReadOptionLabels(1))
 	fmt.Println(df)
 	// Output:
 	// +--------++-------+------+
@@ -66,7 +67,7 @@ func ExampleReadCSV_withLabels() {
 	data := `foo, bar
 	baz, qux
 	corge, fred`
-	df, _ := ReadCSV(strings.NewReader(data), ReadOptionLabels(1))
+	df, _ := tada.ReadCSV(strings.NewReader(data), tada.ReadOptionLabels(1))
 	fmt.Println(df)
 	// Output:
 	// +-------++------+
@@ -81,7 +82,7 @@ func ExampleReadCSV_delimiter() {
 	data := `foo|bar
 	baz|qux
 	corge|fred`
-	df, _ := ReadCSV(strings.NewReader(data), ReadOptionDelimiter('|'))
+	df, _ := tada.ReadCSV(strings.NewReader(data), tada.ReadOptionDelimiter('|'))
 	fmt.Println(df)
 	// Output:
 	// +---++-------+------+
@@ -98,7 +99,7 @@ func ExampleReadCSVFromRecords() {
 		{"baz", "qux"},
 		{"corge", "fred"},
 	}
-	df, _ := ReadCSVFromRecords(data)
+	df, _ := tada.ReadCSVFromRecords(data)
 	fmt.Println(df)
 	// Output:
 	// +---++-------+------+
@@ -115,7 +116,7 @@ func ExampleReadCSVFromRecords_colsAsMajorDimension() {
 		{"baz", "qux"},
 		{"corge", "fred"},
 	}
-	df, _ := ReadCSVFromRecords(data, ReadOptionSwitchDims())
+	df, _ := tada.ReadCSVFromRecords(data, tada.ReadOptionSwitchDims())
 	fmt.Println(df)
 	// Output:
 	// +---++-----+-----+-------+
@@ -126,9 +127,9 @@ func ExampleReadCSVFromRecords_colsAsMajorDimension() {
 }
 
 func ExampleDataFrame() {
-	df := NewDataFrame([]interface{}{
+	df := tada.NewDataFrame([]interface{}{
 		[]float64{1, 2}, []string{"baz", "qux"}},
-	)
+	).SetName("foo")
 	fmt.Println(df)
 	// Output:
 	// +---++---+-----+
@@ -137,23 +138,11 @@ func ExampleDataFrame() {
 	// | 0 || 1 | baz |
 	// | 1 || 2 | qux |
 	// +---++---+-----+
-}
-
-func ExampleDataFrame_withNullValues() {
-	df := NewDataFrame([]interface{}{[]float64{math.NaN(), 2}, []string{"foo", ""}}).SetColNames([]string{"a", "b"}).SetName("qux")
-	fmt.Println(df)
-	// Output:
-	// +---++-----+-----+
-	// | - ||  a  |  b  |
-	// |---||-----|-----|
-	// | 0 || n/a | foo |
-	// | 1 ||   2 | n/a |
-	// +---++-----+-----+
-	// name: qux
+	// name: foo
 }
 
 func ExampleDataFrame_SetColNames() {
-	df := NewDataFrame([]interface{}{
+	df := tada.NewDataFrame([]interface{}{
 		[]float64{1, 2}, []string{"baz", "qux"}},
 	).
 		SetColNames([]string{"foo", "bar"})
@@ -168,7 +157,7 @@ func ExampleDataFrame_SetColNames() {
 }
 
 func ExampleDataFrame_SetLabelNames() {
-	df := NewDataFrame([]interface{}{[]float64{1, 2}}).
+	df := tada.NewDataFrame([]interface{}{[]float64{1, 2}}).
 		SetLabelNames([]string{"baz"})
 	fmt.Println(df)
 	// Output:
@@ -181,7 +170,7 @@ func ExampleDataFrame_SetLabelNames() {
 }
 
 func ExampleDataFrame_SetLabelNames_multiple() {
-	df := NewDataFrame(
+	df := tada.NewDataFrame(
 		[]interface{}{[]float64{1, 2}},
 		[]int{0, 1}, []string{"foo", "bar"},
 	).
@@ -198,7 +187,7 @@ func ExampleDataFrame_SetLabelNames_multiple() {
 }
 
 func ExampleDataFrameMutator_WithCol_rename() {
-	df := NewDataFrame([]interface{}{
+	df := tada.NewDataFrame([]interface{}{
 		[]float64{1, 2}},
 	).
 		SetColNames([]string{"foo"})
@@ -223,7 +212,7 @@ func ExampleDataFrameMutator_WithCol_rename() {
 }
 
 func ExampleDataFrame_WithCol_rename() {
-	df := NewDataFrame([]interface{}{
+	df := tada.NewDataFrame([]interface{}{
 		[]float64{1, 2}},
 	).
 		SetColNames([]string{"foo"})
@@ -248,7 +237,7 @@ func ExampleDataFrame_WithCol_rename() {
 }
 
 func ExampleDataFrame_WithCol_overwrite() {
-	df := NewDataFrame([]interface{}{
+	df := tada.NewDataFrame([]interface{}{
 		[]float64{1, 2}},
 	).
 		SetColNames([]string{"foo"})
@@ -273,7 +262,7 @@ func ExampleDataFrame_WithCol_overwrite() {
 }
 
 func ExampleDataFrame_WithCol_append() {
-	df := NewDataFrame([]interface{}{
+	df := tada.NewDataFrame([]interface{}{
 		[]float64{1, 2}},
 	).
 		SetColNames([]string{"foo"})
@@ -298,7 +287,7 @@ func ExampleDataFrame_WithCol_append() {
 }
 
 func ExampleDataFrame_Sort() {
-	df := NewDataFrame([]interface{}{
+	df := tada.NewDataFrame([]interface{}{
 		[]float64{2, 2, 1}, []string{"b", "c", "a"}},
 	).
 		SetColNames([]string{"foo", "bar"})
@@ -307,8 +296,8 @@ func ExampleDataFrame_Sort() {
 	// first sort by foo in ascending order, then sort by bar in descending order
 	ret := df.Sort(
 		// Float64 is the default sorting DType, and ascending is the default ordering
-		Sorter{Name: "foo"},
-		Sorter{Name: "bar", DType: String, Descending: true},
+		tada.Sorter{Name: "foo"},
+		tada.Sorter{Name: "bar", DType: tada.String, Descending: true},
 	)
 	fmt.Println(ret)
 	// Output:
@@ -332,14 +321,14 @@ func ExampleDataFrame_Sort() {
 func ExampleDataFrame_Filter_float64() {
 	dt1 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	dt2 := dt1.AddDate(0, 0, 1)
-	df := NewDataFrame([]interface{}{
+	df := tada.NewDataFrame([]interface{}{
 		[]float64{1, 2}, []string{"corge", "fred"}, []time.Time{dt1, dt2}},
 	).
 		SetColNames([]string{"foo", "bar", "baz"})
 	fmt.Println(df)
 
-	gt1 := FilterFn{Float64: func(v float64) bool { return v > 1 }}
-	ret := df.Filter(map[string]FilterFn{"foo": gt1})
+	gt1 := tada.FilterFn{Float64: func(v float64) bool { return v > 1 }}
+	ret := df.Filter(map[string]tada.FilterFn{"foo": gt1})
 	fmt.Println(ret)
 	// Output:
 	// +---++-----+-------+----------------------+
@@ -359,14 +348,14 @@ func ExampleDataFrame_Filter_float64() {
 func ExampleDataFrame_Filter_string() {
 	dt1 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	dt2 := dt1.AddDate(0, 0, 1)
-	df := NewDataFrame([]interface{}{
+	df := tada.NewDataFrame([]interface{}{
 		[]float64{1, 2}, []string{"corge", "fred"}, []time.Time{dt1, dt2}},
 	).
 		SetColNames([]string{"foo", "bar", "baz"})
 	fmt.Println(df)
 
-	containsD := FilterFn{String: func(v string) bool { return strings.Contains(v, "d") }}
-	ret := df.Filter(map[string]FilterFn{"bar": containsD})
+	containsD := tada.FilterFn{String: func(v string) bool { return strings.Contains(v, "d") }}
+	ret := df.Filter(map[string]tada.FilterFn{"bar": containsD})
 	fmt.Println(ret)
 	// Output:
 	// +---++-----+-------+----------------------+
@@ -386,14 +375,14 @@ func ExampleDataFrame_Filter_string() {
 func ExampleDataFrame_Filter_dateTime() {
 	dt1 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	dt2 := dt1.AddDate(0, 0, 1)
-	df := NewDataFrame([]interface{}{
+	df := tada.NewDataFrame([]interface{}{
 		[]float64{1, 2}, []string{"corge", "fred"}, []time.Time{dt1, dt2}},
 	).
 		SetColNames([]string{"foo", "bar", "baz"})
 	fmt.Println(df)
 
-	afterDate := FilterFn{DateTime: func(v time.Time) bool { return v.After(dt1) }}
-	ret := df.Filter(map[string]FilterFn{"baz": afterDate})
+	afterDate := tada.FilterFn{DateTime: func(v time.Time) bool { return v.After(dt1) }}
+	ret := df.Filter(map[string]tada.FilterFn{"baz": afterDate})
 	fmt.Println(ret)
 	// Output:
 	// +---++-----+-------+----------------------+
@@ -413,20 +402,20 @@ func ExampleDataFrame_Filter_dateTime() {
 func ExampleDataFrame_Filter_interface() {
 	dt1 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	dt2 := dt1.AddDate(0, 0, 1)
-	df := NewDataFrame([]interface{}{
+	df := tada.NewDataFrame([]interface{}{
 		[]int{1, 2}, []string{"corge", "fred"}, []time.Time{dt1, dt2}},
 	).
 		SetColNames([]string{"foo", "bar", "baz"})
 	fmt.Println(df)
 
-	gt1 := FilterFn{Interface: func(v interface{}) bool {
+	gt1 := tada.FilterFn{Interface: func(v interface{}) bool {
 		val, ok := v.(int)
 		if !ok {
 			log.Fatalf("Expecting type int, got %v", reflect.TypeOf(v))
 		}
 		return val > 1
 	}}
-	ret := df.Filter(map[string]FilterFn{"foo": gt1})
+	ret := df.Filter(map[string]tada.FilterFn{"foo": gt1})
 	fmt.Println(ret)
 	// Output:
 	// +---++-----+-------+----------------------+
@@ -444,14 +433,14 @@ func ExampleDataFrame_Filter_interface() {
 }
 
 func ExampleDataFrame_Where() {
-	df := NewDataFrame([]interface{}{
+	df := tada.NewDataFrame([]interface{}{
 		[]int{1, 2}},
 	).
 		SetColNames([]string{"foo"})
 	fmt.Println(df)
 
-	gt1 := FilterFn{Float64: func(v float64) bool { return v > 1 }}
-	ret, _ := df.Where(map[string]FilterFn{"foo": gt1}, true, false)
+	gt1 := tada.FilterFn{Float64: func(v float64) bool { return v > 1 }}
+	ret, _ := df.Where(map[string]tada.FilterFn{"foo": gt1}, true, false)
 	fmt.Println(ret)
 	// Output:
 	// +---++-----+
@@ -469,12 +458,11 @@ func ExampleDataFrame_Where() {
 	// +---++-------+
 }
 func ExamplePrintOptionMaxRows() {
-	df := NewDataFrame([]interface{}{
+	df := tada.NewDataFrame([]interface{}{
 		[]float64{1, 2, 3, 4, 5, 6, 7, 8}}).SetColNames([]string{"A"})
-	archive := optionMaxRows
-	PrintOptionMaxRows(6)
+	tada.PrintOptionMaxRows(6)
 	fmt.Println(df)
-	PrintOptionMaxRows(archive)
+	tada.PrintOptionMaxRows(50)
 	// Output:
 	// +-----++-----+
 	// |  -  ||  A  |
@@ -490,14 +478,13 @@ func ExamplePrintOptionMaxRows() {
 }
 
 func ExamplePrintOptionMaxColumns() {
-	df := NewDataFrame([]interface{}{
+	df := tada.NewDataFrame([]interface{}{
 		[]float64{1, 2}, []float64{3, 4}, []float64{5, 6},
 		[]float64{3, 4}, []float64{5, 6},
 	}).SetColNames([]string{"A", "B", "C", "D", "E"})
-	archive := optionMaxColumns
-	PrintOptionMaxColumns(2)
+	tada.PrintOptionMaxColumns(2)
 	fmt.Println(df)
-	PrintOptionMaxColumns(archive)
+	tada.PrintOptionMaxColumns(20)
 	// Output:
 	// +---++---+-----+---+
 	// | - || A | ... | E |
@@ -508,7 +495,7 @@ func ExamplePrintOptionMaxColumns() {
 }
 
 func ExampleDataFrame_GroupBy() {
-	df := NewDataFrame([]interface{}{
+	df := tada.NewDataFrame([]interface{}{
 		[]float64{1, 2, 3, 4},
 	},
 		[]string{"foo", "bar", "foo", "bar"}).
