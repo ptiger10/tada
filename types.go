@@ -182,17 +182,17 @@ type ApplyFn struct {
 	DateTime func(val time.Time) time.Time
 }
 
-// A GroupReduceFn supplies logic to the Reduce() function.
+// A GroupReduceFn supplies logic to the Reduce() function to reduce a slice to a single value.
 // Only the first field selected (i.e., not left nil) is used - any others are ignored.
-// If Interface is selected, the slice of values may be type-asserted from its underlying interface{}),
-// and all output values must have the same type (though this may be different than the original type).
+// If Interface is selected, the slice must be type-asserted,
+// and each output value must have the same type as one another (though this may be different than the original type).
 // Otherwise, values are coerced to the type specified in the field before the reduce function is evaluated.
 //
 type GroupReduceFn struct {
-	Float64   func(slice []float64) float64
-	String    func(slice []string) string
-	DateTime  func(slice []time.Time) time.Time
-	Interface func(slice interface{}) interface{}
+	Float64   func(slice []float64) (value float64)
+	String    func(slice []string) (value string)
+	DateTime  func(slice []time.Time) (value time.Time)
+	Interface func(slice interface{}) (value interface{})
 }
 
 // An ApplyFormatFn is a lambda function supplied to ApplyFormat() with formatting instructions.

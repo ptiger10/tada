@@ -34,12 +34,16 @@ func (g *GroupedSeries) GetGroup(group string) *Series {
 	return seriesWithError(fmt.Errorf("getting group: group (%v) not in groups", group))
 }
 
-// Transform applies lambda to every group and returns the modified values in the same order as the original
-// Series values, preserving the original Series labels and named name.
-// Each input into each lambda call will be a slice of values that may then be type-asserted by the user.
-// The output of each lambda call must be a slice that is the same length as the input.
-// All outputs must be of the same type (though this may be a different type than the input).
-func (g *GroupedSeries) Transform(name string, lambda func(interface{}) interface{}) *Series {
+// Transform applies lambda to every group and returns a new Series named name
+// that preserves the original Series labels
+// and places transformed values in the same order in which they appeared in the original Series.
+// Each lambda input will be a slice of grouped values (including values considered null).
+// Each lambda output must be a slice that is the same length as the input.
+// All output slices must be of the same type as one another (though this may be a different type than the input).
+//
+// Caution: null values are included in the input into lambda, but with no indication that they are null.
+// It is recommended to fill or drop nulls from a dataset prior to using Transform().
+func (g *GroupedSeries) Transform(name string, lambda func(slice interface{}) (equalLengthSlice interface{})) *Series {
 	vals, err := groupedInterfaceTransformFunc(
 		g.series.values.slice, name, g.rowIndices, lambda)
 	if err != nil {
@@ -714,7 +718,7 @@ func groupedInterfaceTransformFunc(
 	rowIndices [][]int,
 	fn func(slice interface{}) interface{}) (*valueContainer, error) {
 
-	// default: return length is equal to the number of groups
+	// return length is equal to the number of rows in the value container
 	retLength := reflect.ValueOf(slice).Len()
 
 	// must deduce output type

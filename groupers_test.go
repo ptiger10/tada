@@ -3697,7 +3697,7 @@ func TestGroupedSeries_Transform(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
 				series: &Series{values: &valueContainer{
-					slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "baz"},
+					slice: []string{"a", "b", "c", ""}, isNull: []bool{false, false, false, true}, name: "baz"}, // null values are also transformed
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
 			args{name: "foo", lambda: func(slice interface{}) interface{} {
