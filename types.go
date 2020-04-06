@@ -218,8 +218,8 @@ type WriteOption func(*writeConfig)
 // All write functions accept zero or more modifiers that alter the default write config, which is:
 // Include labels; "," as field delimiter; and rows as the major dimension of a nested slice.
 type writeConfig struct {
-	IncludeLabels bool
-	Delimiter     rune
+	includeLabels bool
+	delimiter     rune
 }
 
 // A ReadOption configures a read function.
@@ -230,10 +230,23 @@ type ReadOption func(*readConfig)
 // All read functions accept zero or more modifiers that alter the default read config, which is:
 // 1 header row, 0 label levels, "," as field delimiter, and rows as the major dimension of a nested slice.
 type readConfig struct {
-	NumHeaderRows  int
-	NumLabelLevels int
-	Delimiter      rune
-	MajorDimIsCols bool
+	numHeaderRows  int
+	numLabelLevels int
+	delimiter      rune
+	majorDimIsCols bool
+}
+
+// A JoinOption configures a lookup or merge function.
+// Available lookup options: JoinOptionHow, JoinOptionLeftOn, JoinOptionRightOn
+type JoinOption func(*joinConfig)
+
+// A joinConfig configures a lookup or merge function.
+// All lookup/merge functions accept zero or more modifiers that alter the default read config, which is:
+// left join, no specified join keys (so automatically uses shared label names as keys)
+type joinConfig struct {
+	how     string
+	leftOn  []string
+	rightOn []string
 }
 
 // Resampler supplies logic for the Resample() function.

@@ -183,11 +183,11 @@ func ExampleSeries_PercentileBin_customLabels() {
 }
 
 func ExampleSeries_Lookup() {
-	s := tada.NewSeries([]float64{1, 2}, []int{0, 1}).SetName("foo")
+	s := tada.NewSeries([]float64{1, 2}, []int{0, 1}).SetName("foo").SetLabelNames([]string{"a"})
 	fmt.Println("--original Series--")
 	fmt.Println(s)
 
-	s2 := tada.NewSeries([]float64{4, 5}, []int{0, 10})
+	s2 := tada.NewSeries([]float64{4, 5}, []int{0, 10}).SetLabelNames([]string{"a"})
 	fmt.Println("--Series to lookup--")
 	fmt.Println(s2)
 
@@ -196,7 +196,7 @@ func ExampleSeries_Lookup() {
 	// Output:
 	// --original Series--
 	// +---++-----+
-	// | - || foo |
+	// | a || foo |
 	// |---||-----|
 	// | 0 ||   1 |
 	// | 1 ||   2 |
@@ -204,7 +204,7 @@ func ExampleSeries_Lookup() {
 	//
 	// --Series to lookup--
 	// +----++---+
-	// | -  || 0 |
+	// | a  || 0 |
 	// |----||---|
 	// |  0 || 4 |
 	// | 10 || 5 |
@@ -212,28 +212,33 @@ func ExampleSeries_Lookup() {
 	//
 	// --result--
 	// +---++--------+
-	// | - ||  foo   |
+	// | a ||  foo   |
 	// |---||--------|
 	// | 0 ||      4 |
 	// | 1 || (null) |
 	// +---++--------+
 }
 
-func ExampleSeries_LookupAdvanced() {
-	s := tada.NewSeries([]float64{1, 2}, []string{"foo", "bar"}, []int{0, 1})
+func ExampleSeries_Lookup_withOptions() {
+	s := tada.NewSeries([]float64{1, 2}, []string{"foo", "bar"}, []int{0, 1}).SetLabelNames([]string{"a", "b"})
 	fmt.Println("--original Series--")
 	fmt.Println(s)
 
-	s2 := tada.NewSeries([]float64{4, 5}, []int{0, 10}, []string{"baz", "bar"})
+	s2 := tada.NewSeries([]float64{4, 5}, []int{0, 10}, []string{"baz", "bar"}).SetLabelNames([]string{"a", "b"})
 	fmt.Println("--Series to lookup--")
 	fmt.Println(s2)
 
 	fmt.Println("--result--")
-	fmt.Println(s.LookupAdvanced(s2, "inner", []string{"*1"}, []string{"*0"}))
+	fmt.Println(s.Lookup(
+		s2,
+		tada.JoinOptionHow("inner"),
+		tada.JoinOptionLeftOn([]string{"a"}),
+		tada.JoinOptionRightOn([]string{"b"}),
+	))
 	// Output:
 	// --original Series--
 	// +-----+---++---+
-	// |  -  | - || 0 |
+	// |  a  | b || 0 |
 	// |-----|---||---|
 	// | foo | 0 || 1 |
 	// | bar | 1 || 2 |
@@ -241,7 +246,7 @@ func ExampleSeries_LookupAdvanced() {
 	//
 	// --Series to lookup--
 	// +----+-----++---+
-	// | -  |  -  || 0 |
+	// | a  |  b  || 0 |
 	// |----|-----||---|
 	// |  0 | baz || 4 |
 	// | 10 | bar || 5 |
@@ -249,9 +254,9 @@ func ExampleSeries_LookupAdvanced() {
 	//
 	// --result--
 	// +-----+---++---+
-	// |  -  | - || 0 |
+	// |  a  | b || 0 |
 	// |-----|---||---|
-	// | foo | 0 || 4 |
+	// | bar | 1 || 5 |
 	// +-----+---++---+
 }
 
@@ -290,6 +295,47 @@ func ExampleSeries_Merge() {
 	// | 0 ||   1 |      4 |
 	// | 1 ||   2 | (null) |
 	// +---++-----+--------+
+}
+
+func ExampleSeries_Merge_withOptions() {
+	s := tada.NewSeries([]float64{1, 2}, []string{"foo", "bar"}, []int{0, 1}).SetLabelNames([]string{"a", "b"})
+	fmt.Println("--original Series--")
+	fmt.Println(s)
+
+	s2 := tada.NewSeries([]float64{4, 5}, []int{0, 10}, []string{"baz", "bar"}).SetLabelNames([]string{"a", "b"})
+	fmt.Println("--Series to lookup--")
+	fmt.Println(s2)
+
+	fmt.Println("--result--")
+	fmt.Println(s.Merge(
+		s2,
+		tada.JoinOptionHow("inner"),
+		tada.JoinOptionLeftOn([]string{"a"}),
+		tada.JoinOptionRightOn([]string{"b"}),
+	))
+	// Output:
+	// --original Series--
+	// +-----+---++---+
+	// |  a  | b || 0 |
+	// |-----|---||---|
+	// | foo | 0 || 1 |
+	// | bar | 1 || 2 |
+	// +-----+---++---+
+	//
+	// --Series to lookup--
+	// +----+-----++---+
+	// | a  |  b  || 0 |
+	// |----|-----||---|
+	// |  0 | baz || 4 |
+	// | 10 | bar || 5 |
+	// +----+-----++---+
+	//
+	// --result--
+	// +-----+---++---+-----+
+	// |  a  | b || 0 | 0_1 |
+	// |-----|---||---|-----|
+	// | bar | 1 || 2 |   5 |
+	// +-----+---++---+-----+
 }
 
 func ExampleSeries_Apply_float64() {

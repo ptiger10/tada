@@ -149,13 +149,14 @@ func makeIntRange(min, max int) []int {
 	return ret
 }
 
-// search for a name only once. if it is found multiple times, return only the first
-func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels2 []*valueContainer) ([]int, []int, error) {
+// search for a name only once.
+// if it is found multiple times, return only the first
+func findMatchingKeysBetweenTwoContainers(container1 []*valueContainer, container2 []*valueContainer) ([]int, []int, error) {
 	var leftKeys, rightKeys []int
 	searched := make(map[string]bool)
 	// add every level name to the map in order to skip duplicates
-	for j := range labels1 {
-		key := labels1[j].name
+	for j := range container1 {
+		key := container1[j].name
 		// if level name already in map, skip
 		if _, ok := searched[key]; ok {
 			continue
@@ -163,9 +164,9 @@ func findMatchingKeysBetweenTwoLabelContainers(labels1 []*valueContainer, labels
 		} else {
 			searched[key] = true
 		}
-		for k := range labels2 {
+		for k := range container2 {
 			// compare to every name in labels2
-			if key == labels2[k].name {
+			if key == container2[k].name {
 				leftKeys = append(leftKeys, j)
 				rightKeys = append(rightKeys, k)
 				break
@@ -483,10 +484,10 @@ func (df *DataFrame) toCSVByRows(includeLabels bool) ([][]string, error) {
 func setReadConfig(options []ReadOption) *readConfig {
 	// default config
 	config := &readConfig{
-		NumHeaderRows:  1,
-		NumLabelLevels: 0,
-		Delimiter:      ',',
-		MajorDimIsCols: false,
+		numHeaderRows:  1,
+		numLabelLevels: 0,
+		delimiter:      ',',
+		majorDimIsCols: false,
 	}
 	for _, option := range options {
 		option(config)
@@ -497,8 +498,19 @@ func setReadConfig(options []ReadOption) *readConfig {
 func setWriteConfig(options []WriteOption) *writeConfig {
 	// default config
 	config := &writeConfig{
-		IncludeLabels: true,
-		Delimiter:     ',',
+		includeLabels: true,
+		delimiter:     ',',
+	}
+	for _, option := range options {
+		option(config)
+	}
+	return config
+}
+
+func setJoinConfig(options []JoinOption) *joinConfig {
+	// default config
+	config := &joinConfig{
+		how: "left",
 	}
 	for _, option := range options {
 		option(config)
@@ -515,40 +527,40 @@ func readCSVByRows(csv [][]string, cfg *readConfig) (*DataFrame, error) {
 				i, len(csv[i]), numFields)
 		}
 	}
-	numRows := len(csv) - cfg.NumHeaderRows
-	numCols := len(csv[0]) - cfg.NumLabelLevels
+	numRows := len(csv) - cfg.numHeaderRows
+	numCols := len(csv[0]) - cfg.numLabelLevels
 
 	// prepare intermediary values containers
 	vals := makeStringMatrix(numCols, numRows)
 	valsIsNull := makeBoolMatrix(numCols, numRows)
-	valsNames := makeStringMatrix(numCols, cfg.NumHeaderRows)
+	valsNames := makeStringMatrix(numCols, cfg.numHeaderRows)
 
 	// prepare intermediary label containers
-	labels := makeStringMatrix(cfg.NumLabelLevels, numRows)
-	labelsIsNull := makeBoolMatrix(cfg.NumLabelLevels, numRows)
-	levelNames := makeStringMatrix(cfg.NumLabelLevels, cfg.NumHeaderRows)
+	labels := makeStringMatrix(cfg.numLabelLevels, numRows)
+	labelsIsNull := makeBoolMatrix(cfg.numLabelLevels, numRows)
+	levelNames := makeStringMatrix(cfg.numLabelLevels, cfg.numHeaderRows)
 
 	// iterate over csv and transpose rows and columns
 	for row := range csv {
 		for column := range csv[row] {
-			if row < cfg.NumHeaderRows {
-				if column < cfg.NumLabelLevels {
+			if row < cfg.numHeaderRows {
+				if column < cfg.numLabelLevels {
 					// write header rows to labels, no offset
 					levelNames[column][row] = csv[row][column]
 				} else {
 					// write header rows to cols, offset for label cols
-					offsetFromLabelCols := column - cfg.NumLabelLevels
+					offsetFromLabelCols := column - cfg.numLabelLevels
 					valsNames[offsetFromLabelCols][row] = csv[row][column]
 				}
 				continue
 			}
-			offsetFromHeaderRows := row - cfg.NumHeaderRows
-			if column < cfg.NumLabelLevels {
+			offsetFromHeaderRows := row - cfg.numHeaderRows
+			if column < cfg.numLabelLevels {
 				// write values to labels, offset for header rows
 				labels[column][offsetFromHeaderRows] = csv[row][column]
 				labelsIsNull[column][offsetFromHeaderRows] = isNullString(csv[row][column])
 			} else {
-				offsetFromLabelCols := column - cfg.NumLabelLevels
+				offsetFromLabelCols := column - cfg.numLabelLevels
 				// write values to cols, offset for label cols and header rows
 				vals[offsetFromLabelCols][offsetFromHeaderRows] = csv[row][column]
 				valsIsNull[offsetFromLabelCols][offsetFromHeaderRows] = isNullString(csv[row][column])
@@ -574,7 +586,7 @@ func readCSVByRows(csv [][]string, cfg *readConfig) (*DataFrame, error) {
 
 	// create default col level names
 	var retColLevelNames []string
-	retColLevelNames, retVals = defaultColsIfNoHeader(cfg.NumHeaderRows, retVals)
+	retColLevelNames, retVals = defaultColsIfNoHeader(cfg.numHeaderRows, retVals)
 
 	return &DataFrame{
 		values:        retVals,
@@ -593,8 +605,8 @@ func readCSVByCols(csv [][]string, cfg *readConfig) (*DataFrame, error) {
 		}
 	}
 
-	numRows := len(csv[0]) - cfg.NumHeaderRows
-	numCols := len(csv) - cfg.NumLabelLevels
+	numRows := len(csv[0]) - cfg.numHeaderRows
+	numCols := len(csv) - cfg.numLabelLevels
 
 	// prepare intermediary values containers
 	vals := make([][]string, numCols)
@@ -602,32 +614,32 @@ func readCSVByCols(csv [][]string, cfg *readConfig) (*DataFrame, error) {
 	valsNames := make([]string, numCols)
 
 	// prepare intermediary label containers
-	labels := make([][]string, cfg.NumLabelLevels)
-	labelsIsNull := make([][]bool, cfg.NumLabelLevels)
-	labelsNames := make([]string, cfg.NumLabelLevels)
+	labels := make([][]string, cfg.numLabelLevels)
+	labelsIsNull := make([][]bool, cfg.numLabelLevels)
+	labelsNames := make([]string, cfg.numLabelLevels)
 
 	// iterate over all cols to get header names
-	for j := 0; j < cfg.NumLabelLevels; j++ {
+	for j := 0; j < cfg.numLabelLevels; j++ {
 		// write label headers, no offset
-		labelsNames[j] = strings.Join(csv[j][:cfg.NumHeaderRows], optionLevelSeparator)
+		labelsNames[j] = strings.Join(csv[j][:cfg.numHeaderRows], optionLevelSeparator)
 	}
 	for k := 0; k < numCols; k++ {
 		// write col headers, offset for label cols
-		offsetFromLabelCols := k + cfg.NumLabelLevels
-		valsNames[k] = strings.Join(csv[offsetFromLabelCols][:cfg.NumHeaderRows], optionLevelSeparator)
+		offsetFromLabelCols := k + cfg.numLabelLevels
+		valsNames[k] = strings.Join(csv[offsetFromLabelCols][:cfg.numHeaderRows], optionLevelSeparator)
 	}
 	for container := range csv {
-		if container < cfg.NumLabelLevels {
+		if container < cfg.numLabelLevels {
 			// write label values as slice, offset for header rows
-			valsToWrite := csv[container][cfg.NumHeaderRows:]
+			valsToWrite := csv[container][cfg.numHeaderRows:]
 			labels[container] = valsToWrite
 			// duck error because values are all string, and therefore supported
 			nulls, _ := setNullsFromInterface(valsToWrite)
 			labelsIsNull[container] = nulls
 		} else {
 			// write column values as slice, offset for label cols and header rows
-			offsetFromLabelCols := container - cfg.NumLabelLevels
-			valsToWrite := csv[container][cfg.NumHeaderRows:]
+			offsetFromLabelCols := container - cfg.numLabelLevels
+			valsToWrite := csv[container][cfg.numHeaderRows:]
 			vals[offsetFromLabelCols] = valsToWrite
 			// duck error because values are all string, and therefore supported
 			nulls, _ := setNullsFromInterface(valsToWrite)
@@ -644,7 +656,7 @@ func readCSVByCols(csv [][]string, cfg *readConfig) (*DataFrame, error) {
 
 	// create default col level names
 	var retColLevelNames []string
-	retColLevelNames, retVals = defaultColsIfNoHeader(cfg.NumHeaderRows, retVals)
+	retColLevelNames, retVals = defaultColsIfNoHeader(cfg.numHeaderRows, retVals)
 
 	return &DataFrame{
 		values:        retVals,
@@ -2680,14 +2692,14 @@ func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune
 
 // major dimension of input: columns
 func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *readConfig) *DataFrame {
-	numCols := len(values) - config.NumLabelLevels
-	numRows := len(values[0]) - config.NumHeaderRows
-	labelNames := make([]string, config.NumLabelLevels)
+	numCols := len(values) - config.numLabelLevels
+	numRows := len(values[0]) - config.numHeaderRows
+	labelNames := make([]string, config.numLabelLevels)
 	// iterate over all label levels to get header names
-	if config.NumHeaderRows > 0 {
-		for j := 0; j < config.NumLabelLevels; j++ {
+	if config.numHeaderRows > 0 {
+		for j := 0; j < config.numLabelLevels; j++ {
 			// only read from last header row
-			labelNames[j] = values[j][config.NumHeaderRows-1]
+			labelNames[j] = values[j][config.numHeaderRows-1]
 		}
 	}
 
@@ -2695,25 +2707,25 @@ func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *readC
 	for k := 0; k < numCols; k++ {
 		// write column header names, offset by label levels
 		colNames[k] = string(
-			strings.Join(values[k+config.NumLabelLevels][:config.NumHeaderRows], optionLevelSeparator))
+			strings.Join(values[k+config.numLabelLevels][:config.numHeaderRows], optionLevelSeparator))
 	}
 
 	// remove headers from original data
 	for container := 0; container < len(values); container++ {
-		values[container] = values[container][config.NumHeaderRows:]
-		isNull[container] = isNull[container][config.NumHeaderRows:]
+		values[container] = values[container][config.numHeaderRows:]
+		isNull[container] = isNull[container][config.numHeaderRows:]
 	}
 	// write labels up to the number of label levels
 	labels := copyStringsIntoValueContainers(
-		values[:config.NumLabelLevels],
-		isNull[:config.NumLabelLevels],
+		values[:config.numLabelLevels],
+		isNull[:config.numLabelLevels],
 		labelNames,
 	)
 
 	// write columns after the label levels
 	columns := copyStringsIntoValueContainers(
-		values[config.NumLabelLevels:],
-		isNull[config.NumLabelLevels:],
+		values[config.numLabelLevels:],
+		isNull[config.numLabelLevels:],
 		colNames,
 	)
 
@@ -2721,7 +2733,7 @@ func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *readC
 	labels = defaultLabelsIfEmpty(labels, numRows)
 
 	// update label names if labels provided but no header
-	if config.NumHeaderRows == 0 && config.NumLabelLevels != 0 {
+	if config.numHeaderRows == 0 && config.numLabelLevels != 0 {
 		for j := range labels {
 			labels[j].name = optionPrefix + fmt.Sprint(j)
 		}
@@ -2729,7 +2741,7 @@ func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *readC
 
 	// create default col level names
 	var colLevelNames []string
-	colLevelNames, columns = defaultColsIfNoHeader(config.NumHeaderRows, columns)
+	colLevelNames, columns = defaultColsIfNoHeader(config.numHeaderRows, columns)
 
 	return &DataFrame{
 		values:        columns,

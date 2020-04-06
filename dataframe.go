@@ -173,21 +173,21 @@ func (df *DataFrame) Cast(containerAsType map[string]DType) {
 // ReadOptionHeaders configures a read function to expect n rows to be column headers (default: 1).
 func ReadOptionHeaders(n int) func(*readConfig) {
 	return func(r *readConfig) {
-		r.NumHeaderRows = n
+		r.numHeaderRows = n
 	}
 }
 
 // ReadOptionLabels configures a read function to expect the first n columns to be label levels (default: 0).
 func ReadOptionLabels(n int) func(*readConfig) {
 	return func(r *readConfig) {
-		r.NumLabelLevels = n
+		r.numLabelLevels = n
 	}
 }
 
 // ReadOptionDelimiter configures a read function to use sep as a field delimiter for use in ReadCSV (default: ",").
 func ReadOptionDelimiter(sep rune) func(*readConfig) {
 	return func(r *readConfig) {
-		r.Delimiter = sep
+		r.delimiter = sep
 	}
 }
 
@@ -203,7 +203,7 @@ func ReadOptionDelimiter(sep rune) func(*readConfig) {
 //  baz qux							bar qux
 func ReadOptionSwitchDims() func(*readConfig) {
 	return func(r *readConfig) {
-		r.MajorDimIsCols = true
+		r.majorDimIsCols = true
 	}
 }
 
@@ -226,7 +226,7 @@ func ReadCSVFromRecords(records [][]string, options ...ReadOption) (ret *DataFra
 	}
 	config := setReadConfig(options)
 
-	if config.MajorDimIsCols {
+	if config.majorDimIsCols {
 		ret, err = readCSVByCols(records, config)
 	} else {
 		ret, err = readCSVByRows(records, config)
@@ -254,14 +254,14 @@ func ReadCSV(r io.Reader, options ...ReadOption) (*DataFrame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading csv: %s", err)
 	}
-	numRows, numCols, err := extractCSVDimensions(b, config.Delimiter)
+	numRows, numCols, err := extractCSVDimensions(b, config.delimiter)
 	if err != nil {
 		return nil, fmt.Errorf("reading csv: %v", err)
 	}
 	retVals := makeStringMatrix(numCols, numRows)
 	retNulls := makeBoolMatrix(numCols, numRows)
 	data := bytes.NewReader(b)
-	err = readCSVBytes(data, retVals, retNulls, config.Delimiter)
+	err = readCSVBytes(data, retVals, retNulls, config.delimiter)
 	if err != nil {
 		return nil, fmt.Errorf("reading csv: %s", err)
 	}
@@ -323,7 +323,7 @@ func ReadStruct(structPointer interface{}, options ...ReadOption) (*DataFrame, e
 			name = field.Name
 		}
 		// write to label
-		if container < config.NumLabelLevels {
+		if container < config.numLabelLevels {
 			labelNames = append(labelNames, name)
 			labels = append(labels, v.Field(k).Interface())
 			// write to column
@@ -337,7 +337,7 @@ func ReadStruct(structPointer interface{}, options ...ReadOption) (*DataFrame, e
 		return nil, fmt.Errorf("reading struct as schema: %v", df.err)
 	}
 	// not default labels? apply label names
-	if config.NumLabelLevels > 0 {
+	if config.numLabelLevels > 0 {
 		df = df.SetLabelNames(labelNames)
 	}
 	df = df.SetColNames(colNames)
@@ -345,7 +345,7 @@ func ReadStruct(structPointer interface{}, options ...ReadOption) (*DataFrame, e
 	if hasNullTag {
 		var min int
 		// default labels? do not change nulls
-		if config.NumLabelLevels == 0 {
+		if config.numLabelLevels == 0 {
 			min = 1
 		}
 		containers := makeIntRange(min, df.NumLevels()+df.NumColumns())
@@ -422,7 +422,7 @@ func (df *DataFrame) EqualsCSV(includeLabels bool, want io.Reader, wantOptions .
 
 	got := df.CSVRecords(writeOptionIncludeLabels(includeLabels))
 	// df2 has default labels? exclude them
-	wantDF := df2.CSVRecords(writeOptionIncludeLabels(config.NumLabelLevels > 0))
+	wantDF := df2.CSVRecords(writeOptionIncludeLabels(config.numLabelLevels > 0))
 	diffs, eq := tablediff.Diff(got, wantDF)
 	return eq, diffs, nil
 }
@@ -432,21 +432,21 @@ func (df *DataFrame) EqualsCSV(includeLabels bool, want io.Reader, wantOptions .
 // WriteOptionExcludeLabels excludes the label levels from the output.
 func WriteOptionExcludeLabels() func(*writeConfig) {
 	return func(w *writeConfig) {
-		w.IncludeLabels = false
+		w.includeLabels = false
 	}
 }
 
 // for internal use
 func writeOptionIncludeLabels(set bool) func(w *writeConfig) {
 	return func(w *writeConfig) {
-		w.IncludeLabels = set
+		w.includeLabels = set
 	}
 }
 
 // WriteOptionDelimiter configures a write function to use sep as a field delimiter for use in write functions (default: ",").
 func WriteOptionDelimiter(sep rune) func(*writeConfig) {
 	return func(w *writeConfig) {
-		w.Delimiter = sep
+		w.delimiter = sep
 	}
 }
 
@@ -454,7 +454,7 @@ func WriteOptionDelimiter(sep rune) func(*writeConfig) {
 // Null values are replaced with "(null)".
 func (df *DataFrame) CSVRecords(options ...WriteOption) [][]string {
 	config := setWriteConfig(options)
-	transposedStringValues, err := df.toCSVByRows(config.IncludeLabels)
+	transposedStringValues, err := df.toCSVByRows(config.includeLabels)
 	if err != nil {
 		return nil
 	}
@@ -487,7 +487,7 @@ func (df *DataFrame) Struct(structPointer interface{}, options ...WriteOption) e
 	}
 	v := reflect.ValueOf(structPointer).Elem()
 	var mergedLabelsAndCols []*valueContainer
-	if config.IncludeLabels {
+	if config.includeLabels {
 		mergedLabelsAndCols = append(df.labels, df.values...)
 	} else {
 		mergedLabelsAndCols = df.values
@@ -549,10 +549,10 @@ func (df *DataFrame) Struct(structPointer interface{}, options ...WriteOption) e
 // Null values are replaced with "(null)".
 func (df *DataFrame) WriteCSV(w io.Writer, options ...WriteOption) error {
 	config := setWriteConfig(options)
-	ret := df.CSVRecords(writeOptionIncludeLabels(config.IncludeLabels))
+	ret := df.CSVRecords(writeOptionIncludeLabels(config.includeLabels))
 	var b bytes.Buffer
 	cw := csv.NewWriter(&b)
-	cw.Comma = config.Delimiter
+	cw.Comma = config.delimiter
 	cw.WriteAll(ret)
 	_, err := w.Write(b.Bytes())
 	return err
@@ -577,23 +577,23 @@ func WriteMockCSV(w io.Writer, n int, r io.Reader, options ...ReadOption) error 
 		return fmt.Errorf("writing mock csv: reading r: %v", err)
 	}
 	// data has default labels? exclude them
-	src := data.CSVRecords(writeOptionIncludeLabels(config.NumLabelLevels > 0))
+	src := data.CSVRecords(writeOptionIncludeLabels(config.numLabelLevels > 0))
 
-	if !config.MajorDimIsCols {
+	if !config.majorDimIsCols {
 		rowCount = len(src)
 	} else {
 		rowCount = len(src[0])
 	}
 	// numSampleRows must not exceed total number of non-header rows in src
-	maxRows := rowCount - config.NumHeaderRows
+	maxRows := rowCount - config.numHeaderRows
 	if maxRows < numSampleRows {
 		numSampleRows = maxRows
 	}
 
 	// major dimension is rows?
-	if !config.MajorDimIsCols {
+	if !config.majorDimIsCols {
 		// copy headers
-		for i := 0; i < config.NumHeaderRows; i++ {
+		for i := 0; i < config.numHeaderRows; i++ {
 			headers = append(headers, src[i])
 		}
 		// prepare one inferredTypes map per column
@@ -607,7 +607,7 @@ func WriteMockCSV(w io.Writer, n int, r io.Reader, options ...ReadOption) error 
 
 		// for each row, infer type column-by-column
 		// offset data sample by header rows
-		dataSample := src[config.NumHeaderRows : numSampleRows+config.NumHeaderRows]
+		dataSample := src[config.numHeaderRows : numSampleRows+config.numHeaderRows]
 		for i := range dataSample {
 			for k := range dataSample[i] {
 				value := dataSample[i][k]
@@ -630,7 +630,7 @@ func WriteMockCSV(w io.Writer, n int, r io.Reader, options ...ReadOption) error 
 
 		// copy headers
 		headers = make([][]string, 0)
-		for l := 0; l < config.NumHeaderRows; l++ {
+		for l := 0; l < config.numHeaderRows; l++ {
 			headers = append(headers, make([]string, len(src)))
 			for k := range src {
 				// NB: major dimension of output is rows
@@ -642,7 +642,7 @@ func WriteMockCSV(w io.Writer, n int, r io.Reader, options ...ReadOption) error 
 		for k := range src {
 			// offset by header rows
 			// infer type of only the sample rows
-			dataSample := src[k][config.NumHeaderRows : numSampleRows+config.NumHeaderRows]
+			dataSample := src[k][config.numHeaderRows : numSampleRows+config.numHeaderRows]
 			for i := range dataSample {
 				dtype := inferType(dataSample[i])
 				inferredTypes[k][dtype]++
@@ -1560,7 +1560,7 @@ func (df *DataFrame) SetColNames(colNames []string) *DataFrame {
 
 // -- RESHAPING
 
-// Transpose switches all row values to column values and label names to column names.
+// Transpose coerces all values to string, then switches all row values to column values and label names to column names.
 // For example a DataFrame with 2 rows and 1 column has 2 columns and 1 row after transposition.
 func (df *DataFrame) Transpose() *DataFrame {
 	// row values become column values: 2 row x 1 col -> 2 col x 1 row
@@ -1957,9 +1957,36 @@ func (df *DataFrameMutator) ApplyFormat(lambdas map[string]ApplyFormatFn) {
 
 // -- MERGERS
 
-// Merge performs a left join of other onto df using containers with matching names as keys.
-// To perform a different type of join or specify the matching keys,
-// use df.LookupAdvanced() to isolate values in other, and append them with df.WithCol().
+// JoinOptionHow specifies how to join two Series or DataFrames. Supported options:
+// left (ie left join), right, inner (default: left).
+func JoinOptionHow(how string) func(*joinConfig) {
+	return func(l *joinConfig) {
+		l.how = how
+	}
+}
+
+// JoinOptionLeftOn specifies the key(s) to use to join the left Series/DataFrame.
+// Keys must be existing container names (either label level or column names).
+// Default: no keys are specified, so shared label names are used automatically as keys.
+func JoinOptionLeftOn(keys []string) func(*joinConfig) {
+	return func(l *joinConfig) {
+		l.leftOn = keys
+	}
+}
+
+// JoinOptionRightOn specifies the key(s) to use to join the right Series/DataFrame.
+// Keys must be existing container names (either label level or column names).
+// Default: no keys are specified, so shared label names are used automatically as keys.
+func JoinOptionRightOn(keys []string) func(*joinConfig) {
+	return func(l *joinConfig) {
+		l.rightOn = keys
+	}
+}
+
+// Merge joins other onto df.
+// Performs a left join unless a different join type is specified as an option.
+// If left and right keys are supplied as options, those are used as lookup keys.
+// Otherwise, the join will automatically use shared label names or return an error if none exist.
 //
 // Merge identifies the row alignment between df and other and appends aligned values as new columns on df.
 // Rows are aligned when
@@ -1983,15 +2010,16 @@ func (df *DataFrameMutator) ApplyFormat(lambdas map[string]ApplyFormatFn) {
 //
 // Finally, all container names (columns and label names) are deduplicated after the merge so that they are unique.
 // Returns a new DataFrame.
-func (df *DataFrame) Merge(other *DataFrame) *DataFrame {
+func (df *DataFrame) Merge(other *DataFrame, options ...JoinOption) *DataFrame {
 	df = df.Copy()
-	df.InPlace().Merge(other)
+	df.InPlace().Merge(other, options...)
 	return df
 }
 
-// Merge performs a left join of other onto df using containers with matching names as keys.
-// To perform a different type of join or specify the matching keys,
-// use df.LookupAdvanced() to isolate values in other, and append them with df.WithCol().
+// Merge joins other onto df.
+// Performs a left join unless a different join type is specified as an option.
+// If left and right keys are supplied as options, those are used as lookup keys.
+// Otherwise, the join will automatically use shared label names or return an error if none exist.
 //
 // Merge identifies the row alignment between df and other and appends aligned values as new columns on df.
 // Rows are aligned when:
@@ -2015,19 +2043,38 @@ func (df *DataFrame) Merge(other *DataFrame) *DataFrame {
 //
 // Finally, all container names (columns and label names) are deduplicated after the merge so that they are unique.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) Merge(other *DataFrame) {
-	lookupDF := df.dataframe.Lookup(other)
+func (df *DataFrameMutator) Merge(other *DataFrame, options ...JoinOption) {
+	config := setJoinConfig(options)
+	if config.how == "inner" {
+		// inner merge should be a left merge with null rows dropped
+		options = append(options, JoinOptionHow("left"))
+	}
+	lookupDF := df.dataframe.Lookup(other, options...)
 	if lookupDF.Err() != nil {
 		df.dataframe.resetWithError(fmt.Errorf("merge: %v", lookupDF.Err()))
 	}
-	for k := range lookupDF.values {
-		df.dataframe.values = append(df.dataframe.values, lookupDF.values[k])
+	anchor := df
+	if config.how == "right" {
+		anchor = other.InPlace()
 	}
-	df.DeduplicateNames()
+	for k := range lookupDF.values {
+		anchor.dataframe.values = append(anchor.dataframe.values, lookupDF.values[k])
+	}
+	if config.how == "inner" {
+		anchor.DropNull()
+	}
+	anchor.DeduplicateNames()
+	// set df to anchor
+	df.dataframe.values = anchor.dataframe.values
+	df.dataframe.labels = anchor.dataframe.labels
+	df.dataframe.colLevelNames = anchor.dataframe.colLevelNames
+	df.dataframe.name = anchor.dataframe.name
 }
 
-// Lookup performs the lookup portion of a left join of other onto df using containers with matching names as keys.
-// To perform a different type of lookup or specify the matching keys, use df.LookupAdvanced().
+// Lookup performs the lookup portion of a join of other onto df.
+// Performs a left join unless a different join type is specified as an option.
+// If left and right keys are supplied as options, those are used as lookup keys.
+// Otherwise, the join will automatically use shared label names or return an error if none exist.
 //
 // Lookup identifies the row alignment between df and other and returns the aligned values.
 // Rows are aligned when:
@@ -2045,69 +2092,42 @@ func (df *DataFrameMutator) Merge(other *DataFrame) {
 // The result of a lookup will be:
 //
 // FOO BAR
-// bar null
+// bar (null)
 // baz corge
 //
 // Returns a new DataFrame.
-func (df *DataFrame) Lookup(other *DataFrame) *DataFrame {
-	return df.LookupAdvanced(other, "left", nil, nil)
-}
-
-// LookupAdvanced performs the lookup portion of a join of other onto df matching on the container keys specified.
-// Supported how options: left, right, inner.
-//
-// LookupAdvanced identifies the row alignment between df and other and returns the aligned values.
-// Rows are aligned when:
-// 1) one or more containers (either column or label level) in other share the same name as one or more containers in df,
-// and 2) the stringified values in the other containers match the values in the df containers.
-// For the following dataframes:
-//
-// df    	other
-// FOO BAR	FRED QUX
-// bar 0	baz  corge
-// baz 1	qux  waldo
-//
-// In LookupAdvanced(other, "left", ["foo"], ["fred"]),
-// row 1 in df is "aligned" with row 0 in other, because those are the rows in which
-// both share the same value ("baz") in the keyed containers.
-// The result of this lookup will be:
-//
-// FOO BAR
-// bar null
-// baz corge
-//
-// Returns a new DataFrame.
-func (df *DataFrame) LookupAdvanced(other *DataFrame, how string, leftOn []string, rightOn []string) *DataFrame {
+func (df *DataFrame) Lookup(other *DataFrame, options ...JoinOption) *DataFrame {
+	config := setJoinConfig(options)
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	otherMergedLabelsAndCols := append(other.labels, other.values...)
 	var leftKeys, rightKeys []int
 	var err error
-	if len(leftOn) == 0 || len(rightOn) == 0 {
-		if !(len(leftOn) == 0 && len(rightOn) == 0) {
+	if len(config.leftOn) == 0 || len(config.rightOn) == 0 {
+		if !(len(config.leftOn) == 0 && len(config.rightOn) == 0) {
 			return dataFrameWithError(
 				fmt.Errorf("lookup: if either leftOn or rightOn is empty, both must be empty"))
 		}
 	}
-	if len(leftOn) == 0 {
-		leftKeys, rightKeys, err = findMatchingKeysBetweenTwoLabelContainers(
-			mergedLabelsAndCols, otherMergedLabelsAndCols)
+	// no join keys specified? find matching labels
+	if len(config.leftOn) == 0 {
+		leftKeys, rightKeys, err = findMatchingKeysBetweenTwoContainers(df.labels, other.labels)
 		if err != nil {
 			return dataFrameWithError(fmt.Errorf("lookup: %v", err))
 		}
 	} else {
-		leftKeys, err = indexOfContainers(leftOn, mergedLabelsAndCols)
+		leftKeys, err = indexOfContainers(config.leftOn, mergedLabelsAndCols)
 		if err != nil {
 			return dataFrameWithError(fmt.Errorf("lookup: leftOn: %v", err))
 		}
-		rightKeys, err = indexOfContainers(rightOn, otherMergedLabelsAndCols)
+		rightKeys, err = indexOfContainers(config.rightOn, otherMergedLabelsAndCols)
 		if err != nil {
 			return dataFrameWithError(fmt.Errorf("lookup: rightOn: %v", err))
 		}
 	}
 	ret, err := lookupDataFrame(
-		how, df.name, df.colLevelNames,
+		config.how, df.name, df.colLevelNames,
 		df.values, df.labels, leftKeys,
-		other.values, other.labels, rightKeys, leftOn, rightOn)
+		other.values, other.labels, rightKeys, config.leftOn, config.rightOn)
 	if err != nil {
 		return dataFrameWithError(fmt.Errorf("lookup: %v", err))
 	}

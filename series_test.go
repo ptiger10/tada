@@ -1365,10 +1365,8 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 		err    error
 	}
 	type args struct {
-		other   *Series
-		how     string
-		leftOn  []string
-		rightOn []string
+		other  *Series
+		config []JoinOption
 	}
 	tests := []struct {
 		name   string
@@ -1382,8 +1380,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 			args{
 				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "qux"},
 					labels: []*valueContainer{{name: "bar", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-				how:    "left",
-				leftOn: []string{"foo"}, rightOn: []string{"bar"}},
+				config: []JoinOption{JoinOptionLeftOn([]string{"foo"}), JoinOptionRightOn([]string{"bar"})}},
 			&Series{values: &valueContainer{slice: []float64{30, 0}, isNull: []bool{false, true}},
 				labels: []*valueContainer{
 					{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
@@ -1395,8 +1392,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 			args{
 				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-				how:    "left",
-				leftOn: nil, rightOn: nil},
+				config: nil},
 			&Series{values: &valueContainer{slice: []float64{30, 0}, isNull: []bool{false, true}},
 				labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
 					cache: []string{"bar", "baz"}}}},
@@ -1412,8 +1408,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 					labels: []*valueContainer{
 						{name: "corge", slice: []int{3, 1, 5}, isNull: []bool{false, false, false}},
 						{name: "waldo", slice: []string{"baz", "bar", "quux"}, isNull: []bool{false, false}}}},
-				how:    "left",
-				leftOn: nil, rightOn: nil},
+				config: nil},
 			&Series{values: &valueContainer{slice: []float64{0, 20}, isNull: []bool{true, false}},
 				labels: []*valueContainer{
 					{name: "waldo", slice: []string{"baz", "bar"}, isNull: []bool{false, false},
@@ -1427,8 +1422,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 			args{
 				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-				how:    "left",
-				leftOn: []string{"foo"}, rightOn: nil},
+				config: []JoinOption{JoinOptionLeftOn([]string{"foo"})}},
 			&Series{err: errors.New("lookup: if either leftOn or rightOn is empty, both must be empty")},
 		},
 		{"fail - no key supplied, and no matching key", fields{
@@ -1437,8 +1431,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 			args{
 				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
 					labels: []*valueContainer{{name: "corge", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-				how:    "left",
-				leftOn: nil, rightOn: nil},
+				config: nil},
 			&Series{err: errors.New("lookup: no matching keys between containers")},
 		},
 		{"fail - no matching left key", fields{
@@ -1447,8 +1440,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 			args{
 				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-				how:    "left",
-				leftOn: []string{"corge"}, rightOn: []string{"foo"}},
+				config: []JoinOption{JoinOptionLeftOn([]string{"corge"}), JoinOptionRightOn([]string{"foo"})}},
 			&Series{err: errors.New("lookup: leftOn: name (corge) not found")},
 		},
 		{"fail - no matching right key", fields{
@@ -1457,8 +1449,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 			args{
 				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-				how:    "left",
-				leftOn: []string{"foo"}, rightOn: []string{"corge"}},
+				config: []JoinOption{JoinOptionLeftOn([]string{"foo"}), JoinOptionRightOn([]string{"corge"})}},
 			&Series{err: errors.New("lookup: rightOn: name (corge) not found")},
 		},
 		{"fail - unsupported how", fields{
@@ -1467,8 +1458,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 			args{
 				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-				how:    "other",
-				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
+				config: []JoinOption{JoinOptionHow("other")}},
 			&Series{err: errors.New("lookup: how: must be left, right, or inner")},
 		},
 	}
@@ -1479,8 +1469,8 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.LookupAdvanced(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !EqualSeries(got, tt.want) {
-				t.Errorf("Series.LookupAdvanced() = %v, want %v", got, tt.want)
+			if got := s.Lookup(tt.args.other, tt.args.config...); !EqualSeries(got, tt.want) {
+				t.Errorf("Series.Lookup() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1494,7 +1484,8 @@ func TestSeries_Merge(t *testing.T) {
 		err        error
 	}
 	type args struct {
-		other *Series
+		other   *Series
+		options []JoinOption
 	}
 	tests := []struct {
 		name   string
@@ -1507,7 +1498,9 @@ func TestSeries_Merge(t *testing.T) {
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}},
 			args{&Series{
 				values: &valueContainer{slice: []string{"c"}, isNull: []bool{false}, name: "bar"},
-				labels: []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}}}},
+				labels: []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}}},
+				nil,
+			},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
@@ -1516,6 +1509,25 @@ func TestSeries_Merge(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0",
 						cache: []string{"0", "1"},
+					}},
+				colLevelNames: []string{"*0"}},
+		},
+		{"right merge",
+			fields{values: &valueContainer{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}},
+			args{&Series{
+				values: &valueContainer{slice: []string{"c"}, isNull: []bool{false}, name: "bar"},
+				labels: []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}}},
+				[]JoinOption{JoinOptionHow("right")},
+			},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"c"}, isNull: []bool{false}, name: "bar"},
+					{slice: []string{"b"}, isNull: []bool{false}, name: "foo"},
+				},
+				labels: []*valueContainer{
+					{slice: []int{1}, isNull: []bool{false}, name: "*0",
+						cache: []string{"1"},
 					}},
 				colLevelNames: []string{"*0"}},
 		},
@@ -1528,7 +1540,7 @@ func TestSeries_Merge(t *testing.T) {
 				sharedData: tt.fields.sharedData,
 				err:        tt.fields.err,
 			}
-			if got := s.Merge(tt.args.other); !EqualDataFrames(got, tt.want) {
+			if got := s.Merge(tt.args.other, tt.args.options...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("Series.Merge() = %v, want %v", got, tt.want)
 			}
 		})

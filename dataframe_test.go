@@ -2378,7 +2378,8 @@ func TestDataFrame_Merge(t *testing.T) {
 		colLevelNames []string
 	}
 	type args struct {
-		other *DataFrame
+		other   *DataFrame
+		options []JoinOption
 	}
 	tests := []struct {
 		name   string
@@ -2390,11 +2391,14 @@ func TestDataFrame_Merge(t *testing.T) {
 			fields{values: []*valueContainer{
 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				name:          "foo",
 				colLevelNames: []string{"*0"}},
 			args{&DataFrame{
 				values:        []*valueContainer{{slice: []string{"c"}, isNull: []bool{false}, name: "bar"}},
 				labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
-				colLevelNames: []string{"anything"}}},
+				name:          "bar",
+				colLevelNames: []string{"*1"}},
+				nil},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
@@ -2404,6 +2408,55 @@ func TestDataFrame_Merge(t *testing.T) {
 					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0",
 						cache: []string{"0", "1"}},
 				},
+				name:          "foo",
+				colLevelNames: []string{"*0"}},
+		},
+		{"right merge",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				name:          "foo",
+				colLevelNames: []string{"*0"}},
+			args{&DataFrame{
+				values:        []*valueContainer{{slice: []string{"c"}, isNull: []bool{false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
+				name:          "bar",
+				colLevelNames: []string{"*1"}},
+				[]JoinOption{JoinOptionHow("right")},
+			},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"c"}, isNull: []bool{false}, name: "bar"},
+					{slice: []string{"b"}, isNull: []bool{false}, name: "foo"},
+				},
+				labels: []*valueContainer{
+					{slice: []int{1}, isNull: []bool{false}, name: "*0",
+						cache: []string{"1"},
+					}},
+				name:          "bar",
+				colLevelNames: []string{"*1"}},
+		},
+		{"inner merge", // resets cache when it drops null rows
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				name:          "foo",
+				colLevelNames: []string{"*0"}},
+			args{&DataFrame{
+				values:        []*valueContainer{{slice: []string{"c"}, isNull: []bool{false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
+				name:          "bar",
+				colLevelNames: []string{"*1"}},
+				[]JoinOption{JoinOptionHow("inner")},
+			},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"b"}, isNull: []bool{false}, name: "foo"},
+					{slice: []string{"c"}, isNull: []bool{false}, name: "bar"},
+				},
+				labels: []*valueContainer{
+					{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
+				name:          "foo",
 				colLevelNames: []string{"*0"}},
 		},
 		{"fail - no shared merge key ",
@@ -2414,7 +2467,8 @@ func TestDataFrame_Merge(t *testing.T) {
 			args{&DataFrame{
 				values:        []*valueContainer{{slice: []string{"c"}, isNull: []bool{false}, name: "bar"}},
 				labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "corge"}},
-				colLevelNames: []string{"anything"}}},
+				colLevelNames: []string{"anything"}},
+				nil},
 			&DataFrame{
 				err: fmt.Errorf("merge: lookup: no matching keys between containers")},
 		},
@@ -2428,14 +2482,14 @@ func TestDataFrame_Merge(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.Merge(tt.args.other); !EqualDataFrames(got, tt.want) {
+			if got := df.Merge(tt.args.other, tt.args.options...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Merge() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestDataFrame_LookupAdvanced(t *testing.T) {
+func TestDataFrame_Lookup(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -2445,9 +2499,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 	}
 	type args struct {
 		other   *DataFrame
-		how     string
-		leftOn  []string
-		rightOn []string
+		options []JoinOption
 	}
 	tests := []struct {
 		name   string
@@ -2455,7 +2507,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 		args   args
 		want   *DataFrame
 	}{
-		{"single label level, named keys, left join - other has more labels", fields{
+		{"single label level, supplied keys, left join - other has more labels", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
 			labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
 			name:          "qux",
@@ -2463,8 +2515,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 			args{
 				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-				how:    "left",
-				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
+				options: []JoinOption{JoinOptionLeftOn([]string{"foo"}), JoinOptionRightOn([]string{"foo"})}},
 			&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
 				labels: []*valueContainer{
 					{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
@@ -2473,7 +2524,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 				name:          "qux",
 				colLevelNames: []string{"*0"}},
 		},
-		{"single label level, named keys, left join - other has fewer labels", fields{
+		{"single label level, supplied keys, left join - other has fewer labels", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
 			labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
 			name:          "qux",
@@ -2481,8 +2532,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 			args{
 				other: &DataFrame{values: []*valueContainer{{slice: []float64{30}, isNull: []bool{false, false, false}, name: "corge"}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"bar"}, isNull: []bool{false, false, false}}}},
-				how:    "left",
-				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
+				options: []JoinOption{JoinOptionLeftOn([]string{"foo"}), JoinOptionRightOn([]string{"foo"})}},
 			&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
 				labels: []*valueContainer{
 					{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
@@ -2493,18 +2543,34 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 		},
 		{"auto key match", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
-			labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+			labels:        []*valueContainer{{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo"}},
 			name:          "qux",
 			colLevelNames: []string{"*0"}},
 			args{
 				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
-					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-				how:    "left",
-				leftOn: nil, rightOn: nil},
+					labels: []*valueContainer{{slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}, name: "foo"}}},
+				options: nil},
 			&DataFrame{values: []*valueContainer{{slice: []float64{30, 0}, isNull: []bool{false, true}, name: "corge"}},
 				labels: []*valueContainer{
 					{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
 						cache: []string{"bar", "baz"}},
+				},
+				name:          "qux",
+				colLevelNames: []string{"*0"}},
+		},
+		{"auto key match - right join", fields{
+			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
+			labels:        []*valueContainer{{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo"}},
+			name:          "qux",
+			colLevelNames: []string{"*0"}},
+			args{
+				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
+					labels: []*valueContainer{{slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}, name: "foo"}}},
+				options: []JoinOption{JoinOptionHow("right")}},
+			&DataFrame{values: []*valueContainer{{slice: []float64{0, 0, 1}, isNull: []bool{true, true, false}, name: "waldo"}},
+				labels: []*valueContainer{
+					{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false},
+						cache: []string{"qux", "quux", "bar"}},
 				},
 				name:          "qux",
 				colLevelNames: []string{"*0"}},
@@ -2517,8 +2583,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 			args{
 				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-				how:    "left",
-				leftOn: []string{"foo"}, rightOn: nil},
+				options: []JoinOption{JoinOptionLeftOn([]string{"foo"})}},
 			&DataFrame{err: fmt.Errorf("lookup: if either leftOn or rightOn is empty, both must be empty")},
 		},
 		{"fail - bad leftOn", fields{
@@ -2529,8 +2594,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 			args{
 				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-				how:    "left",
-				leftOn: []string{"corge"}, rightOn: []string{"foo"}},
+				options: []JoinOption{JoinOptionLeftOn([]string{"corge"}), JoinOptionRightOn([]string{"foo"})}},
 			&DataFrame{err: fmt.Errorf("lookup: leftOn: name (corge) not found")},
 		},
 		{"fail - bad rightOn", fields{
@@ -2541,8 +2605,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 			args{
 				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "baz"}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-				how:    "left",
-				leftOn: []string{"foo"}, rightOn: []string{"corge"}},
+				options: []JoinOption{JoinOptionLeftOn([]string{"foo"}), JoinOptionRightOn([]string{"corge"})}},
 			&DataFrame{err: fmt.Errorf("lookup: rightOn: name (corge) not found")},
 		},
 		{"fail - unsupported lookup", fields{
@@ -2553,8 +2616,7 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 			args{
 				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
-				how:    "special",
-				leftOn: []string{"foo"}, rightOn: []string{"foo"}},
+				options: []JoinOption{JoinOptionHow("other")}},
 			&DataFrame{err: fmt.Errorf("lookup: how: must be left, right, or inner")},
 		},
 	}
@@ -2567,8 +2629,8 @@ func TestDataFrame_LookupAdvanced(t *testing.T) {
 				colLevelNames: tt.fields.colLevelNames,
 				err:           tt.fields.err,
 			}
-			if got := df.LookupAdvanced(tt.args.other, tt.args.how, tt.args.leftOn, tt.args.rightOn); !EqualDataFrames(got, tt.want) {
-				t.Errorf("DataFrame.LookupAdvanced() = %v, want %v", got, tt.want)
+			if got := df.Lookup(tt.args.other, tt.args.options...); !EqualDataFrames(got, tt.want) {
+				t.Errorf("DataFrame.Lookup() = %v, want %v", got, tt.want)
 
 			}
 		})

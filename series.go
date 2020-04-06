@@ -839,8 +839,11 @@ func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
 
 // -- MERGERS
 
-// Lookup performs the lookup portion of a left join of other onto s using containers with matching names as keys.
-// To perform a different type of lookup or specify the matching keys, use s.LookupAdvanced().
+// Lookup performs the lookup portion of a join of other onto df.
+// Performs a left join unless a different join type is specified as an option.
+// If left and right keys are supplied as options, those are used as lookup keys.
+// Otherwise, the join will automatically use shared label names or return an error if none exist.
+//
 //
 // Lookup identifies the row alignment between s and other and returns the aligned values.
 // Rows are aligned when:
@@ -861,69 +864,44 @@ func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
 // bar null
 // baz corge
 //
-// Returns a new DataFrame.
-func (s *Series) Lookup(other *Series) *Series {
-	return s.LookupAdvanced(other, "left", nil, nil)
-}
-
-// LookupAdvanced performs the lookup portion of a join of other onto s matching on the container keys specified.
-// Supported how options: left, right, inner.
-//
-// LookupAdvanced identifies the row alignment between s and other and returns the aligned values.
-// Rows are aligned when:
-// 1) one or more containers (either values or label level) in other share the same name as one or more containers in s,
-// and 2) the stringified values in the other containers match the values in the s containers.
-// For the following dataframes:
-//
-// s    	other
-// FOO BAR	FRED QUX
-// bar 0	baz  corge
-// baz 1	qux  waldo
-//
-// In LookupAdvanced(other, "left", ["foo"], ["fred"]),
-// row 1 in s is "aligned" with row 0 in other, because those are the rows in which
-// both share the same value ("baz") in the keyed containers.
-// The result of this lookup will be:
-//
-// FOO BAR
-// bar null
-// baz corge
-//
 // Returns a new Series.
-func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, rightOn []string) *Series {
+func (s *Series) Lookup(other *Series, options ...JoinOption) *Series {
+	config := setJoinConfig(options)
 	var leftKeys, rightKeys []int
 	var err error
-	if len(leftOn) == 0 || len(rightOn) == 0 {
-		if !(len(leftOn) == 0 && len(rightOn) == 0) {
+	if len(config.leftOn) == 0 || len(config.rightOn) == 0 {
+		if !(len(config.leftOn) == 0 && len(config.rightOn) == 0) {
 			return seriesWithError(fmt.Errorf("lookup: if either leftOn or rightOn is empty, both must be empty"))
 		}
 	}
-	if len(leftOn) == 0 {
-		leftKeys, rightKeys, err = findMatchingKeysBetweenTwoLabelContainers(s.labels, other.labels)
+	// no join keys specified? find matching labels
+	if len(config.leftOn) == 0 {
+		leftKeys, rightKeys, err = findMatchingKeysBetweenTwoContainers(s.labels, other.labels)
 		if err != nil {
 			return seriesWithError(fmt.Errorf("lookup: %v", err))
 		}
 	} else {
-		leftKeys, err = indexOfContainers(leftOn, s.labels)
+		leftKeys, err = indexOfContainers(config.leftOn, s.labels)
 		if err != nil {
 			return seriesWithError(fmt.Errorf("lookup: leftOn: %v", err))
 		}
-		rightKeys, err = indexOfContainers(rightOn, other.labels)
+		rightKeys, err = indexOfContainers(config.rightOn, other.labels)
 		if err != nil {
 			return seriesWithError(fmt.Errorf("lookup: rightOn: %v", err))
 		}
 	}
 
-	ret, err := lookup(how, s.values, s.labels, leftKeys, other.values, other.labels, rightKeys)
+	ret, err := lookup(config.how, s.values, s.labels, leftKeys, other.values, other.labels, rightKeys)
 	if err != nil {
 		return seriesWithError(fmt.Errorf("lookup: %v", err))
 	}
 	return ret
 }
 
-// Merge converts s and other to dataframes. and then performs a left join of other onto df using containers with matching names as keys.
-// To perform a different type of join or specify the matching keys,
-// use s.DataFrame() + df.LookupAdvanced() to isolate values in other, and append them with df.WithCol().
+// Merge joins other onto s.
+// Performs a left join unless a different join type is specified as an option.
+// If left and right keys are supplied as options, those are used as lookup keys.
+// Otherwise, the join will automatically use shared label names or return an error if none exist.
 //
 // Merge identifies the row alignment between s and other and appends aligned values as new columns on s.
 // Rows are aligned when:
@@ -947,8 +925,8 @@ func (s *Series) LookupAdvanced(other *Series, how string, leftOn []string, righ
 //
 // Finally, all container names (either the Series name or label name) are deduplicated after the merge so that they are unique.
 // Returns a new DataFrame.
-func (s *Series) Merge(other *Series) *DataFrame {
-	return s.DataFrame().Merge(other.DataFrame())
+func (s *Series) Merge(other *Series, options ...JoinOption) *DataFrame {
+	return s.DataFrame().Merge(other.DataFrame(), options...)
 }
 
 // Add coerces other and s to float64 values, aligns other with s, and adds the values in aligned rows,

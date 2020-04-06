@@ -189,7 +189,7 @@ func Test_makeValueContainersFromInterfaces(t *testing.T) {
 	}
 }
 
-func Test_findMatchingKeysBetweenTwoLabelContainers(t *testing.T) {
+func Test_findMatchingKeysBetweenTwoContainers(t *testing.T) {
 	type args struct {
 		labels1 []*valueContainer
 		labels2 []*valueContainer
@@ -228,16 +228,16 @@ func Test_findMatchingKeysBetweenTwoLabelContainers(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := findMatchingKeysBetweenTwoLabelContainers(tt.args.labels1, tt.args.labels2)
+			got, got1, err := findMatchingKeysBetweenTwoContainers(tt.args.labels1, tt.args.labels2)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("findMatchingKeysBetweenTwoLabelContainers() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("findMatchingKeysBetweenTwoContainers() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("findMatchingKeysBetweenTwoLabelContainers() got = %v, want %v", got, tt.want)
+				t.Errorf("findMatchingKeysBetweenTwoContainers() got = %v, want %v", got, tt.want)
 			}
 			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("findMatchingKeysBetweenTwoLabelContainers() got1 = %v, want %v", got1, tt.want1)
+				t.Errorf("findMatchingKeysBetweenTwoContainers() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}
@@ -1918,7 +1918,7 @@ func Test_readCSVByRows(t *testing.T) {
 		{"1 header row, 2 columns, no label levels",
 			args{
 				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				config: &readConfig{NumHeaderRows: 1}},
+				config: &readConfig{numHeaderRows: 1}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
@@ -1928,7 +1928,7 @@ func Test_readCSVByRows(t *testing.T) {
 		{"1 header row, 1 column, 1 label level",
 			args{
 				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				config: &readConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
+				config: &readConfig{numHeaderRows: 1, numLabelLevels: 1}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels: []*valueContainer{
@@ -1938,13 +1938,13 @@ func Test_readCSVByRows(t *testing.T) {
 		{"misaligned: wrong numbers of columns: too many",
 			args{
 				csv:    [][]string{{"foo", "bar"}, {"1", "2", "3"}},
-				config: &readConfig{NumHeaderRows: 1}},
+				config: &readConfig{numHeaderRows: 1}},
 			nil,
 			true},
 		{"misaligned: wrong numbers of columns: too few",
 			args{
 				csv:    [][]string{{"foo", "bar"}, {"1"}},
-				config: &readConfig{NumHeaderRows: 1}},
+				config: &readConfig{numHeaderRows: 1}},
 			nil,
 			true},
 	}
@@ -1976,7 +1976,7 @@ func Test_readCSVByCols(t *testing.T) {
 		{"1 header row, 2 columns, no label levels",
 			args{
 				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
-				config: &readConfig{NumHeaderRows: 1}},
+				config: &readConfig{numHeaderRows: 1}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
@@ -1986,7 +1986,7 @@ func Test_readCSVByCols(t *testing.T) {
 		{"1 header row, 1 column, 1 label levels",
 			args{
 				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
-				config: &readConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
+				config: &readConfig{numHeaderRows: 1, numLabelLevels: 1}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
 				labels: []*valueContainer{
@@ -1997,13 +1997,13 @@ func Test_readCSVByCols(t *testing.T) {
 		{"misaligned lines: too few",
 			args{
 				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5"}},
-				config: &readConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
+				config: &readConfig{numHeaderRows: 1, numLabelLevels: 1}},
 			nil,
 			true},
 		{"misaligned lines: too many",
 			args{
 				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6,", "6"}},
-				config: &readConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
+				config: &readConfig{numHeaderRows: 1, numLabelLevels: 1}},
 			nil,
 			true},
 	}
@@ -3851,7 +3851,7 @@ func Test_makeDataFrameFromMatrices(t *testing.T) {
 				{"foo", "bar"},
 				{"baz", ""}},
 			isNull: [][]bool{{false, false}, {false, true}},
-			config: &readConfig{NumHeaderRows: 1}},
+			config: &readConfig{numHeaderRows: 1}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []string{"bar"}, isNull: []bool{false}, name: "foo"},
@@ -3867,7 +3867,7 @@ func Test_makeDataFrameFromMatrices(t *testing.T) {
 				{"foo", "bar"},
 				{"baz", ""}},
 			isNull: [][]bool{{false, false}, {false, true}},
-			config: &readConfig{NumHeaderRows: 1, NumLabelLevels: 1}},
+			config: &readConfig{numHeaderRows: 1, numLabelLevels: 1}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []string{""}, isNull: []bool{true}, name: "baz"},
@@ -3882,7 +3882,7 @@ func Test_makeDataFrameFromMatrices(t *testing.T) {
 				{"foo", "bar"},
 				{"baz", ""}},
 			isNull: [][]bool{{false, false}, {false, true}},
-			config: &readConfig{NumLabelLevels: 1}},
+			config: &readConfig{numLabelLevels: 1}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []string{"baz", ""}, isNull: []bool{false, true}, name: "0"},
@@ -4771,10 +4771,10 @@ func Test_setReadConfig(t *testing.T) {
 		want *readConfig
 	}{
 		{"default", args{nil}, &readConfig{
-			NumHeaderRows:  1,
-			NumLabelLevels: 0,
-			Delimiter:      ',',
-			MajorDimIsCols: false,
+			numHeaderRows:  1,
+			numLabelLevels: 0,
+			delimiter:      ',',
+			majorDimIsCols: false,
 		}},
 		{"pass", args{[]ReadOption{
 			ReadOptionHeaders(2),
@@ -4782,10 +4782,10 @@ func Test_setReadConfig(t *testing.T) {
 			ReadOptionDelimiter('|'),
 			ReadOptionSwitchDims(),
 		}}, &readConfig{
-			NumHeaderRows:  2,
-			NumLabelLevels: 2,
-			Delimiter:      '|',
-			MajorDimIsCols: true,
+			numHeaderRows:  2,
+			numLabelLevels: 2,
+			delimiter:      '|',
+			majorDimIsCols: true,
 		}},
 	}
 	for _, tt := range tests {
