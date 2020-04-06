@@ -1105,21 +1105,13 @@ func (vc *valueContainer) apply(lambda ApplyFn) {
 }
 
 func (vc *valueContainer) applyFormat(lambda ApplyFormatFn) {
-	if lambda.Float64 != nil {
-		slice := vc.float64().slice
-		retSlice := make([]string, len(slice))
-		for i := range slice {
-			retSlice[i] = lambda.Float64(slice[i])
-		}
-		vc.slice = retSlice
-	} else if lambda.DateTime != nil {
-		slice := vc.dateTime().slice
-		retSlice := make([]string, len(slice))
-		for i := range slice {
-			retSlice[i] = lambda.DateTime(slice[i])
-		}
-		vc.slice = retSlice
+	v := reflect.ValueOf(vc.slice)
+	ret := make([]string, v.Len())
+	for i := 0; i < v.Len(); i++ {
+		val := v.Index(i).Interface()
+		ret[i] = lambda(val)
 	}
+	vc.slice = ret
 	vc.resetCache()
 }
 
@@ -2079,10 +2071,8 @@ func (lambda ApplyFn) validate() error {
 }
 
 func (lambda ApplyFormatFn) validate() error {
-	if lambda.Float64 == nil {
-		if lambda.DateTime == nil {
-			return fmt.Errorf("no apply function provided")
-		}
+	if lambda == nil {
+		return fmt.Errorf("no apply function provided")
 	}
 	return nil
 }

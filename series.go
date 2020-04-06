@@ -1286,23 +1286,23 @@ func (s *Series) PercentileBin(bins []float64, config *Binner) *Series {
 
 // -- Slicers
 
-// GetValuesFloat64 coerces the Series values into []float64.
-func (s *Series) GetValuesFloat64() []float64 {
+// GetValuesAsFloat64 coerces the Series values into []float64.
+func (s *Series) GetValuesAsFloat64() []float64 {
 	output := make([]float64, s.Len())
 	copy(output, s.values.float64().slice)
 	return output
 }
 
-// GetValuesString coerces the Series values into []string.
-func (s *Series) GetValuesString() []string {
+// GetValuesAsString coerces the Series values into []string.
+func (s *Series) GetValuesAsString() []string {
 	output := make([]string, s.Len())
 	copy(output, s.values.string().slice)
 	return output
 
 }
 
-// GetValuesTime coerces the Series values into []time.Time.
-func (s *Series) GetValuesTime() []time.Time {
+// GetValuesAsTime coerces the Series values into []time.Time.
+func (s *Series) GetValuesAsTime() []time.Time {
 	output := make([]time.Time, s.Len())
 	copy(output, s.values.dateTime().slice)
 	return output

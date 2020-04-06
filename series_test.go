@@ -1607,7 +1607,7 @@ func TestSeries_ApplyFormat(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, .25}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFormatFn{Float64: func(v float64) string { return strconv.FormatFloat(v, 'f', 1, 64) }}},
+			args{func(v interface{}) string { return strconv.FormatFloat(v.(float64), 'f', 1, 64) }},
 			&Series{
 				values: &valueContainer{slice: []string{"0.0", "0.2"}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
@@ -1615,7 +1615,7 @@ func TestSeries_ApplyFormat(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFormatFn{}},
+			args{nil},
 			&Series{
 				err: errors.New("apply format: no apply function provided")}},
 	}
@@ -2526,7 +2526,7 @@ func TestSeries_Latest(t *testing.T) {
 	}
 }
 
-func TestSeries_GetValuesFloat64(t *testing.T) {
+func TestSerieAss_GetValuesFloat64(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -2550,19 +2550,19 @@ func TestSeries_GetValuesFloat64(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			got := s.GetValuesFloat64()
+			got := s.GetValuesAsFloat64()
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.GetValuesFloat64() = %v, want %v", got, tt.want)
+				t.Errorf("Series.GetValuesAsFloat64() = %v, want %v", got, tt.want)
 			}
 			got[0] = 10
-			if reflect.DeepEqual(got, s.GetValuesFloat64()) {
-				t.Errorf("Series.GetValuesFloat64() retained reference to original, want copy")
+			if reflect.DeepEqual(got, s.GetValuesAsFloat64()) {
+				t.Errorf("Series.GetValuesAsFloat64() retained reference to original, want copy")
 			}
 		})
 	}
 }
 
-func TestSeries_GetValuesString(t *testing.T) {
+func TestSeries_GetValuesAsString(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -2589,19 +2589,19 @@ func TestSeries_GetValuesString(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			got := s.GetValuesString()
+			got := s.GetValuesAsString()
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.GetValuesString() = %v, want %v", got, tt.want)
+				t.Errorf("Series.GetValuesAsString() = %v, want %v", got, tt.want)
 			}
 			got[0] = "baz"
-			if reflect.DeepEqual(got, s.GetValuesString()) {
-				t.Errorf("Series.GetValuesString() retained reference to original, want copy")
+			if reflect.DeepEqual(got, s.GetValuesAsString()) {
+				t.Errorf("Series.GetValuesAsString() retained reference to original, want copy")
 			}
 		})
 	}
 }
 
-func TestSeries_GetValuesTime(t *testing.T) {
+func TestSeries_GetValuesAsTime(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -2625,13 +2625,13 @@ func TestSeries_GetValuesTime(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			got := s.GetValuesTime()
+			got := s.GetValuesAsTime()
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.GetValuesTime() = %v, want %v", got, tt.want)
+				t.Errorf("Series.GetValuesAsTime() = %v, want %v", got, tt.want)
 			}
 			got[0] = time.Date(2020, 2, 1, 0, 0, 0, 0, time.UTC)
-			if reflect.DeepEqual(got, s.GetValuesTime()) {
-				t.Errorf("Series.GetValuesTime() retained reference to original, want copy")
+			if reflect.DeepEqual(got, s.GetValuesAsTime()) {
+				t.Errorf("Series.GetValuesAsTime() retained reference to original, want copy")
 			}
 		})
 	}

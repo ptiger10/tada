@@ -175,6 +175,7 @@ type FilterFn func(interface{}) bool
 // An ApplyFn supplies logic to the Apply() function.
 // Only the first field selected (i.e., not left nil) is used - any others are ignored.
 // Values are coerced to the type specified in the field (e.g., DateTime -> time.Time) before the apply function is evaluated.
+// To simulate Apply without type coercion, access the underlying values of any Series with GetValues(), type cast them, then transform them.
 type ApplyFn struct {
 	Float64  func(val float64) float64
 	String   func(val string) string
@@ -183,9 +184,9 @@ type ApplyFn struct {
 
 // A GroupReduceFn supplies logic to the Reduce() function.
 // Only the first field selected (i.e., not left nil) is used - any others are ignored.
-// If Interface is selected, the slice of values retains its original type (as interface{}, so must be type-asserted),
+// If Interface is selected, the slice of values may be type-asserted from its underlying interface{}),
 // and all output values must have the same type (though this may be different than the original type).
-// Otherwise, values are coerced to the type specified in the field (e.g., DateTime -> time.Time) before the reduce function is evaluated.
+// Otherwise, values are coerced to the type specified in the field before the reduce function is evaluated.
 //
 type GroupReduceFn struct {
 	Float64   func(slice []float64) float64
@@ -194,13 +195,8 @@ type GroupReduceFn struct {
 	Interface func(slice interface{}) interface{}
 }
 
-// An ApplyFormatFn supplies logic to the ApplyFormat() function.
-// Only the first field selected (i.e., not left nil) is used - any others are ignored.
-// Values are coerced to the type specified in the field (e.g., DateTime -> time.Time) before the formatting function is evaluated.
-type ApplyFormatFn struct {
-	Float64  func(val float64) string
-	DateTime func(val time.Time) string
-}
+// An ApplyFormatFn is a lambda function supplied to ApplyFormat() with formatting instructions.
+type ApplyFormatFn func(interface{}) string
 
 // DType is a DataType that may be used in Sort() or Cast().
 type DType int

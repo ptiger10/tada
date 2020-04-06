@@ -1629,21 +1629,21 @@ func Test_valueContainer_applyFormat(t *testing.T) {
 	}{
 		{"float",
 			fields{slice: []float64{.75}, isNull: []bool{false}},
-			args{ApplyFormatFn{Float64: func(v float64) string {
-				return strconv.FormatFloat(v, 'f', 1, 64)
-			}}},
+			args{func(v interface{}) string {
+				return strconv.FormatFloat(v.(float64), 'f', 1, 64)
+			}},
 			&valueContainer{slice: []string{"0.8"}, isNull: []bool{false}}},
 		{"float - reset cache",
 			fields{slice: []float64{.75}, isNull: []bool{false}, cache: []string{".75"}},
-			args{ApplyFormatFn{Float64: func(v float64) string {
-				return strconv.FormatFloat(v, 'f', 1, 64)
-			}}},
+			args{func(v interface{}) string {
+				return strconv.FormatFloat(v.(float64), 'f', 1, 64)
+			}},
 			&valueContainer{slice: []string{"0.8"}, isNull: []bool{false}}},
 		{"datetime",
 			fields{slice: []time.Time{time.Date(2019, 1, 1, 0, 0, 0, 0, time.UTC)}, isNull: []bool{false}},
-			args{ApplyFormatFn{DateTime: func(v time.Time) string {
-				return v.Format("2006-01-02")
-			}}},
+			args{func(v interface{}) string {
+				return v.(time.Time).Format("2006-01-02")
+			}},
 			&valueContainer{slice: []string{"2019-01-01"}, isNull: []bool{false}}},
 	}
 	for _, tt := range tests {

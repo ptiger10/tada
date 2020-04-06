@@ -322,7 +322,7 @@ func ExampleSeries_ApplyFormat_float64() {
 	s := tada.NewSeries([]float64{1, 2.5, 3.1415}).SetName("foo")
 	fmt.Println(s)
 
-	decimalFormat := tada.ApplyFormatFn{Float64: func(v float64) string { return strconv.FormatFloat(v, 'f', 2, 64) }}
+	decimalFormat := func(v interface{}) string { return strconv.FormatFloat(v.(float64), 'f', 2, 64) }
 	fmt.Println(s.ApplyFormat(decimalFormat))
 
 	// Output:
@@ -347,7 +347,7 @@ func ExampleSeries_ApplyFormat_dateTime() {
 	s := tada.NewSeries([]time.Time{time.Date(2020, 1, 15, 0, 0, 0, 0, time.UTC)}).SetName("foo")
 	fmt.Println(s)
 
-	monthFormat := tada.ApplyFormatFn{DateTime: func(v time.Time) string { return v.Format("2006-01") }}
+	monthFormat := func(v interface{}) string { return v.(time.Time).Format("2006-01") }
 	fmt.Println(s.ApplyFormat(monthFormat))
 
 	// Output:
@@ -621,7 +621,7 @@ func ExampleSeries_zscore() {
 	s := tada.NewSeries([]float64{1, 2, 3, 4, 5}).SetName("foo")
 	fmt.Println(s)
 
-	vals := s.GetValuesFloat64()
+	vals := s.GetValuesAsFloat64()
 	ret := make([]float64, s.Len())
 	mean := s.Mean()
 	std := s.StdDev()
@@ -630,7 +630,7 @@ func ExampleSeries_zscore() {
 	}
 
 	newS := tada.NewSeries(ret, s.GetLabels()...).SetName("zscore_foo")
-	decimalFormat := tada.ApplyFormatFn{Float64: func(v float64) string { return strconv.FormatFloat(v, 'f', 2, 64) }}
+	decimalFormat := func(v interface{}) string { return strconv.FormatFloat(v.(float64), 'f', 2, 64) }
 	newS.InPlace().ApplyFormat(decimalFormat)
 	fmt.Println(newS)
 	// Output:

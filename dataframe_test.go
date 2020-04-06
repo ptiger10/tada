@@ -1977,9 +1977,9 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 			labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
 			name:          "baz",
 			colLevelNames: []string{"*0"}},
-			args{map[string]ApplyFormatFn{"foo": {Float64: func(v float64) string {
-				return strconv.FormatFloat(v, 'f', 1, 64)
-			}}}},
+			args{map[string]ApplyFormatFn{"foo": func(v interface{}) string {
+				return strconv.FormatFloat(v.(float64), 'f', 1, 64)
+			}}},
 			&DataFrame{
 				values: []*valueContainer{
 					{slice: []string{"0.5"}, isNull: []bool{false}, name: "foo"},
@@ -1995,7 +1995,7 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			name:   "baz"},
-			args{map[string]ApplyFormatFn{"foo": {}}},
+			args{map[string]ApplyFormatFn{"foo": nil}},
 			&DataFrame{
 				err: fmt.Errorf("apply format: no apply function provided")},
 		},
@@ -2005,7 +2005,7 @@ func TestDataFrame_ApplyFormat(t *testing.T) {
 				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
 			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			name:   "baz"},
-			args{map[string]ApplyFormatFn{"corge": {Float64: func(float64) string { return "" }}}},
+			args{map[string]ApplyFormatFn{"corge": func(v interface{}) string { return "" }}},
 			&DataFrame{
 				err: fmt.Errorf("apply format: name (corge) not found")},
 		},
