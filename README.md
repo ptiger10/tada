@@ -69,7 +69,7 @@ func TestDataPipeline(t *testing.T) {
 }
 ```
 
-### Comparing to struct (comapres typed values)
+### Comparing to struct (compares typed values)
 ```
 func Test_sampleDataPipelineTyped(t *testing.T) {
 	type output struct {

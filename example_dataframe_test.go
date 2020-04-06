@@ -512,3 +512,43 @@ func ExampleDataFrame_GroupBy() {
 	// |     ||   4 |
 	// +-----++-----+
 }
+
+func ExampleDataFrame_Struct() {
+	df := tada.NewDataFrame(
+		[]interface{}{
+			[]float64{1, 2},
+		},
+		[]string{"baz", "qux"},
+	).SetLabelNames([]string{"foo"}).
+		SetColNames([]string{"bar"})
+	type output struct {
+		Foo []string  `tada:"foo"`
+		Bar []float64 `tada:"bar"`
+	}
+	var out output
+	df.Struct(&out)
+	fmt.Printf("%#v", out)
+	// Output:
+	// tada_test.output{Foo:[]string{"baz", "qux"}, Bar:[]float64{1, 2}}
+}
+
+func ExampleDataFrame_Struct_withNulls() {
+	df := tada.NewDataFrame(
+		[]interface{}{
+			[]float64{1, 2},
+		},
+		[]string{"", "qux"},
+	).SetLabelNames([]string{"foo"}).
+		SetColNames([]string{"bar"})
+	type output struct {
+		Foo   []string  `tada:"foo"`
+		Bar   []float64 `tada:"bar"`
+		Nulls [][]bool  `tada:"isNull"`
+	}
+	var out output
+	df.Struct(&out)
+	fmt.Printf("%#v", out)
+	// Output:
+	// tada_test.output{Foo:[]string{"", "qux"}, Bar:[]float64{1, 2}, Nulls:[][]bool{[]bool{true, false}, []bool{false, false}}}
+
+}
