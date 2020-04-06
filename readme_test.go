@@ -13,7 +13,8 @@ func sampleDataPipeline(df *DataFrame) *DataFrame {
 		log.Fatal(err)
 	}
 	df.InPlace().DropNull()
-	validScore := FilterFn{Float64: func(v float64) bool { return v >= 0 && v <= 10 }}
+	df.Cast(map[string]DType{"score": Float64})
+	validScore := func(v interface{}) bool { return v.(float64) >= 0 && v.(float64) <= 10 }
 	df.InPlace().Filter(map[string]FilterFn{"score": validScore})
 	df.InPlace().Sort(Sorter{Name: "name", DType: String})
 	return df.GroupBy("name").Mean("score")

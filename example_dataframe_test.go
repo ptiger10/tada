@@ -2,8 +2,6 @@ package tada_test
 
 import (
 	"fmt"
-	"log"
-	"reflect"
 	"strings"
 	"time"
 
@@ -318,118 +316,36 @@ func ExampleDataFrame_Sort() {
 	// +---++-----+-----+
 }
 
-func ExampleDataFrame_Filter_float64() {
+func ExampleDataFrame_Filter() {
 	dt1 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	dt2 := dt1.AddDate(0, 0, 1)
 	df := tada.NewDataFrame([]interface{}{
-		[]float64{1, 2}, []string{"corge", "fred"}, []time.Time{dt1, dt2}},
+		[]float64{1, 2, 3}, []time.Time{dt1, dt2, dt1}},
 	).
-		SetColNames([]string{"foo", "bar", "baz"})
+		SetColNames([]string{"foo", "bar"})
 	fmt.Println(df)
 
-	gt1 := tada.FilterFn{Float64: func(v float64) bool { return v > 1 }}
-	ret := df.Filter(map[string]tada.FilterFn{"foo": gt1})
+	gt1 := func(val interface{}) bool { return val.(float64) > 1 }
+	beforeDate := func(val interface{}) bool { return val.(time.Time).Before(dt2) }
+	ret := df.Filter(map[string]tada.FilterFn{
+		"foo": gt1,
+		"bar": beforeDate,
+	})
 	fmt.Println(ret)
 	// Output:
-	// +---++-----+-------+----------------------+
-	// | - || foo |  bar  |         baz          |
-	// |---||-----|-------|----------------------|
-	// | 0 ||   1 | corge | 2020-01-01T00:00:00Z |
-	// | 1 ||   2 |  fred | 2020-01-02T00:00:00Z |
-	// +---++-----+-------+----------------------+
+	// +---++-----+----------------------+
+	// | - || foo |         bar          |
+	// |---||-----|----------------------|
+	// | 0 ||   1 | 2020-01-01T00:00:00Z |
+	// | 1 ||   2 | 2020-01-02T00:00:00Z |
+	// | 2 ||   3 | 2020-01-01T00:00:00Z |
+	// +---++-----+----------------------+
 	//
-	// +---++-----+------+----------------------+
-	// | - || foo | bar  |         baz          |
-	// |---||-----|------|----------------------|
-	// | 1 ||   2 | fred | 2020-01-02T00:00:00Z |
-	// +---++-----+------+----------------------+
-}
-
-func ExampleDataFrame_Filter_string() {
-	dt1 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	dt2 := dt1.AddDate(0, 0, 1)
-	df := tada.NewDataFrame([]interface{}{
-		[]float64{1, 2}, []string{"corge", "fred"}, []time.Time{dt1, dt2}},
-	).
-		SetColNames([]string{"foo", "bar", "baz"})
-	fmt.Println(df)
-
-	containsD := tada.FilterFn{String: func(v string) bool { return strings.Contains(v, "d") }}
-	ret := df.Filter(map[string]tada.FilterFn{"bar": containsD})
-	fmt.Println(ret)
-	// Output:
-	// +---++-----+-------+----------------------+
-	// | - || foo |  bar  |         baz          |
-	// |---||-----|-------|----------------------|
-	// | 0 ||   1 | corge | 2020-01-01T00:00:00Z |
-	// | 1 ||   2 |  fred | 2020-01-02T00:00:00Z |
-	// +---++-----+-------+----------------------+
-	//
-	// +---++-----+------+----------------------+
-	// | - || foo | bar  |         baz          |
-	// |---||-----|------|----------------------|
-	// | 1 ||   2 | fred | 2020-01-02T00:00:00Z |
-	// +---++-----+------+----------------------+
-}
-
-func ExampleDataFrame_Filter_dateTime() {
-	dt1 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	dt2 := dt1.AddDate(0, 0, 1)
-	df := tada.NewDataFrame([]interface{}{
-		[]float64{1, 2}, []string{"corge", "fred"}, []time.Time{dt1, dt2}},
-	).
-		SetColNames([]string{"foo", "bar", "baz"})
-	fmt.Println(df)
-
-	afterDate := tada.FilterFn{DateTime: func(v time.Time) bool { return v.After(dt1) }}
-	ret := df.Filter(map[string]tada.FilterFn{"baz": afterDate})
-	fmt.Println(ret)
-	// Output:
-	// +---++-----+-------+----------------------+
-	// | - || foo |  bar  |         baz          |
-	// |---||-----|-------|----------------------|
-	// | 0 ||   1 | corge | 2020-01-01T00:00:00Z |
-	// | 1 ||   2 |  fred | 2020-01-02T00:00:00Z |
-	// +---++-----+-------+----------------------+
-	//
-	// +---++-----+------+----------------------+
-	// | - || foo | bar  |         baz          |
-	// |---||-----|------|----------------------|
-	// | 1 ||   2 | fred | 2020-01-02T00:00:00Z |
-	// +---++-----+------+----------------------+
-}
-
-func ExampleDataFrame_Filter_interface() {
-	dt1 := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
-	dt2 := dt1.AddDate(0, 0, 1)
-	df := tada.NewDataFrame([]interface{}{
-		[]int{1, 2}, []string{"corge", "fred"}, []time.Time{dt1, dt2}},
-	).
-		SetColNames([]string{"foo", "bar", "baz"})
-	fmt.Println(df)
-
-	gt1 := tada.FilterFn{Interface: func(v interface{}) bool {
-		val, ok := v.(int)
-		if !ok {
-			log.Fatalf("Expecting type int, got %v", reflect.TypeOf(v))
-		}
-		return val > 1
-	}}
-	ret := df.Filter(map[string]tada.FilterFn{"foo": gt1})
-	fmt.Println(ret)
-	// Output:
-	// +---++-----+-------+----------------------+
-	// | - || foo |  bar  |         baz          |
-	// |---||-----|-------|----------------------|
-	// | 0 ||   1 | corge | 2020-01-01T00:00:00Z |
-	// | 1 ||   2 |  fred | 2020-01-02T00:00:00Z |
-	// +---++-----+-------+----------------------+
-	//
-	// +---++-----+------+----------------------+
-	// | - || foo | bar  |         baz          |
-	// |---||-----|------|----------------------|
-	// | 1 ||   2 | fred | 2020-01-02T00:00:00Z |
-	// +---++-----+------+----------------------+
+	// +---++-----+----------------------+
+	// | - || foo |         bar          |
+	// |---||-----|----------------------|
+	// | 2 ||   3 | 2020-01-01T00:00:00Z |
+	// +---++-----+----------------------+
 }
 
 func ExampleDataFrame_Where() {
@@ -439,7 +355,7 @@ func ExampleDataFrame_Where() {
 		SetColNames([]string{"foo"})
 	fmt.Println(df)
 
-	gt1 := tada.FilterFn{Float64: func(v float64) bool { return v > 1 }}
+	gt1 := func(val interface{}) bool { return val.(int) > 1 }
 	ret, _ := df.Where(map[string]tada.FilterFn{"foo": gt1}, true, false)
 	fmt.Println(ret)
 	// Output:

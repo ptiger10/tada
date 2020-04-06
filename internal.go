@@ -1067,34 +1067,11 @@ func (vc *valueContainer) iterRow(index int) Element {
 // call filter.validate() first
 func (vc *valueContainer) filter(filter FilterFn) []int {
 	var index []int
-	if filter.Float64 != nil {
-		slice := vc.float64().slice
-		for i := range slice {
-			if filter.Float64(slice[i]) && !vc.isNull[i] {
-				index = append(index, i)
-			}
-		}
-	} else if filter.String != nil {
-		slice := vc.string().slice
-		for i := range slice {
-			if filter.String(slice[i]) && !vc.isNull[i] {
-				index = append(index, i)
-			}
-		}
-	} else if filter.DateTime != nil {
-		slice := vc.dateTime().slice
-		for i := range slice {
-			if filter.DateTime(slice[i]) && !vc.isNull[i] {
-				index = append(index, i)
-			}
-		}
-	} else if filter.Interface != nil {
-		v := reflect.ValueOf(vc.slice)
-		for i := 0; i < v.Len(); i++ {
-			val := v.Index(i).Interface()
-			if filter.Interface(val) && !vc.isNull[i] {
-				index = append(index, i)
-			}
+	v := reflect.ValueOf(vc.slice)
+	for i := 0; i < v.Len(); i++ {
+		val := v.Index(i).Interface()
+		if filter(val) && !vc.isNull[i] {
+			index = append(index, i)
 		}
 	}
 	return index
@@ -2084,8 +2061,7 @@ func cumsum(vals []float64, isNull []bool, index []int) []float64 {
 }
 
 func (filter FilterFn) validate() error {
-	if filter.Float64 == nil && filter.String == nil &&
-		filter.DateTime == nil && filter.Interface == nil {
+	if filter == nil {
 		return fmt.Errorf("no filter function provided")
 	}
 	return nil

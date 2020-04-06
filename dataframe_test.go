@@ -1708,18 +1708,8 @@ func TestDataFrame_Filter(t *testing.T) {
 			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
 			args{map[string]FilterFn{
-				"foo": {Float64: func(val float64) bool {
-					if val > 1 {
-						return true
-					}
-					return false
-				}},
-				"bar": {String: func(val string) bool {
-					if strings.Contains(val, "a") {
-						return true
-					}
-					return false
-				}},
+				"foo": func(val interface{}) bool { return val.(float64) > 1 },
+				"bar": func(val interface{}) bool { return strings.Contains(val.(string), "a") },
 			}},
 			&DataFrame{
 				values: []*valueContainer{
@@ -1735,9 +1725,7 @@ func TestDataFrame_Filter(t *testing.T) {
 			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
 			args{map[string]FilterFn{
-				"foo": {Float64: func(val float64) bool {
-					return val >= 10
-				}},
+				"foo": func(val interface{}) bool { return val.(float64) >= 10 },
 			}},
 			&DataFrame{
 				values: []*valueContainer{
@@ -1766,7 +1754,7 @@ func TestDataFrame_Filter(t *testing.T) {
 				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
 			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
-			args{map[string]FilterFn{"*0": {}}},
+			args{map[string]FilterFn{"*0": nil}},
 			&DataFrame{err: fmt.Errorf("filter: no filter function provided")}},
 		{"fail - bad column name", fields{
 			values: []*valueContainer{
@@ -1774,7 +1762,7 @@ func TestDataFrame_Filter(t *testing.T) {
 				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "bar"}},
 			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
-			args{map[string]FilterFn{"corge": {Float64: func(float64) bool { return true }}}},
+			args{map[string]FilterFn{"corge": func(interface{}) bool { return true }}},
 			&DataFrame{err: fmt.Errorf("filter: name (corge) not found")}},
 	}
 	for _, tt := range tests {
@@ -1825,12 +1813,8 @@ func TestDataFrame_Where(t *testing.T) {
 			},
 			args{
 				name: "foo",
-				filters: map[string]FilterFn{"qux": {Float64: func(v float64) bool {
-					return v > 1
-				}},
-					"": {String: func(v string) bool {
-						return strings.Contains(v, "ba")
-					}},
+				filters: map[string]FilterFn{"qux": func(val interface{}) bool { return val.(int) > 1 },
+					"": func(val interface{}) bool { return strings.Contains(val.(string), "ba") },
 				},
 				ifTrue:  "yes",
 				ifFalse: 0},
@@ -1844,12 +1828,9 @@ func TestDataFrame_Where(t *testing.T) {
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{
 				name: "foo",
-				filters: map[string]FilterFn{"qux": {Float64: func(v float64) bool {
-					return v > 1
-				}},
-					"": {String: func(v string) bool {
-						return strings.Contains(v, "ba")
-					}},
+				filters: map[string]FilterFn{
+					"qux": func(val interface{}) bool { return val.(int) > 1 },
+					"":    func(val interface{}) bool { return strings.Contains(val.(string), "ba") },
 				},
 				ifTrue:  "yes",
 				ifFalse: ""},
@@ -1861,19 +1842,19 @@ func TestDataFrame_Where(t *testing.T) {
 			fields{
 				values: []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
-			args{"foo", map[string]FilterFn{"corge": {Float64: func(v float64) bool { return true }}}, "yes", 0},
+			args{"foo", map[string]FilterFn{"corge": func(val interface{}) bool { return true }}, "yes", 0},
 			nil, true},
 		{"fail - unsupported ifTrue",
 			fields{
 				values: []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
-			args{"foo", map[string]FilterFn{"qux": {Float64: func(v float64) bool { return true }}}, complex64(1), 0},
+			args{"foo", map[string]FilterFn{"qux": func(val interface{}) bool { return true }}, complex64(1), 0},
 			nil, true},
 		{"fail - unsupported ifFalse",
 			fields{
 				values: []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
-			args{"foo", map[string]FilterFn{"qux": {Float64: func(v float64) bool { return false }}}, 0, complex64(1)},
+			args{"foo", map[string]FilterFn{"qux": func(val interface{}) bool { return false }}, 0, complex64(1)},
 			nil, true},
 	}
 	for _, tt := range tests {

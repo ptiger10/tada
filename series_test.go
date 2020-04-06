@@ -1242,25 +1242,21 @@ func TestSeries_FilterIndex(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{FilterFn{Float64: func(val float64) bool {
-				return val > 1
-			}}},
+			args{func(val interface{}) bool { return val.(float64) > 1 }},
 			[]int{2},
 		},
 		{"Float64 filter - no matches",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{FilterFn{Float64: func(val float64) bool {
-				return val > 5
-			}}},
+			args{func(val interface{}) bool { return val.(float64) > 5 }},
 			[]int{},
 		},
 		{"Float64 filter - error",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{FilterFn{}},
+			args{nil},
 			nil,
 		},
 	}
@@ -1298,9 +1294,7 @@ func TestSeries_Filter(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{map[string]FilterFn{"": {Float64: func(val float64) bool {
-				return val > 1
-			}}}},
+			args{map[string]FilterFn{"": func(val interface{}) bool { return val.(float64) > 1 }}},
 			&Series{
 				values: &valueContainer{slice: []float64{3}, isNull: []bool{false}, name: "foo"},
 				labels: []*valueContainer{{name: "*0", slice: []int{2}, isNull: []bool{false}}}},
@@ -1309,9 +1303,7 @@ func TestSeries_Filter(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{map[string]FilterFn{"": {Float64: func(val float64) bool {
-				return val > 5
-			}}}},
+			args{map[string]FilterFn{"": func(val interface{}) bool { return val.(float64) > 10 }}},
 			&Series{
 				values: &valueContainer{slice: []float64{}, isNull: []bool{}, name: "foo"},
 				labels: []*valueContainer{
@@ -1322,18 +1314,8 @@ func TestSeries_Filter(t *testing.T) {
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
 				labels: []*valueContainer{{name: "*0", slice: []string{"bar", "foo", "baz"}, isNull: []bool{false, false, false}}}},
 			args{map[string]FilterFn{
-				"foo": {Float64: func(val float64) bool {
-					if val > 1 {
-						return true
-					}
-					return false
-				}},
-				"*0": {String: func(val string) bool {
-					if strings.Contains(val, "a") {
-						return true
-					}
-					return false
-				}},
+				"foo": func(val interface{}) bool { return val.(float64) > 1 },
+				"*0":  func(val interface{}) bool { return strings.Contains(val.(string), "a") },
 			}},
 			&Series{
 				values: &valueContainer{slice: []float64{3}, isNull: []bool{false}, name: "foo"},
@@ -1351,14 +1333,14 @@ func TestSeries_Filter(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{map[string]FilterFn{"*0": {}}},
+			args{map[string]FilterFn{"*0": nil}},
 			&Series{err: errors.New("filter: no filter function provided")},
 		},
 		{"fail: no matching col",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{map[string]FilterFn{"corge": {Float64: func(float64) bool { return true }}}},
+			args{map[string]FilterFn{"corge": func(val interface{}) bool { return true }}},
 			&Series{err: errors.New("filter: name (corge) not found")},
 		},
 	}
@@ -2248,12 +2230,11 @@ func TestSeries_Where(t *testing.T) {
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{
 				name: "foo",
-				filters: map[string]FilterFn{"qux": {Float64: func(v float64) bool {
-					return v > 1
-				}},
-					"": {String: func(v string) bool {
-						return strings.Contains(v, "ba")
-					}},
+				filters: map[string]FilterFn{
+					"qux": func(val interface{}) bool { return val.(int) > 1 },
+					"": func(val interface{}) bool {
+						return strings.Contains(val.(string), "ba")
+					},
 				},
 				ifTrue:  "yes",
 				ifFalse: 0},
@@ -2267,12 +2248,9 @@ func TestSeries_Where(t *testing.T) {
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{
 				name: "foo",
-				filters: map[string]FilterFn{"qux": {Float64: func(v float64) bool {
-					return v > 1
-				}},
-					"": {String: func(v string) bool {
-						return strings.Contains(v, "ba")
-					}},
+				filters: map[string]FilterFn{
+					"qux": func(val interface{}) bool { return val.(int) > 1 },
+					"":    func(val interface{}) bool { return strings.Contains(val.(string), "ba") },
 				},
 				ifTrue:  "yes",
 				ifFalse: ""},
@@ -2284,19 +2262,19 @@ func TestSeries_Where(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
-			args{"foo", map[string]FilterFn{"corge": {Float64: func(v float64) bool { return true }}}, "yes", 0},
+			args{"foo", map[string]FilterFn{"corge": func(val interface{}) bool { return true }}, "yes", 0},
 			nil, true},
 		{"fail - unsupported ifTrue",
 			fields{
 				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
-			args{"foo", map[string]FilterFn{"qux": {Float64: func(v float64) bool { return true }}}, complex64(1), 0},
+			args{"foo", map[string]FilterFn{"qux": func(val interface{}) bool { return true }}, complex64(1), 0},
 			nil, true},
 		{"fail - unsupported ifFalse",
 			fields{
 				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
-			args{"foo", map[string]FilterFn{"qux": {Float64: func(v float64) bool { return false }}}, 0, complex64(1)},
+			args{"foo", map[string]FilterFn{"qux": func(val interface{}) bool { return false }}, 0, complex64(1)},
 			nil, true},
 	}
 	for _, tt := range tests {

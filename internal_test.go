@@ -4184,17 +4184,11 @@ func Test_valueContainer_filter(t *testing.T) {
 		want   []int
 	}{
 		{"Float64", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
-			args{FilterFn{Float64: func(val float64) bool { return val > 1 }}},
-			[]int{2}},
-		{"String", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
-			args{FilterFn{String: func(val string) bool { return val == "2" }}},
+			args{func(val interface{}) bool { return val.(float64) > 1 }},
 			[]int{2}},
 		{"DateTime", fields{slice: []time.Time{d.AddDate(0, 0, -1), d, d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false}, name: "foo"},
-			args{FilterFn{DateTime: func(val time.Time) bool { return val.Before(d) }}},
+			args{func(val interface{}) bool { return val.(time.Time).Before(d) }},
 			[]int{0}},
-		{"Interface", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
-			args{FilterFn{Interface: func(val interface{}) bool { return val.(float64) == 2 }}},
-			[]int{2}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -4278,8 +4272,8 @@ func Test_filter(t *testing.T) {
 				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
 				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
 			map[string]FilterFn{
-				"qux": {Float64: func(val float64) bool { return val >= 1 }},
-				"bar": {String: func(val string) bool { return val == "foo" }},
+				"qux": func(val interface{}) bool { return val.(int) >= 1 },
+				"bar": func(val interface{}) bool { return val.(string) == "foo" },
 			}},
 			[]int{1},
 			false},
@@ -4288,7 +4282,7 @@ func Test_filter(t *testing.T) {
 				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
 				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
 			map[string]FilterFn{
-				"corge": {Float64: func(val float64) bool { return val >= 1 }},
+				"corge": func(val interface{}) bool { return val.(int) >= 1 },
 			}},
 			nil,
 			true},
@@ -4297,7 +4291,7 @@ func Test_filter(t *testing.T) {
 				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
 				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
 			map[string]FilterFn{
-				"qux": {},
+				"qux": nil,
 			}},
 			nil,
 			true},

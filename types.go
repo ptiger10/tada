@@ -8,8 +8,6 @@
 //
 // * seamlessly handles null data and type conversions
 //
-// * well-suited to conventional IDE-based programming, but also supports notebook usage
-//
 // * robust datetime support
 //
 // * advanced filtering, lookups and merging, grouping, sorting, and pivoting
@@ -171,16 +169,8 @@ type NullFiller struct {
 	FillFloat    float64
 }
 
-// A FilterFn supplies logic to the Filter() function.
-// Only the first field selected (i.e., not left nil) is used - any others are ignored.
-// Values are coerced to the type specified in the field (e.g., DateTime -> time.Time) before the filter function is evaluated.
-// Once it has been filtered, data retains its original type.
-type FilterFn struct {
-	Float64   func(val float64) bool
-	String    func(val string) bool
-	DateTime  func(val time.Time) bool
-	Interface func(val interface{}) bool
-}
+// A FilterFn is a lambda function supplied to a Filter or Where function.
+type FilterFn func(interface{}) bool
 
 // An ApplyFn supplies logic to the Apply() function.
 // Only the first field selected (i.e., not left nil) is used - any others are ignored.
