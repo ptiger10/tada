@@ -55,17 +55,16 @@ First you write a test. You can test in two ways:
 ### Comparing to stringified csv (compares stringified values, regardless of type)
 ```
 func TestDataPipeline(t *testing.T) {
-  want := `name, mean_score
+	want := `name, mean_score
            jane doe, 9
            john doe, 6`
 
-
-  df, _ := tada.ReadCSV(strings.NewReader(data))
-  ret := sampleDataPipeline(df)
-  eq, diffs, _ := ret.EqualsCSV(true, strings.NewReader(want))
-  if !eq {
-    t.Errorf("sampleDataPipeline(): got %v, want %v, has diffs: \n%v", ret, want, diffs)
-  }
+	df, _ := tada.ReadCSV(strings.NewReader(data))
+	ret := sampleDataPipeline(df)
+	eq, diffs, _ := ret.EqualsCSV(true, strings.NewReader(want))
+	if !eq {
+		t.Errorf("sampleDataPipeline(): got %v, want %v, has diffs: \n%v", ret, want, diffs)
+	}
 }
 ```
 
@@ -81,7 +80,7 @@ func Test_sampleDataPipelineTyped(t *testing.T) {
 		MeanScore: []float64{9, 5},
 	}
 
-	df, _ := ReadCSV(strings.NewReader(data))
+	df, _ := tada.ReadCSV(strings.NewReader(data))
 
 	out := sampleDataPipeline(df)
 	var got output
@@ -94,17 +93,22 @@ func Test_sampleDataPipelineTyped(t *testing.T) {
 
 Then you write the data pipeline:
 ```
-func sampleDataPipeline(df *DataFrame) *DataFrame {
+func sampleDataPipeline(df *tada.DataFrame) *tada.DataFrame {
 	err := df.HasCols("name", "score")
 	if err != nil {
 		log.Fatal(err)
 	}
 	df.InPlace().DropNull()
-	df.Cast(map[string]DType{"score": Float64})
+	df.Cast(map[string]tada.DType{"score": tada.Float64})
 	validScore := func(v interface{}) bool { return v.(float64) >= 0 && v.(float64) <= 10 }
-	df.InPlace().Filter(map[string]FilterFn{"score": validScore})
-	df.InPlace().Sort(Sorter{Name: "name", DType: String})
-	return df.GroupBy("name").Mean("score")
+	df.InPlace().Filter(map[string]tada.FilterFn{"score": validScore})
+	df.InPlace().Sort(tada.Sorter{Name: "name", DType: tada.String})
+	
+	ret := df.GroupBy("name").Mean("score")
+	if ret.Err() != nil {
+		log.Fatal(ret.Err())
+	}
+	return ret
 }
 ```
 More [examples](https://godoc.org/github.com/ptiger10/tada#pkg-examples)
