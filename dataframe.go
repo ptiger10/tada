@@ -268,33 +268,34 @@ func ReadCSV(r io.Reader, options ...ReadOption) (*DataFrame, error) {
 	return makeDataFrameFromMatrices(retVals, retNulls, config), nil
 }
 
-// ReadStruct reads the exported fields in structPointer into a DataFrame.
-// structPointer must be a pointer to a struct.
-// If any exported field in structPointer is nil, returns an error.
+// ReadStruct reads the exported fields in strct into a DataFrame.
+// strct must be a struct.
+// If any exported field in strct is nil, returns an error.
 //
 // If a "tada" tag is present with the value "isNull", this field must be [][]bool with one equal-lengthed slice for each exported field.
 // These values will set the null status for each of the resulting value containers in the DataFrame, from left-to-right.
 // If a "tada" tag has any other value, the resulting value container will have the same name as the tag value.
 // Otherwise, the value container will have the same name as the exported field.
-func ReadStruct(structPointer interface{}, options ...ReadOption) (*DataFrame, error) {
+func ReadStruct(strct interface{}, options ...ReadOption) (*DataFrame, error) {
 	config := setReadConfig(options)
-	if reflect.TypeOf(structPointer).Kind() != reflect.Ptr {
-		return nil, fmt.Errorf("reading struct as schema: structPointer must be pointer to struct, not %s", reflect.TypeOf(structPointer).Kind())
+	if reflect.TypeOf(strct).Kind() == reflect.Ptr {
+		strct = reflect.ValueOf(strct).Elem().Interface()
 	}
-	if reflect.TypeOf(structPointer).Elem().Kind() != reflect.Struct {
-		return nil, fmt.Errorf("reading struct as schema: structPointer must be pointer to struct, not to %s", reflect.TypeOf(structPointer).Elem().Kind())
+	if reflect.TypeOf(strct).Kind() != reflect.Struct {
+		return nil, fmt.Errorf("reading struct: strct must be reflect.Kind struct, not %s",
+			reflect.TypeOf(strct).Kind())
 	}
 	labels := make([]interface{}, 0)
 	values := make([]interface{}, 0)
 	labelNames := make([]string, 0)
 	colNames := make([]string, 0)
-	v := reflect.ValueOf(structPointer).Elem()
+	v := reflect.ValueOf(strct)
 	var hasNullTag bool
 	var nullField string
 	nullTag := "isNull"
 	var offset int
 	for k := 0; k < v.NumField(); k++ {
-		field := reflect.TypeOf(structPointer).Elem().Field(k)
+		field := reflect.TypeOf(strct).Field(k)
 		// is unexported field?
 		if unicode.IsLower([]rune(field.Name)[0]) {
 			offset--
@@ -304,7 +305,7 @@ func ReadStruct(structPointer interface{}, options ...ReadOption) (*DataFrame, e
 		if field.Tag.Get("tada") == nullTag {
 			offset--
 			if field.Type.String() != "[][]bool" {
-				return nil, fmt.Errorf("reading struct as schema: field with tag %v must be type [][]bool, not %s",
+				return nil, fmt.Errorf("reading struct: field with tag %v must be type [][]bool, not %s",
 					nullTag, field.Type.String())
 			}
 			hasNullTag = true
@@ -313,7 +314,7 @@ func ReadStruct(structPointer interface{}, options ...ReadOption) (*DataFrame, e
 		}
 		// is nil?
 		if v.Field(k).IsZero() {
-			return nil, fmt.Errorf("reading struct as schema: field %s: structPointer cannot contain a nil exported field",
+			return nil, fmt.Errorf("reading struct: field %s: strct cannot contain a nil exported field",
 				field.Name)
 		}
 		container := k + offset
@@ -353,7 +354,7 @@ func ReadStruct(structPointer interface{}, options ...ReadOption) (*DataFrame, e
 		for incrementor, k := range containers {
 			err := df.SetNulls(k, nullTable[incrementor])
 			if err != nil {
-				return nil, fmt.Errorf("reading struct as schema: writing null table: position %d: %v", incrementor, err)
+				return nil, fmt.Errorf("reading struct: writing nulls: position %d: %v", incrementor, err)
 			}
 		}
 

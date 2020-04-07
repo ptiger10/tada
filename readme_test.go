@@ -104,7 +104,7 @@ func Test_sampleDataPipelineTypedInput(t *testing.T) {
 		NullMap:   [][]bool{{false, false}, {false, false}},
 	}
 
-	df, err := tada.ReadStruct(&data)
+	df, err := tada.ReadStruct(data)
 	if err != nil {
 		log.Fatal(err)
 	}

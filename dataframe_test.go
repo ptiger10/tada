@@ -5177,8 +5177,8 @@ type testSchema4 struct {
 
 func TestReadStruct(t *testing.T) {
 	type args struct {
-		structPointer interface{}
-		options       []ReadOption
+		strct   interface{}
+		options []ReadOption
 	}
 	tests := []struct {
 		name    string
@@ -5187,6 +5187,21 @@ func TestReadStruct(t *testing.T) {
 		wantErr bool
 	}{
 		{"pass - default labels",
+			args{
+				testSchema{
+					Foo: []int{1, 2},
+					Bar: []float64{3, 4},
+				}, nil},
+			&DataFrame{
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				values: []*valueContainer{
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"},
+					{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          ""},
+			false},
+		{"pass - pointer with labels",
 			args{
 				&testSchema{
 					Foo: []int{1, 2},
@@ -5203,7 +5218,7 @@ func TestReadStruct(t *testing.T) {
 			false},
 		{"pass - default labels - mix of tags and no tags",
 			args{
-				&testSchema2{
+				testSchema2{
 					Foo: []int{1, 2},
 					Bar: []float64{3, 4},
 				}, nil},
@@ -5218,7 +5233,7 @@ func TestReadStruct(t *testing.T) {
 			false},
 		{"pass - supplied labels",
 			args{
-				&testSchema{
+				testSchema{
 					Foo: []int{1, 2},
 					Bar: []float64{3, 4},
 				}, []ReadOption{ReadOptionLabels(1)}},
@@ -5232,7 +5247,7 @@ func TestReadStruct(t *testing.T) {
 			false},
 		{"pass - null table",
 			args{
-				&testSchema3{
+				testSchema3{
 					Foo:     []int{0, 2},
 					Bar:     []float64{3, 4},
 					NullMap: [][]bool{{true, false}, {false, false}},
@@ -5248,7 +5263,7 @@ func TestReadStruct(t *testing.T) {
 			false},
 		{"pass - null table - with index",
 			args{
-				&testSchema3{
+				testSchema3{
 					Foo:     []int{0, 2},
 					Bar:     []float64{3, 4},
 					NullMap: [][]bool{{true, false}, {false, false}},
@@ -5263,7 +5278,7 @@ func TestReadStruct(t *testing.T) {
 			false},
 		{"fail - null table of wrong type",
 			args{
-				&testSchema4{
+				testSchema4{
 					Foo:     []int{0, 2},
 					NullMap: [][]int{{0, 1}, {1, 2}},
 				}, nil},
@@ -5271,7 +5286,7 @@ func TestReadStruct(t *testing.T) {
 			true},
 		{"fail - null table with wrong length",
 			args{
-				&testSchema3{
+				testSchema3{
 					Foo:     []int{0, 2},
 					Bar:     []float64{3, 4},
 					NullMap: [][]bool{{true, false}, {false}},
@@ -5280,27 +5295,19 @@ func TestReadStruct(t *testing.T) {
 			true},
 		{"fail - nil values",
 			args{
-				&testSchema{
-					Foo: []int{1, 2},
-				}, nil},
-			nil,
-			true},
-		{"fail - not pointer",
-			args{
 				testSchema{
 					Foo: []int{1, 2},
-					Bar: []float64{3, 4},
 				}, nil},
 			nil,
 			true},
-		{"fail - not pointer to struct",
+		{"fail - not struct",
 			args{
-				&[]int{}, nil},
+				[]int{}, nil},
 			nil,
 			true},
 		{"fail - uneven lengths",
 			args{
-				&testSchema{
+				testSchema{
 					Foo: []int{1, 2},
 					Bar: []float64{3, 4, 5},
 				}, nil},
@@ -5309,7 +5316,7 @@ func TestReadStruct(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ReadStruct(tt.args.structPointer, tt.args.options...)
+			got, err := ReadStruct(tt.args.strct, tt.args.options...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("ReadStruct() error = %v, wantErr %v", err, tt.wantErr)
 				return
