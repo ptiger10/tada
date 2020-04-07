@@ -3767,7 +3767,7 @@ func TestDataFrame_FilterByValue(t *testing.T) {
 	}
 }
 
-func TestDataFrame_LabelsSeries(t *testing.T) {
+func TestDataFrame_LabelsAsSeries(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -3815,8 +3815,8 @@ func TestDataFrame_LabelsSeries(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.LabelsSeries(tt.args.name); !EqualSeries(got, tt.want) {
-				t.Errorf("DataFrame.LabelsSeries() = %v, want %v", got, tt.want)
+			if got := df.LabelsAsSeries(tt.args.name); !EqualSeries(got, tt.want) {
+				t.Errorf("DataFrame.LabelsAsSeries() = %v, want %v", got, tt.want)
 			}
 		})
 	}

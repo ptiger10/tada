@@ -1016,12 +1016,12 @@ func (df *DataFrame) GetLabels() []interface{} {
 	return ret
 }
 
-// LabelsSeries finds the first label level with matching name
+// LabelsAsSeries finds the first label level with matching name
 // and returns the values as a Series.
 // Similar to Col(), but selects label values instead of column values.
 // The labels in the Series are shared with the labels in the DataFrame.
 // If label level name is default (prefixed with *), the prefix is removed.
-func (df *DataFrame) LabelsSeries(name string) *Series {
+func (df *DataFrame) LabelsAsSeries(name string) *Series {
 	index, err := indexOfContainer(name, df.labels)
 	if err != nil {
 		return seriesWithError(fmt.Errorf("converting labels to Series: %v", err))
