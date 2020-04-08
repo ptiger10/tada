@@ -589,8 +589,9 @@ func (df *DataFrame) Struct(structPointer interface{}, options ...WriteOption) e
 			offset--
 			continue
 		}
+		tag := field.Tag.Get("tada")
 		// has null tag?
-		if field.Tag.Get("tada") == nullTag {
+		if tag == nullTag {
 			offset--
 			if field.Type.String() != "[][]bool" {
 				return fmt.Errorf("writing to struct: field with tag %v must be type [][]bool, not %s", nullTag, field.Type.String())
@@ -605,17 +606,20 @@ func (df *DataFrame) Struct(structPointer interface{}, options ...WriteOption) e
 			return fmt.Errorf("writing to struct: insufficient containers to write to exported field %s (container count: %d)",
 				field.Name, container)
 		}
-		// container name == exported field name?
-		if name := mergedLabelsAndCols[container].name; name != field.Name {
-			// container name == tada tag name?
-			if name != field.Tag.Get("tada") {
-				return fmt.Errorf("writing to struct: DataFrame has wrong field name (container %d): %s != %s",
-					container, name, field.Name)
-			}
+		// use tag as name if it exists, else default to exported name
+		name := tag
+		if tag == "" {
+			name = field.Name
+		}
+		if mergedLabelsAndCols[container].name != name {
+			return fmt.Errorf("writing to struct: exported field %s (index %d): container name does not match (%s != %s)",
+				field.Name, container,
+				mergedLabelsAndCols[container].name, name)
 		}
 		if mergedLabelsAndCols[container].dtype() != field.Type {
-			return fmt.Errorf("writing to struct: DataFrame has wrong type (container %s): %s != %s",
-				field.Name, mergedLabelsAndCols[container].dtype(), field.Type)
+			return fmt.Errorf("writing to struct: exported field %s (index %d): container (%s) has wrong type: %s != %s",
+				field.Name, container, mergedLabelsAndCols[container].name,
+				mergedLabelsAndCols[container].dtype(), field.Type)
 		}
 		src := reflect.ValueOf(mergedLabelsAndCols[container].slice)
 		dst := v.FieldByName(field.Name)

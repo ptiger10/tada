@@ -5158,15 +5158,15 @@ type testSchema struct {
 }
 
 type testSchema2 struct {
-	Foo  []int `tada:"foo"`
+	Foo  []int
 	skip []float64
 	Bar  []float64
 }
 
 type testSchema3 struct {
-	Foo     []int    `tada:"foo"`
-	NullMap [][]bool `tada:"isNull"`
-	Bar     []float64
+	Foo     []int     `tada:"foo"`
+	NullMap [][]bool  `tada:"isNull"`
+	Bar     []float64 `tada:"bar"`
 }
 
 type testSchema4 struct {
@@ -5221,7 +5221,7 @@ func TestReadStruct(t *testing.T) {
 				colLevelNames: []string{"*0"},
 				name:          ""},
 			false},
-		{"pass - default labels - mix of tags and no tags",
+		{"pass - default labels - no tags",
 			args{
 				testSchema2{
 					Foo: []int{1, 2},
@@ -5230,7 +5230,7 @@ func TestReadStruct(t *testing.T) {
 			&DataFrame{
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				values: []*valueContainer{
-					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "Foo"},
 					{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "Bar"},
 				},
 				colLevelNames: []string{"*0"},
@@ -5261,7 +5261,7 @@ func TestReadStruct(t *testing.T) {
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				values: []*valueContainer{
 					{slice: []int{0, 2}, isNull: []bool{true, false}, name: "foo"},
-					{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "Bar"},
+					{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          ""},
@@ -5276,7 +5276,7 @@ func TestReadStruct(t *testing.T) {
 			&DataFrame{
 				labels: []*valueContainer{{slice: []int{0, 2}, isNull: []bool{true, false}, name: "foo"}},
 				values: []*valueContainer{
-					{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "Bar"},
+					{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          ""},
@@ -5352,19 +5352,6 @@ func TestDataFrame_Struct(t *testing.T) {
 		want    interface{}
 		wantErr bool
 	}{
-		{"pass - match exported names", fields{
-			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Foo"}},
-			values: []*valueContainer{
-				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "Bar"},
-			},
-			colLevelNames: []string{"*0"}},
-			args{&testSchema{}, nil},
-			&testSchema{
-				Foo: []int{0, 1},
-				Bar: []float64{0, 1},
-			},
-			false,
-		},
 		{"pass - match tag names", fields{
 			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"}},
 			values: []*valueContainer{
@@ -5378,11 +5365,24 @@ func TestDataFrame_Struct(t *testing.T) {
 			},
 			false,
 		},
+		{"pass - match exported names", fields{
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Foo"}},
+			values: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "Bar"},
+			},
+			colLevelNames: []string{"*0"}},
+			args{&testSchema2{}, nil},
+			&testSchema2{
+				Foo: []int{0, 1},
+				Bar: []float64{0, 1},
+			},
+			false,
+		},
 		{"pass - ignore label names", fields{
 			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 			values: []*valueContainer{
-				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Foo"},
-				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "Bar"},
+				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "bar"},
 			},
 			colLevelNames: []string{"*0"}},
 			args{&testSchema{}, []WriteOption{WriteOptionExcludeLabels()}},
@@ -5393,9 +5393,9 @@ func TestDataFrame_Struct(t *testing.T) {
 			false,
 		},
 		{"pass - null table", fields{
-			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Foo"}},
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "foo"}},
 			values: []*valueContainer{
-				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "Bar"},
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "bar"},
 			},
 			colLevelNames: []string{"*0"}},
 			args{&testSchema3{}, nil},
