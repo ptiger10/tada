@@ -89,8 +89,7 @@ func TestNewDataFrame(t *testing.T) {
 			nil,
 			[]interface{}{[]string{"a", "b"}}},
 			&DataFrame{
-				values: []*valueContainer{
-					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "0"}},
+				values:        []*valueContainer{},
 				labels:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
 		},

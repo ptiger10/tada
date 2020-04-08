@@ -722,6 +722,7 @@ func groupedInterfaceReduceFunc(
 	sampleRows := subsetInterfaceSlice(slice, rowIndices[0])
 	sampleOutput := fn(sampleRows)
 
+	// create output using reflect
 	retVals := reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(sampleOutput)), retLength, retLength)
 	for i, rowIndex := range rowIndices {
 		subsetRows := subsetInterfaceSlice(slice, rowIndex)

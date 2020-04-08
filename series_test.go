@@ -33,7 +33,7 @@ func TestNewSeries(t *testing.T) {
 			&Series{values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "0"},
 				labels: []*valueContainer{{slice: []string{"bar"}, isNull: []bool{false}, name: "*0"}}}},
 		{"[]float64, default values", args{slice: nil, labels: []interface{}{[]string{"bar"}}},
-			&Series{values: &valueContainer{slice: []int{0}, isNull: []bool{false}, name: "0"},
+			&Series{values: &valueContainer{},
 				labels: []*valueContainer{{slice: []string{"bar"}, isNull: []bool{false}, name: "*0"}}}},
 		{"unsupported input: nil slice, nil labels", args{slice: nil},
 			&Series{err: errors.New("constructing new Series: slice and labels cannot both be nil")}},

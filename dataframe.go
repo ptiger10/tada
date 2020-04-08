@@ -31,7 +31,7 @@ func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 	if slices == nil && labels == nil {
 		return dataFrameWithError(fmt.Errorf("constructing new DataFrame: slices and labels cannot both be nil"))
 	}
-	var values []*valueContainer
+	values := make([]*valueContainer, 0)
 	var err error
 	if slices != nil {
 		// handle values
@@ -46,23 +46,29 @@ func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
 		return dataFrameWithError(fmt.Errorf("constructing new DataFrame: labels: %v", err))
 	}
 	if len(retLabels) == 0 {
-		// handle default labels
+		// handle default labels case
 		numRows := reflect.ValueOf(slices[0]).Len()
 		defaultLabels := makeDefaultLabels(0, numRows, true)
 		retLabels = append(retLabels, defaultLabels)
 	}
-	if slices == nil {
-		// default values
-		defaultValues := makeDefaultLabels(0, reflect.ValueOf(labels[0]).Len(), false)
-		values = append(values, defaultValues)
+
+	// ensure equal-lengthed slices
+	var requiredLength int
+	if len(values) > 0 {
+		requiredLength = values[0].len()
+	} else {
+		// handle null values case
+		requiredLength = retLabels[0].len()
 	}
-	err = ensureEqualLengths(retLabels, values[0].len())
+	err = ensureEqualLengths(retLabels, requiredLength)
 	if err != nil {
 		return dataFrameWithError(fmt.Errorf("constructing new DataFrame: labels: %v", err))
 	}
-	err = ensureEqualLengths(values, values[0].len())
-	if err != nil {
-		return dataFrameWithError(fmt.Errorf("constructing new DataFrame: columns: %v", err))
+	if len(values) > 0 {
+		err = ensureEqualLengths(values, requiredLength)
+		if err != nil {
+			return dataFrameWithError(fmt.Errorf("constructing new DataFrame: columns: %v", err))
+		}
 	}
 	return &DataFrame{values: values, labels: retLabels, colLevelNames: []string{"*0"}}
 }

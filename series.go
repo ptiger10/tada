@@ -27,7 +27,7 @@ func NewSeries(slice interface{}, labels ...interface{}) *Series {
 	if slice == nil && labels == nil {
 		return seriesWithError(fmt.Errorf("constructing new Series: slice and labels cannot both be nil"))
 	}
-	var values *valueContainer
+	values := &valueContainer{}
 	var err error
 	if slice != nil {
 		// handle values
@@ -47,15 +47,20 @@ func NewSeries(slice interface{}, labels ...interface{}) *Series {
 		defaultLabels := makeDefaultLabels(0, reflect.ValueOf(slice).Len(), true)
 		retLabels = append(retLabels, defaultLabels)
 	}
-	if slice == nil {
-		// default values
-		defaultValues := makeDefaultLabels(0, reflect.ValueOf(labels[0]).Len(), false)
-		values = defaultValues
+
+	// ensure equal-lengthed slices
+	var requiredLength int
+	if values.slice != nil {
+		requiredLength = values.len()
+	} else {
+		// handle null values case
+		requiredLength = retLabels[0].len()
 	}
-	err = ensureEqualLengths(retLabels, values.len())
+	err = ensureEqualLengths(retLabels, requiredLength)
 	if err != nil {
 		return seriesWithError(fmt.Errorf("constructing new Series: labels: %v", err))
 	}
+
 	return &Series{values: values, labels: retLabels}
 }
 
