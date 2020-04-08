@@ -589,6 +589,20 @@ func TestGroupedSeries_Sum(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
 					{slice: []int{0, 0}, isNull: []bool{false, false}, name: "*1"}}}},
+		{"pass - after HavingCount",
+			fields{
+				orderedKeys: []string{"bar"},
+				rowIndices:  [][]int{{1, 2, 3}},
+				labels: []*valueContainer{
+					{slice: []string{"bar"}, isNull: []bool{false}, name: "*0"},
+				},
+				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
+					}}},
+			&Series{values: &valueContainer{slice: []float64{9}, isNull: []bool{false}, name: "sum_foo"},
+				labels: []*valueContainer{
+					{slice: []string{"bar"}, isNull: []bool{false}, name: "*0"}}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2830,6 +2844,20 @@ func TestGroupedSeries_Series(t *testing.T) {
 			&Series{values: &valueContainer{slice: []float64{1, 3, 2, 4}, isNull: []bool{false, false, false, false}},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*1"}}}},
+		{"pass - after HavingCount",
+			fields{
+				orderedKeys: []string{"bar"},
+				rowIndices:  [][]int{{1, 2, 3}},
+				labels: []*valueContainer{
+					{slice: []string{"bar"}, isNull: []bool{false}, name: "*0"},
+				},
+				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
+					}}},
+			&Series{values: &valueContainer{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []string{"bar", "bar", "bar"}, isNull: []bool{false, false, false}, name: "*0"}}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2872,7 +2900,9 @@ func TestGroupedDataFrame_HavingCount(t *testing.T) {
 				labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
 				df: &DataFrame{values: []*valueContainer{{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}}},
 					labels: []*valueContainer{
-						{slice: []string{"foo", "bar", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+						{slice: []string{"foo", "bar", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+					colLevelNames: []string{"*0"},
+					name:          "foobar"}},
 			args: args{func(v int) bool { return v >= 2 }},
 			want: &GroupedDataFrame{
 				orderedKeys: []string{"bar"},
@@ -2883,7 +2913,10 @@ func TestGroupedDataFrame_HavingCount(t *testing.T) {
 				df: &DataFrame{values: []*valueContainer{{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}}},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "bar", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
-					}}}},
+					},
+					colLevelNames: []string{"*0"},
+					name:          "foobar"}},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2975,6 +3008,28 @@ func TestGroupedDataFrame_DataFrame(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "baz"},
 					{slice: []int{4, 4, 5, 5}, isNull: []bool{false, false, false, false}, name: "*1"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "foobar"}},
+		{name: "pass - after HavingCount",
+			fields: fields{
+				orderedKeys: []string{"bar"},
+				rowIndices:  [][]int{{1, 2, 3}},
+				labels: []*valueContainer{
+					{slice: []string{"bar"}, isNull: []bool{false}, name: "*0"},
+				},
+				df: &DataFrame{values: []*valueContainer{
+					{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
+					},
+					colLevelNames: []string{"*0"},
+					name:          "foobar"}},
+			want: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []string{"bar", "bar", "bar"}, isNull: []bool{false, false, false}, name: "*0"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          "foobar"}},

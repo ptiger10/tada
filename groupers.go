@@ -271,11 +271,10 @@ func (g *GroupedSeries) HavingCount(lambda func(int) bool) *GroupedSeries {
 
 // Series returns the GroupedSeries as a Series,
 // with group names as label levels,
-// group names ordered by the order of their appearance in the original Series,
+// in order of appearance in the original Series,
 // and values grouped together by group name.
 func (g *GroupedSeries) Series() *Series {
-	index := make([]int, g.series.Len())
-	labels := make([]*valueContainer, len(g.labels))
+	index := make([]int, rowCount(g.rowIndices))
 	var counter int
 	for _, group := range g.rowIndices {
 		for _, i := range group {
@@ -286,8 +285,11 @@ func (g *GroupedSeries) Series() *Series {
 	s := g.series.Subset(index).Copy()
 	s.sharedData = false
 
+	// repeat group labels n times each
+	n := groupCounts(g.rowIndices)
+	labels := make([]*valueContainer, len(g.labels))
 	for j := range labels {
-		labels[j] = g.labels[j].expand(groupCounts(g.rowIndices))
+		labels[j] = g.labels[j].expand(n)
 	}
 	s.labels = labels
 	return s
@@ -630,12 +632,11 @@ func (g *GroupedDataFrame) HavingCount(lambda func(int) bool) *GroupedDataFrame 
 
 // DataFrame returns the GroupedDataFrame as a DataFrame,
 // with group names as label levels,
-// group names ordered by the order of their appearance in the original Series,
+// in order of appearance in the original Series,
 // and values grouped together by group name.
 // Columns used as label levels are dropped.
 func (g *GroupedDataFrame) DataFrame() *DataFrame {
-	index := make([]int, g.df.Len())
-	labels := make([]*valueContainer, len(g.labels))
+	index := make([]int, rowCount(g.rowIndices))
 	var counter int
 	for _, group := range g.rowIndices {
 		for _, i := range group {
@@ -643,8 +644,11 @@ func (g *GroupedDataFrame) DataFrame() *DataFrame {
 			counter++
 		}
 	}
+	// repeat group labels n times each
+	n := groupCounts(g.rowIndices)
+	labels := make([]*valueContainer, len(g.labels))
 	for j := range labels {
-		labels[j] = g.labels[j].expand(groupCounts(g.rowIndices))
+		labels[j] = g.labels[j].expand(n)
 	}
 	df := g.df.Subset(index).Copy()
 	df.labels = labels

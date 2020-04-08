@@ -4871,3 +4871,26 @@ func Test_groupCounts(t *testing.T) {
 		})
 	}
 }
+
+func Test_rowCount(t *testing.T) {
+	type args struct {
+		rowIndices [][]int
+	}
+	tests := []struct {
+		name string
+		args args
+		want int
+	}{
+		{"pass", args{
+			[][]int{{0, 1}, {}, {1, 2, 3}}},
+			5,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := rowCount(tt.args.rowIndices); got != tt.want {
+				t.Errorf("rowCount() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -755,7 +755,7 @@ func TestSeries_WithLabels(t *testing.T) {
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
 			args{"corge", "baz"},
-			&Series{err: errors.New("with labels: cannot rename column: name (corge) not found")},
+			&Series{err: errors.New("with labels: cannot rename container: name (corge) not found")},
 		},
 		{"fail: unsupported slice type",
 			fields{
@@ -769,7 +769,7 @@ func TestSeries_WithLabels(t *testing.T) {
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
 			args{"qux", []string{"waldo", "corge"}},
-			&Series{err: errors.New("with labels: cannot replace items in column qux: length of input does not match existing length (2 != 1)")},
+			&Series{err: errors.New("with labels: cannot replace slice in container qux: length of input (2) does not match existing length (1)")},
 		},
 		{"fail: unsupported input",
 			fields{
@@ -831,7 +831,7 @@ func TestSeries_WithValues(t *testing.T) {
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "qux"},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}}},
 			args{[]float64{1, 2, 3}},
-			&Series{err: errors.New("with values: cannot replace items in column qux: length of input does not match existing length (3 != 1)")},
+			&Series{err: errors.New("with values: cannot replace slice in container qux: length of input (3) does not match existing length (1)")},
 		},
 	}
 	for _, tt := range tests {

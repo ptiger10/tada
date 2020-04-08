@@ -23,7 +23,7 @@ import (
 
 func errorWarning(err error) {
 	if optionWarnings {
-		log.Println("Error Warning:", err)
+		log.Println("Warning:", err)
 	}
 }
 
@@ -219,7 +219,7 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 	case reflect.String:
 		lvl, err := indexOfContainer(name, cols)
 		if err != nil {
-			return nil, fmt.Errorf("cannot rename column: %v", err)
+			return nil, fmt.Errorf("cannot rename container: %v", err)
 		}
 		cols[lvl].name = input.(string)
 	case reflect.Slice:
@@ -229,7 +229,7 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 		}
 		if l := reflect.ValueOf(input).Len(); l != requiredLen {
 			return nil, fmt.Errorf(
-				"cannot replace items in column %s: length of input does not match existing length (%d != %d)",
+				"cannot replace slice in container %s: length of input (%d) does not match existing length (%d)",
 				name, l, requiredLen)
 		}
 		// input is supported slice? append or overwrite
@@ -2800,6 +2800,14 @@ func groupCounts(rowIndices [][]int) []int {
 	ret := make([]int, len(rowIndices))
 	for i := range rowIndices {
 		ret[i] = len(rowIndices[i])
+	}
+	return ret
+}
+
+func rowCount(rowIndices [][]int) int {
+	var ret int
+	for i := range rowIndices {
+		ret += len(rowIndices[i])
 	}
 	return ret
 }
