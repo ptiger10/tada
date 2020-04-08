@@ -1263,10 +1263,8 @@ func concatenateLabelsToStringsBytes(labels []*valueContainer) []string {
 
 // reduceContainers reduces the containers referenced in the index
 // to 1) a new []*valueContainer with slices with one unique combination of labels per row (same type as original labels),
-// 2) an []int that maps each new row
-// back to the rows in the original containers with the matching label combo
-// 3) a []string of the unique label combinations in order
-// and 4) a map[int]int that maps each original row index to its row index in the new containers
+// 2) an [][]int that maps each new row back to the rows in the original containers with the matching label combo
+// and 3) a []string of the unique label combinations in order
 func reduceContainers(containers []*valueContainer) (
 	newContainers []*valueContainer,
 	originalRowIndices [][]int,

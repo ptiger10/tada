@@ -5628,3 +5628,149 @@ func TestReadInterface(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_ReorderCols(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		colNames []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"pass",
+			fields{
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "foo"}},
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "bar"},
+					{slice: []float64{3}, isNull: []bool{false}, name: "baz"},
+					{slice: []float64{5}, isNull: []bool{false}, name: "qux"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "foo"},
+			args{[]string{"qux", "baz"}},
+			&DataFrame{
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "foo"}},
+				values: []*valueContainer{
+					{slice: []float64{5}, isNull: []bool{false}, name: "qux"},
+					{slice: []float64{3}, isNull: []bool{false}, name: "baz"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "foo",
+			},
+		},
+		{"fail - bad column name",
+			fields{
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "foo"}},
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "bar"},
+					{slice: []float64{3}, isNull: []bool{false}, name: "baz"},
+					{slice: []float64{5}, isNull: []bool{false}, name: "qux"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "foo"},
+			args{[]string{"qux", "corge"}},
+			&DataFrame{
+				err: fmt.Errorf("reordering columns: colNames (index 1): name (corge) not found"),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.ReorderCols(tt.args.colNames); !EqualDataFrames(got, tt.want) {
+				t.Errorf("DataFrame.ReorderCols() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_ReorderLabels(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		levelNames []string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"pass",
+			fields{
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "foo"},
+					{slice: []float64{3}, isNull: []bool{false}, name: "baz"},
+					{slice: []float64{5}, isNull: []bool{false}, name: "qux"},
+				},
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "foo"},
+			args{[]string{"qux", "baz"}},
+			&DataFrame{
+				labels: []*valueContainer{
+					{slice: []float64{5}, isNull: []bool{false}, name: "qux"},
+					{slice: []float64{3}, isNull: []bool{false}, name: "baz"},
+				},
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "foo",
+			},
+		},
+		{"fail - bad column name",
+			fields{
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "foo"},
+					{slice: []float64{3}, isNull: []bool{false}, name: "baz"},
+					{slice: []float64{5}, isNull: []bool{false}, name: "qux"},
+				},
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "foo"},
+			args{[]string{"qux", "corge"}},
+			&DataFrame{
+				err: fmt.Errorf("reordering labels: levelNames (index 1): name (corge) not found"),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.ReorderLabels(tt.args.levelNames); !EqualDataFrames(got, tt.want) {
+				t.Errorf("DataFrame.ReorderLabels() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

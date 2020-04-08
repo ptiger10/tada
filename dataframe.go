@@ -1642,6 +1642,56 @@ func (df *DataFrame) SetColNames(colNames []string) *DataFrame {
 	return df
 }
 
+// ReorderCols reorders the columns to be in the same order as specified by colNames.
+// If a column is not specified, it is excluded from the resulting DataFrame.
+// Returns a new DataFrame.
+func (df *DataFrame) ReorderCols(colNames []string) *DataFrame {
+	df = df.Copy()
+	df.InPlace().ReorderCols(colNames)
+	return df
+}
+
+// ReorderCols reorders the columns to be in the same order as specified by colNames.
+// If a column is not specified, it is excluded from the resulting DataFrame.
+// Modifies the underlying DataFrame.
+func (df *DataFrameMutator) ReorderCols(colNames []string) {
+	newIndex := make([]int, len(colNames))
+	for k, name := range colNames {
+		index, err := indexOfContainer(name, df.dataframe.values)
+		if err != nil {
+			df.dataframe.resetWithError(fmt.Errorf("reordering columns: colNames (index %d): %v", k, err))
+			return
+		}
+		newIndex[k] = index
+	}
+	df.SubsetCols(newIndex)
+}
+
+// ReorderLabels reorders the label levels to be in the same order as specified by levelNames.
+// If a level is not specified, it is excluded from the resulting DataFrame.
+// Returns a new DataFrame.
+func (df *DataFrame) ReorderLabels(levelNames []string) *DataFrame {
+	df = df.Copy()
+	df.InPlace().ReorderLabels(levelNames)
+	return df
+}
+
+// ReorderLabels reorders the label levels to be in the same order as specified by levelNames.
+// If a level is not specified, it is excluded from the resulting DataFrame.
+// Modifies the underlying DataFrame.
+func (df *DataFrameMutator) ReorderLabels(levelNames []string) {
+	newIndex := make([]int, len(levelNames))
+	for j, name := range levelNames {
+		index, err := indexOfContainer(name, df.dataframe.labels)
+		if err != nil {
+			df.dataframe.resetWithError(fmt.Errorf("reordering labels: levelNames (index %d): %v", j, err))
+			return
+		}
+		newIndex[j] = index
+	}
+	df.SubsetLabels(newIndex)
+}
+
 // -- RESHAPING
 
 // Transpose coerces all columns to []string, then switches all row values to column values and label names to column names.
