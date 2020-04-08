@@ -160,8 +160,8 @@ func (st *StructTransposer) Transpose(structPointer interface{}) error {
 				field.Name, container)
 		}
 		if reflect.TypeOf(transfer[container]) != field.Type {
-			return fmt.Errorf("transposing struct: DataFrame has wrong type (container %s): %s != %s",
-				field.Name, reflect.TypeOf(transfer[container]), field.Type)
+			return fmt.Errorf("transposing struct: position %d, StructTransposer has wrong type for field %s (%s != %s)",
+				container, field.Name, reflect.TypeOf(transfer[container]), field.Type)
 		}
 		src := reflect.ValueOf(reflect.ValueOf(transfer[container]).Interface())
 		dst := v.FieldByName(field.Name)
