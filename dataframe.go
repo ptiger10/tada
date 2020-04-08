@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"reflect"
+	"strings"
 	"unicode"
 
 	"github.com/ptiger10/tablediff"
@@ -207,36 +208,6 @@ func ReadOptionSwitchDims() func(*readConfig) {
 	}
 }
 
-// ReadCSVFromRecords reads records into a DataFrame (configured by options).
-// Often used with (encoding/csv) csv.NewReader().ReadAll()
-// Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionSwitchDims.
-//
-// Default if no options are supplied:
-// 1 header row; no labels; rows as major dimension
-//
-// If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
-// If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing.
-// Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
-func ReadCSVFromRecords(records [][]string, options ...ReadOption) (ret *DataFrame, err error) {
-	if len(records) == 0 {
-		return nil, fmt.Errorf("reading csv from records: records must have at least one row")
-	}
-	if len(records[0]) == 0 {
-		return nil, fmt.Errorf("reading csv from records: records must have at least one column")
-	}
-	config := setReadConfig(options)
-
-	if config.majorDimIsCols {
-		ret, err = readCSVByCols(records, config)
-	} else {
-		ret, err = readCSVByRows(records, config)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("reading csv from records: %v", err)
-	}
-	return ret, nil
-}
-
 // ReadCSV reads csv records in r into a Dataframe (configured by options).
 // Rows must be the major dimension of r.
 // For advanced cases, use the standard csv library NewReader().ReadAll() + tada.ReadCSVFromRecords().
@@ -268,8 +239,114 @@ func ReadCSV(r io.Reader, options ...ReadOption) (*DataFrame, error) {
 	return makeDataFrameFromMatrices(retVals, retNulls, config), nil
 }
 
+// ReadCSVFromRecords reads records into a DataFrame (configured by options).
+// Often used with encoding/csv.NewReader().ReadAll()
+// All columns will be read as []string.
+// Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionSwitchDims.
+//
+// Default if no options are supplied:
+// 1 header row; no labels; rows as major dimension
+//
+// If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
+// If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing.
+// Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
+func ReadCSVFromRecords(records [][]string, options ...ReadOption) (ret *DataFrame, err error) {
+	if len(records) == 0 {
+		return nil, fmt.Errorf("reading csv from records: must have at least one record")
+	}
+	if len(records[0]) == 0 {
+		return nil, fmt.Errorf("reading csv from records: first record cannot be empty")
+	}
+	config := setReadConfig(options)
+
+	if config.majorDimIsCols {
+		ret, err = readCSVByCols(records, config)
+	} else {
+		ret, err = readCSVByRows(records, config)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("reading csv from records: %v", err)
+	}
+	return ret, nil
+}
+
+// ReadInterface reads records into a DataFrame (configured by options).
+// All columns will be read as []interface{}.
+// Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionSwitchDims.
+//
+// Default if no options are supplied:
+// 1 header row; no labels; rows as major dimension
+//
+// If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
+// If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing.
+// Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
+func ReadInterface(records [][]interface{}, options ...ReadOption) (ret *DataFrame, err error) {
+	if len(records) == 0 {
+		return nil, fmt.Errorf("reading csv from [][]interface{}: must have at least one record")
+	}
+	if len(records[0]) == 0 {
+		return nil, fmt.Errorf("reading csv from [][]interface{}: first record cannot be empty")
+	}
+	config := setReadConfig(options)
+	var slices []interface{}
+	if !config.majorDimIsCols {
+		slices, err = readNestedInterfaceByRows(records, false)
+	} else {
+		slices, err = readNestedInterfaceByCols(records, false)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("reading csv from [][]interface{}: %v", err)
+	}
+
+	numCols := len(slices) - config.numLabelLevels
+	labelNames := make([]string, config.numLabelLevels)
+	colNames := make([]string, numCols)
+
+	// iterate over all containers to get header names
+	for j := 0; j < config.numLabelLevels; j++ {
+		// write label headers, no offset
+		fields := make([]string, config.numHeaderRows)
+		for i := range fields {
+			fields[i] = fmt.Sprint(slices[j].([]interface{})[i])
+		}
+		labelNames[j] = strings.Join(fields, optionLevelSeparator)
+		// remove label headers from input
+		slices[j] = slices[j].([]interface{})[config.numHeaderRows:]
+	}
+	for k := 0; k < numCols; k++ {
+		// write col headers, offset for label cols
+		offsetFromLabelCols := k + config.numLabelLevels
+		fields := make([]string, config.numHeaderRows)
+		for i := range fields {
+			fields[i] = fmt.Sprint(slices[offsetFromLabelCols].([]interface{})[i])
+		}
+		colNames[k] = strings.Join(fields, optionLevelSeparator)
+		// remove column headers from input
+		slices[offsetFromLabelCols] = slices[offsetFromLabelCols].([]interface{})[config.numHeaderRows:]
+	}
+	labels := slices[:config.numLabelLevels]
+	slices = slices[config.numLabelLevels:]
+
+	if len(labels) > 0 {
+		ret = NewDataFrame(slices, labels...)
+		if ret.err != nil {
+			return nil, fmt.Errorf("reading csv from [][]interface{}: %v", ret.err)
+		}
+		ret = ret.SetLabelNames(labelNames).SetColNames(colNames)
+	} else {
+		ret = NewDataFrame(slices)
+		if ret.err != nil {
+			return nil, fmt.Errorf("reading csv from [][]interface{}: %v", ret.err)
+		}
+		if config.numHeaderRows > 0 {
+			ret = ret.SetColNames(colNames)
+		}
+	}
+	return ret, nil
+}
+
 // ReadStruct reads the exported fields in strct into a DataFrame.
-// strct must be a struct.
+// strct must be a struct or pointer to a struct.
 // If any exported field in strct is nil, returns an error.
 //
 // If a "tada" tag is present with the value "isNull", this field must be [][]bool with one equal-lengthed slice for each exported field.
@@ -351,13 +428,14 @@ func ReadStruct(strct interface{}, options ...ReadOption) (*DataFrame, error) {
 		}
 		containers := makeIntRange(min, df.NumLevels()+df.NumColumns())
 		nullTable := v.FieldByName(nullField).Interface().([][]bool)
-		for incrementor, k := range containers {
-			err := df.SetNulls(k, nullTable[incrementor])
-			if err != nil {
-				return nil, fmt.Errorf("reading struct: writing nulls: position %d: %v", incrementor, err)
+		if len(nullTable) > 0 {
+			for incrementor, k := range containers {
+				err := df.SetNulls(k, nullTable[incrementor])
+				if err != nil {
+					return nil, fmt.Errorf("reading struct: writing nulls: position %d: %v", incrementor, err)
+				}
 			}
 		}
-
 	}
 	return df, nil
 }
@@ -515,6 +593,11 @@ func (df *DataFrame) Struct(structPointer interface{}, options ...WriteOption) e
 			continue
 		}
 		container := k + offset
+		// df does not have enough containers?
+		if container >= len(mergedLabelsAndCols) {
+			return fmt.Errorf("writing to struct: insufficient containers to write to exported field %s (container count: %d)",
+				field.Name, container)
+		}
 		// container name == exported field name?
 		if name := mergedLabelsAndCols[container].name; name != field.Name {
 			// container name == tada tag name?
@@ -1561,7 +1644,7 @@ func (df *DataFrame) SetColNames(colNames []string) *DataFrame {
 
 // -- RESHAPING
 
-// Transpose coerces all values to string, then switches all row values to column values and label names to column names.
+// Transpose coerces all columns to []string, then switches all row values to column values and label names to column names.
 // For example a DataFrame with 2 rows and 1 column has 2 columns and 1 row after transposition.
 func (df *DataFrame) Transpose() *DataFrame {
 	// row values become column values: 2 row x 1 col -> 2 col x 1 row

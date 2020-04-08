@@ -5175,6 +5175,12 @@ type testSchema4 struct {
 	NullMap [][]int `tada:"isNull"`
 }
 
+type testSchema5 struct {
+	Foo []int
+	Bar []float64
+	Baz []string
+}
+
 func TestReadStruct(t *testing.T) {
 	type args struct {
 		strct   interface{}
@@ -5422,6 +5428,19 @@ func TestDataFrame_Struct(t *testing.T) {
 			&[]float64{},
 			true,
 		},
+		{"fail - not enough containers", fields{
+			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Foo"}},
+			values: []*valueContainer{
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "Bar"},
+			},
+			colLevelNames: []string{"*0"}},
+			args{&testSchema5{}, nil},
+			&testSchema5{
+				Foo: []int{0, 1},
+				Bar: []float64{0, 1},
+			},
+			true,
+		},
 		{"fail - wrong order", fields{
 			labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "Bar"}},
 			values: []*valueContainer{
@@ -5478,7 +5497,133 @@ func TestDataFrame_Struct(t *testing.T) {
 			}
 			if !reflect.DeepEqual(tt.args.structPointer, tt.want) {
 				t.Errorf("DataFrame.Struct() -> %v, want %v", tt.args.structPointer, tt.want)
+			}
+		})
+	}
+}
 
+func TestReadInterface(t *testing.T) {
+	type args struct {
+		records [][]interface{}
+		options []ReadOption
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantRet *DataFrame
+		wantErr bool
+	}{
+		{"pass - major dim rows - 1 header",
+			args{
+				[][]interface{}{
+					{"foo", "bar"},
+					{float64(1), float64(2)},
+				}, nil},
+			&DataFrame{
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				values: []*valueContainer{
+					{slice: []interface{}{float64(1)}, isNull: []bool{false}, name: "foo"},
+					{slice: []interface{}{float64(2)}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"}},
+			false,
+		},
+		{"pass - major dim cols - 1 header",
+			args{
+				[][]interface{}{
+					{"foo", float64(1)},
+					{"bar", float64(2)},
+				}, []ReadOption{ReadOptionSwitchDims()}},
+			&DataFrame{
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				values: []*valueContainer{
+					{slice: []interface{}{float64(1)}, isNull: []bool{false}, name: "foo"},
+					{slice: []interface{}{float64(2)}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"}},
+			false,
+		},
+		{"pass - major dim cols - 1 header - not string",
+			args{
+				[][]interface{}{
+					{0, float64(1)},
+					{1, float64(2)},
+				}, []ReadOption{ReadOptionSwitchDims()}},
+			&DataFrame{
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				values: []*valueContainer{
+					{slice: []interface{}{float64(1)}, isNull: []bool{false}, name: "0"},
+					{slice: []interface{}{float64(2)}, isNull: []bool{false}, name: "1"},
+				},
+				colLevelNames: []string{"*0"}},
+			false,
+		},
+		{"pass - major dim cols - 1 label",
+			args{
+				[][]interface{}{
+					{"foo", float64(1)},
+					{"bar", float64(2)},
+				}, []ReadOption{ReadOptionSwitchDims(), ReadOptionLabels(1)}},
+			&DataFrame{
+				labels: []*valueContainer{
+					{slice: []interface{}{float64(1)}, isNull: []bool{false}, name: "foo"}},
+				values: []*valueContainer{
+					{slice: []interface{}{float64(2)}, isNull: []bool{false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"}},
+			false,
+		},
+		{"pass - major dim cols - 0 headers",
+			args{
+				[][]interface{}{
+					{float64(1)},
+					{float64(2)},
+				}, []ReadOption{ReadOptionSwitchDims(), ReadOptionHeaders(0)}},
+			&DataFrame{
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				values: []*valueContainer{
+					{slice: []interface{}{float64(1)}, isNull: []bool{false}, name: "0"},
+					{slice: []interface{}{float64(2)}, isNull: []bool{false}, name: "1"},
+				},
+				colLevelNames: []string{"*0"}},
+			false,
+		},
+		{"fail - no records",
+			args{
+				[][]interface{}{}, nil},
+			nil, true,
+		},
+		{"fail - first record empty",
+			args{
+				[][]interface{}{{}, {0}}, nil},
+			nil, true,
+		},
+		{"fail - unevenly shaped",
+			args{
+				[][]interface{}{{"foo"}, {1, 2}}, nil},
+			nil, true,
+		},
+		{"fail - unsupported type - no labels",
+			args{
+				[][]interface{}{{"foo"}, {[]complex64{1}}}, nil},
+			nil, true,
+		},
+		{"fail - unsupported type - with labels",
+			args{
+				[][]interface{}{{"foo", "bar"}, {[]complex64{1}, []complex64{2}}}, []ReadOption{ReadOptionLabels(1)}},
+			nil, true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotRet, err := ReadInterface(tt.args.records, tt.args.options...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ReadInterface() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !EqualDataFrames(gotRet, tt.wantRet) {
+				t.Errorf("ReadInterface() = %v, want %v", gotRet, tt.wantRet)
 			}
 		})
 	}
