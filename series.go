@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"reflect"
 	"time"
 
@@ -459,6 +460,23 @@ func (s *SeriesMutator) WithValues(input interface{}) {
 	}
 	s.series.values = vals[0]
 	return
+}
+
+// Shuffle randomizes the row order of the Series.
+// Returns a new Series.
+func (s *Series) Shuffle(seed int64) *Series {
+	s = s.Copy()
+	s.InPlace().Shuffle(seed)
+	return s
+}
+
+// Shuffle randomizes the row order of the Series.
+// Modifies the underlying Series.
+func (s *SeriesMutator) Shuffle(seed int64) {
+	index := makeIntRange(0, s.series.Len())
+	rand.Seed(seed)
+	rand.Shuffle(len(index), func(i, j int) { index[i], index[j] = index[j], index[i] })
+	s.Subset(index)
 }
 
 // DropRow removes the row at the specified index.

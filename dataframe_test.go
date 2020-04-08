@@ -5774,3 +5774,58 @@ func TestDataFrame_ReorderLabels(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_Shuffle(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		seed int64
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"pass",
+			fields{
+				labels: []*valueContainer{
+					{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "foo"},
+				},
+				values: []*valueContainer{
+					{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "foo"},
+			args{1},
+			&DataFrame{
+				labels: []*valueContainer{
+					{slice: []int{0, 1, 3, 2}, isNull: []bool{false, false, false, false}, name: "foo"},
+				},
+				values: []*valueContainer{
+					{slice: []float64{1, 2, 4, 3}, isNull: []bool{false, false, false, false}, name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "foo"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.Shuffle(tt.args.seed); !EqualDataFrames(got, tt.want) {
+				t.Errorf("DataFrame.Shuffle() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

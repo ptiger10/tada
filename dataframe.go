@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/rand"
 	"reflect"
 	"strings"
 	"unicode"
@@ -1423,6 +1424,23 @@ func (df *DataFrameMutator) WithCol(name string, input interface{}) {
 		df.dataframe.resetWithError(fmt.Errorf("with column: %v", err))
 	}
 	df.dataframe.values = cols
+}
+
+// Shuffle randomizes the row order of the DataFrame.
+// Returns a new DataFrame.
+func (df *DataFrame) Shuffle(seed int64) *DataFrame {
+	df = df.Copy()
+	df.InPlace().Shuffle(seed)
+	return df
+}
+
+// Shuffle randomizes the row order of the DataFrame.
+// Modifies the underlying DataFrame.
+func (df *DataFrameMutator) Shuffle(seed int64) {
+	index := makeIntRange(0, df.dataframe.Len())
+	rand.Seed(seed)
+	rand.Shuffle(len(index), func(i, j int) { index[i], index[j] = index[j], index[i] })
+	df.Subset(index)
 }
 
 // DropLabels drops the first label level matching name.

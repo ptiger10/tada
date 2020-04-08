@@ -3638,3 +3638,44 @@ func TestSeries_WriteCSV(t *testing.T) {
 		})
 	}
 }
+
+func TestSeries_Shuffle(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		seed int64
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"pass", fields{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			labels: []*valueContainer{{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "qux"}},
+		},
+			args{1},
+			&Series{
+				values: &valueContainer{slice: []float64{1, 2, 4, 3}, isNull: []bool{false, false, false, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1, 3, 2}, isNull: []bool{false, false, false, false}, name: "qux"}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.Shuffle(tt.args.seed); !EqualSeries(got, tt.want) {
+				t.Errorf("Series.Shuffle() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
