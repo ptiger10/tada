@@ -43,7 +43,7 @@ func (g *GroupedSeries) GetGroup(group string) *Series {
 //
 // Caution: null values are included in the input into lambda, but with no indication that they are null.
 // It is recommended to fill or drop nulls from a dataset prior to using Transform().
-func (g *GroupedSeries) Transform(name string, lambda func(slice interface{}) (equalLengthSlice interface{})) *Series {
+func (g *GroupedSeries) Transform(name string, lambda func(groupedSlice interface{}) (equalLengthSlice interface{})) *Series {
 	vals, err := groupedInterfaceTransformFunc(
 		g.series.values.slice, name, g.rowIndices, lambda)
 	if err != nil {
@@ -122,10 +122,14 @@ func (g *GroupedSeries) countReduceFunc(name string, fn func(interface{}, []bool
 	}
 }
 
-// Reduce iterates over the groups in g and reduces each group of values into a single value
+// Reduce iterates over the groups in the GroupedSeries and reduces each group of values into a single value
 // using the function supplied in lambda.
 // Reduce returns a new Series named "name_originalColName" where each reduced group is represented by a single row.
-// The reduction lambda function is the first field selected (i.e., not left blank) in the GroupReduceFn.
+//
+// The new Series will be a slice of reduced values with the same type as the GroupReduceFn output.
+// With GroupReduceFn.Float64, for example, Reduce will iterate over all the grouped values,
+// coerce each group to []float64, reduce each groupedSlice to a single float64 value,
+// then concatenate these reduced values into a new []float64 and return in a new Series.
 func (g *GroupedSeries) Reduce(name string, lambda GroupReduceFn) *Series {
 	// remove all nulls before running each set of values through custom user function
 	if lambda.Float64 != nil {
@@ -561,12 +565,15 @@ func (g *GroupedDataFrame) Col(colName string) *GroupedSeries {
 	}
 }
 
-// Reduce iterates over the groups in g and reduces each group of values into a single value
-// applying the function supplied in lambda to the column values in cols.
-// Reduce returns a new DataFrame named "name_originalDataFrameName",
-// with columns named "name_originalColName",
+// Reduce iterates over the groups in the GroupedDataFrame and reduces each group of values into a single value
+// using the function supplied in lambda.
+// Reduce returns a new DataFrame named "name_originalDataFrameName" with columns named "name_originalColumnName"
 // where each reduced group is represented by a single row.
-// The reduction lambda function is the first field selected (i.e., not left blank) in the GroupReduceFn.
+//
+// The columns in the new DataFrame will be slices of reduced values with the same type as the GroupReduceFn output.
+// With GroupReduceFn.Float64, for example, Reduce will iterate over all the grouped values in each column,
+// coerce each group to []float64, reduce each groupedSlice to a single float64 value,
+// then concatenate these reduced values into new []float64 columns and return in a new DataFrame.
 func (g *GroupedDataFrame) Reduce(name string, cols []string, lambda GroupReduceFn) *DataFrame {
 	// remove all nulls before running each set of values through custom user function
 	if lambda.Float64 != nil {
