@@ -193,9 +193,9 @@ func (st *StructTransposer) Transpose(structPointer interface{}) error {
 
 }
 
-// Shuffle randomly shuffles the row order in Rows.
-func (st *StructTransposer) Shuffle() {
-	rand.Seed(randSeed)
+// Shuffle randomly shuffles the row order in Rows, using a randomizer seeded with seed.
+func (st *StructTransposer) Shuffle(seed int64) {
+	rand.Seed(seed)
 	rand.Shuffle(
 		len(st.Rows),
 		func(i, j int) {

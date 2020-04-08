@@ -369,14 +369,17 @@ func TestStructTransposer_Transpose(t *testing.T) {
 }
 
 func TestStructTransposer_Shuffle(t *testing.T) {
-	randSeed = 1
 	type fields struct {
 		Rows   [][]interface{}
 		IsNull [][]bool
 	}
+	type args struct {
+		seed int64
+	}
 	tests := []struct {
 		name   string
 		fields fields
+		args   args
 		want   *StructTransposer
 	}{
 		{"pass", fields{
@@ -389,6 +392,7 @@ func TestStructTransposer_Shuffle(t *testing.T) {
 			},
 			IsNull: [][]bool{{true}, {false}, {false}, {false}, {false}},
 		},
+			args{1},
 			&StructTransposer{
 				Rows: [][]interface{}{
 					{2},
@@ -407,7 +411,7 @@ func TestStructTransposer_Shuffle(t *testing.T) {
 				Rows:   tt.fields.Rows,
 				IsNull: tt.fields.IsNull,
 			}
-			st.Shuffle()
+			st.Shuffle(tt.args.seed)
 			if !reflect.DeepEqual(st, tt.want) {
 				t.Errorf("StructTransposer.Shuffle() -> got %v, want %v", st, tt.want)
 			}
