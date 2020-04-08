@@ -2,6 +2,7 @@ package tada
 
 import (
 	"fmt"
+	"math/rand"
 	"reflect"
 	"unicode"
 )
@@ -110,8 +111,8 @@ func transposeNestedNulls(isNull [][]bool) ([][]bool, error) {
 }
 
 // A StructTransposer is a row-oriented struct representation of a DataFrame
-// that can be transposed into a column-oriented struct representation of a DataFrame.
-// It is primarily used for more readable row-oriented testing.
+// that can be randomly shuffled or transposed into a column-oriented struct representation of a DataFrame.
+// It is useful for intuitive and robust row-oriented testing.
 type StructTransposer struct {
 	Rows   [][]interface{}
 	IsNull [][]bool
@@ -119,7 +120,7 @@ type StructTransposer struct {
 
 // Transpose reads the values of a row-oriented struct representation of a DataFrame
 // into a column-oriented struct representation of a DataFrame.
-func (st StructTransposer) Transpose(structPointer interface{}) error {
+func (st *StructTransposer) Transpose(structPointer interface{}) error {
 	transfer, err := readNestedInterfaceByRows(st.Rows, true)
 	if err != nil {
 		return fmt.Errorf("transposing struct: %v", err)
@@ -166,6 +167,7 @@ func (st StructTransposer) Transpose(structPointer interface{}) error {
 		dst := v.FieldByName(field.Name)
 		dst.Set(src)
 	}
+	// receiving structPointer has null tag?
 	if hasNullTag {
 		isNull, err := transposeNestedNulls(st.IsNull)
 		if err != nil {
@@ -189,4 +191,16 @@ func (st StructTransposer) Transpose(structPointer interface{}) error {
 
 	return nil
 
+}
+
+// Shuffle randomly shuffles the row order in Rows.
+func (st *StructTransposer) Shuffle() {
+	rand.Seed(randSeed)
+	rand.Shuffle(
+		len(st.Rows),
+		func(i, j int) {
+			st.Rows[i], st.Rows[j] = st.Rows[j], st.Rows[i]
+			st.IsNull[i], st.IsNull[j] = st.IsNull[j], st.IsNull[i]
+		})
+	return
 }
