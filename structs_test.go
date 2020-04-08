@@ -404,6 +404,26 @@ func TestStructTransposer_Shuffle(t *testing.T) {
 				IsNull: [][]bool{{false}, {true}, {false}, {false}, {false}},
 			},
 		},
+		{"pass - no nulls", fields{
+			Rows: [][]interface{}{
+				{0},
+				{1},
+				{2},
+				{3},
+				{4},
+			},
+		},
+			args{1},
+			&StructTransposer{
+				Rows: [][]interface{}{
+					{2},
+					{0},
+					{1},
+					{4},
+					{3},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

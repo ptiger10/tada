@@ -200,7 +200,9 @@ func (st *StructTransposer) Shuffle(seed int64) {
 		len(st.Rows),
 		func(i, j int) {
 			st.Rows[i], st.Rows[j] = st.Rows[j], st.Rows[i]
-			st.IsNull[i], st.IsNull[j] = st.IsNull[j], st.IsNull[i]
+			if len(st.IsNull) == len(st.Rows) {
+				st.IsNull[i], st.IsNull[j] = st.IsNull[j], st.IsNull[i]
+			}
 		})
 	return
 }
