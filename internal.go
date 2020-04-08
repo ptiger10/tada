@@ -2795,3 +2795,44 @@ func filterByValue(containers []*valueContainer, values map[string]interface{}) 
 	index := intersection(subIndexes, containers[0].len())
 	return index, nil
 }
+
+func groupCounts(rowIndices [][]int) []int {
+	ret := make([]int, len(rowIndices))
+	for i := range rowIndices {
+		ret[i] = len(rowIndices[i])
+	}
+	return ret
+}
+
+// expand a valueContainer by repeating each value n times, where n is aligned to value's index position
+func (vc *valueContainer) expand(n []int) *valueContainer {
+	var length int
+	for i := range n {
+		length += n[i]
+	}
+
+	vals := reflect.MakeSlice(reflect.TypeOf(vc.slice), length, length)
+	nulls := make([]bool, length)
+
+	v := reflect.ValueOf(vc.slice)
+	var counter int
+	for i := 0; i < v.Len(); i++ {
+		src := v.Index(i)
+		isNull := vc.isNull[i]
+		for repeat := 0; repeat < n[i]; repeat++ {
+			dst := vals.Index(counter)
+			dst.Set(src)
+
+			if isNull {
+				nulls[counter] = true
+			}
+			counter++
+		}
+	}
+	ret := &valueContainer{
+		slice:  vals.Interface(),
+		isNull: nulls,
+		name:   vc.name,
+	}
+	return ret
+}

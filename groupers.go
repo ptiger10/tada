@@ -269,9 +269,13 @@ func (g *GroupedSeries) HavingCount(lambda func(int) bool) *GroupedSeries {
 	}
 }
 
-// Series returns the GroupedSeries as a Series, sorted by group, with groups in the order in which they appear in the original Series.
+// Series returns the GroupedSeries as a Series,
+// with group names as label levels,
+// group names ordered by the order of their appearance in the original Series,
+// and values grouped together by group name.
 func (g *GroupedSeries) Series() *Series {
 	index := make([]int, g.series.Len())
+	labels := make([]*valueContainer, len(g.labels))
 	var counter int
 	for _, group := range g.rowIndices {
 		for _, i := range group {
@@ -281,6 +285,11 @@ func (g *GroupedSeries) Series() *Series {
 	}
 	s := g.series.Subset(index).Copy()
 	s.sharedData = false
+
+	for j := range labels {
+		labels[j] = g.labels[j].expand(groupCounts(g.rowIndices))
+	}
+	s.labels = labels
 	return s
 }
 
@@ -619,9 +628,14 @@ func (g *GroupedDataFrame) HavingCount(lambda func(int) bool) *GroupedDataFrame 
 	}
 }
 
-// DataFrame returns the GroupedDataFrame as a DataFrame, sorted by group, with groups in the order in which they appear in the original DataFrame.
+// DataFrame returns the GroupedDataFrame as a DataFrame,
+// with group names as label levels,
+// group names ordered by the order of their appearance in the original Series,
+// and values grouped together by group name.
+// Columns used as label levels are dropped.
 func (g *GroupedDataFrame) DataFrame() *DataFrame {
 	index := make([]int, g.df.Len())
+	labels := make([]*valueContainer, len(g.labels))
 	var counter int
 	for _, group := range g.rowIndices {
 		for _, i := range group {
@@ -629,7 +643,18 @@ func (g *GroupedDataFrame) DataFrame() *DataFrame {
 			counter++
 		}
 	}
-	return g.df.Subset(index).Copy()
+	for j := range labels {
+		labels[j] = g.labels[j].expand(groupCounts(g.rowIndices))
+	}
+	df := g.df.Subset(index).Copy()
+	df.labels = labels
+	// drop columns used as labels
+	for _, name := range listNames(df.labels) {
+		if _, err := indexOfContainer(name, df.values); err == nil {
+			df.InPlace().DropCol(name)
+		}
+	}
+	return df
 }
 
 // Next advances to next grouped DataFrame. Returns false at end of iteration.

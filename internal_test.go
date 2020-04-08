@@ -4796,3 +4796,78 @@ func Test_setReadConfig(t *testing.T) {
 		})
 	}
 }
+
+func Test_valueContainer_expand(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		cache  []string
+		name   string
+	}
+	type args struct {
+		n []int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *valueContainer
+	}{
+		{"pass", fields{
+			slice:  []string{"foo", "", "bar"},
+			isNull: []bool{false, true, false},
+			name:   "foobar"},
+			args{[]int{1, 2, 1}},
+			&valueContainer{
+				slice:  []string{"foo", "", "", "bar"},
+				isNull: []bool{false, true, true, false},
+				name:   "foobar",
+			},
+		},
+		{"pass - repeat then 0", fields{
+			slice:  []string{"foo", "", "bar", "baz"},
+			isNull: []bool{false, true, false, false},
+			name:   "foobar"},
+			args{[]int{1, 2, 0, 2}},
+			&valueContainer{
+				slice:  []string{"foo", "", "", "baz", "baz"},
+				isNull: []bool{false, true, true, false, false},
+				name:   "foobar",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				cache:  tt.fields.cache,
+				name:   tt.fields.name,
+			}
+			if got := vc.expand(tt.args.n); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.expand() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_groupCounts(t *testing.T) {
+	type args struct {
+		rowIndices [][]int
+	}
+	tests := []struct {
+		name string
+		args args
+		want []int
+	}{
+		{"pass", args{[][]int{{0, 1}, {}, {1}}},
+			[]int{2, 0, 1}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := groupCounts(tt.args.rowIndices); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("groupCounts() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
