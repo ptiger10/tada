@@ -1089,31 +1089,27 @@ func (vc *valueContainer) filter(filter FilterFn) []int {
 	return index
 }
 
-func (vc *valueContainer) apply(lambda ApplyFn) {
-	if lambda.Float64 != nil {
-		slice := vc.float64().slice
-		retSlice := make([]float64, len(slice))
-		for i := range slice {
-			retSlice[i] = lambda.Float64(slice[i])
-		}
-		vc.slice = retSlice
-	} else if lambda.String != nil {
-		slice := vc.string().slice
-		retSlice := make([]string, len(slice))
-		for i := range slice {
-			retSlice[i] = lambda.String(slice[i])
-		}
-		vc.slice = retSlice
-	} else if lambda.DateTime != nil {
-		slice := vc.dateTime().slice
-		retSlice := make([]time.Time, len(slice))
-		for i := range slice {
-			retSlice[i] = lambda.DateTime(slice[i])
-		}
-		vc.slice = retSlice
+func (vc *valueContainer) apply(lambda ApplyFn) error {
+	// create caches to reset container on error
+	cache := make([]bool, len(vc.isNull))
+	copy(cache, vc.isNull)
+	requiredLen := vc.len()
+
+	ret := lambda(vc.slice, vc.isNull)
+
+	_, err := setNullsFromInterface(ret)
+	if err != nil {
+		vc.isNull = cache
+		return fmt.Errorf("constructing new values: %v", err)
 	}
+	if reflect.ValueOf(ret).Len() != requiredLen {
+		vc.isNull = cache
+		return fmt.Errorf("constructing new values: new slice is not same length as original slice (%d != %d)",
+			reflect.ValueOf(ret).Len(), requiredLen)
+	}
+	vc.slice = ret
 	vc.resetCache()
-	return
+	return nil
 }
 
 func (vc *valueContainer) applyFormat(lambda ApplyFormatFn) {
@@ -2070,12 +2066,8 @@ func (filter FilterFn) validate() error {
 }
 
 func (lambda ApplyFn) validate() error {
-	if lambda.Float64 == nil {
-		if lambda.String == nil {
-			if lambda.DateTime == nil {
-				return fmt.Errorf("no apply function provided")
-			}
-		}
+	if lambda == nil {
+		return fmt.Errorf("no apply function provided")
 	}
 	return nil
 }

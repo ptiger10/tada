@@ -169,18 +169,15 @@ type NullFiller struct {
 	FillFloat    float64
 }
 
-// A FilterFn is a lambda function supplied to a Filter or Where function.
-type FilterFn func(interface{}) bool
+// A FilterFn is an anonymous function supplied to a Filter or Where function.
+// The function will be called on every val in the container.
+type FilterFn func(val interface{}) bool
 
-// An ApplyFn supplies logic to the Apply() function.
-// Only the first field selected (i.e., not left nil) is used - any others are ignored.
-// Values are coerced to the type specified in the field (e.g., DateTime -> time.Time) before the apply function is evaluated.
-// To simulate Apply without type coercion, access the underlying values of any Series with GetValues(), type cast them, then transform them.
-type ApplyFn struct {
-	Float64  func(val float64) float64
-	String   func(val string) string
-	DateTime func(val time.Time) time.Time
-}
+// An ApplyFn is an anonymous function supplied to an Apply function.
+// The function will be called once on the container slice, and should return a slice of equal length.
+// isNull contains the null status of every row in the container.
+// The null status of a row may be changed by setting the row's isNull element within the function.
+type ApplyFn func(slice interface{}, isNull []bool) (equalLengthSlice interface{})
 
 // A GroupReduceFn supplies logic to the Reduce() function to reduce a slice of grouped values to a single value.
 // Only the first field selected (i.e., not left nil) is used - any others are ignored.

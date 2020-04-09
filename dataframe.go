@@ -277,7 +277,7 @@ func ReadCSVFromRecords(records [][]string, options ...ReadOption) (ret *DataFra
 	return ret, nil
 }
 
-// ReadInterface reads records into a DataFrame (configured by options).
+// ReadInterfaceRecords reads records into a DataFrame (configured by options).
 // All columns will be read as []interface{}.
 // Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionSwitchDims.
 //
@@ -287,12 +287,12 @@ func ReadCSVFromRecords(records [][]string, options ...ReadOption) (ret *DataFra
 // If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
 // If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing.
 // Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
-func ReadInterface(records [][]interface{}, options ...ReadOption) (ret *DataFrame, err error) {
+func ReadInterfaceRecords(records [][]interface{}, options ...ReadOption) (ret *DataFrame, err error) {
 	if len(records) == 0 {
-		return nil, fmt.Errorf("reading csv from [][]interface{}: must have at least one record")
+		return nil, fmt.Errorf("reading records from [][]interface{}: must have at least one record")
 	}
 	if len(records[0]) == 0 {
-		return nil, fmt.Errorf("reading csv from [][]interface{}: first record cannot be empty")
+		return nil, fmt.Errorf("reading records from [][]interface{}: first record cannot be empty")
 	}
 	config := setReadConfig(options)
 	var slices []interface{}
@@ -302,7 +302,7 @@ func ReadInterface(records [][]interface{}, options ...ReadOption) (ret *DataFra
 		slices, err = readNestedInterfaceByCols(records, false)
 	}
 	if err != nil {
-		return nil, fmt.Errorf("reading csv from [][]interface{}: %v", err)
+		return nil, fmt.Errorf("reading records from [][]interface{}: %v", err)
 	}
 
 	numCols := len(slices) - config.numLabelLevels
@@ -337,13 +337,13 @@ func ReadInterface(records [][]interface{}, options ...ReadOption) (ret *DataFra
 	if len(labels) > 0 {
 		ret = NewDataFrame(slices, labels...)
 		if ret.err != nil {
-			return nil, fmt.Errorf("reading csv from [][]interface{}: %v", ret.err)
+			return nil, fmt.Errorf("reading records from [][]interface{}: %v", ret.err)
 		}
 		ret = ret.SetLabelNames(labelNames).SetColNames(colNames)
 	} else {
 		ret = NewDataFrame(slices)
 		if ret.err != nil {
-			return nil, fmt.Errorf("reading csv from [][]interface{}: %v", ret.err)
+			return nil, fmt.Errorf("reading records from [][]interface{}: %v", ret.err)
 		}
 		if config.numHeaderRows > 0 {
 			ret = ret.SetColNames(colNames)
@@ -2062,11 +2062,6 @@ func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 			df.dataframe.resetWithError((fmt.Errorf("apply: %v", err)))
 		}
 		mergedLabelsAndCols[index].apply(lambda)
-		// if either prior or new value is null, new value is null
-		// ducks error because values are controlled to be of supported type
-		newNulls, _ := setNullsFromInterface(mergedLabelsAndCols[index].slice)
-		mergedLabelsAndCols[index].isNull = isEitherNull(
-			mergedLabelsAndCols[index].isNull, newNulls)
 	}
 	return
 }

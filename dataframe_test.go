@@ -1896,17 +1896,22 @@ func TestDataFrame_Apply(t *testing.T) {
 	}{
 		{"float64", fields{
 			values: []*valueContainer{
-				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 				{slice: []int{1}, isNull: []bool{false}, name: "bar"}},
 			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			colLevelNames: []string{"*0"},
 			name:          "baz"},
-			args{map[string]ApplyFn{"foo": {Float64: func(v float64) float64 {
-				return v + 1
-			}}}},
+			args{map[string]ApplyFn{"foo": func(slice interface{}, isNull []bool) interface{} {
+				vals := slice.([]float64)
+				ret := make([]float64, len(vals))
+				for i := range ret {
+					ret[i] = vals[i] * 2
+				}
+				return ret
+			}}},
 			&DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+					{slice: []float64{2}, isNull: []bool{false}, name: "foo"},
 					{slice: []int{1}, isNull: []bool{false}, name: "bar"}},
 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
@@ -1919,7 +1924,7 @@ func TestDataFrame_Apply(t *testing.T) {
 			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			colLevelNames: []string{"*0"},
 			name:          "baz"},
-			args{map[string]ApplyFn{"foo": {}}},
+			args{map[string]ApplyFn{"foo": nil}},
 			&DataFrame{
 				err: fmt.Errorf("apply: no apply function provided")},
 		},
@@ -1930,7 +1935,7 @@ func TestDataFrame_Apply(t *testing.T) {
 			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
 			colLevelNames: []string{"*0"},
 			name:          "baz"},
-			args{map[string]ApplyFn{"corge": {Float64: func(float64) float64 { return 0 }}}},
+			args{map[string]ApplyFn{"corge": func(interface{}, []bool) interface{} { return 0 }}},
 			&DataFrame{
 				err: fmt.Errorf("apply: name (corge) not found")},
 		},
@@ -5501,7 +5506,7 @@ func TestDataFrame_Struct(t *testing.T) {
 	}
 }
 
-func TestReadInterface(t *testing.T) {
+func TestReadInterfaceRecords(t *testing.T) {
 	type args struct {
 		records [][]interface{}
 		options []ReadOption
@@ -5616,13 +5621,13 @@ func TestReadInterface(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotRet, err := ReadInterface(tt.args.records, tt.args.options...)
+			gotRet, err := ReadInterfaceRecords(tt.args.records, tt.args.options...)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ReadInterface() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ReadInterfaceRecords() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !EqualDataFrames(gotRet, tt.wantRet) {
-				t.Errorf("ReadInterface() = %v, want %v", gotRet, tt.wantRet)
+				t.Errorf("ReadInterfaceRecords() = %v, want %v", gotRet, tt.wantRet)
 			}
 		})
 	}

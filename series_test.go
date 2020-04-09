@@ -1566,7 +1566,14 @@ func TestSeries_Apply(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFn{Float64: func(v float64) float64 { return v * 2 }}},
+			args{func(slice interface{}, isNull []bool) interface{} {
+				vals := slice.([]float64)
+				ret := make([]float64, len(vals))
+				for i := range ret {
+					ret[i] = vals[i] * 2
+				}
+				return ret
+			}},
 			&Series{
 				values: &valueContainer{slice: []float64{0, 2}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
@@ -1574,15 +1581,38 @@ func TestSeries_Apply(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{true, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFn{Float64: func(v float64) float64 { return v * 2 }}},
+			args{func(slice interface{}, isNull []bool) interface{} {
+				vals := slice.([]float64)
+				ret := make([]float64, len(vals))
+				for i := range ret {
+					ret[i] = vals[i] * 2
+				}
+				return ret
+			}},
 			&Series{
 				values: &valueContainer{slice: []float64{0, 2}, isNull: []bool{true, false}},
+				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}}},
+		{"apply - change null",
+			fields{
+				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{true, false}},
+				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{func(slice interface{}, isNull []bool) interface{} {
+				vals := slice.([]float64)
+				ret := make([]float64, len(vals))
+				isNull[1] = true
+				for i := range ret {
+					ret[i] = vals[i] * 2
+				}
+				return ret
+			}},
+			&Series{
+				values: &valueContainer{slice: []float64{0, 2}, isNull: []bool{true, true}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}}},
 		{"fail: no function supplied",
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{ApplyFn{}},
+			args{nil},
 			&Series{
 				err: errors.New("apply: no apply function provided")}},
 	}

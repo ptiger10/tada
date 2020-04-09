@@ -339,11 +339,17 @@ func ExampleSeries_Merge_withOptions() {
 }
 
 func ExampleSeries_Apply_float64() {
-	s := tada.NewSeries([]int{1, 2, 3}).SetName("foo")
+	s := tada.NewSeries([]float64{1, 2, 3}).SetName("foo")
 	fmt.Println(s)
 
-	// coerces to float64, applies func
-	times2 := tada.ApplyFn{Float64: func(v float64) float64 { return v * 2 }}
+	times2 := func(slice interface{}, isNull []bool) interface{} {
+		vals := slice.([]float64)
+		ret := make([]float64, len(vals))
+		for i := range ret {
+			ret[i] = vals[i] * 2
+		}
+		return ret
+	}
 	fmt.Println(s.Apply(times2))
 
 	// Output:

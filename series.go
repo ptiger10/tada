@@ -810,7 +810,6 @@ func (s *Series) Apply(lambda ApplyFn) *Series {
 // Values are converted from their original type to the selected field type.
 // For example, {ApplyFn{Float64: lambda}} converts the Series values to float64 and
 // applies the lambda function to each row in the container, outputting a new float64 value for each row.
-// If a value is null either before or after the lambda function is applied, it is also null after.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Apply(lambda ApplyFn) {
 	err := lambda.validate()
@@ -819,10 +818,6 @@ func (s *SeriesMutator) Apply(lambda ApplyFn) {
 		return
 	}
 	s.series.values.apply(lambda)
-	// if either prior or new value is null, new value is null
-	// ducks error because values are controlled to be of supported type
-	newNulls, _ := setNullsFromInterface(s.series.values.slice)
-	s.series.values.isNull = isEitherNull(s.series.values.isNull, newNulls)
 	return
 }
 

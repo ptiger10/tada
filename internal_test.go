@@ -10,7 +10,6 @@ import (
 	"os"
 	"reflect"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -1563,36 +1562,66 @@ func Test_valueContainer_apply(t *testing.T) {
 		apply ApplyFn
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *valueContainer
+		name    string
+		fields  fields
+		args    args
+		want    *valueContainer
+		wantErr bool
 	}{
 		{"float", fields{
 			slice:  []float64{1, 2},
 			isNull: []bool{false, false},
 			name:   "foo"},
-			args{ApplyFn{Float64: func(v float64) float64 { return v * 2 }}},
-			&valueContainer{slice: []float64{2, 4}, isNull: []bool{false, false}, name: "foo"}},
-		{"float - reset cache", fields{
+			args{func(slice interface{}, isNull []bool) interface{} {
+				vals := slice.([]float64)
+				ret := make([]float64, len(vals))
+				for i := range ret {
+					ret[i] = vals[i] * 2
+				}
+				return ret
+			}},
+			&valueContainer{slice: []float64{2, 4}, isNull: []bool{false, false}, name: "foo"},
+			false,
+		},
+		{"int to float - change null", fields{
+			slice:  []int{1, 2},
+			isNull: []bool{false, false},
+			name:   "foo"},
+			args{func(slice interface{}, isNull []bool) interface{} {
+				vals := slice.([]int)
+				ret := make([]float64, len(vals))
+				for i := range ret {
+					if i == 0 {
+						isNull[i] = true
+					}
+					ret[i] = float64(vals[i]) * 2
+				}
+				return ret
+			}},
+			&valueContainer{slice: []float64{2, 4}, isNull: []bool{true, false}, name: "foo"},
+			false,
+		},
+		{"fail - does not return slice (resets isNulls to original)", fields{
 			slice:  []float64{1, 2},
 			isNull: []bool{false, false},
-			name:   "foo", cache: []string{"1", "2"}},
-			args{ApplyFn{Float64: func(v float64) float64 { return v * 2 }}},
-			&valueContainer{slice: []float64{2, 4}, isNull: []bool{false, false}, name: "foo"}},
-		{"string", fields{
-			slice:  []string{"foo", "bar"},
+			name:   "foo"},
+			args{func(slice interface{}, isNull []bool) interface{} {
+				isNull[0] = true
+				return "foo"
+			}},
+			&valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+			true,
+		},
+		{"fail - does not return equal length slice (resets isNulls to original)", fields{
+			slice:  []float64{1, 2},
 			isNull: []bool{false, false},
 			name:   "foo"},
-			args{ApplyFn{String: func(s string) string { return strings.Replace(s, "o", "a", -1) }}},
-			&valueContainer{
-				slice: []string{"faa", "bar"}, isNull: []bool{false, false}, name: "foo"}},
-		{"date", fields{
-			slice:  []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
-			isNull: []bool{false},
-			name:   "foo"},
-			args{ApplyFn{DateTime: func(v time.Time) time.Time { return v.AddDate(0, 0, 1) }}},
-			&valueContainer{slice: []time.Time{time.Date(2020, 1, 2, 0, 0, 0, 0, time.UTC)}, isNull: []bool{false}, name: "foo"},
+			args{func(slice interface{}, isNull []bool) interface{} {
+				isNull[0] = true
+				return []float64{1}
+			}},
+			&valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+			true,
 		},
 	}
 	for _, tt := range tests {
@@ -1603,9 +1632,12 @@ func Test_valueContainer_apply(t *testing.T) {
 				name:   tt.fields.name,
 				cache:  tt.fields.cache,
 			}
-			vc.apply(tt.args.apply)
+			err := vc.apply(tt.args.apply)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("valueContainer.apply() error = %v, want %v", err, tt.wantErr)
+			}
 			if !reflect.DeepEqual(vc, tt.want) {
-				t.Errorf("valueContainer.apply() = %v, want %v", vc, tt.want)
+				t.Errorf("valueContainer.apply() -> %v, want %v", vc, tt.want)
 			}
 		})
 	}
