@@ -3715,7 +3715,7 @@ func TestGroupedSeries_interfaceReduceFunc(t *testing.T) {
 	}
 }
 
-func Test_groupedInterfaceTransformFunc(t *testing.T) {
+func Test_groupedApplyFunc(t *testing.T) {
 	type args struct {
 		slice      interface{}
 		isNull     []bool
@@ -3813,11 +3813,11 @@ func Test_groupedInterfaceTransformFunc(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := groupedApplyFunc(tt.args.slice, tt.args.isNull, tt.args.name, tt.args.rowIndices, tt.args.fn)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("groupedInterfaceTransformFunc() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("groupedApplyFunc() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("groupedInterfaceTransformFunc() = %v, want %v", got, tt.want)
+				t.Errorf("groupedApplyFunc() = %v, want %v", got, tt.want)
 			}
 		})
 	}

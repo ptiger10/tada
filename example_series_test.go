@@ -3,7 +3,6 @@ package tada_test
 import (
 	"fmt"
 	"math"
-	"strconv"
 	"time"
 
 	"github.com/ptiger10/tada"
@@ -633,20 +632,11 @@ func ExampleSeries_zscore() {
 	mean := s.Mean()
 	std := s.StdDev()
 	for i := range vals {
-		ret[i] = (vals[i] - mean) / std
+		val := (vals[i] - mean) / std
+		ret[i] = math.Round((val * 100)) / 100 // round to 2 decimal points
 	}
-
-	newS := tada.NewSeries(ret, s.GetLabels()...).SetName("zscore_foo")
-	decimalFormat := func(slice interface{}, _ []bool) interface{} {
-		vals := slice.([]float64)
-		ret := make([]string, len(vals))
-		for i := range ret {
-			ret[i] = strconv.FormatFloat(vals[i], 'f', 2, 64)
-		}
-		return ret
-	}
-	newS.InPlace().Apply(decimalFormat)
-	fmt.Println(newS)
+	df := s.DataFrame().WithCol("zscore_foo", ret)
+	fmt.Println(df)
 	// Output:
 	// +---++-----+
 	// | - || foo |
@@ -658,64 +648,104 @@ func ExampleSeries_zscore() {
 	// | 4 ||   5 |
 	// +---++-----+
 	//
-	// +---++------------+
-	// | - || zscore_foo |
-	// |---||------------|
-	// | 0 ||      -1.41 |
-	// | 1 ||      -0.71 |
-	// | 2 ||       0.00 |
-	// | 3 ||       0.71 |
-	// | 4 ||       1.41 |
-	// +---++------------+
+	// +---++-----+------------+
+	// | - || foo | zscore_foo |
+	// |---||-----|------------|
+	// | 0 ||   1 |      -1.41 |
+	// | 1 ||   2 |      -0.71 |
+	// | 2 ||   3 |          0 |
+	// | 3 ||   4 |       0.71 |
+	// | 4 ||   5 |       1.41 |
+	// +---++-----+------------+
 }
 
 func ExampleGroupedSeries_Apply() {
-	s := tada.NewSeries([]float64{1, 2, 3, 4}, []int{0, 1, 0, 1}).
-		SetName("foo").
-		SetLabelNames([]string{"baz"})
+	s := tada.NewSeries([]float64{1, 2, 3, 4}, []string{"bar", "bar", "foo", "bar"}, []int{0, 1, 2, 3}).
+		SetName("foobar").
+		SetLabelNames([]string{"baz", "qux"})
 	fmt.Println(s)
 
-	g := s.GroupBy()
-	zScore := func(slice interface{}, _ []bool) interface{} {
+	g := s.GroupBy("baz")
+	// if group has at least 3 items, multiply by 2. otherwise set as null.
+	modifyBigGroup := func(slice interface{}, isNull []bool) interface{} {
 		vals, _ := slice.([]float64) // in normal usage, check the type assertion and handle an error
-		var sum float64
-		for i := range vals {
-			sum += vals[i]
-		}
-		mean := sum / float64(len(vals))
-
-		var variance float64
-		for i := range vals {
-			variance += math.Pow((vals[i] - mean), 2)
-		}
-		std := math.Pow(variance/float64(len(vals)), 0.5)
-
 		ret := make([]float64, len(vals))
-		for i := range vals {
-			ret[i] = (vals[i] - mean) / std
+		if len(vals) >= 3 {
+			for i := range ret {
+				ret[i] = vals[i] * 2
+			}
+		} else {
+			for i := range ret {
+				isNull[i] = true
+			}
 		}
 		return ret
 	}
-	fmt.Println(g.Apply(zScore).Series())
+	fmt.Println(g.Apply(modifyBigGroup).Series())
 
 	// Output:
-	// +-----++-----+
-	// | baz || foo |
-	// |-----||-----|
-	// |   0 ||   1 |
-	// |   1 ||   2 |
-	// |   0 ||   3 |
-	// |   1 ||   4 |
-	// +-----++-----+
+	// +-----+-----++--------+
+	// | baz | qux || foobar |
+	// |-----|-----||--------|
+	// | bar |   0 ||      1 |
+	// |     |   1 ||      2 |
+	// | foo |   2 ||      3 |
+	// | bar |   3 ||      4 |
+	// +-----+-----++--------+
 	//
-	// +-----++-----+
-	// | baz || foo |
-	// |-----||-----|
-	// |   0 ||  -1 |
-	// |     ||   1 |
-	// |   1 ||  -1 |
-	// |     ||   1 |
-	// +-----++-----+
+	// +-----++--------+
+	// | baz || foobar |
+	// |-----||--------|
+	// | bar ||      2 |
+	// |     ||      4 |
+	// |     ||      8 |
+	// | foo || (null) |
+	// +-----++--------+
+}
+
+func ExampleGroupedSeries_Apply_align() {
+	s := tada.NewSeries([]float64{1, 2, 3, 4}, []string{"bar", "bar", "foo", "bar"}, []int{0, 1, 2, 3}).
+		SetName("foobar").
+		SetLabelNames([]string{"baz", "qux"})
+	fmt.Println(s)
+
+	g := s.GroupBy("baz")
+	// if group has at least 3 items, multiply by 2. otherwise set as null.
+	modifyBigGroup := func(slice interface{}, isNull []bool) interface{} {
+		vals, _ := slice.([]float64) // in normal usage, check the type assertion and handle an error
+		ret := make([]float64, len(vals))
+		if len(vals) >= 3 {
+			for i := range ret {
+				ret[i] = vals[i] * 2
+			}
+		} else {
+			for i := range ret {
+				isNull[i] = true
+			}
+		}
+		return ret
+	}
+	g.Align()
+	fmt.Println(g.Apply(modifyBigGroup).Series())
+
+	// Output:
+	// +-----+-----++--------+
+	// | baz | qux || foobar |
+	// |-----|-----||--------|
+	// | bar |   0 ||      1 |
+	// |     |   1 ||      2 |
+	// | foo |   2 ||      3 |
+	// | bar |   3 ||      4 |
+	// +-----+-----++--------+
+	//
+	// +-----+-----++--------+
+	// | baz | qux || foobar |
+	// |-----|-----||--------|
+	// | bar |   0 ||      2 |
+	// |     |   1 ||      4 |
+	// | foo |   2 || (null) |
+	// | bar |   3 ||      8 |
+	// +-----+-----++--------+
 }
 
 func ExampleGroupedSeries_HavingCount_sum() {

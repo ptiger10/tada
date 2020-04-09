@@ -824,11 +824,15 @@ func groupedApplyFunc(
 		nulls := subsetNulls(isNull, rowIndex)
 		output := fn(subsetRows, nulls)
 		if !isSlice(output) {
-			return nil, fmt.Errorf("group %d: output must be slice (not %v)",
+			return nil, fmt.Errorf("constructing new values: group %d: output must be slice (not %v)",
 				i, reflect.TypeOf(output).Kind())
 		}
+		_, err := setNullsFromInterface(output)
+		if err != nil {
+			return nil, fmt.Errorf("constructing new values: group %d: %v", i, err)
+		}
 		if reflect.ValueOf(output).Len() != reflect.ValueOf(subsetRows).Len() {
-			return nil, fmt.Errorf("group %d: length of output slice must match length of input slice "+
+			return nil, fmt.Errorf("constructing new values: group %d: length of output slice must match length of input slice "+
 				"(%d != %d)", i, reflect.ValueOf(output).Len(), reflect.ValueOf(subsetRows).Len())
 		}
 		// write each output multiple times and out of order into retVals
@@ -839,11 +843,12 @@ func groupedApplyFunc(
 			retNulls[index] = nulls[incrementor]
 		}
 	}
-	ret, err := makeValueContainerFromInterface(retVals.Interface(), name)
-	if err != nil {
-		return nil, fmt.Errorf("interface{} output: %v", err)
-	}
-	return ret, nil
+
+	return &valueContainer{
+		slice:  retVals.Interface(),
+		isNull: retNulls,
+		name:   name,
+	}, nil
 }
 
 func groupedIndexReduceFunc(
