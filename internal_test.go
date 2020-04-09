@@ -9,7 +9,6 @@ import (
 	"math"
 	"os"
 	"reflect"
-	"strconv"
 	"testing"
 	"time"
 
@@ -1643,56 +1642,6 @@ func Test_valueContainer_apply(t *testing.T) {
 	}
 }
 
-func Test_valueContainer_applyFormat(t *testing.T) {
-	type fields struct {
-		slice  interface{}
-		isNull []bool
-		name   string
-		cache  []string
-	}
-	type args struct {
-		apply ApplyFormatFn
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *valueContainer
-	}{
-		{"float",
-			fields{slice: []float64{.75}, isNull: []bool{false}},
-			args{func(v interface{}) string {
-				return strconv.FormatFloat(v.(float64), 'f', 1, 64)
-			}},
-			&valueContainer{slice: []string{"0.8"}, isNull: []bool{false}}},
-		{"float - reset cache",
-			fields{slice: []float64{.75}, isNull: []bool{false}, cache: []string{".75"}},
-			args{func(v interface{}) string {
-				return strconv.FormatFloat(v.(float64), 'f', 1, 64)
-			}},
-			&valueContainer{slice: []string{"0.8"}, isNull: []bool{false}}},
-		{"datetime",
-			fields{slice: []time.Time{time.Date(2019, 1, 1, 0, 0, 0, 0, time.UTC)}, isNull: []bool{false}},
-			args{func(v interface{}) string {
-				return v.(time.Time).Format("2006-01-02")
-			}},
-			&valueContainer{slice: []string{"2019-01-01"}, isNull: []bool{false}}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			vc := &valueContainer{
-				slice:  tt.fields.slice,
-				isNull: tt.fields.isNull,
-				name:   tt.fields.name,
-				cache:  tt.fields.cache,
-			}
-			vc.applyFormat(tt.args.apply)
-			if !reflect.DeepEqual(vc, tt.want) {
-				t.Errorf("valueContainer.applyFormat() = %v, want %v", vc, tt.want)
-			}
-		})
-	}
-}
 
 func Test_withColumn(t *testing.T) {
 	type args struct {

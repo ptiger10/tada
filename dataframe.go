@@ -2041,13 +2041,8 @@ func (df *DataFrame) Apply(lambdas map[string]ApplyFn) *DataFrame {
 }
 
 // Apply applies a user-defined function to every row in a container based on lambdas,
-// which is a map of container names (either column or label names) to tada.ApplyFn structs.
-// For each container name in the map, the first field selected (i.e., not left blank)
-// in its ApplyFn struct provides the apply logic for that container.
-// Values are converted from their original type to the selected field type.
-// For example, {"foo": ApplyFn{Float64: lambda}} converts the values in the foo container to float64 and
-// applies the lambda function to each row in the container, outputting a new float64 value for each row.
-// If a value is null either before or after the lambda function is applied, it is also null after.
+// which is a map of container names (either column or label names) to anonymous functions.
+//
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
@@ -2062,52 +2057,6 @@ func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 			df.dataframe.resetWithError((fmt.Errorf("apply: %v", err)))
 		}
 		mergedLabelsAndCols[index].apply(lambda)
-	}
-	return
-}
-
-// ApplyFormat applies a user-defined formatting function to every row in a container based on lambdas,
-// which is a map of container names (either column or label names) to tada.ApplyFormatFn structs.
-// For each container name in the map, the first field selected (i.e., not left blank)
-// in its ApplyFormatFn struct provides the formatting logic for that container.
-// Values are converted from their original type to the selected field type and then to string.
-// For example, {"foo": ApplyFormatFn{Float64: lambda}} converts the values in the foo container to float64 and
-// applies the lambda function to each row in the container, outputting a new string value for each row.
-// If a value is null either before or after the lambda function is applied, it is also null after.
-// Returns a new DataFrame.
-func (df *DataFrame) ApplyFormat(lambdas map[string]ApplyFormatFn) *DataFrame {
-	df = df.Copy()
-	df.InPlace().ApplyFormat(lambdas)
-	return df
-}
-
-// ApplyFormat applies a user-defined formatting function to every row in a container based on lambdas,
-// which is a map of container names (either column or label names) to tada.ApplyFormatFn structs.
-// For each container name in the map, the first field selected (i.e., not left blank)
-// in its ApplyFormatFn struct provides the formatting logic for that container.
-// Values are converted from their original type to the selected field type and then to string.
-// For example, {"foo": ApplyFormatFn{Float64: lambda}} converts the values in the foo container to float64 and
-// applies the lambda function to each row in the container, outputting a new string value for each row.
-// If a value is null either before or after the lambda function is applied, it is also null after.
-// Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) ApplyFormat(lambdas map[string]ApplyFormatFn) {
-	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
-	for containerName, lambda := range lambdas {
-		err := lambda.validate()
-		if err != nil {
-			df.dataframe.resetWithError((fmt.Errorf("apply format: %v", err)))
-			return
-		}
-		index, err := indexOfContainer(containerName, mergedLabelsAndCols)
-		if err != nil {
-			df.dataframe.resetWithError((fmt.Errorf("apply format: %v", err)))
-		}
-		mergedLabelsAndCols[index].applyFormat(lambda)
-		// if either prior or new value is null, new value is null
-		// ducks error because values are controlled to be of supported type
-		newNulls, _ := setNullsFromInterface(mergedLabelsAndCols[index].slice)
-		mergedLabelsAndCols[index].isNull = isEitherNull(
-			mergedLabelsAndCols[index].isNull, newNulls)
 	}
 	return
 }

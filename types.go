@@ -105,6 +105,7 @@ type GroupedDataFrame struct {
 	rowIndices  [][]int
 	labels      []*valueContainer
 	df          *DataFrame
+	aligned     bool
 	err         error
 }
 
@@ -174,25 +175,15 @@ type NullFiller struct {
 type FilterFn func(val interface{}) bool
 
 // An ApplyFn is an anonymous function supplied to an Apply function.
-// The function will be called once on the container slice, and should return a slice of equal length.
-// isNull contains the null status of every row in the container.
+// The function input will be a slice, and it must return a slice of equal length (though the type may be different).
+// isNull contains the null status of every row in the input slice.
 // The null status of a row may be changed by setting the row's isNull element within the function.
 type ApplyFn func(slice interface{}, isNull []bool) (equalLengthSlice interface{})
 
-// A GroupReduceFn supplies logic to the Reduce() function to reduce a slice of grouped values to a single value.
-// Only the first field selected (i.e., not left nil) is used - any others are ignored.
-// If Interface is selected, the slice must be type-asserted,
-// and each output value must have the same type as one another (though this may be different than the original type).
-// Otherwise, values are coerced to the type specified in the field before the reduce function is evaluated.
-type GroupReduceFn struct {
-	Float64   func(groupedSlice []float64) (value float64)
-	String    func(groupedSlice []string) (value string)
-	DateTime  func(groupedSlice []time.Time) (value time.Time)
-	Interface func(groupedSlice interface{}) (value interface{})
-}
-
-// An ApplyFormatFn is a lambda function supplied to ApplyFormat() with formatting instructions.
-type ApplyFormatFn func(interface{}) string
+// A ReduceFn is an anonymous function supplied to a Reduce function
+// to reduce a slice of values to one value and one null status per group.
+// isNull contains the null status of every value in the group.
+type ReduceFn func(slice interface{}, isNull []bool) (value interface{}, null bool)
 
 // DType is a DataType that may be used in Sort() or Cast().
 type DType int

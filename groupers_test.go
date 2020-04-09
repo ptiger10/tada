@@ -41,6 +41,40 @@ func TestGroupedSeries_Err(t *testing.T) {
 	}
 }
 
+func TestGroupedSeries_Err_String(t *testing.T) {
+	type fields struct {
+		labels     []*valueContainer
+		rowIndices [][]int
+		series     *Series
+		aligned    bool
+		err        error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{"pass",
+			fields{
+				err: fmt.Errorf("foo")},
+			"Error: foo"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedSeries{
+				labels:     tt.fields.labels,
+				rowIndices: tt.fields.rowIndices,
+				series:     tt.fields.series,
+				aligned:    tt.fields.aligned,
+				err:        tt.fields.err,
+			}
+			if g.String() != tt.want {
+				t.Errorf("GroupedSeries.Err().String() -> %v, want %v", g, tt.want)
+			}
+		})
+	}
+}
+
 func TestGroupedSeries_GetGroup(t *testing.T) {
 	type fields struct {
 		rowIndices  [][]int
@@ -108,11 +142,11 @@ func TestGroupedSeries_GetGroup(t *testing.T) {
 func Test_groupedInterfaceFunc(t *testing.T) {
 	type args struct {
 		slice      interface{}
-		nulls      []bool
+		isNull     []bool
 		name       string
 		aligned    bool
 		rowIndices [][]int
-		fn         func(slice interface{}) interface{}
+		fn         func(slice interface{}, isNull []bool) (interface{}, bool)
 	}
 	tests := []struct {
 		name    string
@@ -121,12 +155,12 @@ func Test_groupedInterfaceFunc(t *testing.T) {
 		wantErr bool
 	}{
 		{"grouped", args{
-			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
 			name: "foo", aligned: false,
 			rowIndices: [][]int{{0, 1}, {2, 3}},
-			fn: func(slice interface{}) interface{} {
+			fn: func(slice interface{}, isNull []bool) (interface{}, bool) {
 				vals := slice.([]float64)
-				return vals[0]
+				return vals[0], false
 			}},
 			&valueContainer{
 				slice:  []float64{1, 3},
@@ -135,12 +169,12 @@ func Test_groupedInterfaceFunc(t *testing.T) {
 			},
 			false},
 		{"grouped - new type", args{
-			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
 			name: "foo", aligned: false,
 			rowIndices: [][]int{{0, 1}, {2, 3}},
-			fn: func(slice interface{}) interface{} {
+			fn: func(slice interface{}, isNull []bool) (interface{}, bool) {
 				vals := slice.([]float64)
-				return fmt.Sprintf("%.2f", vals[0])
+				return fmt.Sprintf("%.2f", vals[0]), false
 			}},
 			&valueContainer{
 				slice:  []string{"1.00", "3.00"},
@@ -149,12 +183,12 @@ func Test_groupedInterfaceFunc(t *testing.T) {
 			},
 			false},
 		{"grouped and nested", args{
-			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
 			name: "foo", aligned: false,
 			rowIndices: [][]int{{0, 1}, {2, 3}},
-			fn: func(slice interface{}) interface{} {
+			fn: func(slice interface{}, isNull []bool) (interface{}, bool) {
 				vals := slice.([]float64)
-				return vals
+				return vals, false
 			}},
 			&valueContainer{
 				slice:  [][]float64{{1, 2}, {3, 4}},
@@ -163,12 +197,12 @@ func Test_groupedInterfaceFunc(t *testing.T) {
 			},
 			false},
 		{"aligned", args{
-			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
 			name: "foo", aligned: true,
 			rowIndices: [][]int{{0, 1}, {2, 3}},
-			fn: func(slice interface{}) interface{} {
+			fn: func(slice interface{}, isNull []bool) (interface{}, bool) {
 				vals := slice.([]float64)
-				return vals[0]
+				return vals[0], false
 			}},
 			&valueContainer{
 				slice:  []float64{1, 1, 3, 3},
@@ -177,19 +211,19 @@ func Test_groupedInterfaceFunc(t *testing.T) {
 			},
 			false},
 		{"fail - unsupported", args{
-			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
 			name: "foo", aligned: false,
 			rowIndices: [][]int{{0, 1}, {2, 3}},
-			fn: func(slice interface{}) interface{} {
+			fn: func(slice interface{}, isNull []bool) (interface{}, bool) {
 				vals := slice.([]float64)
-				return [][][]float64{{{vals[0]}}}
+				return [][][]float64{{{vals[0]}}}, false
 			}},
 			nil,
 			true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := groupedInterfaceReduceFunc(tt.args.slice, tt.args.name, tt.args.aligned, tt.args.rowIndices, tt.args.fn)
+			got, err := groupedInterfaceReduceFunc(tt.args.slice, tt.args.isNull, tt.args.name, tt.args.aligned, tt.args.rowIndices, tt.args.fn)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("groupedInterfaceReduceFunc() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -1285,8 +1319,8 @@ func TestGroupedSeries_Latest(t *testing.T) {
 		})
 	}
 }
+
 func TestGroupedSeries_Reduce(t *testing.T) {
-	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	type fields struct {
 		orderedKeys []string
 		rowIndices  [][]int
@@ -1297,7 +1331,7 @@ func TestGroupedSeries_Reduce(t *testing.T) {
 	}
 	type args struct {
 		name   string
-		lambda GroupReduceFn
+		lambda ReduceFn
 	}
 	tests := []struct {
 		name   string
@@ -1315,74 +1349,27 @@ func TestGroupedSeries_Reduce(t *testing.T) {
 				values: &valueContainer{slice: []float64{1, 2, 0, 0}, isNull: []bool{false, false, true, true}, name: "qux"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			args{"custom", GroupReduceFn{Float64: func(vals []float64) float64 {
+			args{"custom", func(slice interface{}, isNull []bool) (interface{}, bool) {
+				vals := slice.([]float64)
 				var sum float64
+				var atLeastOneValid bool
 				for i := range vals {
-					sum += vals[i]
+					if !isNull[i] {
+						sum += vals[i]
+						atLeastOneValid = true
+					}
 				}
-				return sum
-			}}},
+				if !atLeastOneValid {
+					return 0.0, true
+				}
+				return sum, false
+			}},
 			&Series{values: &valueContainer{
 				slice: []float64{3, 0}, isNull: []bool{false, true}, name: "custom_qux"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
 				}}},
-		// -- string
-		{"not aligned - string", fields{
-			orderedKeys: []string{"foo", "bar"},
-			rowIndices:  [][]int{{0, 1}, {2, 3}},
-			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
-			aligned:     false,
-			series: &Series{
-				values: &valueContainer{slice: []string{"a", "b", "", ""}, isNull: []bool{false, false, true, true}, name: "qux"},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			args{"custom", GroupReduceFn{String: func(vals []string) string {
-				return strings.ToUpper(vals[0])
-			}}},
-			&Series{values: &valueContainer{
-				slice: []string{"A", ""}, isNull: []bool{false, true}, name: "custom_qux"},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
-				}}},
-		// -- datetime
-		{" not aligned - datetime", fields{
-			orderedKeys: []string{"foo", "bar"},
-			rowIndices:  [][]int{{0, 1}, {2, 3}},
-			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
-			aligned:     false,
-			series: &Series{
-				values: &valueContainer{slice: []time.Time{d, d.AddDate(0, 0, 1), {}, {}}, isNull: []bool{false, false, true, true}, name: "qux"},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			args{"custom", GroupReduceFn{DateTime: func(vals []time.Time) time.Time {
-				return vals[0]
-			}}},
-			&Series{values: &valueContainer{
-				slice: []time.Time{d, {}}, isNull: []bool{false, true}, name: "custom_qux"},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
-				}}},
-		// -- interface
-		{"not aligned - interface", fields{
-			orderedKeys: []string{"foo", "bar"},
-			rowIndices:  [][]int{{0, 1}, {2, 3}},
-			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
-			aligned:     false,
-			series: &Series{
-				values: &valueContainer{slice: []string{"a", "b", "", ""}, isNull: []bool{false, false, true, true}, name: "qux"},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			args{"custom", GroupReduceFn{Interface: func(vals interface{}) interface{} {
-				arr := vals.([]string)
-				return strings.ToUpper(arr[0])
-			}}},
-			&Series{values: &valueContainer{
-				slice: []string{"A", ""}, isNull: []bool{false, true}, name: "custom_qux"},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
-				}}},
-		{"not aligned - interface - error", fields{
+		{"fail - not aligned", fields{
 			orderedKeys: []string{"foo", "bar"},
 			rowIndices:  [][]int{{0, 1}, {2, 3}},
 			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
@@ -1391,10 +1378,10 @@ func TestGroupedSeries_Reduce(t *testing.T) {
 				values: &valueContainer{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "qux"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			args{"custom", GroupReduceFn{Interface: func(vals interface{}) interface{} {
-				return complex64(1)
-			}}},
-			&Series{err: fmt.Errorf("reducing grouped Series: interface{} output: unable to calculate null values ([]complex64 not supported)")}},
+			args{"custom", func(slice interface{}, isNull []bool) (interface{}, bool) {
+				return complex64(1), false
+			}},
+			&Series{err: fmt.Errorf("reducing grouped Series: constructing new Series from reduce function: unable to calculate null values ([]complex64 not supported)")}},
 		// -- no function
 		{"fail", fields{
 			orderedKeys: []string{"foo", "bar"},
@@ -1405,7 +1392,7 @@ func TestGroupedSeries_Reduce(t *testing.T) {
 				values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			args{"custom", GroupReduceFn{}},
+			args{"custom", nil},
 			&Series{err: fmt.Errorf("reducing grouped Series: no lambda function provided")}},
 	}
 	for _, tt := range tests {
@@ -1426,7 +1413,6 @@ func TestGroupedSeries_Reduce(t *testing.T) {
 }
 
 func TestGroupedDataFrame_Reduce(t *testing.T) {
-	d := time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
 	type fields struct {
 		orderedKeys []string
 		rowIndices  [][]int
@@ -1437,7 +1423,7 @@ func TestGroupedDataFrame_Reduce(t *testing.T) {
 	type args struct {
 		name   string
 		cols   []string
-		lambda GroupReduceFn
+		lambda ReduceFn
 	}
 	tests := []struct {
 		name   string
@@ -1445,34 +1431,8 @@ func TestGroupedDataFrame_Reduce(t *testing.T) {
 		args   args
 		want   *DataFrame
 	}{
-		// -- float64
-		{"no nulls - not aligned - float", fields{
-			orderedKeys: []string{"foo", "bar"},
-			rowIndices:  [][]int{{0, 1}, {2, 3}},
-			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
-			df: &DataFrame{
-				values: []*valueContainer{{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "qux"}},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"},
-				name:          "foo"}},
-			args{"custom", []string{"qux"}, GroupReduceFn{Float64: func(vals []float64) float64 {
-				var sum float64
-				for i := range vals {
-					sum += vals[i]
-				}
-				return sum
-			}}},
-			&DataFrame{values: []*valueContainer{
-				{slice: []float64{3, 7}, isNull: []bool{false, false}, name: "custom_qux"}},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"},
-				name:          "custom_foo"},
-		},
 
-		// -- string
-		{"no nulls - not aligned - string", fields{
+		{" not aligned - string", fields{
 			orderedKeys: []string{"foo", "bar"},
 			rowIndices:  [][]int{{0, 1}, {2, 3}},
 			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
@@ -1482,39 +1442,17 @@ func TestGroupedDataFrame_Reduce(t *testing.T) {
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "foo"}},
-			args{"custom", []string{"qux"}, GroupReduceFn{String: func(vals []string) string {
-				return strings.ToUpper(vals[0])
-			}}},
+			args{"custom", []string{"qux"}, func(slice interface{}, isNull []bool) (interface{}, bool) {
+				vals := slice.([]string)
+				return strings.ToUpper(vals[0]), false
+			}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"A", "C"}, isNull: []bool{false, false}, name: "custom_qux"}},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "custom_foo"}},
-
-		// -- datetime
-		{"no nulls - not aligned - datetime", fields{
-			orderedKeys: []string{"foo", "bar"},
-			rowIndices:  [][]int{{0, 1}, {2, 3}},
-			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
-			df: &DataFrame{
-				values: []*valueContainer{{slice: []time.Time{d, d.AddDate(0, 0, 1), d.AddDate(0, 0, 2), d.AddDate(0, 0, 3)}, isNull: []bool{false, false, false, false}, name: "qux"}},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"},
-				name:          "foo"}},
-			args{"custom", []string{"qux"}, GroupReduceFn{DateTime: func(vals []time.Time) time.Time {
-				return vals[0]
-			}}},
-			&DataFrame{values: []*valueContainer{
-				{slice: []time.Time{d, d.AddDate(0, 0, 2)}, isNull: []bool{false, false}, name: "custom_qux"}},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"},
-				name:          "custom_foo"}},
-
-		// -- interface
-		{"no nulls - not aligned - interface", fields{
+		{"fail - unsupported type", fields{
 			orderedKeys: []string{"foo", "bar"},
 			rowIndices:  [][]int{{0, 1}, {2, 3}},
 			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
@@ -1524,30 +1462,11 @@ func TestGroupedDataFrame_Reduce(t *testing.T) {
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "foo"}},
-			args{"custom", []string{"qux"}, GroupReduceFn{Interface: func(vals interface{}) interface{} {
-				arr := vals.([]string)
-				return strings.ToUpper(arr[0])
-			}}},
-			&DataFrame{values: []*valueContainer{
-				{slice: []string{"A", "C"}, isNull: []bool{false, false}, name: "custom_qux"}},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"},
-				name:          "custom_foo"}},
-		{"no nulls - not aligned - interface error", fields{
-			orderedKeys: []string{"foo", "bar"},
-			rowIndices:  [][]int{{0, 1}, {2, 3}},
-			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
-			df: &DataFrame{
-				values: []*valueContainer{{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "qux"}},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"},
-				name:          "foo"}},
-			args{"custom", []string{"qux"}, GroupReduceFn{Interface: func(vals interface{}) interface{} {
-				return complex64(1)
-			}}},
-			&DataFrame{err: fmt.Errorf("reducing grouped DataFrame: interface{} output: unable to calculate null values ([]complex64 not supported)")}},
+			args{"custom", []string{"qux"}, func(slice interface{}, isNull []bool) (interface{}, bool) {
+				return complex64(1), false
+			}},
+			&DataFrame{err: fmt.Errorf(
+				"reducing grouped DataFrame: constructing new Series from reduce function: unable to calculate null values ([]complex64 not supported)")}},
 
 		// -- no function
 		{"fail", fields{
@@ -1560,7 +1479,7 @@ func TestGroupedDataFrame_Reduce(t *testing.T) {
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "foo"}},
-			args{"custom", []string{"qux"}, GroupReduceFn{}},
+			args{"custom", []string{"qux"}, nil},
 			&DataFrame{err: fmt.Errorf("reducing grouped DataFrame: no lambda function provided")}},
 	}
 	for _, tt := range tests {
@@ -1714,7 +1633,10 @@ func TestGroupedDataFrame_stringReduceFunc(t *testing.T) {
 					values: []*valueContainer{
 						{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "qux"}},
 					labels: []*valueContainer{
-						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+					colLevelNames: []string{"*0"},
+					name:          "foobar"},
+			},
 			args: args{"first", nil, func(vals []string, isNull []bool, index []int) (string, bool) {
 				for _, i := range index {
 					return vals[i], false
@@ -1725,7 +1647,7 @@ func TestGroupedDataFrame_stringReduceFunc(t *testing.T) {
 				{slice: []string{"a", "c"}, isNull: []bool{false, false}, name: "first_qux"}},
 				labels:        []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
-				name:          "first"},
+				name:          "first_foobar"},
 		},
 		{
 			name: "select one specific column (and not the first)",
@@ -2646,6 +2568,40 @@ func TestGroupedDataFrame_Err(t *testing.T) {
 	}
 }
 
+func TestGroupedDataFrame_Err_String(t *testing.T) {
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		df          *DataFrame
+		err         error
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   string
+	}{
+		{"pass",
+			fields{
+				err: fmt.Errorf("foo")},
+			"Error: foo"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedDataFrame{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				df:          tt.fields.df,
+				err:         tt.fields.err,
+			}
+			if g.String() != tt.want {
+				t.Errorf("GroupedDataFrame.Err().String() -> %v, want %v", g, tt.want)
+			}
+		})
+	}
+}
+
 func TestSeries_RollingN(t *testing.T) {
 	type fields struct {
 		values *valueContainer
@@ -2819,21 +2775,23 @@ func TestGroupedSeries_Series(t *testing.T) {
 		fields fields
 		want   *Series
 	}{
-		{"pass",
+		{"pass - not aligned",
 			fields{
 				orderedKeys: []string{"foo", "bar"},
 				rowIndices:  [][]int{{0, 2}, {1, 3}},
+				aligned:     false,
 				labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
-				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
+				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "bar", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			&Series{values: &valueContainer{slice: []float64{1, 3, 2, 4}, isNull: []bool{false, false, false, false}},
+			&Series{values: &valueContainer{slice: []float64{1, 3, 2, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-		{"pass - select one label in multi label index",
+		{"pass - not aligned - select one label in multi label index",
 			fields{
 				orderedKeys: []string{"foo", "bar"},
 				rowIndices:  [][]int{{0, 2}, {1, 3}},
+				aligned:     false,
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*1"}},
 				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
@@ -2844,20 +2802,48 @@ func TestGroupedSeries_Series(t *testing.T) {
 			&Series{values: &valueContainer{slice: []float64{1, 3, 2, 4}, isNull: []bool{false, false, false, false}},
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*1"}}}},
-		{"pass - after HavingCount",
+		{"pass - not aligned - after HavingCount",
 			fields{
-				orderedKeys: []string{"bar"},
-				rowIndices:  [][]int{{1, 2, 3}},
+				orderedKeys: []string{"bar", "baz"},
+				rowIndices:  [][]int{{1, 3}, {2}},
+				aligned:     false,
 				labels: []*valueContainer{
-					{slice: []string{"bar"}, isNull: []bool{false}, name: "*0"},
+					{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "*0"},
 				},
 				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
 					labels: []*valueContainer{
-						{slice: []string{"foo", "bar", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
+						{slice: []string{"foo", "bar", "baz", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
+					}}},
+			&Series{values: &valueContainer{slice: []float64{2, 4, 3}, isNull: []bool{false, false, false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []string{"bar", "bar", "baz"}, isNull: []bool{false, false, false}, name: "*0"}}}},
+		{"pass - aligned",
+			fields{
+				orderedKeys: []string{"foo", "bar"},
+				rowIndices:  [][]int{{0, 2}, {1, 3}},
+				aligned:     true,
+				labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			&Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+		{"pass - aligned after HavingCount",
+			fields{
+				orderedKeys: []string{"bar", "baz"},
+				rowIndices:  [][]int{{1, 3}, {2}},
+				aligned:     true,
+				labels: []*valueContainer{
+					{slice: []string{"bar", "baz"}, isNull: []bool{false}, name: "*0"},
+				},
+				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "baz", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 					}}},
 			&Series{values: &valueContainer{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []string{"bar", "bar", "bar"}, isNull: []bool{false, false, false}, name: "*0"}}}},
+					{slice: []string{"bar", "baz", "bar"}, isNull: []bool{false, false, false}, name: "*0"}}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2938,6 +2924,7 @@ func TestGroupedDataFrame_DataFrame(t *testing.T) {
 	type fields struct {
 		orderedKeys []string
 		rowIndices  [][]int
+		aligned     bool
 		labels      []*valueContainer
 		df          *DataFrame
 		err         error
@@ -2947,7 +2934,7 @@ func TestGroupedDataFrame_DataFrame(t *testing.T) {
 		fields fields
 		want   *DataFrame
 	}{
-		{name: "pass",
+		{name: "pass - not aligned",
 			fields: fields{
 				orderedKeys: []string{"foo", "bar"},
 				rowIndices:  [][]int{{0, 2}, {1, 3}},
@@ -2964,7 +2951,7 @@ func TestGroupedDataFrame_DataFrame(t *testing.T) {
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "foobar"}},
-		{name: "pass - group by column",
+		{name: "pass - not aligned - group by column",
 			fields: fields{
 				orderedKeys: []string{"foo", "bar"},
 				rowIndices:  [][]int{{0, 2}, {1, 3}},
@@ -2985,7 +2972,7 @@ func TestGroupedDataFrame_DataFrame(t *testing.T) {
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "baz"}},
 				colLevelNames: []string{"*0"},
 				name:          "foobar"}},
-		{name: "pass - group by label and column",
+		{name: "pass - not aligned - group by label and column",
 			fields: fields{
 				orderedKeys: []string{"foo|0", "bar|1"},
 				rowIndices:  [][]int{{0, 2}, {1, 3}},
@@ -3011,26 +2998,65 @@ func TestGroupedDataFrame_DataFrame(t *testing.T) {
 				},
 				colLevelNames: []string{"*0"},
 				name:          "foobar"}},
-		{name: "pass - after HavingCount",
+		{name: "pass - not aligned - after HavingCount",
 			fields: fields{
-				orderedKeys: []string{"bar"},
-				rowIndices:  [][]int{{1, 2, 3}},
+				orderedKeys: []string{"bar", "baz"},
+				rowIndices:  [][]int{{1, 3}, {2}},
 				labels: []*valueContainer{
-					{slice: []string{"bar"}, isNull: []bool{false}, name: "*0"},
+					{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "*0"},
 				},
 				df: &DataFrame{values: []*valueContainer{
 					{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"}},
 					labels: []*valueContainer{
-						{slice: []string{"foo", "bar", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
+						{slice: []string{"foo", "bar", "baz", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
 					},
 					colLevelNames: []string{"*0"},
 					name:          "foobar"}},
 			want: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "foo"}},
+					{slice: []float64{2, 4, 3}, isNull: []bool{false, false, false}, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []string{"bar", "bar", "bar"}, isNull: []bool{false, false, false}, name: "*0"},
+					{slice: []string{"bar", "bar", "baz"}, isNull: []bool{false, false, false}, name: "*0"},
 				},
+				colLevelNames: []string{"*0"},
+				name:          "foobar"}},
+		{name: "pass - aligned",
+			fields: fields{
+				orderedKeys: []string{"foo", "bar"},
+				rowIndices:  [][]int{{0, 2}, {1, 3}},
+				aligned:     true,
+				labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				df: &DataFrame{values: []*valueContainer{
+					{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+					colLevelNames: []string{"*0"},
+					name:          "foobar"}},
+			want: &DataFrame{values: []*valueContainer{
+				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "foobar"}},
+		{name: "pass - aligned - after HavingCount",
+			fields: fields{
+				orderedKeys: []string{"bar", "baz"},
+				rowIndices:  [][]int{{1, 3}, {2}},
+				aligned:     true,
+				labels: []*valueContainer{
+					{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "*0"},
+				},
+				df: &DataFrame{values: []*valueContainer{
+					{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "baz", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"},
+					},
+					colLevelNames: []string{"*0"},
+					name:          "foobar"}},
+			want: &DataFrame{values: []*valueContainer{
+				{slice: []float64{2, 3, 4}, isNull: []bool{false, false, false}, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []string{"bar", "baz", "bar"}, isNull: []bool{false, false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "foobar"}},
 	}
@@ -3041,6 +3067,7 @@ func TestGroupedDataFrame_DataFrame(t *testing.T) {
 				rowIndices:  tt.fields.rowIndices,
 				labels:      tt.fields.labels,
 				df:          tt.fields.df,
+				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
 			if got := g.DataFrame(); !EqualDataFrames(got, tt.want) {
@@ -3624,7 +3651,7 @@ func TestGroupedSeries_interfaceReduceFunc(t *testing.T) {
 	}
 	type args struct {
 		name string
-		fn   func(interface{}) interface{}
+		fn   func(slice interface{}, isNull []bool) (interface{}, bool)
 	}
 	tests := []struct {
 		name    string
@@ -3641,9 +3668,9 @@ func TestGroupedSeries_interfaceReduceFunc(t *testing.T) {
 				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			args{"foo", func(vals interface{}) interface{} {
-				v := vals.([]float64)
-				return v[0]
+			args{"foo", func(slice interface{}, _ []bool) (interface{}, bool) {
+				vals := slice.([]float64)
+				return vals[0], false
 			}},
 			&Series{values: &valueContainer{slice: []float64{1, 3}, isNull: []bool{false, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}}},
@@ -3657,9 +3684,9 @@ func TestGroupedSeries_interfaceReduceFunc(t *testing.T) {
 				series: &Series{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			args{"custom", func(vals interface{}) interface{} {
-				v := vals.([]float64)
-				return v[0]
+			args{"custom", func(slice interface{}, isNull []bool) (interface{}, bool) {
+				vals := slice.([]float64)
+				return vals[0], false
 			}},
 			&Series{values: &valueContainer{slice: []float64{1, 1, 3, 3}, isNull: []bool{false, false, false, false}, name: "custom_foo"},
 				labels:     []*valueContainer{{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
@@ -3691,10 +3718,10 @@ func TestGroupedSeries_interfaceReduceFunc(t *testing.T) {
 func Test_groupedInterfaceTransformFunc(t *testing.T) {
 	type args struct {
 		slice      interface{}
-		nulls      []bool
+		isNull     []bool
 		name       string
 		rowIndices [][]int
-		fn         func(slice interface{}) interface{}
+		fn         func(slice interface{}, isNull []bool) interface{}
 	}
 	tests := []struct {
 		name    string
@@ -3703,10 +3730,10 @@ func Test_groupedInterfaceTransformFunc(t *testing.T) {
 		wantErr bool
 	}{
 		{"pass", args{
-			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
 			name:       "foo",
 			rowIndices: [][]int{{0, 1}, {2, 3}},
-			fn: func(slice interface{}) interface{} {
+			fn: func(slice interface{}, _ []bool) interface{} {
 				vals := slice.([]float64)
 				ret := make([]float64, len(vals))
 				for i := range vals {
@@ -3720,47 +3747,50 @@ func Test_groupedInterfaceTransformFunc(t *testing.T) {
 				name:   "foo",
 			},
 			false},
-		{"pass - new type", args{
-			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+		{"pass - new type, change null", args{
+			slice: []int{0, 2, 3, 4}, isNull: []bool{true, false, false, false},
 			name:       "foo",
 			rowIndices: [][]int{{0, 1}, {2, 3}},
-			fn: func(slice interface{}) interface{} {
-				vals := slice.([]float64)
+			fn: func(slice interface{}, isNull []bool) interface{} {
+				vals := slice.([]int)
 				ret := make([]string, len(vals))
 				for i := range vals {
-					ret[i] = fmt.Sprintf("%.0f", vals[i])
+					ret[i] = fmt.Sprint(vals[i])
+					if isNull[i] {
+						isNull[i] = false
+					}
 				}
 				return ret
 			}},
 			&valueContainer{
-				slice:  []string{"1", "2", "3", "4"},
+				slice:  []string{"0", "2", "3", "4"},
 				isNull: []bool{false, false, false, false},
 				name:   "foo",
 			},
 			false},
 		{"fail - wrong length", args{
-			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
 			name:       "foo",
 			rowIndices: [][]int{{0, 1}, {2, 3}},
-			fn: func(slice interface{}) interface{} {
+			fn: func(slice interface{}, _ []bool) interface{} {
 				return []float64{0}
 			}},
 			nil,
 			true},
 		{"fail - not slice", args{
-			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
 			name:       "foo",
 			rowIndices: [][]int{{0, 1}, {2, 3}},
-			fn: func(slice interface{}) interface{} {
+			fn: func(slice interface{}, _ []bool) interface{} {
 				return 0
 			}},
 			nil,
 			true},
 		{"fail - not slice on not-first group", args{
-			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
 			name:       "foo",
 			rowIndices: [][]int{{0, 1}, {2, 3}},
-			fn: func(slice interface{}) interface{} {
+			fn: func(slice interface{}, _ []bool) interface{} {
 				vals := slice.([]float64)
 				if vals[0] != 1 {
 					return 0
@@ -3770,10 +3800,10 @@ func Test_groupedInterfaceTransformFunc(t *testing.T) {
 			nil,
 			true},
 		{"fail - unsupported type", args{
-			slice: []float64{1, 2, 3, 4}, nulls: []bool{false, false, false, false},
+			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
 			name:       "foo",
 			rowIndices: [][]int{{0, 1}, {2, 3}},
-			fn: func(slice interface{}) interface{} {
+			fn: func(slice interface{}, _ []bool) interface{} {
 				return []complex64{1, 2}
 			}},
 			nil,
@@ -3781,7 +3811,7 @@ func Test_groupedInterfaceTransformFunc(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := groupedInterfaceTransformFunc(tt.args.slice, tt.args.name, tt.args.rowIndices, tt.args.fn)
+			got, err := groupedApplyFunc(tt.args.slice, tt.args.isNull, tt.args.name, tt.args.rowIndices, tt.args.fn)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("groupedInterfaceTransformFunc() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -3793,7 +3823,7 @@ func Test_groupedInterfaceTransformFunc(t *testing.T) {
 	}
 }
 
-func TestGroupedSeries_Transform(t *testing.T) {
+func TestGroupedSeries_Apply(t *testing.T) {
 	type fields struct {
 		orderedKeys []string
 		rowIndices  [][]int
@@ -3803,35 +3833,49 @@ func TestGroupedSeries_Transform(t *testing.T) {
 		err         error
 	}
 	type args struct {
-		name   string
-		lambda func(interface{}) interface{}
+		lambda func(interface{}, []bool) interface{}
 	}
 	tests := []struct {
 		name   string
 		fields fields
 		args   args
-		want   *Series
+		want   *GroupedSeries
 	}{
 		{"pass",
 			fields{
-				rowIndices:  [][]int{{0, 1}, {2, 3}},
+				rowIndices:  [][]int{{0, 2}, {1, 3}},
 				orderedKeys: []string{"foo", "bar"},
+				aligned:     false,
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
 				series: &Series{values: &valueContainer{
-					slice: []string{"a", "b", "c", ""}, isNull: []bool{false, false, false, true}, name: "baz"}, // null values are also transformed
+					slice: []string{"a", "b", "c", ""}, isNull: []bool{false, false, false, true}, name: "baz"},
 					labels: []*valueContainer{
-						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			args{name: "foo", lambda: func(slice interface{}) interface{} {
+						{slice: []string{"foo", "bar", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			args{lambda: func(slice interface{}, isNull []bool) interface{} {
 				vals := slice.([]string)
 				ret := make([]int, len(vals))
 				for i := range vals {
 					ret[i] = i
+					if isNull[i] {
+						isNull[i] = false
+					}
 				}
 				return ret
 			}},
-			&Series{values: &valueContainer{slice: []int{0, 1, 0, 1}, isNull: []bool{false, false, false, false}, name: "foo"},
-				labels: []*valueContainer{{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
+			&GroupedSeries{
+				rowIndices:  [][]int{{0, 2}, {1, 3}},
+				aligned:     false,
+				orderedKeys: []string{"foo", "bar"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				series: &Series{values: &valueContainer{
+					slice: []int{0, 0, 1, 1}, isNull: []bool{false, false, false, false}, name: "baz"}, // transform null
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+					sharedData: true,
+				}},
+		},
 		{"fail",
 			fields{
 				rowIndices:  [][]int{{0, 1}, {2, 3}},
@@ -3842,10 +3886,10 @@ func TestGroupedSeries_Transform(t *testing.T) {
 					slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "baz"},
 					labels: []*valueContainer{
 						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
-			args{name: "foo", lambda: func(slice interface{}) interface{} {
+			args{lambda: func(slice interface{}, _ []bool) interface{} {
 				return "foo"
 			}},
-			&Series{err: fmt.Errorf("transforming grouped Series: group 0: output must be slice (string != slice)")}},
+			&GroupedSeries{err: fmt.Errorf("applying lambda to grouped Series: group 0: output must be slice (not string)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3857,8 +3901,8 @@ func TestGroupedSeries_Transform(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			if got := g.Transform(tt.args.name, tt.args.lambda); !EqualSeries(got, tt.want) {
-				t.Errorf("GroupedSeries.Transform() = %v, want %v", got, tt.want)
+			if got := g.Apply(tt.args.lambda); !equalGroupedSeries(got, tt.want) {
+				t.Errorf("GroupedSeries.Apply() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -4016,7 +4060,7 @@ func TestGroupedDataFrame_interfaceReduceFunc(t *testing.T) {
 	type args struct {
 		name string
 		cols []string
-		fn   func(interface{}) interface{}
+		fn   func(interface{}, []bool) (interface{}, bool)
 	}
 	tests := []struct {
 		name    string
@@ -4034,9 +4078,9 @@ func TestGroupedDataFrame_interfaceReduceFunc(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
 			args{
-				"custom", nil, func(vals interface{}) interface{} {
-					arr := vals.([]float64)
-					return int(arr[0])
+				"custom", nil, func(slice interface{}, isNull []bool) (interface{}, bool) {
+					arr := slice.([]float64)
+					return int(arr[0]), false
 				}},
 			&DataFrame{
 				values: []*valueContainer{
@@ -4057,9 +4101,9 @@ func TestGroupedDataFrame_interfaceReduceFunc(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
 			args{
-				"custom", []string{"bar"}, func(vals interface{}) interface{} {
-					arr := vals.([]float64)
-					return int(arr[0])
+				"custom", []string{"bar"}, func(slice interface{}, isNull []bool) (interface{}, bool) {
+					arr := slice.([]float64)
+					return int(arr[0]), false
 				}},
 			&DataFrame{
 				values: []*valueContainer{
@@ -4069,7 +4113,7 @@ func TestGroupedDataFrame_interfaceReduceFunc(t *testing.T) {
 				name:          "custom",
 				colLevelNames: []string{"*0"}},
 			false},
-		{"fail", fields{
+		{"fail - unsupported type", fields{
 			orderedKeys: []string{"foo", "bar"},
 			rowIndices:  [][]int{{0, 1}, {2, 3}},
 			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
@@ -4077,8 +4121,8 @@ func TestGroupedDataFrame_interfaceReduceFunc(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}}}},
 			args{
-				"foo", nil, func(vals interface{}) interface{} {
-					return complex64(1)
+				"foo", nil, func(slice interface{}, isNull []bool) (interface{}, bool) {
+					return complex64(1), false
 				}},
 			nil,
 			true},
@@ -4245,6 +4289,95 @@ func TestGroupedDataFrame_Nth(t *testing.T) {
 			}
 			if got := g.Nth(tt.args.index, tt.args.colNames...); !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.Nth() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestGroupedDataFrame_Apply(t *testing.T) {
+	type fields struct {
+		orderedKeys []string
+		rowIndices  [][]int
+		labels      []*valueContainer
+		df          *DataFrame
+		err         error
+	}
+	type args struct {
+		cols   []string
+		lambda ApplyFn
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *GroupedDataFrame
+	}{
+		{"pass - all columns",
+			fields{
+				rowIndices:  [][]int{{0, 2}, {1, 3}},
+				orderedKeys: []string{"foo", "bar"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				df: &DataFrame{values: []*valueContainer{
+					{slice: []string{"a", "b", "c", ""}, isNull: []bool{false, false, false, true}, name: "baz"}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+					colLevelNames: []string{"*0"},
+					name:          "foobar",
+				}},
+			args{lambda: func(slice interface{}, isNull []bool) interface{} {
+				vals := slice.([]string)
+				ret := make([]int, len(vals))
+				for i := range vals {
+					ret[i] = i
+					if isNull[i] {
+						isNull[i] = false
+					}
+				}
+				return ret
+			}},
+			&GroupedDataFrame{
+				rowIndices:  [][]int{{0, 2}, {1, 3}},
+				orderedKeys: []string{"foo", "bar"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				df: &DataFrame{values: []*valueContainer{
+					{slice: []int{0, 0, 1, 1}, isNull: []bool{false, false, false, false}, name: "baz"}}, // transform null
+					labels: []*valueContainer{
+						{slice: []string{"foo", "bar", "foo", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+					colLevelNames: []string{"*0"},
+					name:          "foobar",
+				}},
+		},
+		{"fail",
+			fields{
+				rowIndices:  [][]int{{0, 1}, {2, 3}},
+				orderedKeys: []string{"foo", "bar"},
+				labels: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"}},
+				df: &DataFrame{values: []*valueContainer{
+					{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, name: "baz"}},
+					labels: []*valueContainer{
+						{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "*0"}},
+					colLevelNames: []string{"*0"},
+					name:          "foobar",
+				}},
+			args{lambda: func(slice interface{}, _ []bool) interface{} {
+				return "foo"
+			}},
+			&GroupedDataFrame{err: fmt.Errorf("applying lambda to grouped DataFrame: column baz: group 0: output must be slice (not string)")}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			g := &GroupedDataFrame{
+				orderedKeys: tt.fields.orderedKeys,
+				rowIndices:  tt.fields.rowIndices,
+				labels:      tt.fields.labels,
+				df:          tt.fields.df,
+				err:         tt.fields.err,
+			}
+			if got := g.Apply(tt.args.cols, tt.args.lambda); !equalGroupedDataFrames(got, tt.want) {
+				t.Errorf("GroupedDataFrame.Apply() = %v, want %v", got, tt.want)
 			}
 		})
 	}

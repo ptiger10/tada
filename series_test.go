@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1625,51 +1624,6 @@ func TestSeries_Apply(t *testing.T) {
 			}
 			if got := s.Apply(tt.args.function); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Apply() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestSeries_ApplyFormat(t *testing.T) {
-	type fields struct {
-		values *valueContainer
-		labels []*valueContainer
-		err    error
-	}
-	type args struct {
-		lambda ApplyFormatFn
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *Series
-	}{
-		{"apply to series values by default",
-			fields{
-				values: &valueContainer{slice: []float64{0, .25}, isNull: []bool{false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{func(v interface{}) string { return strconv.FormatFloat(v.(float64), 'f', 1, 64) }},
-			&Series{
-				values: &valueContainer{slice: []string{"0.0", "0.2"}, isNull: []bool{false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}}},
-		{"fail: no function supplied",
-			fields{
-				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
-				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
-			args{nil},
-			&Series{
-				err: errors.New("apply format: no apply function provided")}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values: tt.fields.values,
-				labels: tt.fields.labels,
-				err:    tt.fields.err,
-			}
-			if got := s.ApplyFormat(tt.args.lambda); !EqualSeries(got, tt.want) {
-				t.Errorf("Series.ApplyFormat() = %v, want %v", got, tt.want)
 			}
 		})
 	}

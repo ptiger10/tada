@@ -9,27 +9,6 @@ import (
 	"time"
 )
 
-func convertSimplifiedFloat64ReduceFunc(
-	simplifiedFn func([]float64) float64) func(
-	[]float64, []bool, []int) (float64, bool) {
-
-	fn := func(slice []float64, isNull []bool, index []int) (float64, bool) {
-		var atLeastOneValid bool
-		inputVals := make([]float64, 0)
-		for _, i := range index {
-			if !isNull[i] {
-				inputVals = append(inputVals, slice[i])
-				atLeastOneValid = true
-			}
-		}
-		if !atLeastOneValid {
-			return empty{}.float64(), true
-		}
-		return simplifiedFn(inputVals), false
-	}
-	return fn
-}
-
 func groupedFloat64ReduceFunc(
 	slice []float64,
 	nulls []bool,
@@ -100,7 +79,7 @@ func (g *GroupedDataFrame) float64ReduceFunc(
 	for k, colName := range cols {
 		index, _ := indexOfContainer(colName, g.df.values)
 		retVals[k] = groupedFloat64ReduceFunc(
-			g.df.values[index].float64().slice, g.df.values[k].isNull, adjustedColNames[k], false, g.rowIndices, fn)
+			g.df.values[index].float64().slice, g.df.values[k].isNull, adjustedColNames[k], g.aligned, g.rowIndices, fn)
 	}
 	if g.df.name != "" {
 		name = fmt.Sprintf("%v_%v", name, g.df.name)
@@ -112,27 +91,6 @@ func (g *GroupedDataFrame) float64ReduceFunc(
 		colLevelNames: []string{"*0"},
 		name:          name,
 	}
-}
-
-func convertSimplifiedStringReduceFunc(
-	simplifiedFn func([]string) string) func(
-	[]string, []bool, []int) (string, bool) {
-
-	fn := func(slice []string, isNull []bool, index []int) (string, bool) {
-		var atLeastOneValid bool
-		inputVals := make([]string, 0)
-		for _, i := range index {
-			if !isNull[i] {
-				inputVals = append(inputVals, slice[i])
-				atLeastOneValid = true
-			}
-		}
-		if !atLeastOneValid {
-			return empty{}.string(), true
-		}
-		return simplifiedFn(inputVals), false
-	}
-	return fn
 }
 
 func groupedStringReduceFunc(
@@ -205,7 +163,7 @@ func (g *GroupedDataFrame) stringReduceFunc(
 	for k, colName := range cols {
 		index, _ := indexOfContainer(colName, g.df.values)
 		retVals[k] = groupedStringReduceFunc(
-			g.df.values[index].string().slice, g.df.values[k].isNull, adjustedColNames[k], false, g.rowIndices, fn)
+			g.df.values[index].string().slice, g.df.values[k].isNull, adjustedColNames[k], g.aligned, g.rowIndices, fn)
 	}
 	if g.df.name != "" {
 		name = fmt.Sprintf("%v_%v", name, g.df.name)
@@ -217,27 +175,6 @@ func (g *GroupedDataFrame) stringReduceFunc(
 		colLevelNames: []string{"*0"},
 		name:          name,
 	}
-}
-
-func convertSimplifiedDateTimeReduceFunc(
-	simplifiedFn func([]time.Time) time.Time) func(
-	[]time.Time, []bool, []int) (time.Time, bool) {
-
-	fn := func(slice []time.Time, isNull []bool, index []int) (time.Time, bool) {
-		var atLeastOneValid bool
-		inputVals := make([]time.Time, 0)
-		for _, i := range index {
-			if !isNull[i] {
-				inputVals = append(inputVals, slice[i])
-				atLeastOneValid = true
-			}
-		}
-		if !atLeastOneValid {
-			return empty{}.dateTime(), true
-		}
-		return simplifiedFn(inputVals), false
-	}
-	return fn
 }
 
 func groupedDateTimeReduceFunc(
@@ -310,7 +247,7 @@ func (g *GroupedDataFrame) dateTimeReduceFunc(
 	for k, colName := range cols {
 		index, _ := indexOfContainer(colName, g.df.values)
 		retVals[k] = groupedDateTimeReduceFunc(
-			g.df.values[index].dateTime().slice, g.df.values[k].isNull, adjustedColNames[k], false, g.rowIndices, fn)
+			g.df.values[index].dateTime().slice, g.df.values[k].isNull, adjustedColNames[k], g.aligned, g.rowIndices, fn)
 	}
 	if g.df.name != "" {
 		name = fmt.Sprintf("%v_%v", name, g.df.name)

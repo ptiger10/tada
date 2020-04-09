@@ -224,7 +224,7 @@ func (s *Series) LabelsAsSeries(name string) *Series {
 	}
 }
 
-// Subset returns only the rows specified at the index positions, in the order specified. Returns a new Series.
+// Subset returns only the rows specified at the index positions, in the order specified.
 // Returns a new Series.
 func (s *Series) Subset(index []int) *Series {
 	s = s.Copy()
@@ -818,40 +818,6 @@ func (s *SeriesMutator) Apply(lambda ApplyFn) {
 		return
 	}
 	s.series.values.apply(lambda)
-	return
-}
-
-// ApplyFormat applies a user-defined formatting function to every row in the Series based on lambda.
-// The first field selected (i.e., not left blank) in the ApplyFormatFn struct provides the formatting logic.
-// Values are converted from their original type to the selected field type and then to string.
-// For example, {ApplyFn{Float64: lambda}} converts the Series values to float64 and
-// applies the lambda function to each row in the container, outputting a new string value for each row.
-// If a value is null either before or after the lambda function is applied, it is also null after.
-// Returns a new Series.
-func (s *Series) ApplyFormat(lambda ApplyFormatFn) *Series {
-	s = s.Copy()
-	s.InPlace().ApplyFormat(lambda)
-	return s
-}
-
-// ApplyFormat applies a user-defined formatting function to every row in the Series based on lambda.
-// The first field selected (i.e., not left blank) in the ApplyFormatFn struct provides the formatting logic.
-// Values are converted from their original type to the selected field type and then to string.
-// For example, {ApplyFn{Float64: lambda}} converts the Series values to float64 and
-// applies the lambda function to each row in the container, outputting a new string value for each row.
-// If a value is null either before or after the lambda function is applied, it is also null after.
-// Modifies the underlying Series in place.
-func (s *SeriesMutator) ApplyFormat(lambda ApplyFormatFn) {
-	err := lambda.validate()
-	if err != nil {
-		s.series.resetWithError((fmt.Errorf("apply format: %v", err)))
-		return
-	}
-	s.series.values.applyFormat(lambda)
-	// if either prior or new value is null, new value is null
-	// ducks error because values are controlled to be of supported type
-	newNulls, _ := setNullsFromInterface(s.series.values.slice)
-	s.series.values.isNull = isEitherNull(s.series.values.isNull, newNulls)
 	return
 }
 

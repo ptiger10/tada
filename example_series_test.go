@@ -370,52 +370,6 @@ func ExampleSeries_Apply_float64() {
 	// +---++-----+
 }
 
-func ExampleSeries_ApplyFormat_float64() {
-	s := tada.NewSeries([]float64{1, 2.5, 3.1415}).SetName("foo")
-	fmt.Println(s)
-
-	decimalFormat := func(v interface{}) string { return strconv.FormatFloat(v.(float64), 'f', 2, 64) }
-	fmt.Println(s.ApplyFormat(decimalFormat))
-
-	// Output:
-	// +---++--------+
-	// | - ||  foo   |
-	// |---||--------|
-	// | 0 ||      1 |
-	// | 1 ||    2.5 |
-	// | 2 || 3.1415 |
-	// +---++--------+
-	//
-	// +---++------+
-	// | - || foo  |
-	// |---||------|
-	// | 0 || 1.00 |
-	// | 1 || 2.50 |
-	// | 2 || 3.14 |
-	// +---++------+
-}
-
-func ExampleSeries_ApplyFormat_dateTime() {
-	s := tada.NewSeries([]time.Time{time.Date(2020, 1, 15, 0, 0, 0, 0, time.UTC)}).SetName("foo")
-	fmt.Println(s)
-
-	monthFormat := func(v interface{}) string { return v.(time.Time).Format("2006-01") }
-	fmt.Println(s.ApplyFormat(monthFormat))
-
-	// Output:
-	// +---++----------------------+
-	// | - ||         foo          |
-	// |---||----------------------|
-	// | 0 || 2020-01-15T00:00:00Z |
-	// +---++----------------------+
-	//
-	// +---++---------+
-	// | - ||   foo   |
-	// |---||---------|
-	// | 0 || 2020-01 |
-	// +---++---------+
-}
-
 func ExampleSeries_Resample_byMonth() {
 	s := tada.NewSeries([]time.Time{time.Date(2020, 1, 15, 12, 30, 0, 0, time.UTC)}).SetName("foo")
 	fmt.Println(s)
@@ -631,22 +585,23 @@ func ExampleGroupedSeries_Align_mean() {
 	// +-----++----------+
 }
 
-func ExampleGroupedSeries_Reduce_float64() {
+func ExampleGroupedSeries_Reduce() {
 	s := tada.NewSeries([]float64{1, 2, 3, 4, 5, 6}, []int{0, 0, 0, 1, 1, 1}).
 		SetName("foo").
 		SetLabelNames([]string{"baz"})
 	fmt.Println(s)
 
 	g := s.GroupBy("baz")
-	maxOdd := tada.GroupReduceFn{Float64: func(vals []float64) float64 {
+	maxOdd := func(slice interface{}, isNull []bool) (value interface{}, null bool) {
+		vals := slice.([]float64)
 		max := math.Inf(-1)
 		for i := range vals {
-			if int(vals[i])%2 == 1 && vals[i] > max {
+			if !isNull[i] && int(vals[i])%2 == 1 && vals[i] > max {
 				max = vals[i]
 			}
 		}
-		return max
-	}}
+		return max, false
+	}
 	fmt.Println(g.Reduce("max_odd", maxOdd))
 
 	// Output:
@@ -682,8 +637,15 @@ func ExampleSeries_zscore() {
 	}
 
 	newS := tada.NewSeries(ret, s.GetLabels()...).SetName("zscore_foo")
-	decimalFormat := func(v interface{}) string { return strconv.FormatFloat(v.(float64), 'f', 2, 64) }
-	newS.InPlace().ApplyFormat(decimalFormat)
+	decimalFormat := func(slice interface{}, _ []bool) interface{} {
+		vals := slice.([]float64)
+		ret := make([]string, len(vals))
+		for i := range ret {
+			ret[i] = strconv.FormatFloat(vals[i], 'f', 2, 64)
+		}
+		return ret
+	}
+	newS.InPlace().Apply(decimalFormat)
 	fmt.Println(newS)
 	// Output:
 	// +---++-----+
@@ -707,16 +669,15 @@ func ExampleSeries_zscore() {
 	// +---++------------+
 }
 
-func ExampleGroupedSeries_Transform_zscore() {
-	s := tada.NewSeries([]float64{1, 2, 3, 4}, []int{0, 0, 1, 1}).
+func ExampleGroupedSeries_Apply() {
+	s := tada.NewSeries([]float64{1, 2, 3, 4}, []int{0, 1, 0, 1}).
 		SetName("foo").
 		SetLabelNames([]string{"baz"})
 	fmt.Println(s)
 
 	g := s.GroupBy()
-	zScore := func(input interface{}) interface{} {
-		// in normal usage, check the type assertion and handle an error
-		vals, _ := input.([]float64)
+	zScore := func(slice interface{}, _ []bool) interface{} {
+		vals, _ := slice.([]float64) // in normal usage, check the type assertion and handle an error
 		var sum float64
 		for i := range vals {
 			sum += vals[i]
@@ -735,26 +696,26 @@ func ExampleGroupedSeries_Transform_zscore() {
 		}
 		return ret
 	}
-	fmt.Println(g.Transform("z_score", zScore))
+	fmt.Println(g.Apply(zScore).Series())
 
 	// Output:
 	// +-----++-----+
 	// | baz || foo |
 	// |-----||-----|
 	// |   0 ||   1 |
-	// |     ||   2 |
-	// |   1 ||   3 |
-	// |     ||   4 |
+	// |   1 ||   2 |
+	// |   0 ||   3 |
+	// |   1 ||   4 |
 	// +-----++-----+
 	//
-	// +-----++---------+
-	// | baz || z_score |
-	// |-----||---------|
-	// |   0 ||      -1 |
-	// |     ||       1 |
-	// |   1 ||      -1 |
-	// |     ||       1 |
-	// +-----++---------+
+	// +-----++-----+
+	// | baz || foo |
+	// |-----||-----|
+	// |   0 ||  -1 |
+	// |     ||   1 |
+	// |   1 ||  -1 |
+	// |     ||   1 |
+	// +-----++-----+
 }
 
 func ExampleGroupedSeries_HavingCount_sum() {

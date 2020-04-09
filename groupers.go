@@ -3,15 +3,9 @@ package tada
 import (
 	"fmt"
 	"reflect"
+	"sort"
 	"time"
 )
-
-// -- support for generics for grouped types
-type empty struct{}
-
-func (e empty) float64() float64    { return 0 }
-func (e empty) string() string      { return "" }
-func (e empty) dateTime() time.Time { return time.Time{} }
 
 // -- GROUPED SERIES
 
@@ -21,6 +15,9 @@ func (g *GroupedSeries) Err() error {
 }
 
 func (g *GroupedSeries) String() string {
+	if g.err != nil {
+		return fmt.Sprintf("Error: %v", g.err)
+	}
 	return g.Series().String()
 }
 
@@ -34,34 +31,36 @@ func (g *GroupedSeries) GetGroup(group string) *Series {
 	return seriesWithError(fmt.Errorf("getting group: group (%v) not in groups", group))
 }
 
-// Transform applies lambda to every group and returns a new Series named name
-// that preserves the original Series labels
-// and places transformed values in the same order in which they appeared in the original Series.
+// Apply applies lambda to every group.
 // Each lambda input will be a slice of grouped values (including values considered null).
 // Each lambda output must be a slice that is the same length as the input.
-// All output slices must be of the same type as one another (though this may be a different type than the input).
-//
-// Caution: null values are included in the input into lambda, but with no indication that they are null.
-// It is recommended to fill or drop nulls from a dataset prior to using Transform().
-func (g *GroupedSeries) Transform(name string, lambda func(groupedSlice interface{}) (equalLengthSlice interface{})) *Series {
-	vals, err := groupedInterfaceTransformFunc(
-		g.series.values.slice, name, g.rowIndices, lambda)
+func (g *GroupedSeries) Apply(lambda ApplyFn) *GroupedSeries {
+	vals, err := groupedApplyFunc(
+		g.series.values.slice, g.series.values.isNull, g.series.values.name, g.rowIndices, lambda)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("transforming grouped Series: %v", err))
+		return groupedSeriesWithError(fmt.Errorf("applying lambda to grouped Series: %v", err))
 	}
-	return &Series{
-		values: vals,
-		labels: copyContainers(g.series.labels),
+	return &GroupedSeries{
+		orderedKeys: g.orderedKeys,
+		rowIndices:  g.rowIndices,
+		labels:      g.labels,
+		aligned:     g.aligned,
+		series: &Series{
+			values:     vals,
+			labels:     g.series.labels,
+			sharedData: true,
+		},
 	}
 }
 
-func (g *GroupedSeries) interfaceReduceFunc(name string, fn func(interface{}) interface{}) (*Series, error) {
+func (g *GroupedSeries) interfaceReduceFunc(name string, fn func(slice interface{}, isNull []bool) (value interface{}, null bool)) (
+	*Series, error) {
 	var sharedData bool
 	if g.series.values.name != "" {
 		name = fmt.Sprintf("%v_%v", name, g.series.values.name)
 	}
 	retVals, err := groupedInterfaceReduceFunc(
-		g.series.values.slice, name, g.aligned, g.rowIndices, fn)
+		g.series.values.slice, g.series.values.isNull, name, g.aligned, g.rowIndices, fn)
 	if err != nil {
 		return nil, err
 	}
@@ -130,25 +129,16 @@ func (g *GroupedSeries) countReduceFunc(name string, fn func(interface{}, []bool
 // With GroupReduceFn.Float64, for example, Reduce will iterate over all the grouped values,
 // coerce each group to []float64, reduce each groupedSlice to a single float64 value,
 // then concatenate these reduced values into a new []float64 and return in a new Series.
-func (g *GroupedSeries) Reduce(name string, lambda GroupReduceFn) *Series {
-	// remove all nulls before running each set of values through custom user function
-	if lambda.Float64 != nil {
-		fn := convertSimplifiedFloat64ReduceFunc(lambda.Float64)
-		return g.float64ReduceFunc(name, fn)
-	} else if lambda.String != nil {
-		fn := convertSimplifiedStringReduceFunc(lambda.String)
-		return g.stringReduceFunc(name, fn)
-	} else if lambda.DateTime != nil {
-		fn := convertSimplifiedDateTimeReduceFunc(lambda.DateTime)
-		return g.dateTimeReduceFunc(name, fn)
-	} else if lambda.Interface != nil {
-		newSeries, err := g.interfaceReduceFunc(name, lambda.Interface)
-		if err != nil {
-			return seriesWithError(fmt.Errorf("reducing grouped Series: %v", err))
-		}
-		return newSeries
+func (g *GroupedSeries) Reduce(name string, lambda ReduceFn) *Series {
+	if lambda == nil {
+		return seriesWithError(fmt.Errorf("reducing grouped Series: no lambda function provided"))
 	}
-	return seriesWithError(fmt.Errorf("reducing grouped Series: no lambda function provided"))
+	newSeries, err := g.interfaceReduceFunc(name, lambda)
+	if err != nil {
+		return seriesWithError(fmt.Errorf("reducing grouped Series: %v", err))
+	}
+	return newSeries
+
 }
 
 // Sum coerces values to float64 and calculates the sum of each group.
@@ -282,7 +272,18 @@ func (g *GroupedSeries) Series() *Series {
 			counter++
 		}
 	}
-	s := g.series.Subset(index).Copy()
+	var s *Series
+	if g.aligned {
+		if rowCount(g.rowIndices) == g.series.Len() {
+			s = g.series.Copy()
+		} else {
+			sort.Ints(index)
+			s = g.series.Subset(index)
+		}
+		s.sharedData = false
+		return s
+	}
+	s = g.series.Subset(index)
 	s.sharedData = false
 
 	// repeat group labels n times each
@@ -292,6 +293,7 @@ func (g *GroupedSeries) Series() *Series {
 		labels[j] = g.labels[j].expand(n)
 	}
 	s.labels = labels
+
 	return s
 }
 
@@ -397,6 +399,9 @@ func (g *GroupedDataFrame) Err() error {
 }
 
 func (g *GroupedDataFrame) String() string {
+	if g.err != nil {
+		return fmt.Sprintf("Error: %v", g.err)
+	}
 	return g.DataFrame().String()
 }
 
@@ -425,7 +430,9 @@ func (g *GroupedDataFrame) indexReduceFunc(name string, cols []string, index int
 	}
 }
 
-func (g *GroupedDataFrame) interfaceReduceFunc(name string, cols []string, fn func(interface{}) interface{}) (*DataFrame, error) {
+func (g *GroupedDataFrame) interfaceReduceFunc(
+	name string, cols []string, fn func(slice interface{}, isNull []bool) (value interface{}, null bool)) (
+	*DataFrame, error) {
 	if len(cols) == 0 {
 		cols = g.df.ListColNames()
 	}
@@ -438,7 +445,7 @@ func (g *GroupedDataFrame) interfaceReduceFunc(name string, cols []string, fn fu
 	for k, colName := range cols {
 		index, _ := indexOfContainer(colName, g.df.values)
 		retVals[k], err = groupedInterfaceReduceFunc(
-			g.df.values[index].slice, adjustedColNames[k], false, g.rowIndices, fn)
+			g.df.values[index].slice, g.df.values[index].isNull, adjustedColNames[k], false, g.rowIndices, fn)
 		if err != nil {
 			return nil, err
 		}
@@ -585,25 +592,16 @@ func (g *GroupedDataFrame) Col(colName string) *GroupedSeries {
 // With GroupReduceFn.Float64, for example, Reduce will iterate over all the grouped values in each column,
 // coerce each group to []float64, reduce each groupedSlice to a single float64 value,
 // then concatenate these reduced values into new []float64 columns and return in a new DataFrame.
-func (g *GroupedDataFrame) Reduce(name string, cols []string, lambda GroupReduceFn) *DataFrame {
-	// remove all nulls before running each set of values through custom user function
-	if lambda.Float64 != nil {
-		fn := convertSimplifiedFloat64ReduceFunc(lambda.Float64)
-		return g.float64ReduceFunc(name, cols, fn)
-	} else if lambda.String != nil {
-		fn := convertSimplifiedStringReduceFunc(lambda.String)
-		return g.stringReduceFunc(name, cols, fn)
-	} else if lambda.DateTime != nil {
-		fn := convertSimplifiedDateTimeReduceFunc(lambda.DateTime)
-		return g.dateTimeReduceFunc(name, cols, fn)
-	} else if lambda.Interface != nil {
-		newDataFrame, err := g.interfaceReduceFunc(name, cols, lambda.Interface)
-		if err != nil {
-			return dataFrameWithError(fmt.Errorf("reducing grouped DataFrame: %v", err))
-		}
-		return newDataFrame
+func (g *GroupedDataFrame) Reduce(name string, cols []string, lambda ReduceFn) *DataFrame {
+	if lambda == nil {
+		return dataFrameWithError(fmt.Errorf("reducing grouped DataFrame: no lambda function provided"))
 	}
-	return dataFrameWithError(fmt.Errorf("reducing grouped DataFrame: no lambda function provided"))
+
+	newDataFrame, err := g.interfaceReduceFunc(name, cols, lambda)
+	if err != nil {
+		return dataFrameWithError(fmt.Errorf("reducing grouped DataFrame: %v", err))
+	}
+	return newDataFrame
 }
 
 // HavingCount removes any groups from g that do not satisfy the boolean function supplied in lambda.
@@ -630,6 +628,37 @@ func (g *GroupedDataFrame) HavingCount(lambda func(int) bool) *GroupedDataFrame 
 	}
 }
 
+// Apply applies lambda to every group.
+// Each lambda input will be a slice of grouped values (including values considered null) from a single column.
+// Each lambda output must be a slice that is the same length as the input.
+func (g *GroupedDataFrame) Apply(cols []string, lambda ApplyFn) *GroupedDataFrame {
+	if len(cols) == 0 {
+		cols = g.df.ListColNames()
+	}
+	retVals := make([]*valueContainer, len(cols))
+	var err error
+	for k, colName := range cols {
+		index, _ := indexOfContainer(colName, g.df.values)
+		retVals[k], err = groupedApplyFunc(
+			g.df.values[index].slice, g.df.values[k].isNull, cols[k], g.rowIndices, lambda)
+		if err != nil {
+			return groupedDataFrameWithError(fmt.Errorf("applying lambda to grouped DataFrame: column %s: %v", colName, err))
+		}
+	}
+
+	return &GroupedDataFrame{
+		orderedKeys: g.orderedKeys,
+		rowIndices:  g.rowIndices,
+		labels:      g.labels,
+		df: &DataFrame{
+			values:        retVals,
+			labels:        g.df.labels,
+			colLevelNames: g.df.colLevelNames,
+			name:          g.df.name,
+		},
+	}
+}
+
 // DataFrame returns the GroupedDataFrame as a DataFrame,
 // with group names as label levels,
 // in order of appearance in the original Series,
@@ -644,13 +673,25 @@ func (g *GroupedDataFrame) DataFrame() *DataFrame {
 			counter++
 		}
 	}
+	var df *DataFrame
+	if g.aligned {
+		if rowCount(g.rowIndices) == g.df.Len() {
+			df = g.df.Copy()
+		} else {
+			sort.Ints(index)
+			df = g.df.Subset(index)
+		}
+		return df
+	}
+	df = g.df.Subset(index)
+
 	// repeat group labels n times each
 	n := groupCounts(g.rowIndices)
 	labels := make([]*valueContainer, len(g.labels))
 	for j := range labels {
 		labels[j] = g.labels[j].expand(n)
 	}
-	df := g.df.Subset(index).Copy()
+
 	df.labels = labels
 	// drop columns used as labels
 	for _, name := range listNames(df.labels) {
@@ -706,10 +747,11 @@ func (g *GroupedDataFrame) Len() int {
 
 func groupedInterfaceReduceFunc(
 	slice interface{},
+	isNull []bool,
 	name string,
 	aligned bool,
 	rowIndices [][]int,
-	fn func(slice interface{}) interface{}) (*valueContainer, error) {
+	fn func(slice interface{}, isNull []bool) (value interface{}, null bool)) (*valueContainer, error) {
 
 	// default: return length is equal to the number of groups
 	retLength := len(rowIndices)
@@ -720,59 +762,69 @@ func groupedInterfaceReduceFunc(
 	}
 	// must deduce output type
 	sampleRows := subsetInterfaceSlice(slice, rowIndices[0])
-	sampleOutput := fn(sampleRows)
+	sampleOutput, _ := fn(sampleRows, subsetNulls(isNull, rowIndices[0]))
 
 	// create output using reflect
 	retVals := reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(sampleOutput)), retLength, retLength)
+	retNulls := make([]bool, retLength)
 	for i, rowIndex := range rowIndices {
 		subsetRows := subsetInterfaceSlice(slice, rowIndex)
-		output := fn(subsetRows)
+		nulls := subsetNulls(isNull, rowIndex)
+		output, null := fn(subsetRows, nulls)
 
 		src := reflect.ValueOf(output)
 		if !aligned {
 			// default: write each output once and in sequential order into retVals
 			dst := retVals.Index(i)
 			dst.Set(src)
+			retNulls[i] = null
 		} else {
 			// if aligned: write each output multiple times and out of order into retVals
 			for _, index := range rowIndex {
 				dst := retVals.Index(index)
 				dst.Set(src)
+				retNulls[index] = null
 			}
 		}
 	}
-	ret, err := makeValueContainerFromInterface(retVals.Interface(), name)
+	_, err := setNullsFromInterface(retVals.Interface())
 	if err != nil {
-		return nil, fmt.Errorf("interface{} output: %v", err)
+		return nil, fmt.Errorf("constructing new Series from reduce function: %v", err)
 	}
-	return ret, nil
+	return &valueContainer{
+		slice:  retVals.Interface(),
+		isNull: retNulls,
+		name:   name,
+	}, nil
 }
 
 // transforms each original Series row and maintains their order, regardless of whether groupedSeries is aligned
-func groupedInterfaceTransformFunc(
+func groupedApplyFunc(
 	slice interface{},
+	isNull []bool,
 	name string,
 	rowIndices [][]int,
-	fn func(slice interface{}) interface{}) (*valueContainer, error) {
+	fn ApplyFn) (*valueContainer, error) {
 
 	// return length is equal to the number of rows in the value container
 	retLength := reflect.ValueOf(slice).Len()
 
 	// must deduce output type
 	sampleRows := subsetInterfaceSlice(slice, rowIndices[0])
-	sampleOutput := fn(sampleRows)
+	sampleOutput := fn(sampleRows, subsetNulls(isNull, rowIndices[0]))
 	if !isSlice(sampleOutput) {
-		return nil, fmt.Errorf("group 0: output must be slice (%v != slice)",
+		return nil, fmt.Errorf("group 0: output must be slice (not %v)",
 			reflect.TypeOf(sampleOutput).Kind())
 	}
 
 	retVals := reflect.MakeSlice(reflect.TypeOf(sampleOutput), retLength, retLength)
+	retNulls := make([]bool, retLength)
 	for i, rowIndex := range rowIndices {
 		subsetRows := subsetInterfaceSlice(slice, rowIndex)
-		output := fn(subsetRows)
-
+		nulls := subsetNulls(isNull, rowIndex)
+		output := fn(subsetRows, nulls)
 		if !isSlice(output) {
-			return nil, fmt.Errorf("group %d: output must be slice (%v != slice)",
+			return nil, fmt.Errorf("group %d: output must be slice (not %v)",
 				i, reflect.TypeOf(output).Kind())
 		}
 		if reflect.ValueOf(output).Len() != reflect.ValueOf(subsetRows).Len() {
@@ -784,6 +836,7 @@ func groupedInterfaceTransformFunc(
 			src := reflect.ValueOf(output).Index(incrementor)
 			dst := retVals.Index(index)
 			dst.Set(src)
+			retNulls[index] = nulls[incrementor]
 		}
 	}
 	ret, err := makeValueContainerFromInterface(retVals.Interface(), name)

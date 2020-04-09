@@ -1112,26 +1112,6 @@ func (vc *valueContainer) apply(lambda ApplyFn) error {
 	return nil
 }
 
-func (vc *valueContainer) applyFormat(lambda ApplyFormatFn) {
-	v := reflect.ValueOf(vc.slice)
-	ret := make([]string, v.Len())
-	for i := 0; i < v.Len(); i++ {
-		val := v.Index(i).Interface()
-		ret[i] = lambda(val)
-	}
-	vc.slice = ret
-	vc.resetCache()
-}
-
-// expects slices to be same-lengthed; if either is true at position x, ret is true at position x
-func isEitherNull(isNull1, isNull2 []bool) []bool {
-	ret := make([]bool, len(isNull1))
-	for i := 0; i < len(isNull1); i++ {
-		ret[i] = isNull1[i] || isNull2[i]
-	}
-	return ret
-}
-
 func (vc *valueContainer) len() int {
 	return reflect.ValueOf(vc.slice).Len()
 }
@@ -2066,13 +2046,6 @@ func (filter FilterFn) validate() error {
 }
 
 func (lambda ApplyFn) validate() error {
-	if lambda == nil {
-		return fmt.Errorf("no apply function provided")
-	}
-	return nil
-}
-
-func (lambda ApplyFormatFn) validate() error {
 	if lambda == nil {
 		return fmt.Errorf("no apply function provided")
 	}

@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -156,7 +155,7 @@ func TestDataFrame_Err_String(t *testing.T) {
 				colLevelNames: tt.fields.colLevelNames,
 			}
 			if df.String() != tt.want {
-				t.Errorf("Series.Err().String() -> %v, want %v", df, tt.want)
+				t.Errorf("DataFrame.Err().String() -> %v, want %v", df, tt.want)
 			}
 		})
 	}
@@ -1951,80 +1950,6 @@ func TestDataFrame_Apply(t *testing.T) {
 			}
 			if got := df.Apply(tt.args.lambdas); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Apply() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestDataFrame_ApplyFormat(t *testing.T) {
-	type fields struct {
-		labels        []*valueContainer
-		values        []*valueContainer
-		name          string
-		err           error
-		colLevelNames []string
-	}
-	type args struct {
-		lambdas map[string]ApplyFormatFn
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *DataFrame
-	}{
-		{"float64", fields{
-			values: []*valueContainer{
-				{slice: []float64{.51}, isNull: []bool{false}, name: "foo"},
-				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
-			},
-			labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
-			name:          "baz",
-			colLevelNames: []string{"*0"}},
-			args{map[string]ApplyFormatFn{"foo": func(v interface{}) string {
-				return strconv.FormatFloat(v.(float64), 'f', 1, 64)
-			}}},
-			&DataFrame{
-				values: []*valueContainer{
-					{slice: []string{"0.5"}, isNull: []bool{false}, name: "foo"},
-					{slice: []int{1}, isNull: []bool{false}, name: "qux"},
-				},
-				labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
-				name:          "baz",
-				colLevelNames: []string{"*0"}},
-		},
-		{"fail - no function", fields{
-			values: []*valueContainer{
-				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
-				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name:   "baz"},
-			args{map[string]ApplyFormatFn{"foo": nil}},
-			&DataFrame{
-				err: fmt.Errorf("apply format: no apply function provided")},
-		},
-		{"fail - no matching column", fields{
-			values: []*valueContainer{
-				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
-				{slice: []float64{1}, isNull: []bool{false}, name: "bar"}},
-			labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
-			name:   "baz"},
-			args{map[string]ApplyFormatFn{"corge": func(v interface{}) string { return "" }}},
-			&DataFrame{
-				err: fmt.Errorf("apply format: name (corge) not found")},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			df := &DataFrame{
-				labels:        tt.fields.labels,
-				values:        tt.fields.values,
-				name:          tt.fields.name,
-				err:           tt.fields.err,
-				colLevelNames: tt.fields.colLevelNames,
-			}
-			if got := df.ApplyFormat(tt.args.lambdas); !EqualDataFrames(got, tt.want) {
-				t.Errorf("DataFrame.ApplyFormat() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -5466,9 +5391,9 @@ func TestDataFrame_Struct(t *testing.T) {
 			true,
 		},
 		{"fail - does not match field type", fields{
-			labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "Foo"}},
+			labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
 			values: []*valueContainer{
-				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "Bar"},
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "bar"},
 			},
 			colLevelNames: []string{"*0"}},
 			args{&testSchema{}, nil},
