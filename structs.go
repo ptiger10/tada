@@ -7,34 +7,26 @@ import (
 	"unicode"
 )
 
-// if requireSameType, all columns must be of same type; otherwise, each column is converted to []interface{}
-func readNestedInterfaceByRows(rows [][]interface{}, requireSameType bool) (ret []interface{}, isNull [][]bool, err error) {
+// all columns must be of same type.
+// return null values for use in StructTransposer
+func readNestedInterfaceByRowsInferType(rows [][]interface{}) (ret []interface{}, isNull [][]bool, err error) {
 	if len(rows) == 0 {
 		return nil, nil, fmt.Errorf("reading [][]interface{}: must have at least one row")
 	}
-	// must deduce output type per column
+
 	sampleRow := rows[0]
 	ret = make([]interface{}, len(sampleRow))
-
-	if requireSameType {
-		isNull = make([][]bool, len(sampleRow))
-		for k := range sampleRow {
-			isNull[k] = make([]bool, len(rows))
-		}
-	} else {
-		isNull = nil
+	isNull = make([][]bool, len(sampleRow))
+	for k := range sampleRow {
+		isNull[k] = make([]bool, len(rows))
 	}
-
 	colTypes := make([]reflect.Type, len(sampleRow))
 	for k := range sampleRow {
 		colType := reflect.TypeOf(sampleRow[k])
 		colTypes[k] = colType
-		if requireSameType {
-			ret[k] = reflect.MakeSlice(reflect.SliceOf(colType), len(rows), len(rows)).Interface()
-		} else {
-			ret[k] = make([]interface{}, len(rows))
-		}
+		ret[k] = reflect.MakeSlice(reflect.SliceOf(colType), len(rows), len(rows)).Interface()
 	}
+
 	for i := range rows {
 		// different number of columns than in row 0?
 		if len(rows[i]) != len(colTypes) {
@@ -42,35 +34,60 @@ func readNestedInterfaceByRows(rows [][]interface{}, requireSameType bool) (ret 
 				i, len(rows[i]), len(colTypes))
 		}
 		for k := range rows[i] {
-			// all columns are not same type as row 0?
-			if requireSameType {
-				// value is null value?
-				dst := reflect.ValueOf(ret[k]).Index(i)
-				var src reflect.Value
-				// is null value? set to zero type
-				if null, _ := isNullInterface(rows[i][k]); null {
-					isNull[k][i] = true
-					src = reflect.Zero(colTypes[k])
-				}
-				if !isNull[k][i] {
-					if reflect.TypeOf(rows[i][k]) != colTypes[k] {
-						return nil, nil, fmt.Errorf("reading [][]interface{} by rows: [%d][%d]: all types must be the same as in row 0 (%v != %v)",
-							i, k, reflect.TypeOf(rows[i][k]).String(), colTypes[k].String())
-					}
-					src = reflect.ValueOf(rows[i][k])
-				}
-				dst.Set(src)
-			} else {
-				ret[k].([]interface{})[i] = rows[i][k]
+			// value is null value?
+			dst := reflect.ValueOf(ret[k]).Index(i)
+			var src reflect.Value
+			// is null value? set to zero type
+			if null, _ := isNullInterface(rows[i][k]); null {
+				isNull[k][i] = true
+				src = reflect.Zero(colTypes[k])
 			}
+			if !isNull[k][i] {
+				if reflect.TypeOf(rows[i][k]) != colTypes[k] {
+					return nil, nil, fmt.Errorf("reading [][]interface{} by rows: [%d][%d]: all types must be the same as in row 0 (%v != %v)",
+						i, k, reflect.TypeOf(rows[i][k]).String(), colTypes[k].String())
+				}
+				src = reflect.ValueOf(rows[i][k])
+			}
+			dst.Set(src)
 
 		}
 	}
-	return ret, isNull, nil
+	return
+}
+
+// each column is converted to []interface{}
+func readNestedInterfaceByRows(rows [][]interface{}) ([]interface{}, error) {
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("reading [][]interface{}: must have at least one row")
+	}
+	// must deduce output type per column
+	sampleRow := rows[0]
+	ret := make([]interface{}, len(sampleRow))
+
+	colTypes := make([]reflect.Type, len(sampleRow))
+	for k := range sampleRow {
+		colType := reflect.TypeOf(sampleRow[k])
+		colTypes[k] = colType
+		ret[k] = make([]interface{}, len(rows))
+	}
+	for i := range rows {
+		// different number of columns than in row 0?
+		if len(rows[i]) != len(colTypes) {
+			return nil, fmt.Errorf("reading [][]interface{} by rows: row %d: all rows must have same length as row 0 (%d != %d)",
+				i, len(rows[i]), len(colTypes))
+		}
+		for k := range rows[i] {
+
+			ret[k].([]interface{})[i] = rows[i][k]
+
+		}
+	}
+	return ret, nil
 }
 
 // if requireSameType, all columns must be of same type; otherwise, each column is converted to []interface{}
-func readNestedInterfaceByCols(columns [][]interface{}, requireSameType bool) ([]interface{}, error) {
+func readNestedInterfaceByCols(columns [][]interface{}) ([]interface{}, error) {
 	if len(columns) == 0 {
 		return nil, fmt.Errorf("reading [][]interface{}: must have at least one column")
 	}
@@ -80,11 +97,7 @@ func readNestedInterfaceByCols(columns [][]interface{}, requireSameType bool) ([
 	for k := range columns {
 		colType := reflect.TypeOf(columns[k][0])
 		colTypes[k] = colType
-		if requireSameType {
-			ret[k] = reflect.MakeSlice(reflect.SliceOf(colType), len(columns), len(columns)).Interface()
-		} else {
-			ret[k] = make([]interface{}, len(columns))
-		}
+		ret[k] = make([]interface{}, len(columns))
 	}
 
 	for k := range columns {
@@ -92,19 +105,8 @@ func readNestedInterfaceByCols(columns [][]interface{}, requireSameType bool) ([
 			return nil, fmt.Errorf("reading [][]interface{} by columns: column %d: all columns must have same length as column 0 (%d != %d)",
 				k, len(columns[k]), l)
 		}
-		if requireSameType {
-			for i := 0; i < l; i++ {
-				if reflect.TypeOf(columns[k][i]) != colTypes[k] {
-					return nil, fmt.Errorf("reading [][]interface{} by rows: [%d][%d]: all types must be the same as in row 0 (%v != %v)",
-						i, k, reflect.TypeOf(columns[k][i]).String(), colTypes[k].String())
-				}
-				dst := reflect.ValueOf(ret[k]).Index(i)
-				src := reflect.ValueOf(columns[k][i])
-				dst.Set(src)
-			}
-		} else {
-			ret[k] = columns[k]
-		}
+		ret[k] = columns[k]
+
 	}
 	return ret, nil
 }
@@ -133,7 +135,7 @@ func transposeNestedNulls(isNull [][]bool) ([][]bool, error) {
 // into a column-oriented struct representation of a DataFrame.
 // If an error is returned, values are still written to structPointer up until the point the error occurred.
 func (st *StructTransposer) Transpose(structPointer interface{}) error {
-	transfer, isNull, err := readNestedInterfaceByRows(st.Rows, true)
+	transfer, isNull, err := readNestedInterfaceByRowsInferType(st.Rows)
 	if err != nil {
 		return fmt.Errorf("transposing struct: %v", err)
 	}

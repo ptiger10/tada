@@ -297,9 +297,9 @@ func ReadInterfaceRecords(records [][]interface{}, options ...ReadOption) (ret *
 	config := setReadConfig(options)
 	var slices []interface{}
 	if !config.majorDimIsCols {
-		slices, _, err = readNestedInterfaceByRows(records, false)
+		slices, err = readNestedInterfaceByRows(records)
 	} else {
-		slices, err = readNestedInterfaceByCols(records, false)
+		slices, err = readNestedInterfaceByCols(records)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("reading records from [][]interface{}: %v", err)

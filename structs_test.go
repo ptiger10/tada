@@ -1,87 +1,50 @@
 package tada
 
 import (
-	"math"
 	"reflect"
 	"testing"
-	"time"
 )
 
-func Test_readNestedInterfaceByRows(t *testing.T) {
+func Test_readNestedInterfaceByRowsInferType(t *testing.T) {
 	type args struct {
-		rows            [][]interface{}
-		requireSameType bool
+		rows [][]interface{}
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    []interface{}
-		want1   [][]bool
-		wantErr bool
+		name       string
+		args       args
+		wantRet    []interface{}
+		wantIsNull [][]bool
+		wantErr    bool
 	}{
-		{"pass - same type", args{
-			[][]interface{}{
-				{"foo", 0},
-				{"bar", 1},
+		{"pass",
+			args{
+				[][]interface{}{
+					{"foo", 0},
+					{"bar", 1},
+				},
 			},
-			true,
-		},
 			[]interface{}{
 				[]string{"foo", "bar"},
 				[]int{0, 1},
 			},
-			[][]bool{
-				{false, false}, {false, false},
-			},
-			false,
-		},
-		{"pass - different types", args{
-			[][]interface{}{
-				{"foo", 0},
-				{"bar", float64(1)},
-			},
-			false,
-		},
-			[]interface{}{
-				[]interface{}{"foo", "bar"},
-				[]interface{}{0, float64(1)},
-			},
-			nil,
-			false,
-		},
-		{"pass - nulls - not required same type", args{
-			[][]interface{}{
-				{"foo", ""},
-				{"bar", time.Time{}},
-			},
-			false,
-		},
-			[]interface{}{
-				[]interface{}{"foo", "bar"},
-				[]interface{}{"", time.Time{}},
-			},
-			nil,
+			[][]bool{{false, false}, {false, false}},
 			false,
 		},
 		{"pass - nulls - required same type", args{
 			[][]interface{}{
-				{"foo", ""},
-				{"bar", math.NaN()},
+				{"foo", 1},
+				{"bar", ""},
 			},
-			true,
 		},
 			[]interface{}{
 				[]string{"foo", "bar"},
-				[]string{"", ""},
+				[]int{1, 0},
 			},
-			[][]bool{
-				{false, false}, {true, true},
-			},
+			[][]bool{{false, false}, {false, true}},
 			false,
 		},
 		{"fail - no rows", args{
 			[][]interface{}{},
-			true,
 		},
 			nil,
 			nil,
@@ -92,18 +55,6 @@ func Test_readNestedInterfaceByRows(t *testing.T) {
 				{"foo"},
 				{"bar", 1},
 			},
-			true,
-		},
-			nil,
-			nil,
-			true,
-		},
-		{"fail - different types when same is required", args{
-			[][]interface{}{
-				{"foo", "baz"},
-				{"bar", 1},
-			},
-			true,
 		},
 			nil,
 			nil,
@@ -112,16 +63,69 @@ func Test_readNestedInterfaceByRows(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, got1, err := readNestedInterfaceByRows(tt.args.rows, tt.args.requireSameType)
+			gotRet, gotIsNull, err := readNestedInterfaceByRowsInferType(tt.args.rows)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readNestedInterfaceByRowsInferType() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(gotRet, tt.wantRet) {
+				t.Errorf("readNestedInterfaceByRowsInferType() gotRet = %v, want %v", gotRet, tt.wantRet)
+			}
+			if !reflect.DeepEqual(gotIsNull, tt.wantIsNull) {
+				t.Errorf("readNestedInterfaceByRowsInferType() gotIsNull = %v, want %v", gotIsNull, tt.wantIsNull)
+			}
+		})
+	}
+}
+
+func Test_readNestedInterfaceByRows(t *testing.T) {
+	type args struct {
+		rows [][]interface{}
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []interface{}
+		wantErr bool
+	}{
+		{"pass", args{
+			[][]interface{}{
+				{"foo", 0},
+				{"bar", "baz"},
+			},
+		},
+			[]interface{}{
+				[]interface{}{"foo", "bar"},
+				[]interface{}{0, "baz"},
+			},
+			false,
+		},
+
+		{"fail - no rows", args{
+			[][]interface{}{},
+		},
+			nil,
+			true,
+		},
+		{"fail - different length rows", args{
+			[][]interface{}{
+				{"foo"},
+				{"bar", 1},
+			},
+		},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := readNestedInterfaceByRows(tt.args.rows)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readNestedInterfaceByRows() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("readNestedInterfaceByRows() = %v, want %v", got, tt.want)
-			}
-			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("readNestedInterfaceByRows() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}
@@ -138,15 +142,7 @@ func Test_readNestedInterfaceByCols(t *testing.T) {
 		want    []interface{}
 		wantErr bool
 	}{
-		{"pass - same type", args{
-			[][]interface{}{
-				{"foo", "baz"},
-				{0, 1},
-			}, true},
-			[]interface{}{[]string{"foo", "baz"}, []int{0, 1}},
-			false,
-		},
-		{"pass - different types", args{
+		{"pass", args{
 			[][]interface{}{
 				{"foo", 0},
 				{"bar", 1},
@@ -167,18 +163,10 @@ func Test_readNestedInterfaceByCols(t *testing.T) {
 			nil,
 			true,
 		},
-		{"fail - different types when same is required", args{
-			[][]interface{}{
-				{"foo", 0},
-				{"bar", 1},
-			}, true},
-			nil,
-			true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readNestedInterfaceByCols(tt.args.columns, tt.args.requireSameType)
+			got, err := readNestedInterfaceByCols(tt.args.columns)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readNestedInterfaceByCols() error = %v, wantErr %v", err, tt.wantErr)
 				return
