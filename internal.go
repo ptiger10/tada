@@ -103,7 +103,7 @@ func makeValueContainersFromInterfaces(slices []interface{}, usePrefix bool) ([]
 	for i, slice := range slices {
 		vc, err := makeValueContainerFromInterface(slice, namePrefix+fmt.Sprint(i))
 		if err != nil {
-			return nil, fmt.Errorf("error at position %d: %v", i, err)
+			return nil, fmt.Errorf("position %d: %v", i, err)
 		}
 		ret[i] = vc
 	}
@@ -1128,7 +1128,7 @@ func (vc *valueContainer) apply(lambda ApplyFn, index []int) error {
 		isNull = subsetNulls(vc.isNull, index)
 		ret = lambda(subsetInterfaceSlice(vc.slice, index), isNull)
 	}
-	_, err := setNullsFromInterface(ret)
+	err := isSupportedSlice(ret)
 	if err != nil {
 		vc.isNull = cache
 		return fmt.Errorf("constructing new values: %v", err)
@@ -1718,10 +1718,53 @@ func isNullFloat(v float64) bool {
 	return false
 }
 
+func isSupportedSlice(slice interface{}) error {
+	if k := reflect.TypeOf(slice).Kind(); k != reflect.Slice {
+		return fmt.Errorf("unsupported kind (%v); must be slice", k)
+	}
+	switch slice.(type) {
+	case []float64, []string, []time.Time,
+		[]civil.Date, []civil.Time, []civil.DateTime,
+		[][]byte, []bool, []float32,
+		[]uint, []uint8, []uint16, []uint32, []uint64,
+		[]int, []int8, []int16, []int32, []int64,
+		// nested types
+		[][]string, [][]float64, [][]time.Time, [][][]byte,
+		[][]bool, [][]float32,
+		[][]uint, [][]uint16, [][]uint32, [][]uint64,
+		[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
+		return nil
+	case []interface{}:
+		vals := slice.([]interface{})
+		for i := range vals {
+			err := isSupportedInterface(vals[i])
+			if err != nil {
+				return fmt.Errorf("[]interface{}: %v", err)
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("unsupported type ([]%v)", reflect.TypeOf(slice).Elem())
+}
+
+func isSupportedInterface(val interface{}) error {
+	switch val.(type) {
+	case float64, string, time.Time,
+		[]float64, []string, []time.Time,
+		bool, uint, uint8, uint16, uint32, uint64,
+		int, int8, int16, int32, int64, float32,
+		[]bool, []uint, []uint8, []uint16, []uint32, []uint64,
+		[]int, []int8, []int16, []int32, []int64, []float32:
+		return nil
+	}
+	return fmt.Errorf("unsupported type (%v)", reflect.TypeOf(val))
+}
+
 func setNullsFromInterface(input interface{}) ([]bool, error) {
 	var ret []bool
-	if k := reflect.TypeOf(input).Kind(); k != reflect.Slice {
-		return nil, fmt.Errorf("unsupported kind (%v); must be slice", k)
+	err := isSupportedSlice(input)
+	if err != nil {
+		return nil, fmt.Errorf("setting null values from interface{}: %v", err)
 	}
 	switch input.(type) {
 	case []float64:
@@ -1766,10 +1809,7 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 		vals := input.([]interface{})
 		ret = make([]bool, len(vals))
 		for i := range vals {
-			null, err := isNullInterface(vals[i])
-			if err != nil {
-				return nil, fmt.Errorf("unable to calculate null value for %v: %v", vals[i], err)
-			}
+			null := isNullInterface(vals[i])
 			if null {
 				ret[i] = true
 			} else {
@@ -1825,38 +1865,32 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 			// if slice is empty -> null
 			ret[i] = (v.Index(i).Len() == 0)
 		}
-	default:
-		return nil, fmt.Errorf("unable to calculate null values ([]%v not supported)", reflect.TypeOf(input).Elem())
 	}
 	return ret, nil
 }
 
-func isNullInterface(i interface{}) (bool, error) {
+func isNullInterface(i interface{}) bool {
 	switch i.(type) {
 	case float64:
 		f := i.(float64)
 		if isNullFloat(f) {
-			return true, nil
+			return true
 		}
-		return false, nil
+		return false
 	case string:
 		s := i.(string)
 		if isNullString(s) {
-			return true, nil
+			return true
 		}
-		return false, nil
+		return false
 	case time.Time:
 		t := i.(time.Time)
 		if (time.Time{}) == t {
-			return true, nil
+			return true
 		}
-		return false, nil
-	case []float64, []string, []time.Time,
-		[]bool, []uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64, []float32,
-		bool, uint, uint8, uint16, uint32, uint64, int, int8, int16, int32, int64, float32:
-		return false, nil
+		return false
 	default:
-		return false, fmt.Errorf("unsupported type: %v", reflect.TypeOf(i))
+		return false
 	}
 }
 

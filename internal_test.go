@@ -286,28 +286,23 @@ func Test_isNullInterface(t *testing.T) {
 		i interface{}
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    bool
-		wantErr bool
+		name string
+		args args
+		want bool
 	}{
-		{"null float64", args{math.NaN()}, true, false},
-		{"null string", args{""}, true, false},
-		{"null time.Time", args{time.Time{}}, true, false},
-		{"float64", args{float64(1)}, false, false},
-		{"string", args{"foo"}, false, false},
-		{"time.Time", args{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, false, false},
-		{"other", args{true}, false, false},
-		{"other - slice", args{[]bool{true}}, false, false},
-		{"unsupported", args{complex64(1)}, false, true},
+		{"null float64", args{math.NaN()}, true},
+		{"null string", args{""}, true},
+		{"null time.Time", args{time.Time{}}, true},
+		{"float64", args{float64(1)}, false},
+		{"string", args{"foo"}, false},
+		{"time.Time", args{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, false},
+		{"other", args{true}, false},
+		{"other - slice", args{[]bool{true}}, false},
+		{"unsupported", args{complex64(1)}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := isNullInterface(tt.args.i)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("isNullInterface() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got := isNullInterface(tt.args.i)
 			if got != tt.want {
 				t.Errorf("isNullInterface() = %v, want %v", got, tt.want)
 			}

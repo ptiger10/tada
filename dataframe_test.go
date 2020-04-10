@@ -99,12 +99,12 @@ func TestNewDataFrame(t *testing.T) {
 		{"fail - unsupported kind", args{
 			[]interface{}{"foo"}, nil},
 			&DataFrame{
-				err: errors.New("constructing new DataFrame: slices: error at position 0: unsupported kind (string); must be slice")},
+				err: errors.New("constructing new DataFrame: slices: position 0: setting null values from interface{}: unsupported kind (string); must be slice")},
 		},
 		{"fail - unsupported label kind", args{
 			[]interface{}{[]float64{1}}, []interface{}{"foo"}},
 			&DataFrame{
-				err: errors.New("constructing new DataFrame: labels: error at position 0: unsupported kind (string); must be slice")},
+				err: errors.New("constructing new DataFrame: labels: position 0: setting null values from interface{}: unsupported kind (string); must be slice")},
 		},
 		{"fail - wrong length labels", args{
 			[]interface{}{[]int{0}},
@@ -2640,6 +2640,7 @@ func TestDataFrame_Merge(t *testing.T) {
 			got, err := df.Merge(tt.args.other, tt.args.options...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.Merge() error = %v, want %v", err, tt.wantErr)
+				return
 			}
 			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Merge() = %v, want %v", got, tt.want)
@@ -2800,6 +2801,7 @@ func TestDataFrame_Lookup(t *testing.T) {
 			got, err := df.Lookup(tt.args.other, tt.args.options...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.Lookup() error = %v, want %v", err, tt.wantErr)
+				return
 			}
 			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Lookup() = %v, want %v", got, tt.want)
@@ -3258,6 +3260,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 			got, err := df.PivotTable(tt.args.labels, tt.args.columns, tt.args.values, tt.args.aggFn)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.PivotTable() error = %v, want %v", err, tt.wantErr)
+				return
 			}
 			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.PivotTable() = %v, want %v", got, tt.want)
@@ -3902,6 +3905,7 @@ func TestDataFrame_WriteCSV(t *testing.T) {
 			err := df.WriteCSV(w, tt.args.options...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.WriteCSV() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
 			if tt.wantErr == false {
 				if w.(*bytes.Buffer).String() != tt.want {
@@ -5028,6 +5032,7 @@ func TestDataFrame_SumCols(t *testing.T) {
 			got, err := df.SumCols(tt.args.name, tt.args.colNames...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.SumCols() error = %v, want %v", err, tt.wantErr)
+				return
 			}
 			if !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.SumCols() = %v, want %v", got, tt.want)
@@ -5739,6 +5744,7 @@ func TestDataFrame_Struct(t *testing.T) {
 			err := df.Struct(tt.args.structPointer, tt.args.options...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.Struct() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
 			if !reflect.DeepEqual(tt.args.structPointer, tt.want) {
 				t.Errorf("DataFrame.Struct() -> %v, want %v", tt.args.structPointer, tt.want)
@@ -6213,6 +6219,7 @@ func TestDataFrame_Reduce(t *testing.T) {
 			got, err := df.Reduce(tt.args.name, tt.args.lambda)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.Reduce() error = %v, want %v", err, tt.wantErr)
+				return
 			}
 			if !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.Reduce() = %v, want %v", got, tt.want)

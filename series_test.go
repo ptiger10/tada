@@ -39,7 +39,7 @@ func TestNewSeries(t *testing.T) {
 		{"unsupported input: empty slice", args{slice: []float64{}},
 			&Series{err: errors.New("constructing new Series: slice: empty slice: cannot be empty")}},
 		{"unsupported label input: scalar", args{slice: []float64{1}, labels: []interface{}{"foo"}},
-			&Series{err: errors.New("constructing new Series: labels: error at position 0: unsupported kind (string); must be slice")}},
+			&Series{err: errors.New("constructing new Series: labels: position 0: setting null values from interface{}: unsupported kind (string); must be slice")}},
 		{"fail - different lengths", args{slice: []float64{1}, labels: []interface{}{[]int{0, 1}}},
 			&Series{err: errors.New("constructing new Series: labels: position 0: slice does not match required length (2 != 1)")}},
 	}
@@ -1484,6 +1484,7 @@ func TestSeries_Lookup(t *testing.T) {
 			got, err := s.Lookup(tt.args.other, tt.args.config...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Series.Lookup() error = %v, want %v", err, tt.wantErr)
+				return
 			}
 			if !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Lookup() = %v, want %v", got, tt.want)
@@ -1562,6 +1563,7 @@ func TestSeries_Merge(t *testing.T) {
 			got, err := s.Merge(tt.args.other, tt.args.options...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Series.Merge() error = %v, want %v", err, tt.wantErr)
+				return
 			}
 			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("Series.Merge() = %v, want %v", got, tt.want)
@@ -2474,7 +2476,8 @@ func TestSeries_Bin(t *testing.T) {
 			}
 			got, err := s.Bin(tt.args.bins, tt.args.config)
 			if (err != nil) != tt.wantErr {
-
+				t.Errorf("Series.Bin() error = %v, want %v", err, tt.wantErr)
+				return
 			}
 			if !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Bin() = %v, want %v", got, tt.want)
@@ -2601,6 +2604,7 @@ func TestSeries_PercentileBin(t *testing.T) {
 			got, err := s.PercentileBin(tt.args.bins, tt.args.config)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Series.PercentileBin() error = %v, want %v", err, tt.wantErr)
+				return
 			}
 			if !EqualSeries(got, tt.want) {
 				t.Errorf("Series.PercentileBin() = %v, want %v", got, tt.want)
@@ -3713,6 +3717,7 @@ func TestSeries_Struct(t *testing.T) {
 			}
 			if err := s.Struct(tt.args.structPointer, tt.args.options...); (err != nil) != tt.wantErr {
 				t.Errorf("Series.Struct() error = %v, wantErr %v", err, tt.wantErr)
+				return
 			}
 			if !reflect.DeepEqual(tt.args.structPointer, tt.want) {
 				t.Errorf("Series.Struct() -> %v, want %v", tt.args.structPointer, tt.want)

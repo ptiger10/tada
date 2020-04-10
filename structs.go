@@ -38,7 +38,7 @@ func readNestedInterfaceByRowsInferType(rows [][]interface{}) (ret []interface{}
 			dst := reflect.ValueOf(ret[k]).Index(i)
 			var src reflect.Value
 			// is null value? set to zero type
-			if null, _ := isNullInterface(rows[i][k]); null {
+			if null := isNullInterface(rows[i][k]); null {
 				isNull[k][i] = true
 				src = reflect.Zero(colTypes[k])
 			}

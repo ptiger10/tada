@@ -788,9 +788,9 @@ func groupedInterfaceReduceFunc(
 			}
 		}
 	}
-	_, err := setNullsFromInterface(retVals.Interface())
+	err := isSupportedSlice(retVals.Interface())
 	if err != nil {
-		return nil, fmt.Errorf("constructing new Series from reduce function: %v", err)
+		return nil, fmt.Errorf("constructing new slice: %v", err)
 	}
 	return &valueContainer{
 		slice:  retVals.Interface(),
@@ -827,7 +827,7 @@ func groupedApplyFunc(
 			return nil, fmt.Errorf("constructing new values: group %d: output must be slice (not %v)",
 				i, reflect.TypeOf(output).Kind())
 		}
-		_, err := setNullsFromInterface(output)
+		err := isSupportedSlice(output)
 		if err != nil {
 			return nil, fmt.Errorf("constructing new values: group %d: %v", i, err)
 		}

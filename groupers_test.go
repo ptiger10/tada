@@ -1381,7 +1381,7 @@ func TestGroupedSeries_Reduce(t *testing.T) {
 			args{"custom", func(slice interface{}, isNull []bool) (interface{}, bool) {
 				return complex64(1), false
 			}},
-			&Series{err: fmt.Errorf("reducing grouped Series: constructing new Series from reduce function: unable to calculate null values ([]complex64 not supported)")}},
+			&Series{err: fmt.Errorf("reducing grouped Series: constructing new slice: unsupported type ([]complex64)")}},
 		// -- no function
 		{"fail", fields{
 			orderedKeys: []string{"foo", "bar"},
@@ -1466,7 +1466,7 @@ func TestGroupedDataFrame_Reduce(t *testing.T) {
 				return complex64(1), false
 			}},
 			&DataFrame{err: fmt.Errorf(
-				"reducing grouped DataFrame: constructing new Series from reduce function: unable to calculate null values ([]complex64 not supported)")}},
+				"reducing grouped DataFrame: constructing new slice: unsupported type ([]complex64)")}},
 
 		// -- no function
 		{"fail", fields{

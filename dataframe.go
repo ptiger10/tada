@@ -2080,12 +2080,12 @@ func (df *DataFrame) Where(filters map[string]FilterFn, ifTrue, ifFalse interfac
 	}
 	isNull, err := setNullsFromInterface(ret)
 	if err != nil {
-		_, err := setNullsFromInterface([]interface{}{ifTrue})
+		err := isSupportedSlice([]interface{}{ifTrue})
 		// ifTrue is unsupported?
 		if err != nil {
 			return nil, fmt.Errorf("where: ifTrue: %v", err)
 		}
-		// ifFalse is unsupported?
+		// ifFalse is unsupported
 		return nil, fmt.Errorf("where: ifFalse: %v", err)
 	}
 	return &Series{
