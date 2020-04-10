@@ -247,6 +247,7 @@ func (g *GroupedSeries) HavingCount(lambda func(int) bool) *GroupedSeries {
 			retOrderedKeys = append(retOrderedKeys, g.orderedKeys[i])
 		}
 	}
+	// filter out orderedKeys, rowIndices, and grouped labels, but do not change underlying Series
 	labels := copyContainers(g.labels)
 	subsetContainerRows(labels, indexToKeep)
 
@@ -798,7 +799,6 @@ func groupedInterfaceReduceFunc(
 	}, nil
 }
 
-// transforms each original Series row and maintains their order, regardless of whether groupedSeries is aligned
 func groupedApplyFunc(
 	slice interface{},
 	isNull []bool,

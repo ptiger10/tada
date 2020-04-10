@@ -172,12 +172,12 @@ type NullFiller struct {
 
 // A FilterFn is an anonymous function supplied to a Filter or Where function.
 // The function will be called on every val in the container.
-type FilterFn func(val interface{}) bool
+type FilterFn func(value interface{}) bool
 
-// An ApplyFn is an anonymous function supplied to an Apply function.
+// An ApplyFn is an anonymous function supplied to an Apply function to convert one slice to another.
 // The function input will be a slice, and it must return a slice of equal length (though the type may be different).
 // isNull contains the null status of every row in the input slice.
-// The null status of a row may be changed by setting the row's isNull element within the function.
+// The null status of a row may be changed by setting that row's isNull element within the function body.
 type ApplyFn func(slice interface{}, isNull []bool) (equalLengthSlice interface{})
 
 // A ReduceFn is an anonymous function supplied to a Reduce function

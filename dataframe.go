@@ -2025,14 +2025,9 @@ func (df *DataFrameMutator) FilterByValue(filters map[string]interface{}) {
 
 // -- APPLY
 
-// Apply applies a user-defined function to every row in a container based on lambdas,
-// which is a map of container names (either column or label names) to tada.ApplyFn structs.
-// For each container name in the map, the first field selected (i.e., not left blank)
-// in its ApplyFn struct provides the apply logic for that container.
-// Values are converted from their original type to the selected field type.
-// For example, {"foo": ApplyFn{Float64: lambda}} converts the values in the foo container to float64 and
-// applies the lambda function to each row in the container, outputting a new float64 value for each row.
-// If a value is null either before or after the lambda function is applied, it is also null after.
+// Apply applies an anonymous function to every row in a container based on lambdas,
+// which is a map of container names (either column or label names) to anonymous functions.
+// A row's null status can be changed in-place within the anonymous function.
 // Returns a new DataFrame.
 func (df *DataFrame) Apply(lambdas map[string]ApplyFn) *DataFrame {
 	df = df.Copy()
@@ -2040,9 +2035,9 @@ func (df *DataFrame) Apply(lambdas map[string]ApplyFn) *DataFrame {
 	return df
 }
 
-// Apply applies a user-defined function to every row in a container based on lambdas,
+// Apply applies an anonymous function to every row in a container based on lambdas,
 // which is a map of container names (either column or label names) to anonymous functions.
-//
+// A row's null status can be changed in-place within the anonymous function.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
