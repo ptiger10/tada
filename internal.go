@@ -1089,25 +1089,64 @@ func (vc *valueContainer) filter(filter FilterFn) []int {
 	return index
 }
 
-func (vc *valueContainer) apply(lambda ApplyFn) error {
+func (vc *valueContainer) set(newSlice interface{}, newNulls []bool, index []int) error {
+	v := reflect.ValueOf(vc.slice)
+	newV := reflect.ValueOf(newSlice)
+	if v.Type() != newV.Type() {
+		return fmt.Errorf("setting new values: type must match existing type (%s != %s)",
+			v.Type().String(), newV.Type().String())
+	}
+	for incrementor, i := range index {
+		src := newV.Index(incrementor)
+		dst := v.Index(i)
+		dst.Set(src)
+		vc.isNull[i] = newNulls[incrementor]
+	}
+	return nil
+}
+
+func (vc *valueContainer) apply(lambda ApplyFn, index []int) error {
 	// create caches to reset container on error
 	cache := make([]bool, len(vc.isNull))
 	copy(cache, vc.isNull)
-	requiredLen := vc.len()
+	containerLen := vc.len()
+	requiredLen := containerLen
+	if index != nil {
+		requiredLen = len(index)
+		for _, i := range index {
+			if i >= containerLen {
+				return fmt.Errorf("index out of range [%d] with length %d", i, requiredLen)
+			}
+		}
+	}
 
-	ret := lambda(vc.slice, vc.isNull)
-
+	var isNull []bool
+	var ret interface{}
+	if index == nil {
+		ret = lambda(vc.slice, vc.isNull)
+	} else {
+		isNull = subsetNulls(vc.isNull, index)
+		ret = lambda(subsetInterfaceSlice(vc.slice, index), isNull)
+	}
 	_, err := setNullsFromInterface(ret)
 	if err != nil {
 		vc.isNull = cache
 		return fmt.Errorf("constructing new values: %v", err)
 	}
-	if reflect.ValueOf(ret).Len() != requiredLen {
+	l := reflect.ValueOf(ret).Len()
+	if l != requiredLen {
 		vc.isNull = cache
 		return fmt.Errorf("constructing new values: new slice is not same length as original slice (%d != %d)",
-			reflect.ValueOf(ret).Len(), requiredLen)
+			l, requiredLen)
 	}
-	vc.slice = ret
+	if l == vc.len() {
+		vc.slice = ret
+	} else {
+		err := vc.set(ret, isNull, index)
+		if err != nil {
+			return err
+		}
+	}
 	vc.resetCache()
 	return nil
 }

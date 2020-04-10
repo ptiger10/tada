@@ -1229,7 +1229,8 @@ func TestSeries_FilterIndex(t *testing.T) {
 		err        error
 	}
 	type args struct {
-		lambda FilterFn
+		container string
+		lambda    FilterFn
 	}
 	tests := []struct {
 		name   string
@@ -1237,25 +1238,32 @@ func TestSeries_FilterIndex(t *testing.T) {
 		args   args
 		want   []int
 	}{
-		{"Float64 filter - default",
+		{"pass",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{func(val interface{}) bool { return val.(float64) > 1 }},
+			args{"", func(val interface{}) bool { return val.(float64) > 1 }},
 			[]int{2},
 		},
-		{"Float64 filter - no matches",
+		{"no matches",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{func(val interface{}) bool { return val.(float64) > 5 }},
+			args{"", func(val interface{}) bool { return val.(float64) > 5 }},
 			[]int{},
 		},
-		{"Float64 filter - error",
+		{"fail - bad col name",
 			fields{
 				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
-			args{nil},
+			args{"corge", func(val interface{}) bool { return val.(float64) > 1 }},
+			nil,
+		},
+		{"fail - no filter",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}}},
+			args{"", nil},
 			nil,
 		},
 	}
@@ -1267,7 +1275,7 @@ func TestSeries_FilterIndex(t *testing.T) {
 				sharedData: tt.fields.sharedData,
 				err:        tt.fields.err,
 			}
-			if got := s.FilterIndex(tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
+			if got := s.FilterIndex(tt.args.container, tt.args.lambda); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Series.FilterIndex() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1607,13 +1615,22 @@ func TestSeries_Apply(t *testing.T) {
 			&Series{
 				values: &valueContainer{slice: []float64{0, 2}, isNull: []bool{true, true}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}}},
+		{"fail: wrong length",
+			fields{
+				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{true, false}},
+				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{func(slice interface{}, isNull []bool) interface{} {
+				return []int{1, 2, 3}
+			}},
+			&Series{
+				err: errors.New("applying lambda function: constructing new values: new slice is not same length as original slice (3 != 2)")}},
 		{"fail: no function supplied",
 			fields{
 				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{false, false}},
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1}, isNull: []bool{false, false}}}},
 			args{nil},
 			&Series{
-				err: errors.New("apply: no apply function provided")}},
+				err: errors.New("applying lambda function: no apply function provided")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1624,6 +1641,102 @@ func TestSeries_Apply(t *testing.T) {
 			}
 			if got := s.Apply(tt.args.function); !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Apply() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSeries_SetRows(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		lambda ApplyFn
+		rows   []int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"apply to series values",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{func(slice interface{}, isNull []bool) interface{} {
+				vals := slice.([]float64)
+				ret := make([]float64, len(vals))
+				for i := range ret {
+					ret[i] = vals[i] * 2
+				}
+				return ret
+			}, []int{1}},
+			&Series{
+				values: &valueContainer{slice: []float64{1, 4}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+		},
+		{"apply to series values - set null",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{true, true}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{func(slice interface{}, isNull []bool) interface{} {
+				vals := slice.([]float64)
+				ret := make([]float64, len(vals))
+				for i := range ret {
+					isNull[i] = false
+					ret[i] = vals[i] * 2
+				}
+				return ret
+			}, []int{1}},
+			&Series{
+				values: &valueContainer{slice: []float64{1, 4}, isNull: []bool{true, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+		},
+		{"fail - wrong length",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{func(slice interface{}, isNull []bool) interface{} {
+				return []float64{1, 2, 3}
+			}, []int{1}},
+			&Series{err: fmt.Errorf("applying lambda to rows: constructing new values: new slice is not same length as original slice (3 != 1)")},
+		},
+		{"fail - index out of range",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{func(slice interface{}, isNull []bool) interface{} {
+				vals := slice.([]float64)
+				ret := make([]float64, len(vals))
+				for i := range ret {
+					ret[i] = vals[i] * 2
+				}
+				return ret
+			}, []int{1, 2}},
+			&Series{err: fmt.Errorf("applying lambda to rows: index out of range [2] with length 2")},
+		},
+		{"fail - no function",
+			fields{
+				values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}},
+			args{nil, []int{1}},
+			&Series{err: fmt.Errorf("applying lambda to rows: no apply function provided")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			if got := s.SetRows(tt.args.lambda, tt.args.rows); !EqualSeries(got, tt.want) {
+				t.Errorf("Series.SetRows() = %v, want %v", got, tt.want)
 			}
 		})
 	}

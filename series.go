@@ -646,39 +646,34 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 	return
 }
 
-// FilterIndex returns the index position of rows that satisfy lambda,
-// a tada.FilterFn struct that is applied to the Series values.
-//
-// Values are coerced from their original type to the selected field type for filtering.
-// For example, {FilterFn{Float64: lambda}} converts the Series values to float64,
-// applies the true/false lambda function to each row in the container, and returns the rows that return true.
-// Rows with null values are excluded.
-//
-// If an error occurs, returns nil.
 // -- FILTERS
-func (s *Series) FilterIndex(lambda FilterFn) []int {
-	index, err := filter([]*valueContainer{s.values}, map[string]FilterFn{s.values.name: lambda})
+
+// FilterIndex returns the index positions of the rows in container that satsify filterFn.
+// A filter that matches no rows returns empty []int. An out of range container returns nil.
+// FilterIndex may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
+func (s *Series) FilterIndex(container string, filterFn FilterFn) []int {
+	mergedLabelsAndCols := append(s.labels, s.values)
+	if container == "" {
+		container = s.values.name
+	}
+	index, err := filter(mergedLabelsAndCols, map[string]FilterFn{container: filterFn})
 	if err != nil {
 		return nil
 	}
+	// no matches? convert from nil to empty slice
 	if len(index) == 0 {
 		return []int{}
 	}
 	return index
 }
 
-// Filter returns all rows that satisfy all of the filters,
-// which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
+// Filter returns a new Series with only rows that satisfy all of the filters,
+// which is a map of container names (either the Series name or label name) and anonymous functions.
 // Filter may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
-// For each container name in the map, the first field selected (i.e., not left blank)
-// in its FilterFn struct provides the filter logic for that container.
 //
-// Values are coerced from their original type to the selected field type for filtering, but after filtering retain their original type.
-// For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
-// applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
-// Rows with null values are always excluded from the filtered data.
-// If no filter is provided, returns a new copy of the Series.
-// For equality filtering on one or more containers, see also s.FilterByValue().
+// Rows with null values never satsify a filter.
+// If no filter is provided, function does nothing.
+// For equality filtering on one or more containers, consider FilterByValue.
 // Returns a new Series.
 func (s *Series) Filter(filters map[string]FilterFn) *Series {
 	s = s.Copy()
@@ -686,18 +681,13 @@ func (s *Series) Filter(filters map[string]FilterFn) *Series {
 	return s
 }
 
-// Filter returns all rows that satisfy all of the filters,
-// which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
+// Filter returns a new Series with only rows that satisfy all of the filters,
+// which is a map of container names (either the Series name or label name) and anonymous functions.
 // Filter may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
-// For each container name in the map, the first field selected (i.e., not left blank)
-// in its FilterFn struct provides the filter logic for that container
 //
-// Values are coerced from their original type to the selected field type for filtering, but after filtering retain their original type.
-// For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
-// applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
-// Rows with null values are always excluded from the filtered data.
-// If no filter is provided, does nothing.
-// For equality filtering on one or more containers, see also s.FilterByValue().
+// Rows with null values never satsify a filter.
+// If no filter is provided, function does nothing.
+// For equality filtering on one or more containers, consider FilterByValue.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Filter(filters map[string]FilterFn) {
 	if len(filters) == 0 {
@@ -792,12 +782,9 @@ func (s *SeriesMutator) FilterByValue(filters map[string]interface{}) {
 
 // -- APPLY
 
-// Apply applies a user-defined function to every row in the Series based on lambda.
-// The first field selected (i.e., not left blank) in the ApplyFn struct provides the apply logic.
-// Values are converted from their original type to the selected field type.
-// For example, {ApplyFn{Float64: lambda}} converts the Series values to float64 and
-// applies the lambda function to each row in the container, outputting a new float64 value for each row.
-// If a value is null either before or after the lambda function is applied, it is also null after.
+// Apply applies an anonymous function to every row in a container based on lambda,
+// which is an anonymous function.
+// A row's null status can be changed in-place within the anonymous function.
 // Returns a new Series.
 func (s *Series) Apply(lambda ApplyFn) *Series {
 	s = s.Copy()
@@ -805,19 +792,49 @@ func (s *Series) Apply(lambda ApplyFn) *Series {
 	return s
 }
 
-// Apply applies a user-defined function to every row in the Series based on lambda.
-// The first field selected (i.e., not left blank) in the ApplyFn struct provides the apply logic.
-// Values are converted from their original type to the selected field type.
-// For example, {ApplyFn{Float64: lambda}} converts the Series values to float64 and
-// applies the lambda function to each row in the container, outputting a new float64 value for each row.
+// Apply applies an anonymous function to every row in a container based on lambda,
+// which is an anonymous function.
+// A row's null status can be changed in-place within the anonymous function.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Apply(lambda ApplyFn) {
 	err := lambda.validate()
 	if err != nil {
-		s.series.resetWithError((fmt.Errorf("apply: %v", err)))
+		s.series.resetWithError((fmt.Errorf("applying lambda function: %v", err)))
 		return
 	}
-	s.series.values.apply(lambda)
+	err = s.series.values.apply(lambda, nil)
+	if err != nil {
+		s.series.resetWithError((fmt.Errorf("applying lambda function: %v", err)))
+		return
+	}
+	return
+}
+
+// SetRows applies lambda, an anonymous function,
+// to set the values at the specified row positions.
+// The new values must be the same type as the existing values.
+// Returns a new Series.
+func (s *Series) SetRows(lambda ApplyFn, rows []int) *Series {
+	s = s.Copy()
+	s.InPlace().SetRows(lambda, rows)
+	return s
+}
+
+// SetRows applies lambda, an anonymous function,
+// to set the values at the specified row positions.
+// The new values must be the same type as the existing values.
+// Modifies the underlying Series in place.
+func (s *SeriesMutator) SetRows(lambda ApplyFn, rows []int) {
+	err := lambda.validate()
+	if err != nil {
+		s.series.resetWithError((fmt.Errorf("applying lambda to rows: %v", err)))
+		return
+	}
+	err = s.series.values.apply(lambda, rows)
+	if err != nil {
+		s.series.resetWithError((fmt.Errorf("applying lambda to rows: %v", err)))
+		return
+	}
 	return
 }
 

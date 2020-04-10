@@ -1559,6 +1559,7 @@ func Test_valueContainer_apply(t *testing.T) {
 	}
 	type args struct {
 		apply ApplyFn
+		index []int
 	}
 	tests := []struct {
 		name    string
@@ -1578,7 +1579,7 @@ func Test_valueContainer_apply(t *testing.T) {
 					ret[i] = vals[i] * 2
 				}
 				return ret
-			}},
+			}, nil},
 			&valueContainer{slice: []float64{2, 4}, isNull: []bool{false, false}, name: "foo"},
 			false,
 		},
@@ -1596,8 +1597,23 @@ func Test_valueContainer_apply(t *testing.T) {
 					ret[i] = float64(vals[i]) * 2
 				}
 				return ret
-			}},
+			}, nil},
 			&valueContainer{slice: []float64{2, 4}, isNull: []bool{true, false}, name: "foo"},
+			false,
+		},
+		{"subset - with index", fields{
+			slice:  []int{1, 2},
+			isNull: []bool{false, false},
+			name:   "foo"},
+			args{func(slice interface{}, isNull []bool) interface{} {
+				vals := slice.([]int)
+				ret := make([]int, len(vals))
+				for i := range ret {
+					ret[i] = vals[i] * 2
+				}
+				return ret
+			}, []int{1}},
+			&valueContainer{slice: []int{1, 4}, isNull: []bool{false, false}, name: "foo"},
 			false,
 		},
 		{"fail - does not return slice (resets isNulls to original)", fields{
@@ -1607,7 +1623,7 @@ func Test_valueContainer_apply(t *testing.T) {
 			args{func(slice interface{}, isNull []bool) interface{} {
 				isNull[0] = true
 				return "foo"
-			}},
+			}, nil},
 			&valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
 			true,
 		},
@@ -1618,7 +1634,34 @@ func Test_valueContainer_apply(t *testing.T) {
 			args{func(slice interface{}, isNull []bool) interface{} {
 				isNull[0] = true
 				return []float64{1}
-			}},
+			}, nil},
+			&valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+			true,
+		},
+		{"fail - with index - wrong type (resets isNulls to original)", fields{
+			slice:  []float64{1, 2, 3},
+			isNull: []bool{false, true, true},
+			name:   "foo"},
+			args{func(slice interface{}, isNull []bool) interface{} {
+				vals := slice.([]float64)
+				ret := make([]int, len(vals))
+				for i := range ret {
+					isNull[i] = false
+					ret[i] = int(vals[i])
+				}
+				return ret
+			}, []int{1, 2}},
+			&valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, true}, name: "foo"},
+			true,
+		},
+		{"fail - out of range", fields{
+			slice:  []float64{1, 2},
+			isNull: []bool{false, false},
+			name:   "foo"},
+			args{func(slice interface{}, isNull []bool) interface{} {
+				isNull[0] = true
+				return []float64{1}
+			}, []int{2}},
 			&valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
 			true,
 		},
@@ -1631,7 +1674,7 @@ func Test_valueContainer_apply(t *testing.T) {
 				name:   tt.fields.name,
 				cache:  tt.fields.cache,
 			}
-			err := vc.apply(tt.args.apply)
+			err := vc.apply(tt.args.apply, tt.args.index)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("valueContainer.apply() error = %v, want %v", err, tt.wantErr)
 			}
@@ -1641,7 +1684,6 @@ func Test_valueContainer_apply(t *testing.T) {
 		})
 	}
 }
-
 
 func Test_withColumn(t *testing.T) {
 	type args struct {
@@ -4871,6 +4913,72 @@ func Test_rowCount(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := rowCount(tt.args.rowIndices); got != tt.want {
 				t.Errorf("rowCount() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_set(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		cache  []string
+		name   string
+	}
+	type args struct {
+		newSlice interface{}
+		newNulls []bool
+		index    []int
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    *valueContainer
+		wantErr bool
+	}{
+		{"pass", fields{
+			slice:  []string{"foo", "", "bar"},
+			isNull: []bool{false, true, false},
+			name:   "foobar"},
+			args{[]string{"baz"}, []bool{false}, []int{1}},
+
+			&valueContainer{
+				slice:  []string{"foo", "baz", "bar"},
+				isNull: []bool{false, false, false},
+				name:   "foobar",
+			},
+			false,
+		},
+		{"fail - different type", fields{
+			slice:  []string{"foo", "", "bar"},
+			isNull: []bool{false, true, false},
+			name:   "foobar"},
+			args{[]int{1}, []bool{false}, []int{1}},
+
+			&valueContainer{
+				slice:  []string{"foo", "", "bar"},
+				isNull: []bool{false, true, false},
+				name:   "foobar",
+			},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				cache:  tt.fields.cache,
+				name:   tt.fields.name,
+			}
+			err := vc.set(tt.args.newSlice, tt.args.newNulls, tt.args.index)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("valueContainer.set() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(vc, tt.want) {
+				t.Errorf("valueContainer.set() -> %v, want %v", vc, tt.want)
+
 			}
 		})
 	}

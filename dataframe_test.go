@@ -1783,6 +1783,68 @@ func TestDataFrame_Filter(t *testing.T) {
 	}
 }
 
+func TestDataFrame_FilterIndex(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		container string
+		filterFn  FilterFn
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []int
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, false, false}, name: "bar"}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+			args{"foo", func(v interface{}) bool { return v.(float64) > 1 }},
+			[]int{2},
+		},
+		{"no matching rows", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, false, false}, name: "bar"}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+			args{"foo", func(v interface{}) bool { return v.(float64) > 10 }},
+			[]int{},
+		},
+		{"fail - bad col name", fields{
+			values: []*valueContainer{
+				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, false, false}, name: "bar"}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"}},
+			args{"corge", func(v interface{}) bool { return v.(float64) > 1 }},
+			nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.FilterIndex(tt.args.container, tt.args.filterFn); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.FilterIndex() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestDataFrame_Where(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
@@ -1916,6 +1978,19 @@ func TestDataFrame_Apply(t *testing.T) {
 				colLevelNames: []string{"*0"},
 				name:          "baz"},
 		},
+		{"fail - wrong length", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				{slice: []int{1}, isNull: []bool{false}, name: "bar"}},
+			labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
+			args{map[string]ApplyFn{"foo": func(slice interface{}, isNull []bool) interface{} {
+				return []int{1, 2, 3}
+			}}},
+			&DataFrame{
+				err: fmt.Errorf("applying lambda function: constructing new values: new slice is not same length as original slice (3 != 1)")},
+		},
 		{"fail - no function", fields{
 			values: []*valueContainer{
 				{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
@@ -1925,7 +2000,7 @@ func TestDataFrame_Apply(t *testing.T) {
 			name:          "baz"},
 			args{map[string]ApplyFn{"foo": nil}},
 			&DataFrame{
-				err: fmt.Errorf("apply: no apply function provided")},
+				err: fmt.Errorf("applying lambda function: no apply function provided")},
 		},
 		{"fail - no matching column", fields{
 			values: []*valueContainer{
@@ -1936,7 +2011,7 @@ func TestDataFrame_Apply(t *testing.T) {
 			name:          "baz"},
 			args{map[string]ApplyFn{"corge": func(interface{}, []bool) interface{} { return 0 }}},
 			&DataFrame{
-				err: fmt.Errorf("apply: name (corge) not found")},
+				err: fmt.Errorf("applying lambda function: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -1950,6 +2025,146 @@ func TestDataFrame_Apply(t *testing.T) {
 			}
 			if got := df.Apply(tt.args.lambdas); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Apply() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_SetRows(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		lambda    ApplyFn
+		container string
+		rows      []int
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"pass", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []int{1, 2, 3}, isNull: []bool{false, false, false}, name: "bar"}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
+			args{
+				func(slice interface{}, isNull []bool) interface{} {
+					vals := slice.([]float64)
+					ret := make([]float64, len(vals))
+					for i := range ret {
+						ret[i] = vals[i] * 2
+					}
+					return ret
+				},
+				"foo", []int{1},
+			},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1, 4, 3}, isNull: []bool{false, false, false}, name: "foo"},
+					{slice: []int{1, 2, 3}, isNull: []bool{false, false, false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"},
+		},
+		{"pass - change null", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2, 3}, isNull: []bool{true, true, true}, name: "foo"},
+				{slice: []int{1, 2, 3}, isNull: []bool{false, false, false}, name: "bar"}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
+			args{
+				func(slice interface{}, isNull []bool) interface{} {
+					vals := slice.([]float64)
+					ret := make([]float64, len(vals))
+					for i := range ret {
+						isNull[i] = false
+						ret[i] = vals[i] * 2
+					}
+					return ret
+				},
+				"foo", []int{1},
+			},
+			&DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1, 4, 3}, isNull: []bool{true, false, true}, name: "foo"},
+					{slice: []int{1, 2, 3}, isNull: []bool{false, false, false}, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"},
+		},
+		{"fail - bad name", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []int{1, 2, 3}, isNull: []bool{false, false, false}, name: "bar"}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
+			args{
+				func(slice interface{}, isNull []bool) interface{} {
+					vals := slice.([]float64)
+					ret := make([]float64, len(vals))
+					for i := range ret {
+						ret[i] = vals[i] * 2
+					}
+					return ret
+				},
+				"corge", []int{1},
+			},
+			&DataFrame{
+				err: fmt.Errorf("applying lambda to rows: name (corge) not found")},
+		},
+		{"fail - wrong length", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []int{1, 2, 3}, isNull: []bool{false, false, false}, name: "bar"}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
+			args{
+				func(slice interface{}, isNull []bool) interface{} {
+					return []int{0, 1}
+				},
+				"foo", []int{1},
+			},
+			&DataFrame{
+				err: fmt.Errorf("applying lambda to rows: constructing new values: new slice is not same length as original slice (2 != 1)")},
+		},
+		{"fail - no function", fields{
+			values: []*valueContainer{
+				{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
+				{slice: []int{1, 2, 3}, isNull: []bool{false, false, false}, name: "bar"}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
+			args{
+				nil,
+				"foo", []int{1},
+			},
+			&DataFrame{
+				err: fmt.Errorf("applying lambda to rows: no apply function provided")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.SetRows(tt.args.lambda, tt.args.container, tt.args.rows); !EqualDataFrames(got, tt.want) {
+				t.Errorf("DataFrame.SetRows() = %v, want %v", got, tt.want)
 			}
 		})
 	}

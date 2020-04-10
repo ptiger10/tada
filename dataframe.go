@@ -1910,17 +1910,12 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 
 // -- FILTERS
 
-// Filter returns all rows that satisfy all of the filters,
-// which is a map of container names (either column or label names) and tada.FilterFn structs.
-// For each container name in the map, the first field selected (i.e., not left blank)
-// in its FilterFn struct provides the filter logic for that container.
+// Filter returns a new DataFrame with only rows that satisfy all of the filters,
+// which is a map of container names (either column name or label name) and anonymous functions.
 //
-// Values are coerced from their original type to the selected field type for filtering, but after filtering retain their original type.
-// For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
-// applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
-// Rows with null values are always excluded from the filtered data.
-// If no filter is provided, returns a new copy of the DataFrame.
-// For equality filtering on one or more containers, see also df.FilterByValue().
+// Rows with null values never satsify a filter.
+// If no filter is provided, function does nothing.
+// For equality filtering on one or more containers, consider FilterByValue.
 // Returns a new DataFrame.
 func (df *DataFrame) Filter(filters map[string]FilterFn) *DataFrame {
 	df = df.Copy()
@@ -1928,17 +1923,12 @@ func (df *DataFrame) Filter(filters map[string]FilterFn) *DataFrame {
 	return df
 }
 
-// Filter returns all rows that satisfy all of the filters,
-// which is a map of container names (either column or label names) and tada.FilterFn structs.
-// For each container name in the map, the first field selected (i.e., not left blank)
-// in its FilterFn struct provides the filter logic for that container.
+// Filter returns a new DataFrame with only rows that satisfy all of the filters,
+// which is a map of container names (either column name or label name) and anonymous functions.
 //
-// Values are coerced from their original type to the selected field type for filtering, but after filtering retain their original type.
-// For example, {"foo": FilterFn{Float64: lambda}} converts the values in the foo container to float64,
-// applies the true/false lambda function to each row in the container, and returns the rows that return true in their original type.
-// Rows with null values are always excluded from the filtered data.
-// If no filter is provided, does nothing.
-// For equality filtering on one or more containers, see also df.FilterByValue().
+// Rows with null values never satsify a filter.
+// If no filter is provided, function does nothing.
+// For equality filtering on one or more containers, consider FilterByValue.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Filter(filters map[string]FilterFn) {
 	if len(filters) == 0 {
@@ -1953,6 +1943,21 @@ func (df *DataFrameMutator) Filter(filters map[string]FilterFn) {
 	}
 	df.Subset(index)
 	return
+}
+
+// FilterIndex returns the index positions of the rows in container that satsify filterFn.
+// A filter that matches no rows returns empty []int. An out of range container returns nil.
+func (df *DataFrame) FilterIndex(container string, filterFn FilterFn) []int {
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	index, err := filter(mergedLabelsAndCols, map[string]FilterFn{container: filterFn})
+	if err != nil {
+		return nil
+	}
+	// no matches? convert from nil to empty slice
+	if len(index) == 0 {
+		return []int{}
+	}
+	return index
 }
 
 // Where iterates over the rows in df and evaluates whether each one satisfies filters,
@@ -2044,14 +2049,53 @@ func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 	for containerName, lambda := range lambdas {
 		err := lambda.validate()
 		if err != nil {
-			df.dataframe.resetWithError((fmt.Errorf("apply: %v", err)))
+			df.dataframe.resetWithError((fmt.Errorf("applying lambda function: %v", err)))
 			return
 		}
 		index, err := indexOfContainer(containerName, mergedLabelsAndCols)
 		if err != nil {
-			df.dataframe.resetWithError((fmt.Errorf("apply: %v", err)))
+			df.dataframe.resetWithError((fmt.Errorf("applying lambda function: %v", err)))
+			return
 		}
-		mergedLabelsAndCols[index].apply(lambda)
+		err = mergedLabelsAndCols[index].apply(lambda, nil)
+		if err != nil {
+			df.dataframe.resetWithError((fmt.Errorf("applying lambda function: %v", err)))
+			return
+		}
+	}
+	return
+}
+
+// SetRows applies lambda within container (either label or column name)
+// to set the values at the specified row positions.
+// The new values must be the same type as the existing values.
+// Returns a new DataFrame.
+func (df *DataFrame) SetRows(lambda ApplyFn, container string, rows []int) *DataFrame {
+	df = df.Copy()
+	df.InPlace().SetRows(lambda, container, rows)
+	return df
+}
+
+// SetRows applies lambda within container (either label or column name)
+// to set the values at the specified row positions.
+// The new values must be the same type as the existing values.
+// Modifies the underlying DataFrame.
+func (df *DataFrameMutator) SetRows(lambda ApplyFn, container string, rows []int) {
+	err := lambda.validate()
+	if err != nil {
+		df.dataframe.resetWithError((fmt.Errorf("applying lambda to rows: %v", err)))
+		return
+	}
+	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
+	index, err := indexOfContainer(container, mergedLabelsAndCols)
+	if err != nil {
+		df.dataframe.resetWithError((fmt.Errorf("applying lambda to rows: %v", err)))
+		return
+	}
+	err = mergedLabelsAndCols[index].apply(lambda, rows)
+	if err != nil {
+		df.dataframe.resetWithError((fmt.Errorf("applying lambda to rows: %v", err)))
+		return
 	}
 	return
 }
