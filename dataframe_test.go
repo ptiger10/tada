@@ -3766,6 +3766,15 @@ func TestDataFrame_InterfaceRecords(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{nil},
 			[][]interface{}{{"*0", 0, 1}, {"foo", "a", "(null)"}, {"bar", 1, "qux"}}},
+		{"pass - exclude labels",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", ""}, isNull: []bool{false, true}, name: "foo"},
+				{slice: []interface{}{1, "qux"}, isNull: []bool{false, false}, name: "bar"},
+			},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{[]WriteOption{WriteOptionExcludeLabels()}},
+			[][]interface{}{{"foo", "a", "(null)"}, {"bar", 1, "qux"}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -6012,6 +6021,148 @@ func TestDataFrame_Shuffle(t *testing.T) {
 			}
 			if got := df.Shuffle(tt.args.seed); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Shuffle() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_Reduce(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		name   string
+		lambda ReduceFn
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *Series
+	}{
+		{"pass",
+			fields{
+				labels: []*valueContainer{
+					{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "foo"},
+				},
+				values: []*valueContainer{
+					{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "bar"},
+					{slice: []float64{1, 2, 3, 4}, isNull: []bool{true, false, false, false}, name: "baz"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "foo"},
+			args{"custom_sum", func(slice interface{}, isNull []bool) (value interface{}, null bool) {
+				vals := slice.([]float64)
+				var sum float64
+				for i := range vals {
+					if isNull[i] {
+						return 0.0, true
+					}
+					sum += vals[i]
+				}
+				return sum, false
+			}},
+			&Series{
+				values: &valueContainer{slice: []float64{10, 0}, isNull: []bool{false, true}, name: "custom_sum"},
+				labels: []*valueContainer{
+					{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "*0"}}},
+		},
+		{"pass - multi level columns",
+			fields{
+				labels: []*valueContainer{
+					{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "foo"},
+				},
+				values: []*valueContainer{
+					{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "2019|bar"},
+					{slice: []float64{1, 2, 3, 4}, isNull: []bool{true, false, false, false}, name: "2019|baz"},
+				},
+				colLevelNames: []string{"year", "class"},
+				name:          "foo"},
+			args{"custom_sum", func(slice interface{}, isNull []bool) (value interface{}, null bool) {
+				vals := slice.([]float64)
+				var sum float64
+				for i := range vals {
+					if isNull[i] {
+						return 0.0, true
+					}
+					sum += vals[i]
+				}
+				return sum, false
+			}},
+			&Series{
+				values: &valueContainer{slice: []float64{10, 0}, isNull: []bool{false, true}, name: "custom_sum"},
+				labels: []*valueContainer{
+					{slice: []string{"2019", "2019"}, isNull: []bool{false, false}, name: "year"},
+					{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "class"}}},
+		},
+		{"fail - mixed types",
+			fields{
+				labels: []*valueContainer{
+					{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "foo"},
+				},
+				values: []*valueContainer{
+					{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "bar"},
+					{slice: []float64{1, 2, 3, 4}, isNull: []bool{true, false, false, false}, name: "baz"},
+				},
+				colLevelNames: []string{"year", "class"},
+				name:          "foo"},
+			args{"custom_sum", func(slice interface{}, isNull []bool) (value interface{}, null bool) {
+				vals := slice.([]float64)
+				var sum float64
+				for i := range vals {
+					if isNull[i] {
+						return "nil", true
+					}
+					sum += vals[i]
+				}
+				return sum, false
+			}},
+			&Series{
+				err: fmt.Errorf("reducing DataFrame: column baz: type must match type of first reduced value (string != float64)")},
+		},
+		{"fail - no function",
+			fields{
+				labels: []*valueContainer{
+					{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "foo"},
+				},
+				values: []*valueContainer{
+					{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "2019|bar"},
+					{slice: []float64{1, 2, 3, 4}, isNull: []bool{true, false, false, false}, name: "2019|baz"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "foo"},
+			args{"custom_sum", nil},
+			&Series{
+				err: fmt.Errorf("reducing DataFrame: no reduce function provided")},
+		},
+		{"fail - no columns",
+			fields{
+				labels: []*valueContainer{
+					{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "foo"},
+				},
+				values:        []*valueContainer{},
+				colLevelNames: []string{"*0"},
+				name:          "foo"},
+			args{"custom_sum", func(slice interface{}, isNull []bool) (value interface{}, null bool) { return nil, true }},
+			&Series{
+				err: fmt.Errorf("reducing DataFrame: DataFrame must have at least one column")},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.Reduce(tt.args.name, tt.args.lambda); !EqualSeries(got, tt.want) {
+				t.Errorf("DataFrame.Reduce() = %v, want %v", got, tt.want)
 			}
 		})
 	}

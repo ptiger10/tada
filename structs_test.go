@@ -1,8 +1,10 @@
 package tada
 
 import (
+	"math"
 	"reflect"
 	"testing"
+	"time"
 )
 
 func Test_readNestedInterfaceByRows(t *testing.T) {
@@ -14,6 +16,7 @@ func Test_readNestedInterfaceByRows(t *testing.T) {
 		name    string
 		args    args
 		want    []interface{}
+		want1   [][]bool
 		wantErr bool
 	}{
 		{"pass - same type", args{
@@ -26,6 +29,9 @@ func Test_readNestedInterfaceByRows(t *testing.T) {
 			[]interface{}{
 				[]string{"foo", "bar"},
 				[]int{0, 1},
+			},
+			[][]bool{
+				{false, false}, {false, false},
 			},
 			false,
 		},
@@ -40,12 +46,44 @@ func Test_readNestedInterfaceByRows(t *testing.T) {
 				[]interface{}{"foo", "bar"},
 				[]interface{}{0, float64(1)},
 			},
+			nil,
+			false,
+		},
+		{"pass - nulls - not required same type", args{
+			[][]interface{}{
+				{"foo", ""},
+				{"bar", time.Time{}},
+			},
+			false,
+		},
+			[]interface{}{
+				[]interface{}{"foo", "bar"},
+				[]interface{}{"", time.Time{}},
+			},
+			nil,
+			false,
+		},
+		{"pass - nulls - required same type", args{
+			[][]interface{}{
+				{"foo", ""},
+				{"bar", math.NaN()},
+			},
+			true,
+		},
+			[]interface{}{
+				[]string{"foo", "bar"},
+				[]string{"", ""},
+			},
+			[][]bool{
+				{false, false}, {true, true},
+			},
 			false,
 		},
 		{"fail - no rows", args{
 			[][]interface{}{},
 			true,
 		},
+			nil,
 			nil,
 			true,
 		},
@@ -57,6 +95,7 @@ func Test_readNestedInterfaceByRows(t *testing.T) {
 			true,
 		},
 			nil,
+			nil,
 			true,
 		},
 		{"fail - different types when same is required", args{
@@ -67,18 +106,22 @@ func Test_readNestedInterfaceByRows(t *testing.T) {
 			true,
 		},
 			nil,
+			nil,
 			true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readNestedInterfaceByRows(tt.args.rows, tt.args.requireSameType)
+			got, got1, err := readNestedInterfaceByRows(tt.args.rows, tt.args.requireSameType)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("readNestedInterfaceByRows() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("readNestedInterfaceByRows() = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got1, tt.want1) {
+				t.Errorf("readNestedInterfaceByRows() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}
@@ -192,8 +235,7 @@ func Test_transposeNestedNulls(t *testing.T) {
 
 func TestStructTransposer_Transpose(t *testing.T) {
 	type fields struct {
-		Rows   [][]interface{}
-		IsNull [][]bool
+		Rows [][]interface{}
 	}
 	type args struct {
 		structPointer interface{}
@@ -222,18 +264,17 @@ func TestStructTransposer_Transpose(t *testing.T) {
 		},
 		{"pass - nulls", fields{
 			Rows: [][]interface{}{
-				{0, float64(0)},
-				{1, float64(1)},
+				{0, float64(1)},
+				{1, ""},
 			},
-			IsNull: [][]bool{{false, true}, {false, false}},
 		},
 			args{
 				&testSchema3{},
 			},
 			&testSchema3{
 				Foo:     []int{0, 1},
-				Bar:     []float64{0, 1},
-				NullMap: [][]bool{{false, false}, {true, false}},
+				Bar:     []float64{1, 0},
+				NullMap: [][]bool{{false, false}, {false, true}},
 			},
 			false,
 		},
@@ -253,7 +294,6 @@ func TestStructTransposer_Transpose(t *testing.T) {
 				{0, float64(0)},
 				{1, float64(1)},
 			},
-			IsNull: [][]bool{{false, true}, {false, false}},
 		},
 			args{
 				testSchema3{},
@@ -266,7 +306,6 @@ func TestStructTransposer_Transpose(t *testing.T) {
 				{0, float64(0)},
 				{1, float64(1)},
 			},
-			IsNull: [][]bool{{false, true}, {false, false}},
 		},
 			args{
 				&[]float64{},
@@ -274,12 +313,11 @@ func TestStructTransposer_Transpose(t *testing.T) {
 			&[]float64{},
 			true,
 		},
-		{"fail - wrong type of null field", fields{
+		{"fail - struct has null tag, but it is wrong type to receive nulls", fields{
 			Rows: [][]interface{}{
-				{0, float64(0)},
-				{1, float64(1)},
+				{0},
+				{1},
 			},
-			IsNull: [][]bool{{false, true}, {false, false}},
 		},
 			args{
 				&testSchema4{},
@@ -292,7 +330,6 @@ func TestStructTransposer_Transpose(t *testing.T) {
 				{0},
 				{1},
 			},
-			IsNull: [][]bool{{false, true}, {false, false}},
 		},
 			args{
 				&testSchema{},
@@ -311,51 +348,11 @@ func TestStructTransposer_Transpose(t *testing.T) {
 			&testSchema{Foo: []int{0, 1}},
 			true,
 		},
-		{"fail - misshapen IsNull", fields{
-			Rows: [][]interface{}{
-				{0, float64(0)},
-				{1, float64(1)},
-			},
-			IsNull: [][]bool{{false, true}, {false}},
-		},
-			args{
-				&testSchema3{},
-			},
-			&testSchema3{Foo: []int{0, 1}, Bar: []float64{0, 1}},
-			true,
-		},
-		{"fail - unevenly shaped IsNull", fields{
-			Rows: [][]interface{}{
-				{0, float64(0)},
-				{1, float64(1)},
-			},
-			IsNull: [][]bool{{false, true}, {false}},
-		},
-			args{
-				&testSchema3{},
-			},
-			&testSchema3{Foo: []int{0, 1}, Bar: []float64{0, 1}},
-			true,
-		},
-		{"fail - IsNull has wrong number of columns", fields{
-			Rows: [][]interface{}{
-				{0, float64(0)},
-				{1, float64(1)},
-			},
-			IsNull: [][]bool{{false}, {false}},
-		},
-			args{
-				&testSchema3{},
-			},
-			&testSchema3{Foo: []int{0, 1}, Bar: []float64{0, 1}},
-			true,
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			st := StructTransposer{
-				Rows:   tt.fields.Rows,
-				IsNull: tt.fields.IsNull,
+				Rows: tt.fields.Rows,
 			}
 			if err := st.Transpose(tt.args.structPointer); (err != nil) != tt.wantErr {
 				t.Errorf("StructTransposer.Transpose() error = %v, wantErr %v", err, tt.wantErr)
@@ -401,7 +398,6 @@ func TestStructTransposer_Shuffle(t *testing.T) {
 					{4},
 					{3},
 				},
-				IsNull: [][]bool{{false}, {true}, {false}, {false}, {false}},
 			},
 		},
 		{"pass - no nulls", fields{
@@ -428,8 +424,7 @@ func TestStructTransposer_Shuffle(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			st := &StructTransposer{
-				Rows:   tt.fields.Rows,
-				IsNull: tt.fields.IsNull,
+				Rows: tt.fields.Rows,
 			}
 			st.Shuffle(tt.args.seed)
 			if !reflect.DeepEqual(st, tt.want) {

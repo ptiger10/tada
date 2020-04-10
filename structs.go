@@ -8,13 +8,23 @@ import (
 )
 
 // if requireSameType, all columns must be of same type; otherwise, each column is converted to []interface{}
-func readNestedInterfaceByRows(rows [][]interface{}, requireSameType bool) ([]interface{}, error) {
+func readNestedInterfaceByRows(rows [][]interface{}, requireSameType bool) (ret []interface{}, isNull [][]bool, err error) {
 	if len(rows) == 0 {
-		return nil, fmt.Errorf("reading [][]interface{}: must have at least one row")
+		return nil, nil, fmt.Errorf("reading [][]interface{}: must have at least one row")
 	}
 	// must deduce output type per column
 	sampleRow := rows[0]
-	ret := make([]interface{}, len(sampleRow))
+	ret = make([]interface{}, len(sampleRow))
+
+	if requireSameType {
+		isNull = make([][]bool, len(sampleRow))
+		for k := range sampleRow {
+			isNull[k] = make([]bool, len(rows))
+		}
+	} else {
+		isNull = nil
+	}
+
 	colTypes := make([]reflect.Type, len(sampleRow))
 	for k := range sampleRow {
 		colType := reflect.TypeOf(sampleRow[k])
@@ -28,18 +38,27 @@ func readNestedInterfaceByRows(rows [][]interface{}, requireSameType bool) ([]in
 	for i := range rows {
 		// different number of columns than in row 0?
 		if len(rows[i]) != len(colTypes) {
-			return nil, fmt.Errorf("reading [][]interface{} by rows: row %d: all rows must have same length as row 0 (%d != %d)",
+			return nil, nil, fmt.Errorf("reading [][]interface{} by rows: row %d: all rows must have same length as row 0 (%d != %d)",
 				i, len(rows[i]), len(colTypes))
 		}
 		for k := range rows[i] {
 			// all columns are not same type as row 0?
 			if requireSameType {
-				if reflect.TypeOf(rows[i][k]) != colTypes[k] {
-					return nil, fmt.Errorf("reading [][]interface{} by rows: [%d][%d]: all types must be the same as in row 0 (%v != %v)",
-						i, k, reflect.TypeOf(rows[i][k]).String(), colTypes[k].String())
-				}
+				// value is null value?
 				dst := reflect.ValueOf(ret[k]).Index(i)
-				src := reflect.ValueOf(rows[i][k])
+				var src reflect.Value
+				// is null value? set to zero type
+				if null, _ := isNullInterface(rows[i][k]); null {
+					isNull[k][i] = true
+					src = reflect.Zero(colTypes[k])
+				}
+				if !isNull[k][i] {
+					if reflect.TypeOf(rows[i][k]) != colTypes[k] {
+						return nil, nil, fmt.Errorf("reading [][]interface{} by rows: [%d][%d]: all types must be the same as in row 0 (%v != %v)",
+							i, k, reflect.TypeOf(rows[i][k]).String(), colTypes[k].String())
+					}
+					src = reflect.ValueOf(rows[i][k])
+				}
 				dst.Set(src)
 			} else {
 				ret[k].([]interface{})[i] = rows[i][k]
@@ -47,7 +66,7 @@ func readNestedInterfaceByRows(rows [][]interface{}, requireSameType bool) ([]in
 
 		}
 	}
-	return ret, nil
+	return ret, isNull, nil
 }
 
 // if requireSameType, all columns must be of same type; otherwise, each column is converted to []interface{}
@@ -112,8 +131,9 @@ func transposeNestedNulls(isNull [][]bool) ([][]bool, error) {
 
 // Transpose reads the values of a row-oriented struct representation of a DataFrame
 // into a column-oriented struct representation of a DataFrame.
+// If an error is returned, values are still written to structPointer up until the point the error occurred.
 func (st *StructTransposer) Transpose(structPointer interface{}) error {
-	transfer, err := readNestedInterfaceByRows(st.Rows, true)
+	transfer, isNull, err := readNestedInterfaceByRows(st.Rows, true)
 	if err != nil {
 		return fmt.Errorf("transposing struct: %v", err)
 	}
@@ -161,21 +181,8 @@ func (st *StructTransposer) Transpose(structPointer interface{}) error {
 	}
 	// receiving structPointer has null tag?
 	if hasNullTag {
-		isNull, err := transposeNestedNulls(st.IsNull)
-		if err != nil {
-			return fmt.Errorf("transposing struct: %v", err)
-		}
 		if len(isNull) > 0 {
-			copiedFields := v.NumField() + offset
-			nullTable := make([][]bool, copiedFields)
-			if len(isNull) != len(nullTable) {
-				return fmt.Errorf("transposing struct: IsNull field must have columns equal to the number of unexported fields (%d != %d)",
-					len(isNull), len(nullTable))
-			}
-			for k := 0; k < copiedFields; k++ {
-				nullTable[k] = isNull[k]
-			}
-			src := reflect.ValueOf(nullTable).Interface()
+			src := reflect.ValueOf(isNull).Interface()
 			dst := v.FieldByName(nullField)
 			dst.Set(reflect.ValueOf(src))
 		}
@@ -192,9 +199,6 @@ func (st *StructTransposer) Shuffle(seed int64) {
 		len(st.Rows),
 		func(i, j int) {
 			st.Rows[i], st.Rows[j] = st.Rows[j], st.Rows[i]
-			if len(st.IsNull) == len(st.Rows) {
-				st.IsNull[i], st.IsNull[j] = st.IsNull[j], st.IsNull[i]
-			}
 		})
 	return
 }

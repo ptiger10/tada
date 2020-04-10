@@ -297,7 +297,7 @@ func ReadInterfaceRecords(records [][]interface{}, options ...ReadOption) (ret *
 	config := setReadConfig(options)
 	var slices []interface{}
 	if !config.majorDimIsCols {
-		slices, err = readNestedInterfaceByRows(records, false)
+		slices, _, err = readNestedInterfaceByRows(records, false)
 	} else {
 		slices, err = readNestedInterfaceByCols(records, false)
 	}
@@ -2602,4 +2602,58 @@ func (df *DataFrame) Min() *Series {
 // Max coerces the values in each column to float64 and returns the maximum non-null value in each column.
 func (df *DataFrame) Max() *Series {
 	return df.math("max", max)
+}
+
+// Reduce uses lambda to reduce all columns to a Series named name
+// with column names as labels and reduced values as row values.
+// The type of the new Series is a slice with the same type as the first value outputted by the anonymous function.
+func (df *DataFrame) Reduce(name string, lambda ReduceFn) *Series {
+	err := lambda.validate()
+	if err != nil {
+		return seriesWithError(fmt.Errorf("reducing DataFrame: %v", err))
+	}
+	if df.NumColumns() == 0 {
+		return seriesWithError(fmt.Errorf("reducing DataFrame: DataFrame must have at least one column"))
+	}
+	// must deduce output type from first result
+	firstResult, _ := lambda(df.values[0].slice, df.values[0].isNull)
+	firstType := reflect.TypeOf(firstResult)
+	sampleLabel := splitNameIntoLevels(df.values[0].name)
+
+	retVals := reflect.MakeSlice(reflect.SliceOf(firstType), df.NumColumns(), df.NumColumns())
+	retNulls := make([]bool, df.NumColumns())
+	stringifiedLevels := make([][]string, len(sampleLabel))
+	for j := range stringifiedLevels {
+		stringifiedLevels[j] = make([]string, df.NumColumns())
+	}
+	for i := range df.values {
+		val, null := lambda(df.values[i].slice, df.values[i].isNull)
+		src := reflect.ValueOf(val)
+		if src.Type() != firstType {
+			return seriesWithError(fmt.Errorf("reducing DataFrame: column %s: type must match type of first reduced value (%s != %s)",
+				df.values[i].name, src.Type().String(), firstType.String()))
+		}
+		dst := retVals.Index(i)
+		dst.Set(src)
+		if null {
+			retNulls[i] = null
+		}
+		levels := splitNameIntoLevels(df.values[i].name)
+		for j := range levels {
+			stringifiedLevels[j][i] = levels[j]
+		}
+	}
+	retLabels := copyStringsIntoValueContainers(
+		stringifiedLevels,
+		makeBoolMatrix(len(stringifiedLevels), df.NumColumns()),
+		df.colLevelNames,
+	)
+	return &Series{
+		values: &valueContainer{
+			slice:  retVals.Interface(),
+			isNull: retNulls,
+			name:   name,
+		},
+		labels: retLabels,
+	}
 }

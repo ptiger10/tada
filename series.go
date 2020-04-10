@@ -1334,3 +1334,12 @@ func (s *Series) Unique(includeLabels bool) *Series {
 	}
 	return s.Subset(index)
 }
+
+// Reduce reduces all Series values to a single value and null status using lambda.
+func (s *Series) Reduce(lambda ReduceFn) (value interface{}, isNull bool) {
+	err := lambda.validate()
+	if err != nil {
+		return nil, true
+	}
+	return lambda(s.values.slice, s.values.isNull)
+}

@@ -2091,6 +2091,13 @@ func (lambda ApplyFn) validate() error {
 	return nil
 }
 
+func (lambda ReduceFn) validate() error {
+	if lambda == nil {
+		return fmt.Errorf("no reduce function provided")
+	}
+	return nil
+}
+
 // left-exclusive, right-inclusive by default
 // expects vals and isNull to be same length
 func cut(vals []float64, isNull []bool,

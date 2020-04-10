@@ -3776,3 +3776,63 @@ func TestSeries_Shuffle(t *testing.T) {
 		})
 	}
 }
+
+func TestSeries_Reduce(t *testing.T) {
+	type fields struct {
+		values     *valueContainer
+		labels     []*valueContainer
+		sharedData bool
+		err        error
+	}
+	type args struct {
+		lambda ReduceFn
+	}
+	tests := []struct {
+		name       string
+		fields     fields
+		args       args
+		wantValue  interface{}
+		wantIsNull bool
+	}{
+		{"pass",
+			fields{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "qux"}},
+			},
+			args{
+				func(slice interface{}, _ []bool) (interface{}, bool) {
+					vals := slice.([]float64)
+					var sum float64
+					for i := range vals {
+						sum += vals[i]
+					}
+					return sum, false
+				},
+			},
+			10.0, false,
+		},
+		{"fail - no lambda",
+			fields{values: &valueContainer{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+				labels: []*valueContainer{{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "qux"}},
+			},
+			args{nil},
+			nil, true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Series{
+				values:     tt.fields.values,
+				labels:     tt.fields.labels,
+				sharedData: tt.fields.sharedData,
+				err:        tt.fields.err,
+			}
+			gotValue, gotIsNull := s.Reduce(tt.args.lambda)
+			if !reflect.DeepEqual(gotValue, tt.wantValue) {
+				t.Errorf("Series.Reduce() gotValue = %v, want %v", gotValue, tt.wantValue)
+			}
+			if gotIsNull != tt.wantIsNull {
+				t.Errorf("Series.Reduce() gotIsNull = %v, want %v", gotIsNull, tt.wantIsNull)
+			}
+		})
+	}
+}
