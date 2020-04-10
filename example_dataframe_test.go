@@ -410,6 +410,23 @@ func ExamplePrintOptionMaxColumns() {
 	// +---++---+-----+---+
 }
 
+func ExamplePrintOptionMaxCellWidth() {
+	df := tada.NewDataFrame([]interface{}{
+		[]string{"corgilius", "barrius", "foo"},
+	}).SetColNames([]string{"waldonius"})
+	tada.PrintOptionMaxCellWidth(5)
+	fmt.Println(df)
+	tada.PrintOptionMaxCellWidth(30)
+	// Output:
+	// +---++-------+
+	// | - || wa... |
+	// |---||-------|
+	// | 0 || co... |
+	// | 1 || ba... |
+	// | 2 ||   foo |
+	// +---++-------+
+}
+
 func ExampleDataFrame_GroupBy() {
 	df := tada.NewDataFrame([]interface{}{
 		[]float64{1, 2, 3, 4},

@@ -273,3 +273,11 @@ type Binner struct {
 	AndMore bool
 	Labels  []string
 }
+
+// A StructTransposer is a row-oriented struct representation of a DataFrame
+// that can be randomly shuffled or transposed into a column-oriented struct representation of a DataFrame.
+// It is useful for intuitive and robust row-oriented testing.
+type StructTransposer struct {
+	Rows   [][]interface{}
+	IsNull [][]bool
+}

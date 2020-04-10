@@ -8,6 +8,7 @@ import (
 var optionLevelSeparator = "|"
 var optionMaxRows = 50
 var optionMaxColumns = 20
+var optionMaxCellWidth = 30
 var optionsNullPrinter = "(null)"
 var optionMergeRepeats = true
 var optionWrapLines = false
@@ -62,6 +63,17 @@ func PrintOptionMaxRows(n int) {
 // (default: 20).
 func PrintOptionMaxColumns(n int) {
 	optionMaxColumns = n
+}
+
+// PrintOptionMaxCellWidth changes the max rune width of any cell displayed when printing a Series or DataFrame to n
+// (default: 30).
+func PrintOptionMaxCellWidth(n int) {
+	optionMaxCellWidth = n
+}
+
+// defaultMaxCellWidth returns the default max rune width of any cell displayed when printing a Series or DataFrame.
+func defaultMaxCellWidth() int {
+	return 30
 }
 
 // PrintOptionMergeRepeats (if true) instructs the String() function to merge repeated non-header values

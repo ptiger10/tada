@@ -142,3 +142,19 @@ func TestSetOptionAddTimeFormat(t *testing.T) {
 	}
 	optionDateTimeFormats = cache
 }
+
+func TestDefaultMaxCellWidth(t *testing.T) {
+	tests := []struct {
+		name string
+		want int
+	}{
+		{"pass", 30},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := defaultMaxCellWidth(); got != tt.want {
+				t.Errorf("defaultMaxCellWidth() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

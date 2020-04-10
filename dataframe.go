@@ -815,6 +815,16 @@ func (df *DataFrame) String() string {
 				rightHalf...)
 		}
 	}
+	// truncate cells
+	if defaultMaxCellWidth() != optionMaxCellWidth {
+		for i := range data {
+			for k := range data[i] {
+				if r := []rune(data[i][k]); len(r) > optionMaxCellWidth {
+					data[i][k] = string(r[:optionMaxCellWidth-3]) + "..."
+				}
+			}
+		}
+	}
 	// create table
 	var buf bytes.Buffer
 	table := tablewriter.NewTable(&buf)
