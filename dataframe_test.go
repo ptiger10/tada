@@ -3740,6 +3740,49 @@ func TestDataFrame_CSVRecords(t *testing.T) {
 	}
 }
 
+func TestDataFrame_InterfaceRecords(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		options []WriteOption
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   [][]interface{}
+	}{
+		{"pass",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", ""}, isNull: []bool{false, true}, name: "foo"},
+				{slice: []interface{}{1, "qux"}, isNull: []bool{false, false}, name: "bar"},
+			},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{nil},
+			[][]interface{}{{"*0", 0, 1}, {"foo", "a", "(null)"}, {"bar", 1, "qux"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.InterfaceRecords(tt.args.options...); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("DataFrame.InterfaceRecords() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 type badWriter struct{}
 
 func (w badWriter) Write([]byte) (int, error) {

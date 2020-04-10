@@ -8,10 +8,11 @@ import (
 var optionLevelSeparator = "|"
 var optionMaxRows = 50
 var optionMaxColumns = 20
+var optionsNullPrinter = "(null)"
 var optionMergeRepeats = true
 var optionWrapLines = false
 var optionWarnings = true
-var optionNullStrings = map[string]bool{"": true, "(null)": true}
+var optionNullStrings = map[string]bool{"": true, optionsNullPrinter: true}
 var optionNaNIsNull = true
 var optionPrefix = "*"
 var optionDateTimeFormats = []string{
@@ -34,7 +35,7 @@ func SetOptionAddTimeFormat(format string) {
 
 // GetOptionDefaultNullStrings returns the default list of strings that tada considers null.
 func GetOptionDefaultNullStrings() []string {
-	return []string{"", "(null)"}
+	return []string{"", optionsNullPrinter}
 }
 
 // SetOptionNullStrings replaces the default list of strings that tada considers null with list.

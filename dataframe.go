@@ -536,6 +536,21 @@ func WriteOptionDelimiter(sep rune) func(*writeConfig) {
 	}
 }
 
+// InterfaceRecords writes a DataFrame to a [][]interface{} with columns as the major dimension.
+// Null values are replaced with "(null)".
+func (df *DataFrame) InterfaceRecords(options ...WriteOption) [][]interface{} {
+	config := setWriteConfig(options)
+	containers := append(df.labels, df.values...)
+	if !config.includeLabels {
+		containers = df.values
+	}
+	ret := make([][]interface{}, len(containers))
+	for k := range ret {
+		ret[k] = containers[k].interfaceSlice(true)
+	}
+	return ret
+}
+
 // CSVRecords writes a DataFrame to a [][]string with rows as the major dimension.
 // Null values are replaced with "(null)".
 func (df *DataFrame) CSVRecords(options ...WriteOption) [][]string {
@@ -549,7 +564,7 @@ func (df *DataFrame) CSVRecords(options ...WriteOption) [][]string {
 	for i := range transposedStringValues[df.numColLevels():] {
 		for k := range transposedStringValues[i] {
 			if mergedLabelsAndCols[k].isNull[i] {
-				transposedStringValues[i+df.numColLevels()][k] = "(null)"
+				transposedStringValues[i+df.numColLevels()][k] = optionsNullPrinter
 			}
 		}
 	}

@@ -4983,3 +4983,49 @@ func Test_valueContainer_set(t *testing.T) {
 		})
 	}
 }
+
+func Test_valueContainer_interfaceSlice(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		cache  []string
+		name   string
+	}
+	type args struct {
+		includeHeader bool
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   []interface{}
+	}{
+		{"pass - exclude header", fields{
+			slice:  []int{1, 0, 2},
+			isNull: []bool{false, true, false},
+			name:   "foobar"},
+			args{false},
+			[]interface{}{1, "(null)", 2},
+		},
+		{"pass - include header", fields{
+			slice:  []int{1, 0, 2},
+			isNull: []bool{false, true, false},
+			name:   "foobar"},
+			args{true},
+			[]interface{}{"foobar", 1, "(null)", 2},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				cache:  tt.fields.cache,
+				name:   tt.fields.name,
+			}
+			if got := vc.interfaceSlice(tt.args.includeHeader); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.interfaceSlice() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

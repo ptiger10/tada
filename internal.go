@@ -2848,3 +2848,20 @@ func (vc *valueContainer) expand(n []int) *valueContainer {
 	}
 	return ret
 }
+
+// convert vc.slice to []interface
+func (vc *valueContainer) interfaceSlice(includeHeader bool) []interface{} {
+	v := reflect.ValueOf(vc.slice)
+	ret := make([]interface{}, v.Len())
+	for i := range ret {
+		if vc.isNull[i] {
+			ret[i] = optionsNullPrinter
+		} else {
+			ret[i] = v.Index(i).Interface()
+		}
+	}
+	if includeHeader {
+		ret = append([]interface{}{vc.name}, ret...)
+	}
+	return ret
+}
