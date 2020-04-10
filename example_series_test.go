@@ -68,7 +68,8 @@ func ExampleSeries_Bin() {
 	s := tada.NewSeries([]float64{1, 3, 5}).SetName("foo")
 	fmt.Println(s)
 
-	fmt.Println(s.Bin([]float64{0, 2, 4}, nil))
+	binned, _ := s.Bin([]float64{0, 2, 4}, nil)
+	fmt.Println(binned)
 	// Output:
 	// +---++-----+
 	// | - || foo |
@@ -91,7 +92,8 @@ func ExampleSeries_Bin_andMore() {
 	s := tada.NewSeries([]float64{1, 3, 5}).SetName("foo")
 	fmt.Println(s)
 
-	fmt.Println(s.Bin([]float64{0, 2, 4}, &tada.Binner{AndMore: true}))
+	binned, _ := s.Bin([]float64{0, 2, 4}, &tada.Binner{AndMore: true})
+	fmt.Println(binned)
 	// Output:
 	// +---++-----+
 	// | - || foo |
@@ -114,7 +116,8 @@ func ExampleSeries_Bin_customLabels() {
 	s := tada.NewSeries([]float64{1, 3}).SetName("foo")
 	fmt.Println(s)
 
-	fmt.Println(s.Bin([]float64{0, 2, 4}, &tada.Binner{Labels: []string{"low", "high"}}))
+	binned, _ := s.Bin([]float64{0, 2, 4}, &tada.Binner{Labels: []string{"low", "high"}})
+	fmt.Println(binned)
 	// Output:
 	// +---++-----+
 	// | - || foo |
@@ -135,7 +138,8 @@ func ExampleSeries_PercentileBin() {
 	s := tada.NewSeries([]float64{1, 2, 3, 4}).SetName("foo")
 	fmt.Println(s)
 
-	fmt.Println(s.PercentileBin([]float64{0, .5, 1}, nil))
+	binned, _ := s.PercentileBin([]float64{0, .5, 1}, nil)
+	fmt.Println(binned)
 	// Output:
 	// +---++-----+
 	// | - || foo |
@@ -160,7 +164,8 @@ func ExampleSeries_PercentileBin_customLabels() {
 	s := tada.NewSeries([]float64{1, 2, 3, 4}).SetName("foo")
 	fmt.Println(s)
 
-	fmt.Println(s.PercentileBin([]float64{0, .5, 1}, &tada.Binner{Labels: []string{"Bottom 50%", "Top 50%"}}))
+	binned, _ := s.PercentileBin([]float64{0, .5, 1}, &tada.Binner{Labels: []string{"Bottom 50%", "Top 50%"}})
+	fmt.Println(binned)
 	// Output:
 	// +---++-----+
 	// | - || foo |
@@ -191,7 +196,8 @@ func ExampleSeries_Lookup() {
 	fmt.Println(s2)
 
 	fmt.Println("--result--")
-	fmt.Println(s.Lookup(s2))
+	lookup, _ := s.Lookup(s2)
+	fmt.Println(lookup)
 	// Output:
 	// --original Series--
 	// +---++-----+
@@ -228,12 +234,13 @@ func ExampleSeries_Lookup_withOptions() {
 	fmt.Println(s2)
 
 	fmt.Println("--result--")
-	fmt.Println(s.Lookup(
+	lookup, _ := s.Lookup(
 		s2,
 		tada.JoinOptionHow("inner"),
 		tada.JoinOptionLeftOn([]string{"a"}),
 		tada.JoinOptionRightOn([]string{"b"}),
-	))
+	)
+	fmt.Println(lookup)
 	// Output:
 	// --original Series--
 	// +-----+---++---+
@@ -269,7 +276,8 @@ func ExampleSeries_Merge() {
 	fmt.Println(s2)
 
 	fmt.Println("--result--")
-	fmt.Println(s.Merge(s2))
+	merged, _ := s.Merge(s2)
+	fmt.Println(merged)
 	// Output:
 	// --original Series--
 	// +---++-----+
@@ -306,12 +314,12 @@ func ExampleSeries_Merge_withOptions() {
 	fmt.Println(s2)
 
 	fmt.Println("--result--")
-	fmt.Println(s.Merge(
-		s2,
+	merged, _ := s.Merge(s2,
 		tada.JoinOptionHow("inner"),
 		tada.JoinOptionLeftOn([]string{"a"}),
 		tada.JoinOptionRightOn([]string{"b"}),
-	))
+	)
+	fmt.Println(merged)
 	// Output:
 	// --original Series--
 	// +-----+---++---+

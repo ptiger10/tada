@@ -371,7 +371,7 @@ func TestSeries_Subset(t *testing.T) {
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
 			args{[]int{3}},
 			&Series{
-				err: errors.New("subsetting rows: index out of range (3 > 2)")}},
+				err: errors.New("subsetting rows: index out of range [3] with length 3")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -416,7 +416,7 @@ func TestSeries_SubsetLabels(t *testing.T) {
 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}}, {slice: []int{10}, isNull: []bool{false}}, {slice: []int{20}, isNull: []bool{false}}}},
 			args{[]int{3}},
 			&Series{
-				err: errors.New("subsetting labels: index out of range (3 > 2)")}},
+				err: errors.New("subsetting labels: index out of range [3] with length 3")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -426,7 +426,7 @@ func TestSeries_SubsetLabels(t *testing.T) {
 				err:    tt.fields.err,
 			}
 			if got := s.SubsetLabels(tt.args.index); !EqualSeries(got, tt.want) {
-				t.Errorf("Series.SubsetLabels() = %#v, want %#v", got.labels[0], tt.want.labels[0])
+				t.Errorf("Series.SubsetLabels() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -1144,7 +1144,7 @@ func TestSeries_DropRow(t *testing.T) {
 				labels: []*valueContainer{{slice: []string{"foo", "bar", ""}, isNull: []bool{false, false, true}}}},
 			args{3},
 			&Series{
-				err: errors.New("dropping row: index out of range (3 > 2)")}},
+				err: errors.New("dropping row: index out of range [3] with length 3")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1205,7 +1205,7 @@ func TestSeries_Sort(t *testing.T) {
 				labels: []*valueContainer{{name: "*0", slice: []int{0, 1, 2}, isNull: []bool{false, false, false}}}},
 			args{[]Sorter{{Name: "corge", Descending: true}}},
 			&Series{
-				err: errors.New("sort: position 0: name (corge) not found")}},
+				err: errors.New("sorting rows: position 0: name (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1365,7 +1365,7 @@ func TestSeries_Filter(t *testing.T) {
 	}
 }
 
-func TestSeries_LookupAdvanced(t *testing.T) {
+func TestSeries_Lookup(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -1376,10 +1376,11 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 		config []JoinOption
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *Series
+		name    string
+		fields  fields
+		args    args
+		want    *Series
+		wantErr bool
 	}{
 		{"single label level, named keys, left join", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1392,6 +1393,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				labels: []*valueContainer{
 					{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
 						cache: []string{"bar", "baz"}}}},
+			false,
 		},
 		{"single label level, no named keys, left join", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1403,6 +1405,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 			&Series{values: &valueContainer{slice: []float64{30, 0}, isNull: []bool{false, true}},
 				labels: []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false},
 					cache: []string{"bar", "baz"}}}},
+			false,
 		},
 		{"multiple label level, no named keys, left join, match at index 1", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1422,6 +1425,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 						cache: []string{"baz", "bar"}},
 					{name: "corge", slice: []int{0, 1}, isNull: []bool{false, false},
 						cache: []string{"0", "1"}}}},
+			false,
 		},
 		{"fail - leftOn but not rightOn", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1430,7 +1434,8 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				config: []JoinOption{JoinOptionLeftOn([]string{"foo"})}},
-			&Series{err: errors.New("lookup: if either leftOn or rightOn is empty, both must be empty")},
+			nil,
+			true,
 		},
 		{"fail - no key supplied, and no matching key", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1439,7 +1444,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
 					labels: []*valueContainer{{name: "corge", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				config: nil},
-			&Series{err: errors.New("lookup: no matching keys between containers")},
+			nil, true,
 		},
 		{"fail - no matching left key", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1448,7 +1453,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				config: []JoinOption{JoinOptionLeftOn([]string{"corge"}), JoinOptionRightOn([]string{"foo"})}},
-			&Series{err: errors.New("lookup: leftOn: name (corge) not found")},
+			nil, true,
 		},
 		{"fail - no matching right key", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1457,7 +1462,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				config: []JoinOption{JoinOptionLeftOn([]string{"foo"}), JoinOptionRightOn([]string{"corge"})}},
-			&Series{err: errors.New("lookup: rightOn: name (corge) not found")},
+			nil, true,
 		},
 		{"fail - unsupported how", fields{
 			values: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
@@ -1466,7 +1471,7 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				other: &Series{values: &valueContainer{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				config: []JoinOption{JoinOptionHow("other")}},
-			&Series{err: errors.New("lookup: how: must be left, right, or inner")},
+			nil, true,
 		},
 	}
 	for _, tt := range tests {
@@ -1476,7 +1481,11 @@ func TestSeries_LookupAdvanced(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Lookup(tt.args.other, tt.args.config...); !EqualSeries(got, tt.want) {
+			got, err := s.Lookup(tt.args.other, tt.args.config...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Series.Lookup() error = %v, want %v", err, tt.wantErr)
+			}
+			if !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Lookup() = %v, want %v", got, tt.want)
 			}
 		})
@@ -1495,10 +1504,11 @@ func TestSeries_Merge(t *testing.T) {
 		options []JoinOption
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *DataFrame
+		name    string
+		fields  fields
+		args    args
+		want    *DataFrame
+		wantErr bool
 	}{
 		{"matching label key *0",
 			fields{values: &valueContainer{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
@@ -1518,6 +1528,7 @@ func TestSeries_Merge(t *testing.T) {
 						cache: []string{"0", "1"},
 					}},
 				colLevelNames: []string{"*0"}},
+			false,
 		},
 		{"right merge",
 			fields{values: &valueContainer{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
@@ -1537,6 +1548,7 @@ func TestSeries_Merge(t *testing.T) {
 						cache: []string{"1"},
 					}},
 				colLevelNames: []string{"*0"}},
+			false,
 		},
 	}
 	for _, tt := range tests {
@@ -1547,7 +1559,11 @@ func TestSeries_Merge(t *testing.T) {
 				sharedData: tt.fields.sharedData,
 				err:        tt.fields.err,
 			}
-			if got := s.Merge(tt.args.other, tt.args.options...); !EqualDataFrames(got, tt.want) {
+			got, err := s.Merge(tt.args.other, tt.args.options...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Series.Merge() error = %v, want %v", err, tt.wantErr)
+			}
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("Series.Merge() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2416,10 +2432,11 @@ func TestSeries_Bin(t *testing.T) {
 		config *Binner
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *Series
+		name    string
+		fields  fields
+		args    args
+		want    *Series
+		wantErr bool
 	}{
 		{"pass", fields{
 			values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
@@ -2428,7 +2445,9 @@ func TestSeries_Bin(t *testing.T) {
 				bins: []float64{1, 2}, config: &Binner{AndLess: false, AndMore: true, Labels: nil}},
 			&Series{
 				values: &valueContainer{slice: []string{"", "1-2", ">2"}, isNull: []bool{true, false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			false,
+		},
 		{"pass - nil binner", fields{
 			values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
@@ -2436,14 +2455,15 @@ func TestSeries_Bin(t *testing.T) {
 				bins: []float64{1, 2}, config: nil},
 			&Series{
 				values: &valueContainer{slice: []string{"", "1-2", ""}, isNull: []bool{true, false, true}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			false,
+		},
 		{"fail - too many labels", fields{
 			values: &valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{
 				bins: []float64{1, 2}, config: &Binner{AndLess: false, AndMore: false, Labels: []string{"foo", "bar"}}},
-			&Series{
-				err: errors.New("Bin(): number of bin edges (+ includeLess + includeMore), must be one more than number of supplied labels: (2 + 0 + 0) != (2 + 1)")}},
+			nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2452,7 +2472,11 @@ func TestSeries_Bin(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Bin(tt.args.bins, tt.args.config); !EqualSeries(got, tt.want) {
+			got, err := s.Bin(tt.args.bins, tt.args.config)
+			if (err != nil) != tt.wantErr {
+
+			}
+			if !EqualSeries(got, tt.want) {
 				t.Errorf("Series.Bin() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2534,10 +2558,11 @@ func TestSeries_PercentileBin(t *testing.T) {
 		config *Binner
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *Series
+		name    string
+		fields  fields
+		args    args
+		want    *Series
+		wantErr bool
 	}{
 		{"pass", fields{
 			values: &valueContainer{slice: []float64{1, 3, 5}, isNull: []bool{false, false, false}},
@@ -2546,7 +2571,9 @@ func TestSeries_PercentileBin(t *testing.T) {
 				bins: []float64{0, .5, 1}, config: &Binner{Labels: []string{"Bottom 50%", "Top 50%"}}},
 			&Series{
 				values: &valueContainer{slice: []string{"Bottom 50%", "Bottom 50%", "Top 50%"}, isNull: []bool{false, false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			false,
+		},
 		{"pass - nil config", fields{
 			values: &valueContainer{slice: []float64{1, 3, 5}, isNull: []bool{false, false, false}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
@@ -2554,14 +2581,15 @@ func TestSeries_PercentileBin(t *testing.T) {
 				bins: []float64{0, .5, 1}, config: nil},
 			&Series{
 				values: &valueContainer{slice: []string{"0-0.5", "0-0.5", "0.5-1"}, isNull: []bool{false, false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}}},
+				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
+			false,
+		},
 		{"fail - too many labels", fields{
 			values: &valueContainer{slice: []float64{1, 3, 5}, isNull: []bool{false, false, false}},
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{
 				bins: []float64{0, .5, 1}, config: &Binner{Labels: []string{"Bottom 50%", "Medium 50%", "Top 50%"}}},
-			&Series{
-				err: errors.New("percentile bin: number of bin edges (+ includeLess + includeMore), must be one more than number of supplied labels: (3 + 0 + 0) != (3 + 1)")}},
+			nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2570,7 +2598,11 @@ func TestSeries_PercentileBin(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.PercentileBin(tt.args.bins, tt.args.config); !EqualSeries(got, tt.want) {
+			got, err := s.PercentileBin(tt.args.bins, tt.args.config)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Series.PercentileBin() error = %v, want %v", err, tt.wantErr)
+			}
+			if !EqualSeries(got, tt.want) {
 				t.Errorf("Series.PercentileBin() = %v, want %v", got, tt.want)
 			}
 		})
@@ -3430,7 +3462,7 @@ func TestSeries_FilterByValue(t *testing.T) {
 			labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "qux"}}},
 			args{map[string]interface{}{"corge": 0}},
 			&Series{
-				err: errors.New("filter by value: name (corge) not found")},
+				err: errors.New("filtering rows by value: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {

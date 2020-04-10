@@ -180,10 +180,10 @@ func findMatchingKeysBetweenTwoContainers(container1 []*valueContainer, containe
 }
 
 // nameOfContainer returns the name of the container at index position n.
-// If n is out of range, returns "-out of range-"
+// If n is out of range, returns error message as string.
 func nameOfContainer(containers []*valueContainer, n int) string {
 	if n >= len(containers) {
-		return "-out of range-"
+		return fmt.Sprintf("index out of range [%d] with length %d", n, len(containers))
 	}
 	return containers[n].name
 }
@@ -966,7 +966,7 @@ func (vc *valueContainer) subsetRows(index []int) error {
 	}
 	for _, i := range index {
 		if i >= l {
-			return fmt.Errorf("index out of range (%d > %d)", i, l-1)
+			return fmt.Errorf("index out of range [%d] with length %d", i, l)
 		}
 	}
 
@@ -983,7 +983,7 @@ func subsetContainers(containers []*valueContainer, index []int) ([]*valueContai
 	retLabels := make([]*valueContainer, len(index))
 	for indexPosition, indexValue := range index {
 		if indexValue >= len(containers) {
-			return nil, fmt.Errorf("index out of range (%d > %d)", indexValue, len(containers)-1)
+			return nil, fmt.Errorf("index out of range [%d] with length %d", indexValue, len(containers))
 		}
 		retLabels[indexPosition] = containers[indexValue]
 	}
@@ -1420,7 +1420,7 @@ func (s *Series) combineMath(other *Series, ignoreNulls bool, fn func(v1 float64
 	retIsNull := make([]bool, s.Len())
 	originalFloat := s.values.float64().slice
 	originalNulls := s.values.isNull
-	lookupVals := s.Lookup(other)
+	lookupVals, _ := s.Lookup(other)
 	otherFloat := lookupVals.values.float64().slice
 	otherNulls := lookupVals.values.isNull
 
@@ -1615,7 +1615,7 @@ func (vc *valueContainer) dropRow(index int) error {
 	v := reflect.ValueOf(vc.slice)
 	l := v.Len()
 	if index >= l {
-		return fmt.Errorf("index out of range (%d > %d)", index, l-1)
+		return fmt.Errorf("index out of range [%d] with length %d", index, l)
 	}
 	retIsNull := append(vc.isNull[:index], vc.isNull[index+1:]...)
 	retVals := reflect.MakeSlice(v.Type(), 0, 0)

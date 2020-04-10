@@ -151,10 +151,11 @@ func ConcatSeries(series ...*Series) (*DataFrame, error) {
 		if k == 0 {
 			ret = s.DataFrame()
 		} else {
-			ret.InPlace().Merge(s.DataFrame())
-		}
-		if ret.Err() != nil {
-			return nil, ret.Err()
+			var err error
+			ret, err = ret.Merge(s.DataFrame())
+			if err != nil {
+				return nil, fmt.Errorf("concatenating Series: %v", err)
+			}
 		}
 	}
 	return ret, nil
@@ -990,89 +991,96 @@ func (df *DataFrame) InPlace() *DataFrameMutator {
 //Returns a new DataFrame.
 func (df *DataFrame) Subset(index []int) *DataFrame {
 	df = df.Copy()
-	df.InPlace().Subset(index)
+	err := df.InPlace().Subset(index)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
 // Subset returns only the rows specified at the index positions, in the order specified.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) Subset(index []int) {
+func (df *DataFrameMutator) Subset(index []int) error {
 	for k := range df.dataframe.values {
 		err := df.dataframe.values[k].subsetRows(index)
 		if err != nil {
-			df.dataframe.resetWithError(fmt.Errorf("subset: %v", err))
-			return
+			return fmt.Errorf("subsetting rows: %v", err)
 		}
 	}
 	for j := range df.dataframe.labels {
 		df.dataframe.labels[j].subsetRows(index)
 	}
-	return
+	return nil
 }
 
 // SwapLabels swaps the label levels with names i and j.
 // Returns a new DataFrame.
 func (df *DataFrame) SwapLabels(i, j string) *DataFrame {
 	df = df.Copy()
-	df.InPlace().SwapLabels(i, j)
+	err := df.InPlace().SwapLabels(i, j)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
 // SwapLabels swaps the label levels with names i and j.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) SwapLabels(i, j string) {
+func (df *DataFrameMutator) SwapLabels(i, j string) error {
 	index1, err := indexOfContainer(i, df.dataframe.labels)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("swapping labels:i: %v", err))
-		return
+		return fmt.Errorf("swapping labels:i: %v", err)
 	}
 	index2, err := indexOfContainer(j, df.dataframe.labels)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("swapping labels:j: %v", err))
-		return
+		return fmt.Errorf("swapping labels:j: %v", err)
 	}
 	df.dataframe.labels[index1], df.dataframe.labels[index2] = df.dataframe.labels[index2], df.dataframe.labels[index1]
-	return
+	return nil
 }
 
 // SubsetLabels returns only the labels specified at the index positions, in the order specified.
 // Returns a new DataFrame.
 func (df *DataFrame) SubsetLabels(index []int) *DataFrame {
 	df = df.Copy()
-	df.InPlace().SubsetLabels(index)
+	err := df.InPlace().SubsetLabels(index)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
 // SubsetLabels returns only the labels specified at the index positions, in the order specified.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) SubsetLabels(index []int) {
+func (df *DataFrameMutator) SubsetLabels(index []int) error {
 	labels, err := subsetContainers(df.dataframe.labels, index)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("subsetting labels: %v", err))
-		return
+		return fmt.Errorf("subsetting labels: %v", err)
 	}
 	df.dataframe.labels = labels
-	return
+	return nil
 }
 
 // SubsetCols returns only the labels specified at the index positions, in the order specified.
 // Returns a new DataFrame.
 func (df *DataFrame) SubsetCols(index []int) *DataFrame {
 	df = df.Copy()
-	df.InPlace().SubsetCols(index)
+	err := df.InPlace().SubsetCols(index)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
 // SubsetCols returns only the labels specified at the index positions, in the order specified.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) SubsetCols(index []int) {
+func (df *DataFrameMutator) SubsetCols(index []int) error {
 	cols, err := subsetContainers(df.dataframe.values, index)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("subsetting columns: %v", err))
-		return
+		return fmt.Errorf("subsetting columns: %v", err)
 	}
 	df.dataframe.values = cols
-	return
+	return nil
 }
 
 // DeduplicateNames deduplicates the names of containers (label levels and columns) from left-to-right
@@ -1227,26 +1235,37 @@ func (df *DataFrame) Tail(n int) *DataFrame {
 }
 
 // Range returns the rows of the DataFrame starting at first and ending immediately prior to last (left-inclusive, right-exclusive).
-// If either first or last is greater than the length of the DataFrame, a DataFrame error is returned.
-// In all cases, returns a new DataFrame.
+// If either first or last is greater than the length of the DataFrame, an error is returned.
+// Returns a new DataFrame.
 func (df *DataFrame) Range(first, last int) *DataFrame {
+	df = df.Copy()
+	err := df.InPlace().Range(first, last)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
+	return df
+}
+
+// Range returns the rows of the DataFrame starting at first and ending immediately prior to last (left-inclusive, right-exclusive).
+// If first or last is out of range, an error is returned.
+// Modifies the underlying DataFrame in place.
+func (df *DataFrameMutator) Range(first, last int) error {
 	if first > last {
-		return dataFrameWithError(fmt.Errorf("range: first is greater than last (%d > %d)", first, last))
+		return fmt.Errorf("range: first is greater than last (%d > %d)", first, last)
 	}
-	if first >= df.Len() {
-		return dataFrameWithError(fmt.Errorf("range: first index out of range (%d > %d)", first, df.Len()-1))
-	} else if last > df.Len() {
-		return dataFrameWithError(fmt.Errorf("range: last index out of range (%d > %d)", last, df.Len()))
+	if first >= df.dataframe.Len() {
+		return fmt.Errorf("range: first index out of range [%d] with length %d", first, df.dataframe.Len())
+	} else if last > df.dataframe.Len() {
+		// permissible values for last includes the length of the dataframe
+		return fmt.Errorf("range: last index out of range [%d] with max index %d (length + 1)", last, df.dataframe.Len()+1)
 	}
-	retVals := make([]*valueContainer, len(df.values))
-	for k := range df.values {
-		retVals[k] = df.values[k].rangeSlice(first, last)
+	for k := range df.dataframe.values {
+		df.dataframe.values[k] = df.dataframe.values[k].rangeSlice(first, last)
 	}
-	retLabels := make([]*valueContainer, df.NumLevels())
-	for j := range df.labels {
-		retLabels[j] = df.labels[j].rangeSlice(first, last)
+	for j := range df.dataframe.labels {
+		df.dataframe.labels[j] = df.dataframe.labels[j].rangeSlice(first, last)
 	}
-	return &DataFrame{values: retVals, labels: retLabels, name: df.name, colLevelNames: df.colLevelNames}
+	return nil
 }
 
 // FillNull fills null values and makes them non-null based on how,
@@ -1261,7 +1280,10 @@ func (df *DataFrame) Range(first, last int) *DataFrame {
 // Returns a new DataFrame.
 func (df *DataFrame) FillNull(how map[string]NullFiller) *DataFrame {
 	df = df.Copy()
-	df.InPlace().FillNull(how)
+	err := df.InPlace().FillNull(how)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
@@ -1275,17 +1297,16 @@ func (df *DataFrame) FillNull(how map[string]NullFiller) *DataFrame {
 // FillFloat converts the container values to float64 and fills null values with the value supplied.
 // If no field is selected, the container values are converted to float64 and all null values are filled with 0.
 // Modifies the underlying DataFrame.
-func (df *DataFrameMutator) FillNull(how map[string]NullFiller) {
+func (df *DataFrameMutator) FillNull(how map[string]NullFiller) error {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
 	for name, filler := range how {
 		index, err := indexOfContainer(name, mergedLabelsAndCols)
 		if err != nil {
-			df.dataframe.resetWithError(fmt.Errorf("filling null rows: %v", err))
-			return
+			return fmt.Errorf("filling null rows: %v", err)
 		}
 		mergedLabelsAndCols[index].fillnull(filler)
 	}
-	return
+	return nil
 }
 
 // DropNull removes rows with a null value in any column.
@@ -1293,14 +1314,17 @@ func (df *DataFrameMutator) FillNull(how map[string]NullFiller) {
 // Returns a new DataFrame.
 func (df *DataFrame) DropNull(subset ...string) *DataFrame {
 	df = df.Copy()
-	df.InPlace().DropNull(subset...)
+	err := df.InPlace().DropNull(subset...)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
 // DropNull removes rows with a null value in any column.
 // If subset is supplied, removes any rows with null values in any of the specified columns.
 // Modifies the underlying DataFrame.
-func (df *DataFrameMutator) DropNull(subset ...string) {
+func (df *DataFrameMutator) DropNull(subset ...string) error {
 	var index []int
 	if len(subset) == 0 {
 		index = makeIntRange(0, len(df.dataframe.values))
@@ -1308,12 +1332,10 @@ func (df *DataFrameMutator) DropNull(subset ...string) {
 		for _, name := range subset {
 			i, err := indexOfContainer(name, df.dataframe.values)
 			if err != nil {
-				df.dataframe.resetWithError(fmt.Errorf("dropping null rows: %v", err))
-				return
+				return fmt.Errorf("dropping null rows: %v", err)
 			}
 			index = append(index, i)
 		}
-
 	}
 
 	subIndexes := make([][]int, len(index))
@@ -1322,20 +1344,33 @@ func (df *DataFrameMutator) DropNull(subset ...string) {
 	}
 	allValid := intersection(subIndexes, df.dataframe.Len())
 	df.Subset(allValid)
+	return nil
 }
 
-// Null returns all the rows with any null values.
+// IsNull returns all the rows with any null values.
 // If subset is supplied, returns all the rows with all non-null values in the specified columns.
 // Returns a new DataFrame.
-func (df *DataFrame) Null(subset ...string) *DataFrame {
+func (df *DataFrame) IsNull(subset ...string) *DataFrame {
+	df = df.Copy()
+	err := df.InPlace().IsNull(subset...)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
+	return df
+}
+
+// IsNull returns all the rows with any null values.
+// If subset is supplied, returns all the rows with all non-null values in the specified columns.
+// Modifies the underlying DataFrame.
+func (df *DataFrameMutator) IsNull(subset ...string) error {
 	var index []int
 	if len(subset) == 0 {
-		index = makeIntRange(0, len(df.values))
+		index = makeIntRange(0, len(df.dataframe.values))
 	} else {
 		for _, name := range subset {
-			i, err := indexOfContainer(name, df.values)
+			i, err := indexOfContainer(name, df.dataframe.values)
 			if err != nil {
-				return dataFrameWithError(fmt.Errorf("getting null rows: %v", err))
+				return fmt.Errorf("getting null rows: %v", err)
 			}
 			index = append(index, i)
 		}
@@ -1343,15 +1378,15 @@ func (df *DataFrame) Null(subset ...string) *DataFrame {
 
 	subIndexes := make([][]int, len(index))
 	for k := range index {
-		subIndexes[k] = df.values[k].null()
+		subIndexes[k] = df.dataframe.values[k].null()
 	}
 	anyNull := union(subIndexes)
-	return df.Subset(anyNull)
+	df.Subset(anyNull)
+	return nil
 }
 
 // SetNulls overwrites the underlying boolean slice that records whether each value is null or not
 // for the container at position n (either labels or columns).
-// Exported for use in Arrow conversions.
 func (df *DataFrame) SetNulls(n int, nulls []bool) error {
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	if n >= len(mergedLabelsAndCols) {
@@ -1369,18 +1404,23 @@ func (df *DataFrame) SetNulls(n int, nulls []bool) error {
 // level should be 0 unless df has multiple column levels.
 func (df *DataFrame) FilterCols(lambda func(string) bool, level int) *DataFrame {
 	df = df.Copy()
-	df.InPlace().FilterCols(lambda, level)
+	err := df.InPlace().FilterCols(lambda, level)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
 // FilterCols returns the columns with names that satisfy lambda at the supplied column level.
 // level should be 0 unless df has multiple column levels.
-func (df *DataFrameMutator) FilterCols(lambda func(string) bool, level int) {
+func (df *DataFrameMutator) FilterCols(lambda func(string) bool, level int) error {
+	if lambda == nil {
+		return fmt.Errorf("filtering columns: must provide lambda function")
+	}
 	var subset []int
 	names, err := listNamesAtLevel(df.dataframe.values, level, df.dataframe.numColLevels())
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("filter columns: %v", err))
-		return
+		return fmt.Errorf("filtering columns: %v", err)
 	}
 	for k := range names {
 		if lambda(names[k]) {
@@ -1388,7 +1428,7 @@ func (df *DataFrameMutator) FilterCols(lambda func(string) bool, level int) {
 		}
 	}
 	df.SubsetCols(subset)
-	return
+	return nil
 }
 
 // -- SETTERS
@@ -1405,7 +1445,10 @@ func (df *DataFrameMutator) FilterCols(lambda func(string) bool, level int) {
 // In all cases, returns a new DataFrame.
 func (df *DataFrame) WithLabels(name string, input interface{}) *DataFrame {
 	df = df.Copy()
-	df.InPlace().WithLabels(name, input)
+	err := df.InPlace().WithLabels(name, input)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
@@ -1419,12 +1462,13 @@ func (df *DataFrame) WithLabels(name string, input interface{}) *DataFrame {
 // If input is a slice, it must be the same length as the underlying DataFrame.
 //
 // In all cases, modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) WithLabels(name string, input interface{}) {
+func (df *DataFrameMutator) WithLabels(name string, input interface{}) error {
 	labels, err := withColumn(df.dataframe.labels, name, input, df.dataframe.Len())
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("with labels: %v", err))
+		return fmt.Errorf("setting labels: %v", err)
 	}
 	df.dataframe.labels = labels
+	return nil
 }
 
 // WithCol resolves as follows:
@@ -1439,7 +1483,10 @@ func (df *DataFrameMutator) WithLabels(name string, input interface{}) {
 // In all cases, returns a new DataFrame.
 func (df *DataFrame) WithCol(name string, input interface{}) *DataFrame {
 	df = df.Copy()
-	df.InPlace().WithCol(name, input)
+	err := df.InPlace().WithCol(name, input)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
@@ -1453,12 +1500,13 @@ func (df *DataFrame) WithCol(name string, input interface{}) *DataFrame {
 // If input is a slice, it must be the same length as the underlying DataFrame.
 //
 // In all cases, modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) WithCol(name string, input interface{}) {
+func (df *DataFrameMutator) WithCol(name string, input interface{}) error {
 	cols, err := withColumn(df.dataframe.values, name, input, df.dataframe.Len())
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("with column: %v", err))
+		return fmt.Errorf("setting column: %v", err)
 	}
 	df.dataframe.values = cols
+	return nil
 }
 
 // Shuffle randomizes the row order of the DataFrame.
@@ -1482,64 +1530,70 @@ func (df *DataFrameMutator) Shuffle(seed int64) {
 // Returns a new DataFrame.
 func (df *DataFrame) DropLabels(name string) *DataFrame {
 	df = df.Copy()
-	df.InPlace().DropLabels(name)
+	err := df.InPlace().DropLabels(name)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
 // DropLabels drops the first label level matching name.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) DropLabels(name string) {
+func (df *DataFrameMutator) DropLabels(name string) error {
 	newCols, err := dropFromContainers(name, df.dataframe.labels)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("dropping labels: %v", err))
-		return
+		return fmt.Errorf("dropping labels: %v", err)
 	}
 	df.dataframe.labels = newCols
-	return
+	return nil
 }
 
 // DropCol drops the first column matching name.
 // Returns a new DataFrame.
 func (df *DataFrame) DropCol(name string) *DataFrame {
 	df = df.Copy()
-	df.InPlace().DropCol(name)
+	err := df.InPlace().DropCol(name)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
 // DropCol drops the first column matching name.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) DropCol(name string) {
+func (df *DataFrameMutator) DropCol(name string) error {
 	newCols, err := dropFromContainers(name, df.dataframe.values)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("dropping column: %v", err))
-		return
+		return fmt.Errorf("dropping column: %v", err)
 	}
 	df.dataframe.values = newCols
-	return
+	return nil
 }
 
 // DropRow removes the row at the specified index.
 // Returns a new DataFrame.
 func (df *DataFrame) DropRow(index int) *DataFrame {
 	df = df.Copy()
-	df.InPlace().DropRow(index)
+	err := df.InPlace().DropRow(index)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
 // DropRow removes the row at the specified index.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) DropRow(index int) {
+func (df *DataFrameMutator) DropRow(index int) error {
 	for k := range df.dataframe.values {
 		err := df.dataframe.values[k].dropRow(index)
 		if err != nil {
-			df.dataframe.resetWithError(fmt.Errorf("dropping row: %v", err))
-			return
+			return fmt.Errorf("dropping row: %v", err)
 		}
 	}
 	for j := range df.dataframe.labels {
 		df.dataframe.labels[j].dropRow(index)
 	}
-	return
+	return nil
 }
 
 // Append adds the other labels and values as new rows to the DataFrame.
@@ -1547,25 +1601,24 @@ func (df *DataFrameMutator) DropRow(index int) {
 // Returns a new DataFrame.
 func (df *DataFrame) Append(other *DataFrame) *DataFrame {
 	df = df.Copy()
-	df.InPlace().Append(other)
+	err := df.InPlace().Append(other)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
 // Append adds the other labels and values as new rows to the DataFrame.
 // If the types of any container do not match, all the values in that container are coerced to string.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) Append(other *DataFrame) {
+func (df *DataFrameMutator) Append(other *DataFrame) error {
 	if len(other.labels) != len(df.dataframe.labels) {
-		df.dataframe.resetWithError(
-			fmt.Errorf("append: other DataFrame must have same number of label levels as original DataFrame (%d != %d)",
-				len(other.labels), len(df.dataframe.labels)))
-		return
+		return fmt.Errorf("appending rows: other must have same number of label levels as original (%d != %d)",
+			len(other.labels), len(df.dataframe.labels))
 	}
 	if len(other.values) != len(df.dataframe.values) {
-		df.dataframe.resetWithError(
-			fmt.Errorf("append: other DataFrame must have same number of columns as original DataFrame (%d != %d)",
-				len(other.values), len(df.dataframe.values)))
-		return
+		return fmt.Errorf("appending rows: other must have same number of columns as original (%d != %d)",
+			len(other.values), len(df.dataframe.values))
 	}
 	for j := range df.dataframe.labels {
 		df.dataframe.labels[j] = df.dataframe.labels[j].append(other.labels[j])
@@ -1573,11 +1626,11 @@ func (df *DataFrameMutator) Append(other *DataFrame) {
 	for k := range df.dataframe.values {
 		df.dataframe.values[k] = df.dataframe.values[k].append(other.values[k])
 	}
-	return
+	return nil
 }
 
 // Relabel resets the DataFrame labels to default labels (e.g., []int from 0 to df.Len()-1, with *0 as name).
-// Returns a new Series.
+// Returns a new DataFrame.
 func (df *DataFrame) Relabel() *DataFrame {
 	df = df.Copy()
 	df.InPlace().Relabel()
@@ -1624,27 +1677,33 @@ func (df *DataFrameMutator) SetAsLabels(colNames ...string) {
 // ResetLabels appends the label level(s) at the supplied index levels as columns and drops the level.
 // If no index levels are supplied, all label levels are appended as columns and dropped as levels, and replaced by a default label column.
 // Returns a new DataFrame.
-func (df *DataFrame) ResetLabels(index ...int) *DataFrame {
+func (df *DataFrame) ResetLabels(index ...string) *DataFrame {
 	df = df.Copy()
-	df.InPlace().ResetLabels(index...)
+	err := df.InPlace().ResetLabels(index...)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
-// ResetLabels appends the label level(s) at the supplied index levels as columns and drops the level.
+// ResetLabels appends the label level(s) at the supplied index levels as columns and drops the level(s).
 // If no index levels are supplied, all label levels are appended as columns and dropped as levels, and replaced by a default label column.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) ResetLabels(labelLevels ...int) {
+func (df *DataFrameMutator) ResetLabels(labelLevels ...string) error {
+	index := make([]int, len(labelLevels))
 	if len(labelLevels) == 0 {
-		labelLevels = makeIntRange(0, df.dataframe.NumLevels())
+		index = makeIntRange(0, df.dataframe.NumLevels())
 	}
-	for incrementor, i := range labelLevels {
+	for j, name := range labelLevels {
+		idx, err := indexOfContainer(name, df.dataframe.labels)
+		if err != nil {
+			return fmt.Errorf("resetting labels to columns: %v", err)
+		}
+		index[j] = idx
+	}
+	for incrementor, i := range index {
 		// iteratively subset all label levels except the one to be dropped
 		adjustedIndex := i - incrementor
-		if adjustedIndex >= df.dataframe.NumLevels() {
-			df.dataframe.resetWithError(fmt.Errorf(
-				"resetting labels to column: index out of range (%d > %d)", i, df.dataframe.NumLevels()+incrementor))
-			return
-		}
 		newVal := df.dataframe.labels[adjustedIndex]
 		// If label level name has default indicator, remove default indicator
 		newVal.name = removeDefaultNameIndicator(newVal.name)
@@ -1656,7 +1715,7 @@ func (df *DataFrameMutator) ResetLabels(labelLevels ...int) {
 		defaultLabels := makeDefaultLabels(0, df.dataframe.Len(), true)
 		df.dataframe.labels = append(df.dataframe.labels, defaultLabels)
 	}
-	return
+	return nil
 }
 
 // SetName sets the name of a DataFrame and returns the entire DataFrame.
@@ -1671,6 +1730,7 @@ func (df *DataFrame) Name() string {
 }
 
 // SetLabelNames sets the names of all the label levels in the DataFrame and returns the entire DataFrame.
+// If an error is returned, it is written to the DataFrame.
 func (df *DataFrame) SetLabelNames(levelNames []string) *DataFrame {
 	if len(levelNames) != len(df.labels) {
 		return dataFrameWithError(
@@ -1683,6 +1743,7 @@ func (df *DataFrame) SetLabelNames(levelNames []string) *DataFrame {
 }
 
 // SetColNames sets the names of all the columns in the DataFrame and returns the entire DataFrame.
+// If an error is returned, it is written to the DataFrame.
 func (df *DataFrame) SetColNames(colNames []string) *DataFrame {
 	if len(colNames) != len(df.values) {
 		return dataFrameWithError(
@@ -1700,24 +1761,27 @@ func (df *DataFrame) SetColNames(colNames []string) *DataFrame {
 // Returns a new DataFrame.
 func (df *DataFrame) ReorderCols(colNames []string) *DataFrame {
 	df = df.Copy()
-	df.InPlace().ReorderCols(colNames)
+	err := df.InPlace().ReorderCols(colNames)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
 // ReorderCols reorders the columns to be in the same order as specified by colNames.
 // If a column is not specified, it is excluded from the resulting DataFrame.
 // Modifies the underlying DataFrame.
-func (df *DataFrameMutator) ReorderCols(colNames []string) {
+func (df *DataFrameMutator) ReorderCols(colNames []string) error {
 	newIndex := make([]int, len(colNames))
 	for k, name := range colNames {
 		index, err := indexOfContainer(name, df.dataframe.values)
 		if err != nil {
-			df.dataframe.resetWithError(fmt.Errorf("reordering columns: colNames (index %d): %v", k, err))
-			return
+			return fmt.Errorf("reordering columns: colNames (index %d): %v", k, err)
 		}
 		newIndex[k] = index
 	}
 	df.SubsetCols(newIndex)
+	return nil
 }
 
 // ReorderLabels reorders the label levels to be in the same order as specified by levelNames.
@@ -1725,24 +1789,27 @@ func (df *DataFrameMutator) ReorderCols(colNames []string) {
 // Returns a new DataFrame.
 func (df *DataFrame) ReorderLabels(levelNames []string) *DataFrame {
 	df = df.Copy()
-	df.InPlace().ReorderLabels(levelNames)
+	err := df.InPlace().ReorderLabels(levelNames)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
 // ReorderLabels reorders the label levels to be in the same order as specified by levelNames.
 // If a level is not specified, it is excluded from the resulting DataFrame.
 // Modifies the underlying DataFrame.
-func (df *DataFrameMutator) ReorderLabels(levelNames []string) {
+func (df *DataFrameMutator) ReorderLabels(levelNames []string) error {
 	newIndex := make([]int, len(levelNames))
 	for j, name := range levelNames {
 		index, err := indexOfContainer(name, df.dataframe.labels)
 		if err != nil {
-			df.dataframe.resetWithError(fmt.Errorf("reordering labels: levelNames (index %d): %v", j, err))
-			return
+			return fmt.Errorf("reordering labels: levelNames (index %d): %v", j, err)
 		}
 		newIndex[j] = index
 	}
 	df.SubsetLabels(newIndex)
+	return nil
 }
 
 // -- RESHAPING
@@ -1944,7 +2011,10 @@ func (df *DataFrame) PromoteToColLevel(name string) *DataFrame {
 // Returns a new DataFrame.
 func (df *DataFrame) Filter(filters map[string]FilterFn) *DataFrame {
 	df = df.Copy()
-	df.InPlace().Filter(filters)
+	err := df.InPlace().Filter(filters)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
@@ -1955,19 +2025,18 @@ func (df *DataFrame) Filter(filters map[string]FilterFn) *DataFrame {
 // If no filter is provided, function does nothing.
 // For equality filtering on one or more containers, consider FilterByValue.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) Filter(filters map[string]FilterFn) {
+func (df *DataFrameMutator) Filter(filters map[string]FilterFn) error {
 	if len(filters) == 0 {
-		return
+		return nil
 	}
 
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
 	index, err := filter(mergedLabelsAndCols, filters)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("filter: %v", err))
-		return
+		return fmt.Errorf("filtering rows: %v", err)
 	}
 	df.Subset(index)
-	return
+	return nil
 }
 
 // FilterIndex returns the index positions of the rows in container that satsify filterFn.
@@ -2034,7 +2103,10 @@ func (df *DataFrame) Where(filters map[string]FilterFn, ifTrue, ifFalse interfac
 // Returns a new DataFrame.
 func (df *DataFrame) FilterByValue(filters map[string]interface{}) *DataFrame {
 	df = df.Copy()
-	df.InPlace().FilterByValue(filters)
+	err := df.InPlace().FilterByValue(filters)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
@@ -2042,15 +2114,14 @@ func (df *DataFrame) FilterByValue(filters map[string]interface{}) *DataFrame {
 // which is a map of of container names (either column or label names) to interface{} values.
 // A filter is satisfied for a given row value if the stringified value in that container at that row matches the stringified interface{} value.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) FilterByValue(filters map[string]interface{}) {
+func (df *DataFrameMutator) FilterByValue(filters map[string]interface{}) error {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
 	index, err := filterByValue(mergedLabelsAndCols, filters)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("filter by value: %v", err))
-		return
+		return fmt.Errorf("filter by value: %v", err)
 	}
 	df.Subset(index)
-	return
+	return nil
 }
 
 // -- APPLY
@@ -2061,7 +2132,10 @@ func (df *DataFrameMutator) FilterByValue(filters map[string]interface{}) {
 // Returns a new DataFrame.
 func (df *DataFrame) Apply(lambdas map[string]ApplyFn) *DataFrame {
 	df = df.Copy()
-	df.InPlace().Apply(lambdas)
+	err := df.InPlace().Apply(lambdas)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
@@ -2069,26 +2143,23 @@ func (df *DataFrame) Apply(lambdas map[string]ApplyFn) *DataFrame {
 // which is a map of container names (either column or label names) to anonymous functions.
 // A row's null status can be changed in-place within the anonymous function.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
+func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) error {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
 	for containerName, lambda := range lambdas {
 		err := lambda.validate()
 		if err != nil {
-			df.dataframe.resetWithError((fmt.Errorf("applying lambda function: %v", err)))
-			return
+			return fmt.Errorf("applying lambda function: %v", err)
 		}
 		index, err := indexOfContainer(containerName, mergedLabelsAndCols)
 		if err != nil {
-			df.dataframe.resetWithError((fmt.Errorf("applying lambda function: %v", err)))
-			return
+			return fmt.Errorf("applying lambda function: %v", err)
 		}
 		err = mergedLabelsAndCols[index].apply(lambda, nil)
 		if err != nil {
-			df.dataframe.resetWithError((fmt.Errorf("applying lambda function: %v", err)))
-			return
+			return fmt.Errorf("applying lambda function: %v", err)
 		}
 	}
-	return
+	return nil
 }
 
 // SetRows applies lambda within container (either label or column name)
@@ -2097,7 +2168,10 @@ func (df *DataFrameMutator) Apply(lambdas map[string]ApplyFn) {
 // Returns a new DataFrame.
 func (df *DataFrame) SetRows(lambda ApplyFn, container string, rows []int) *DataFrame {
 	df = df.Copy()
-	df.InPlace().SetRows(lambda, container, rows)
+	err := df.InPlace().SetRows(lambda, container, rows)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
@@ -2105,24 +2179,21 @@ func (df *DataFrame) SetRows(lambda ApplyFn, container string, rows []int) *Data
 // to set the values at the specified row positions.
 // The new values must be the same type as the existing values.
 // Modifies the underlying DataFrame.
-func (df *DataFrameMutator) SetRows(lambda ApplyFn, container string, rows []int) {
+func (df *DataFrameMutator) SetRows(lambda ApplyFn, container string, rows []int) error {
 	err := lambda.validate()
 	if err != nil {
-		df.dataframe.resetWithError((fmt.Errorf("applying lambda to rows: %v", err)))
-		return
+		return fmt.Errorf("applying lambda to rows: %v", err)
 	}
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
 	index, err := indexOfContainer(container, mergedLabelsAndCols)
 	if err != nil {
-		df.dataframe.resetWithError((fmt.Errorf("applying lambda to rows: %v", err)))
-		return
+		return fmt.Errorf("applying lambda to rows: %v", err)
 	}
 	err = mergedLabelsAndCols[index].apply(lambda, rows)
 	if err != nil {
-		df.dataframe.resetWithError((fmt.Errorf("applying lambda to rows: %v", err)))
-		return
+		return fmt.Errorf("applying lambda to rows: %v", err)
 	}
-	return
+	return nil
 }
 
 // -- MERGERS
@@ -2180,65 +2251,30 @@ func JoinOptionRightOn(keys []string) func(*joinConfig) {
 //
 // Finally, all container names (columns and label names) are deduplicated after the merge so that they are unique.
 // Returns a new DataFrame.
-func (df *DataFrame) Merge(other *DataFrame, options ...JoinOption) *DataFrame {
-	df = df.Copy()
-	df.InPlace().Merge(other, options...)
-	return df
-}
-
-// Merge joins other onto df.
-// Performs a left join unless a different join type is specified as an option.
-// If left and right keys are supplied as options, those are used as lookup keys.
-// Otherwise, the join will automatically use shared label names or return an error if none exist.
-//
-// Merge identifies the row alignment between df and other and appends aligned values as new columns on df.
-// Rows are aligned when:
-// 1) one or more containers (either column or label level) in other share the same name as one or more containers in df,
-// and 2) the stringified values in the other containers match the values in the df containers.
-// For the following dataframes:
-//
-// df    	other
-// FOO BAR	FOO QUX
-// bar 0	baz corge
-// baz 1	qux waldo
-//
-// Row 1 in df is "aligned" with row 0 in other, because those are the rows in which
-// both share the same value ("baz") in a container with the same name ("foo").
-// After merging, the result will be:
-//
-// df
-// FOO BAR QUX
-// bar 0   null
-// baz 1   corge
-//
-// Finally, all container names (columns and label names) are deduplicated after the merge so that they are unique.
-// Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) Merge(other *DataFrame, options ...JoinOption) {
+func (df *DataFrame) Merge(other *DataFrame, options ...JoinOption) (*DataFrame, error) {
 	config := setJoinConfig(options)
 	if config.how == "inner" {
 		// inner merge should be a left merge with null rows dropped
 		options = append(options, JoinOptionHow("left"))
 	}
-	lookupDF := df.dataframe.Lookup(other, options...)
-	if lookupDF.Err() != nil {
-		df.dataframe.resetWithError(fmt.Errorf("merge: %v", lookupDF.Err()))
+	lookupDF, err := df.Lookup(other, options...)
+	if err != nil {
+		return nil, fmt.Errorf("merging data: %v", err)
 	}
-	anchor := df
+	var ret *DataFrame
 	if config.how == "right" {
-		anchor = other.InPlace()
+		ret = other.Copy()
+	} else {
+		ret = df.Copy()
 	}
 	for k := range lookupDF.values {
-		anchor.dataframe.values = append(anchor.dataframe.values, lookupDF.values[k])
+		ret.values = append(ret.values, lookupDF.values[k])
 	}
 	if config.how == "inner" {
-		anchor.DropNull()
+		ret.InPlace().DropNull()
 	}
-	anchor.DeduplicateNames()
-	// set df to anchor
-	df.dataframe.values = anchor.dataframe.values
-	df.dataframe.labels = anchor.dataframe.labels
-	df.dataframe.colLevelNames = anchor.dataframe.colLevelNames
-	df.dataframe.name = anchor.dataframe.name
+	ret.InPlace().DeduplicateNames()
+	return ret, nil
 }
 
 // Lookup performs the lookup portion of a join of other onto df.
@@ -2266,7 +2302,7 @@ func (df *DataFrameMutator) Merge(other *DataFrame, options ...JoinOption) {
 // baz corge
 //
 // Returns a new DataFrame.
-func (df *DataFrame) Lookup(other *DataFrame, options ...JoinOption) *DataFrame {
+func (df *DataFrame) Lookup(other *DataFrame, options ...JoinOption) (*DataFrame, error) {
 	config := setJoinConfig(options)
 	mergedLabelsAndCols := append(df.labels, df.values...)
 	otherMergedLabelsAndCols := append(other.labels, other.values...)
@@ -2274,24 +2310,23 @@ func (df *DataFrame) Lookup(other *DataFrame, options ...JoinOption) *DataFrame 
 	var err error
 	if len(config.leftOn) == 0 || len(config.rightOn) == 0 {
 		if !(len(config.leftOn) == 0 && len(config.rightOn) == 0) {
-			return dataFrameWithError(
-				fmt.Errorf("lookup: if either leftOn or rightOn is empty, both must be empty"))
+			return nil, fmt.Errorf("lookup: if either leftOn or rightOn is empty, both must be empty")
 		}
 	}
 	// no join keys specified? find matching labels
 	if len(config.leftOn) == 0 {
 		leftKeys, rightKeys, err = findMatchingKeysBetweenTwoContainers(df.labels, other.labels)
 		if err != nil {
-			return dataFrameWithError(fmt.Errorf("lookup: %v", err))
+			return nil, fmt.Errorf("lookup: %v", err)
 		}
 	} else {
 		leftKeys, err = indexOfContainers(config.leftOn, mergedLabelsAndCols)
 		if err != nil {
-			return dataFrameWithError(fmt.Errorf("lookup: leftOn: %v", err))
+			return nil, fmt.Errorf("lookup: leftOn: %v", err)
 		}
 		rightKeys, err = indexOfContainers(config.rightOn, otherMergedLabelsAndCols)
 		if err != nil {
-			return dataFrameWithError(fmt.Errorf("lookup: rightOn: %v", err))
+			return nil, fmt.Errorf("lookup: rightOn: %v", err)
 		}
 	}
 	ret, err := lookupDataFrame(
@@ -2299,9 +2334,9 @@ func (df *DataFrame) Lookup(other *DataFrame, options ...JoinOption) *DataFrame 
 		df.values, df.labels, leftKeys,
 		other.values, other.labels, rightKeys, config.leftOn, config.rightOn)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("lookup: %v", err))
+		return nil, fmt.Errorf("lookup: %v", err)
 	}
-	return ret
+	return ret, nil
 }
 
 // -- SORTERS
@@ -2313,7 +2348,10 @@ func (df *DataFrame) Lookup(other *DataFrame, options ...JoinOption) *DataFrame 
 // Returns a new DataFrame.
 func (df *DataFrame) Sort(by ...Sorter) *DataFrame {
 	df = df.Copy()
-	df.InPlace().Sort(by...)
+	err := df.InPlace().Sort(by...)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
@@ -2321,28 +2359,27 @@ func (df *DataFrame) Sort(by ...Sorter) *DataFrame {
 // If no Sorter is supplied, does not sort.
 // If no DType is supplied for a Sorter, sorts as float64.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) Sort(by ...Sorter) {
+func (df *DataFrameMutator) Sort(by ...Sorter) error {
 	if len(by) == 0 {
-		df.dataframe.resetWithError(fmt.Errorf(
-			"sort: must supply at least one Sorter"))
-		return
+		return fmt.Errorf("sorting rows: must supply at least one Sorter")
 	}
 
 	mergedLabelsAndValues := append(df.dataframe.labels, df.dataframe.values...)
 	// sortContainers iteratively updates the index
 	newIndex, err := sortContainers(mergedLabelsAndValues, by)
 	if err != nil {
-		df.dataframe.resetWithError(fmt.Errorf("sort: %v", err))
-		return
+		return fmt.Errorf("sorting rows: %v", err)
 	}
 	// rearrange the data in place with the final index
 	df.Subset(newIndex)
+	return nil
 }
 
 // -- GROUPERS
 
 // GroupBy groups the DataFrame rows that share the same stringified value
 // in the container(s) (columns or labels) specified by names.
+// If error occurs, writes error to GroupedDataFrame.
 func (df *DataFrame) GroupBy(names ...string) *GroupedDataFrame {
 	var index []int
 	var err error
@@ -2356,18 +2393,8 @@ func (df *DataFrame) GroupBy(names ...string) *GroupedDataFrame {
 			return groupedDataFrameWithError(fmt.Errorf("group by: %v", err))
 		}
 	}
-	return df.groupby(index)
-}
-
-// expects index to refer to merged labels and columns
-func (df *DataFrame) groupby(index []int) *GroupedDataFrame {
-	mergedLabelsAndCols := append(df.labels, df.values...)
 	containers, _ := subsetContainers(mergedLabelsAndCols, index)
 	newLabels, rowIndices, orderedKeys := reduceContainers(containers)
-	names := make([]string, len(index))
-	for i, pos := range index {
-		names[i] = mergedLabelsAndCols[pos].name
-	}
 	return &GroupedDataFrame{
 		orderedKeys: orderedKeys,
 		rowIndices:  rowIndices,
@@ -2382,22 +2409,22 @@ func (df *DataFrame) groupby(index []int) *GroupedDataFrame {
 // promoting the unique values in columns to be new columns.
 // labels, columns, and values should all refer to existing container names (either columns or labels).
 // Supported aggFuncs: sum, mean, median, stdDev, count, min, max.
-func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFrame {
+func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) (*DataFrame, error) {
 
 	mergedLabelsAndCols := append(df.labels, df.values...)
-	labelIndex, err := indexOfContainer(labels, mergedLabelsAndCols)
+	_, err := indexOfContainer(labels, mergedLabelsAndCols)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("pivot table: labels: %v", err))
+		return nil, fmt.Errorf("pivot table: labels: %v", err)
 	}
-	colIndex, err := indexOfContainer(columns, mergedLabelsAndCols)
+	_, err = indexOfContainer(columns, mergedLabelsAndCols)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("pivot table: columns: %v", err))
+		return nil, fmt.Errorf("pivot table: columns: %v", err)
 	}
 	_, err = indexOfContainer(values, mergedLabelsAndCols)
 	if err != nil {
-		return dataFrameWithError(fmt.Errorf("pivot table: values: %v", err))
+		return nil, fmt.Errorf("pivot table: values: %v", err)
 	}
-	grouper := df.groupby([]int{labelIndex, colIndex})
+	grouper := df.GroupBy(labels, columns)
 	var ret *DataFrame
 	switch aggFunc {
 	case "sum":
@@ -2415,11 +2442,11 @@ func (df *DataFrame) PivotTable(labels, columns, values, aggFunc string) *DataFr
 	case "max":
 		ret = grouper.Max(values)
 	default:
-		return dataFrameWithError(fmt.Errorf("pivot table: aggFunc: unsupported (%v)", aggFunc))
+		return nil, fmt.Errorf("pivot table: aggFunc: unsupported (%v)", aggFunc)
 	}
 	ret = ret.PromoteToColLevel(columns)
 	ret.dropColLevel(1)
-	return ret
+	return ret, nil
 }
 
 // dropColLevel drops a column level inplace by changing the name in every column container
@@ -2441,7 +2468,10 @@ func (df *DataFrame) dropColLevel(level int) *DataFrame {
 // Returns a new DataFrame.
 func (df *DataFrame) Resample(how map[string]Resampler) *DataFrame {
 	df = df.Copy()
-	df.InPlace().Resample(how)
+	err := df.InPlace().Resample(how)
+	if err != nil {
+		return dataFrameWithError(err)
+	}
 	return df
 }
 
@@ -2451,17 +2481,16 @@ func (df *DataFrame) Resample(how map[string]Resampler) *DataFrame {
 // in its Resampler struct provides the resampling logic for that container.
 // If AsCivilDate or AsCivilTime is true, saves slice values as []civil.Date or []civil.Time, respectively.
 // Modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) Resample(how map[string]Resampler) {
+func (df *DataFrameMutator) Resample(how map[string]Resampler) error {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)
 	for name, resampler := range how {
 		index, err := indexOfContainer(name, mergedLabelsAndCols)
 		if err != nil {
-			df.dataframe.resetWithError(fmt.Errorf("resample: %v", err))
-			return
+			return fmt.Errorf("resample: %v", err)
 		}
 		mergedLabelsAndCols[index].resample(resampler)
 	}
-	return
+	return nil
 }
 
 // -- ITERATORS
@@ -2544,15 +2573,15 @@ func (df *DataFrame) math(name string, mathFunction func([]float64, []bool, []in
 // SumCols finds each column matching a supplied colName, coerces its values to float64, and adds them row-wise.
 // The resulting Series is named name.
 // If any column has a null value for a given row, that row is considered null.
-func (df *DataFrame) SumCols(name string, colNames ...string) *Series {
+func (df *DataFrame) SumCols(name string, colNames ...string) (*Series, error) {
 	if len(colNames) == 0 {
-		return seriesWithError(fmt.Errorf("sum columns: colNames cannot be empty"))
+		return nil, fmt.Errorf("sum columns: colNames cannot be empty")
 	}
 	var ret *Series
 	for i, name := range colNames {
 		_, err := indexOfContainer(name, df.values)
 		if err != nil {
-			return seriesWithError(fmt.Errorf("sum columns: %v", err))
+			return nil, fmt.Errorf("sum columns: %v", err)
 		}
 		if i == 0 {
 			ret = df.Col(name)
@@ -2561,7 +2590,7 @@ func (df *DataFrame) SumCols(name string, colNames ...string) *Series {
 		}
 	}
 	ret.SetName(name)
-	return ret
+	return ret, nil
 }
 
 // Sum coerces the values in each column to float64 and sums each column.
@@ -2607,13 +2636,13 @@ func (df *DataFrame) Max() *Series {
 // Reduce uses lambda to reduce all columns to a Series named name
 // with column names as labels and reduced values as row values.
 // The type of the new Series is a slice with the same type as the first value outputted by the anonymous function.
-func (df *DataFrame) Reduce(name string, lambda ReduceFn) *Series {
+func (df *DataFrame) Reduce(name string, lambda ReduceFn) (*Series, error) {
 	err := lambda.validate()
 	if err != nil {
-		return seriesWithError(fmt.Errorf("reducing DataFrame: %v", err))
+		return nil, fmt.Errorf("reducing DataFrame: %v", err)
 	}
 	if df.NumColumns() == 0 {
-		return seriesWithError(fmt.Errorf("reducing DataFrame: DataFrame must have at least one column"))
+		return nil, fmt.Errorf("reducing DataFrame: DataFrame must have at least one column")
 	}
 	// must deduce output type from first result
 	firstResult, _ := lambda(df.values[0].slice, df.values[0].isNull)
@@ -2630,8 +2659,8 @@ func (df *DataFrame) Reduce(name string, lambda ReduceFn) *Series {
 		val, null := lambda(df.values[i].slice, df.values[i].isNull)
 		src := reflect.ValueOf(val)
 		if src.Type() != firstType {
-			return seriesWithError(fmt.Errorf("reducing DataFrame: column %s: type must match type of first reduced value (%s != %s)",
-				df.values[i].name, src.Type().String(), firstType.String()))
+			return nil, fmt.Errorf("reducing DataFrame: column %s: type must match type of first reduced value (%s != %s)",
+				df.values[i].name, src.Type().String(), firstType.String())
 		}
 		dst := retVals.Index(i)
 		dst.Set(src)
@@ -2655,5 +2684,5 @@ func (df *DataFrame) Reduce(name string, lambda ReduceFn) *Series {
 			name:   name,
 		},
 		labels: retLabels,
-	}
+	}, nil
 }

@@ -353,7 +353,7 @@ func TestDataFrame_Subset(t *testing.T) {
 			name:          "baz"},
 			args{[]int{10}},
 			&DataFrame{err: fmt.Errorf(
-				"subset: index out of range (10 > 1)")}},
+				"subsetting rows: index out of range [10] with length 2")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -582,7 +582,7 @@ func TestDataFrame_SubsetLabels(t *testing.T) {
 			colLevelNames: []string{"*0"},
 			name:          "baz"},
 			args{[]int{10}},
-			&DataFrame{err: fmt.Errorf("subsetting labels: index out of range (10 > 1)")}},
+			&DataFrame{err: fmt.Errorf("subsetting labels: index out of range [10] with length 2")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -646,7 +646,7 @@ func TestDataFrame_SubsetCols(t *testing.T) {
 			colLevelNames: []string{"*0"},
 			name:          "baz"},
 			args{[]int{10}},
-			&DataFrame{err: fmt.Errorf("subsetting columns: index out of range (10 > 1)")}},
+			&DataFrame{err: fmt.Errorf("subsetting columns: index out of range [10] with length 2")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -776,10 +776,11 @@ func TestDataFrame_Tail(t *testing.T) {
 }
 func TestDataFrame_Range(t *testing.T) {
 	type fields struct {
-		labels []*valueContainer
-		values []*valueContainer
-		name   string
-		err    error
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		colLevelNames []string
+		err           error
 	}
 	type args struct {
 		first int
@@ -797,19 +798,22 @@ func TestDataFrame_Range(t *testing.T) {
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"},
 			},
-			name: "baz"},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{1, 2},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"bar"}, isNull: []bool{false}, name: "0"}},
-				labels: []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
-				name:   "baz"}},
+				labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"}},
 		{"fail - first > last", fields{
 			values: []*valueContainer{
 				{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "0"}},
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"},
 			},
-			name: "baz"},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{3, 2},
 			&DataFrame{err: fmt.Errorf("range: first is greater than last (3 > 2)")}},
 		{"fail - first out of range", fields{
@@ -818,26 +822,29 @@ func TestDataFrame_Range(t *testing.T) {
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"},
 			},
-			name: "baz"},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{3, 3},
-			&DataFrame{err: fmt.Errorf("range: first index out of range (3 > 2)")}},
+			&DataFrame{err: fmt.Errorf("range: first index out of range [3] with length 3")}},
 		{"fail - last out of range", fields{
 			values: []*valueContainer{
 				{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "0"}},
 			labels: []*valueContainer{
 				{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"},
 			},
-			name: "baz"},
+			colLevelNames: []string{"*0"},
+			name:          "baz"},
 			args{2, 4},
-			&DataFrame{err: fmt.Errorf("range: last index out of range (4 > 3)")}},
+			&DataFrame{err: fmt.Errorf("range: last index out of range [4] with max index 4 (length + 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := &DataFrame{
-				labels: tt.fields.labels,
-				values: tt.fields.values,
-				name:   tt.fields.name,
-				err:    tt.fields.err,
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				colLevelNames: tt.fields.colLevelNames,
+				err:           tt.fields.err,
 			}
 			if got := df.Range(tt.args.first, tt.args.last); !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Range() = %v, want %v", got, tt.want)
@@ -902,7 +909,18 @@ func TestDataFrame_FilterCols(t *testing.T) {
 				return false
 			}, 10},
 			&DataFrame{
-				err: fmt.Errorf("filter columns: level out of range: 10 >= 0")},
+				err: fmt.Errorf("filtering columns: level out of range: 10 >= 0")},
+		},
+		{"fail - no lambda provided", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "bar"},
+				{slice: []float64{1}, isNull: []bool{false}, name: "baz"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, name: "*0"}}},
+			args{nil, 0},
+			&DataFrame{
+				err: fmt.Errorf("filtering columns: must provide lambda function")},
 		},
 	}
 	for _, tt := range tests {
@@ -1013,7 +1031,7 @@ func TestDataFrame_WithCol(t *testing.T) {
 			colLevelNames: []string{"*0"},
 			name:          "bar"},
 			args{"baz", []complex64{10}},
-			&DataFrame{err: fmt.Errorf("with column: unable to calculate null values ([]complex64 not supported)")},
+			&DataFrame{err: fmt.Errorf("setting column: unable to calculate null values ([]complex64 not supported)")},
 		},
 	}
 	for _, tt := range tests {
@@ -1108,7 +1126,7 @@ func TestDataFrame_WithLabels(t *testing.T) {
 			colLevelNames: []string{"*0"},
 			name:          "bar"},
 			args{"baz", []complex64{10}},
-			&DataFrame{err: fmt.Errorf("with labels: unable to calculate null values ([]complex64 not supported)")},
+			&DataFrame{err: fmt.Errorf("setting labels: unable to calculate null values ([]complex64 not supported)")},
 		},
 	}
 	for _, tt := range tests {
@@ -1209,7 +1227,7 @@ func TestDataFrame_DropNull(t *testing.T) {
 	}
 }
 
-func TestDataFrame_Null(t *testing.T) {
+func TestDataFrame_IsNull(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -1277,12 +1295,12 @@ func TestDataFrame_Null(t *testing.T) {
 				name:          tt.fields.name,
 				err:           tt.fields.err,
 			}
-			got := df.Null(tt.args.subset...)
+			got := df.IsNull(tt.args.subset...)
 			if !EqualDataFrames(got, tt.want) {
-				t.Errorf("DataFrame.Null() = %v, want %v", got, tt.want)
+				t.Errorf("DataFrame.IsNull() = %v, want %v", got, tt.want)
 			}
 			if !dataFrameIsDistinct(got, df) {
-				t.Errorf("DataFrame.Null() changed underlying values, want copy")
+				t.Errorf("DataFrame.IsNull() changed underlying values, want copy")
 			}
 		})
 	}
@@ -1373,7 +1391,7 @@ func TestDataFrame_ResetLabels(t *testing.T) {
 		err           error
 	}
 	type args struct {
-		index []int
+		index []string
 	}
 	tests := []struct {
 		name   string
@@ -1389,7 +1407,7 @@ func TestDataFrame_ResetLabels(t *testing.T) {
 				{slice: []int{1}, isNull: []bool{false}, name: "*1"}},
 			colLevelNames: []string{"*0"},
 			name:          "baz"},
-			args{[]int{1}},
+			args{[]string{"*1"}},
 			&DataFrame{values: []*valueContainer{
 				{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
 				{slice: []int{1}, isNull: []bool{false}, name: "1"},
@@ -1424,18 +1442,8 @@ func TestDataFrame_ResetLabels(t *testing.T) {
 				{slice: []int{1}, isNull: []bool{false}, name: "*1"}},
 			colLevelNames: []string{"*0"},
 			name:          "baz"},
-			args{[]int{10}},
-			&DataFrame{err: fmt.Errorf("resetting labels to column: index out of range (10 > 2)")}},
-		{"fail - out of range after adjustment ", fields{
-			values: []*valueContainer{
-				{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
-			labels: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
-				{slice: []int{1}, isNull: []bool{false}, name: "*1"}},
-			colLevelNames: []string{"*0"},
-			name:          "baz"},
-			args{[]int{1, 10}},
-			&DataFrame{err: fmt.Errorf("resetting labels to column: index out of range (10 > 2)")}},
+			args{[]string{"corge"}},
+			&DataFrame{err: fmt.Errorf("resetting labels to columns: name (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1753,7 +1761,7 @@ func TestDataFrame_Filter(t *testing.T) {
 			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
 			args{map[string]FilterFn{"*0": nil}},
-			&DataFrame{err: fmt.Errorf("filter: no filter function provided")}},
+			&DataFrame{err: fmt.Errorf("filtering rows: no filter function provided")}},
 		{"fail - bad column name", fields{
 			values: []*valueContainer{
 				{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
@@ -1761,7 +1769,7 @@ func TestDataFrame_Filter(t *testing.T) {
 			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
 			args{map[string]FilterFn{"corge": func(interface{}) bool { return true }}},
-			&DataFrame{err: fmt.Errorf("filter: name (corge) not found")}},
+			&DataFrame{err: fmt.Errorf("filtering rows: name (corge) not found")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2208,7 +2216,7 @@ func TestDataFrame_Sort(t *testing.T) {
 			name:   "baz"},
 			args{nil},
 			&DataFrame{
-				err: fmt.Errorf("sort: must supply at least one Sorter")},
+				err: fmt.Errorf("sorting rows: must supply at least one Sorter")},
 		},
 		{"fail - bad colName", fields{
 			values: []*valueContainer{
@@ -2217,7 +2225,7 @@ func TestDataFrame_Sort(t *testing.T) {
 			name:   "baz"},
 			args{[]Sorter{{Name: "corge"}}},
 			&DataFrame{
-				err: fmt.Errorf("sort: position 0: name (corge) not found")},
+				err: fmt.Errorf("sorting rows: position 0: name (corge) not found")},
 		},
 	}
 	for _, tt := range tests {
@@ -2526,10 +2534,11 @@ func TestDataFrame_Merge(t *testing.T) {
 		options []JoinOption
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *DataFrame
+		name    string
+		fields  fields
+		args    args
+		want    *DataFrame
+		wantErr bool
 	}{
 		{"matching label key *0",
 			fields{values: []*valueContainer{
@@ -2554,6 +2563,7 @@ func TestDataFrame_Merge(t *testing.T) {
 				},
 				name:          "foo",
 				colLevelNames: []string{"*0"}},
+			false,
 		},
 		{"right merge",
 			fields{values: []*valueContainer{
@@ -2579,6 +2589,7 @@ func TestDataFrame_Merge(t *testing.T) {
 					}},
 				name:          "bar",
 				colLevelNames: []string{"*1"}},
+			false,
 		},
 		{"inner merge", // resets cache when it drops null rows
 			fields{values: []*valueContainer{
@@ -2602,6 +2613,7 @@ func TestDataFrame_Merge(t *testing.T) {
 					{slice: []int{1}, isNull: []bool{false}, name: "*0"}},
 				name:          "foo",
 				colLevelNames: []string{"*0"}},
+			false,
 		},
 		{"fail - no shared merge key ",
 			fields{values: []*valueContainer{
@@ -2613,8 +2625,7 @@ func TestDataFrame_Merge(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "corge"}},
 				colLevelNames: []string{"anything"}},
 				nil},
-			&DataFrame{
-				err: fmt.Errorf("merge: lookup: no matching keys between containers")},
+			nil, true,
 		},
 	}
 	for _, tt := range tests {
@@ -2626,7 +2637,11 @@ func TestDataFrame_Merge(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.Merge(tt.args.other, tt.args.options...); !EqualDataFrames(got, tt.want) {
+			got, err := df.Merge(tt.args.other, tt.args.options...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.Merge() error = %v, want %v", err, tt.wantErr)
+			}
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Merge() = %v, want %v", got, tt.want)
 			}
 		})
@@ -2646,10 +2661,11 @@ func TestDataFrame_Lookup(t *testing.T) {
 		options []JoinOption
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *DataFrame
+		name    string
+		fields  fields
+		args    args
+		want    *DataFrame
+		wantErr bool
 	}{
 		{"single label level, supplied keys, left join - other has more labels", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
@@ -2667,6 +2683,7 @@ func TestDataFrame_Lookup(t *testing.T) {
 				},
 				name:          "qux",
 				colLevelNames: []string{"*0"}},
+			false,
 		},
 		{"single label level, supplied keys, left join - other has fewer labels", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
@@ -2684,6 +2701,7 @@ func TestDataFrame_Lookup(t *testing.T) {
 				},
 				name:          "qux",
 				colLevelNames: []string{"*0"}},
+			false,
 		},
 		{"auto key match", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
@@ -2701,6 +2719,7 @@ func TestDataFrame_Lookup(t *testing.T) {
 				},
 				name:          "qux",
 				colLevelNames: []string{"*0"}},
+			false,
 		},
 		{"auto key match - right join", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
@@ -2718,6 +2737,7 @@ func TestDataFrame_Lookup(t *testing.T) {
 				},
 				name:          "qux",
 				colLevelNames: []string{"*0"}},
+			false,
 		},
 		{"fail - leftOn but not rightOn", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
@@ -2728,7 +2748,8 @@ func TestDataFrame_Lookup(t *testing.T) {
 				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				options: []JoinOption{JoinOptionLeftOn([]string{"foo"})}},
-			&DataFrame{err: fmt.Errorf("lookup: if either leftOn or rightOn is empty, both must be empty")},
+			nil,
+			true,
 		},
 		{"fail - bad leftOn", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
@@ -2739,7 +2760,8 @@ func TestDataFrame_Lookup(t *testing.T) {
 				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				options: []JoinOption{JoinOptionLeftOn([]string{"corge"}), JoinOptionRightOn([]string{"foo"})}},
-			&DataFrame{err: fmt.Errorf("lookup: leftOn: name (corge) not found")},
+			nil,
+			true,
 		},
 		{"fail - bad rightOn", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
@@ -2750,7 +2772,8 @@ func TestDataFrame_Lookup(t *testing.T) {
 				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "baz"}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				options: []JoinOption{JoinOptionLeftOn([]string{"foo"}), JoinOptionRightOn([]string{"corge"})}},
-			&DataFrame{err: fmt.Errorf("lookup: rightOn: name (corge) not found")},
+			nil,
+			true,
 		},
 		{"fail - unsupported lookup", fields{
 			values:        []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
@@ -2761,7 +2784,8 @@ func TestDataFrame_Lookup(t *testing.T) {
 				other: &DataFrame{values: []*valueContainer{{slice: []float64{10, 20, 30}, isNull: []bool{false, false, false}, name: "corge"}},
 					labels: []*valueContainer{{name: "foo", slice: []string{"qux", "quux", "bar"}, isNull: []bool{false, false, false}}}},
 				options: []JoinOption{JoinOptionHow("other")}},
-			&DataFrame{err: fmt.Errorf("lookup: how: must be left, right, or inner")},
+			nil,
+			true,
 		},
 	}
 	for _, tt := range tests {
@@ -2773,7 +2797,11 @@ func TestDataFrame_Lookup(t *testing.T) {
 				colLevelNames: tt.fields.colLevelNames,
 				err:           tt.fields.err,
 			}
-			if got := df.Lookup(tt.args.other, tt.args.options...); !EqualDataFrames(got, tt.want) {
+			got, err := df.Lookup(tt.args.other, tt.args.options...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.Lookup() error = %v, want %v", err, tt.wantErr)
+			}
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.Lookup() = %v, want %v", got, tt.want)
 
 			}
@@ -3030,10 +3058,11 @@ func TestDataFrame_PivotTable(t *testing.T) {
 		aggFn   string
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *DataFrame
+		name    string
+		fields  fields
+		args    args
+		want    *DataFrame
+		wantErr bool
 	}{
 		{"sum", fields{
 			values: []*valueContainer{
@@ -3052,7 +3081,9 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
-				name:          "sum_foo"}},
+				name:          "sum_foo"},
+			false,
+		},
 		{"mean", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -3070,7 +3101,9 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
-				name:          "mean_foo"}},
+				name:          "mean_foo"},
+			false,
+		},
 		{"median", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -3088,7 +3121,9 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
-				name:          "median_foo"}},
+				name:          "median_foo"},
+			false,
+		},
 		{"stdDev", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -3106,7 +3141,9 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
-				name:          "stdDev_foo"}},
+				name:          "stdDev_foo"},
+			false,
+		},
 		{"count", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -3125,7 +3162,9 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
-				name:          "count_foo"}},
+				name:          "count_foo"},
+			false,
+		},
 		{"min", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -3143,7 +3182,9 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
-				name:          "min_foo"}},
+				name:          "min_foo"},
+			false,
+		},
 		{"max", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -3161,7 +3202,9 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"A", "B"}, isNull: []bool{false, false}, name: "type"}},
 				colLevelNames: []string{"year"},
-				name:          "max_foo"}},
+				name:          "max_foo"},
+			false,
+		},
 		{"fail - no matching index level", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -3171,8 +3214,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
 			args{labels: "corge", columns: "year", values: "amount", aggFn: "stdDev"},
-			&DataFrame{
-				err: fmt.Errorf("pivot table: labels: name (corge) not found")}},
+			nil, true},
 		{"fail - no matching columns", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -3182,8 +3224,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
 			args{labels: "type", columns: "corge", values: "amount", aggFn: "stdDev"},
-			&DataFrame{
-				err: fmt.Errorf("pivot table: columns: name (corge) not found")}},
+			nil, true},
 		{"fail - no matching values", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -3193,8 +3234,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
 			args{labels: "type", columns: "year", values: "corge", aggFn: "stdDev"},
-			&DataFrame{
-				err: fmt.Errorf("pivot table: values: name (corge) not found")}},
+			nil, true},
 		{"fail - unsupported aggfunc", fields{
 			values: []*valueContainer{
 				{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "amount"},
@@ -3204,8 +3244,7 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				{slice: []int{0, 1, 2, 3}, isNull: []bool{false, false, false, false}, name: "*0"}},
 			colLevelNames: []string{"*0"}},
 			args{labels: "type", columns: "year", values: "amount", aggFn: "other"},
-			&DataFrame{
-				err: fmt.Errorf("pivot table: aggFunc: unsupported (other)")}},
+			nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -3216,7 +3255,11 @@ func TestDataFrame_PivotTable(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.PivotTable(tt.args.labels, tt.args.columns, tt.args.values, tt.args.aggFn); !EqualDataFrames(got, tt.want) {
+			got, err := df.PivotTable(tt.args.labels, tt.args.columns, tt.args.values, tt.args.aggFn)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.PivotTable() error = %v, want %v", err, tt.wantErr)
+			}
+			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("DataFrame.PivotTable() = %v, want %v", got, tt.want)
 			}
 		})
@@ -4162,7 +4205,7 @@ func TestDataFrame_DropRow(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{10},
 			&DataFrame{
-				err: fmt.Errorf("dropping row: index out of range (10 > 1)")},
+				err: fmt.Errorf("dropping row: index out of range [10] with length 2")},
 		},
 	}
 	for _, tt := range tests {
@@ -4226,7 +4269,7 @@ func TestDataFrame_Append(t *testing.T) {
 				},
 				colLevelNames: []string{"anything"}}},
 			&DataFrame{
-				err: fmt.Errorf("append: other DataFrame must have same number of label levels as original DataFrame (2 != 1)")},
+				err: fmt.Errorf("appending rows: other must have same number of label levels as original (2 != 1)")},
 		},
 		{"fail - wrong num columns",
 			fields{values: []*valueContainer{
@@ -4241,7 +4284,7 @@ func TestDataFrame_Append(t *testing.T) {
 					{slice: []int{2}, isNull: []bool{false}, name: "anything"}},
 				colLevelNames: []string{"anything"}}},
 			&DataFrame{
-				err: fmt.Errorf("append: other DataFrame must have same number of columns as original DataFrame (2 != 1)")},
+				err: fmt.Errorf("appending rows: other must have same number of columns as original (2 != 1)")},
 		},
 	}
 	for _, tt := range tests {
@@ -4928,10 +4971,11 @@ func TestDataFrame_SumCols(t *testing.T) {
 		colNames []string
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *Series
+		name    string
+		fields  fields
+		args    args
+		want    *Series
+		wantErr bool
 	}{
 		{"pass",
 			fields{
@@ -4945,7 +4989,9 @@ func TestDataFrame_SumCols(t *testing.T) {
 			&Series{
 				values: &valueContainer{slice: []float64{0, 3}, isNull: []bool{true, false}, name: "sum"},
 				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-			}},
+			},
+			false,
+		},
 		{"fail - bad name",
 			fields{
 				values: []*valueContainer{
@@ -4955,9 +5001,9 @@ func TestDataFrame_SumCols(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
 			args{"", []string{"corge", "qux"}},
-			&Series{
-				err: fmt.Errorf("sum columns: name (corge) not found"),
-			}},
+			nil,
+			true,
+		},
 		{"fail - no columns",
 			fields{
 				values: []*valueContainer{
@@ -4967,9 +5013,8 @@ func TestDataFrame_SumCols(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
 				colLevelNames: []string{"*0"}},
 			args{"", nil},
-			&Series{
-				err: fmt.Errorf("sum columns: colNames cannot be empty"),
-			}},
+			nil,
+			true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -4980,7 +5025,11 @@ func TestDataFrame_SumCols(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.SumCols(tt.args.name, tt.args.colNames...); !EqualSeries(got, tt.want) {
+			got, err := df.SumCols(tt.args.name, tt.args.colNames...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.SumCols() error = %v, want %v", err, tt.wantErr)
+			}
+			if !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.SumCols() = %v, want %v", got, tt.want)
 			}
 		})
@@ -6039,10 +6088,11 @@ func TestDataFrame_Reduce(t *testing.T) {
 		lambda ReduceFn
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *Series
+		name    string
+		fields  fields
+		args    args
+		want    *Series
+		wantErr bool
 	}{
 		{"pass",
 			fields{
@@ -6070,6 +6120,7 @@ func TestDataFrame_Reduce(t *testing.T) {
 				values: &valueContainer{slice: []float64{10, 0}, isNull: []bool{false, true}, name: "custom_sum"},
 				labels: []*valueContainer{
 					{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "*0"}}},
+			false,
 		},
 		{"pass - multi level columns",
 			fields{
@@ -6098,6 +6149,7 @@ func TestDataFrame_Reduce(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"2019", "2019"}, isNull: []bool{false, false}, name: "year"},
 					{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "class"}}},
+			false,
 		},
 		{"fail - mixed types",
 			fields{
@@ -6121,8 +6173,7 @@ func TestDataFrame_Reduce(t *testing.T) {
 				}
 				return sum, false
 			}},
-			&Series{
-				err: fmt.Errorf("reducing DataFrame: column baz: type must match type of first reduced value (string != float64)")},
+			nil, true,
 		},
 		{"fail - no function",
 			fields{
@@ -6136,8 +6187,7 @@ func TestDataFrame_Reduce(t *testing.T) {
 				colLevelNames: []string{"*0"},
 				name:          "foo"},
 			args{"custom_sum", nil},
-			&Series{
-				err: fmt.Errorf("reducing DataFrame: no reduce function provided")},
+			nil, true,
 		},
 		{"fail - no columns",
 			fields{
@@ -6148,8 +6198,7 @@ func TestDataFrame_Reduce(t *testing.T) {
 				colLevelNames: []string{"*0"},
 				name:          "foo"},
 			args{"custom_sum", func(slice interface{}, isNull []bool) (value interface{}, null bool) { return nil, true }},
-			&Series{
-				err: fmt.Errorf("reducing DataFrame: DataFrame must have at least one column")},
+			nil, true,
 		},
 	}
 	for _, tt := range tests {
@@ -6161,7 +6210,11 @@ func TestDataFrame_Reduce(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.Reduce(tt.args.name, tt.args.lambda); !EqualSeries(got, tt.want) {
+			got, err := df.Reduce(tt.args.name, tt.args.lambda)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.Reduce() error = %v, want %v", err, tt.wantErr)
+			}
+			if !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.Reduce() = %v, want %v", got, tt.want)
 			}
 		})

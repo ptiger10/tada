@@ -228,67 +228,72 @@ func (s *Series) LabelsAsSeries(name string) *Series {
 // Returns a new Series.
 func (s *Series) Subset(index []int) *Series {
 	s = s.Copy()
-	s.InPlace().Subset(index)
+	err := s.InPlace().Subset(index)
+	if err != nil {
+		return seriesWithError(err)
+	}
 	return s
 }
 
 // Subset returns only the rows specified at the index positions, in the order specified.
 // Modifies the underlying Series in place.
-func (s *SeriesMutator) Subset(index []int) {
+func (s *SeriesMutator) Subset(index []int) error {
 	err := s.series.values.subsetRows(index)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("subsetting rows: %v", err))
-		return
+		return fmt.Errorf("subsetting rows: %v", err)
 	}
 	for j := range s.series.labels {
 		s.series.labels[j].subsetRows(index)
 	}
-	return
+	return nil
 }
 
 // SwapLabels swaps the label levels with names i and j.
 // Returns a new Series.
 func (s *Series) SwapLabels(i, j string) *Series {
 	s = s.Copy()
-	s.InPlace().SwapLabels(i, j)
+	err := s.InPlace().SwapLabels(i, j)
+	if err != nil {
+		return seriesWithError(err)
+	}
 	return s
 }
 
 // SwapLabels swaps the label levels with names i and j.
 // Modifies the underlying Series in place.
-func (s *SeriesMutator) SwapLabels(i, j string) {
+func (s *SeriesMutator) SwapLabels(i, j string) error {
 	index1, err := indexOfContainer(i, s.series.labels)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("swapping labels: i: %v", err))
-		return
+		return fmt.Errorf("swapping labels: i: %v", err)
 	}
 	index2, err := indexOfContainer(j, s.series.labels)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("swapping labels: j: %v", err))
-		return
+		return fmt.Errorf("swapping labels: j: %v", err)
 	}
 	s.series.labels[index1], s.series.labels[index2] = s.series.labels[index2], s.series.labels[index1]
-	return
+	return nil
 }
 
 // SubsetLabels includes only the columns of labels specified at the index positions, in the order specified.
 // Returns a new Series.
 func (s *Series) SubsetLabels(index []int) *Series {
 	s = s.Copy()
-	s.InPlace().SubsetLabels(index)
+	err := s.InPlace().SubsetLabels(index)
+	if err != nil {
+		return seriesWithError(err)
+	}
 	return s
 }
 
 // SubsetLabels includes only the columns of labels specified at the index positions, in the order specified.
 // Modifies the underlying Series in place.
-func (s *SeriesMutator) SubsetLabels(index []int) {
+func (s *SeriesMutator) SubsetLabels(index []int) error {
 	labels, err := subsetContainers(s.series.labels, index)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("subsetting labels: %v", err))
-		return
+		return fmt.Errorf("subsetting labels: %v", err)
 	}
 	s.series.labels = labels
-	return
+	return nil
 }
 
 // Head returns the first n rows of the Series. If n is greater than the length of the Series, returns the entire Series.
@@ -421,7 +426,10 @@ func (s *Series) InPlace() *SeriesMutator {
 // In all cases, returns a new Series.
 func (s *Series) WithLabels(name string, input interface{}) *Series {
 	s = s.Copy()
-	s.InPlace().WithLabels(name, input)
+	err := s.InPlace().WithLabels(name, input)
+	if err != nil {
+		return seriesWithError(err)
+	}
 	return s
 }
 
@@ -435,13 +443,13 @@ func (s *Series) WithLabels(name string, input interface{}) *Series {
 // If input is a slice, it must be the same length as the underlying Series.
 //
 // In all cases, modifies the underlying Series in place.
-func (s *SeriesMutator) WithLabels(name string, input interface{}) {
+func (s *SeriesMutator) WithLabels(name string, input interface{}) error {
 	labels, err := withColumn(s.series.labels, name, input, s.series.Len())
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("with labels: %v", err))
-		return
+		return fmt.Errorf("with labels: %v", err)
 	}
 	s.series.labels = labels
+	return nil
 }
 
 // WithValues replaces the Series values with input.
@@ -449,22 +457,24 @@ func (s *SeriesMutator) WithLabels(name string, input interface{}) {
 // Returns a new Series.
 func (s *Series) WithValues(input interface{}) *Series {
 	s = s.Copy()
-	s.InPlace().WithValues(input)
+	err := s.InPlace().WithValues(input)
+	if err != nil {
+		return seriesWithError(err)
+	}
 	return s
 }
 
 // WithValues replaces the Series values with input.
 // input must be a supported slice type of the same length as the original Series.
 // Modifies the underlying Series.
-func (s *SeriesMutator) WithValues(input interface{}) {
+func (s *SeriesMutator) WithValues(input interface{}) error {
 	// synthesize a collection of valueContainers, ensuring that name already exists
 	vals, err := withColumn([]*valueContainer{s.series.values}, s.series.values.name, input, s.series.Len())
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("with values: %v", err))
-		return
+		return fmt.Errorf("with values: %v", err)
 	}
 	s.series.values = vals[0]
-	return
+	return nil
 }
 
 // Shuffle randomizes the row order of the Series.
@@ -488,41 +498,46 @@ func (s *SeriesMutator) Shuffle(seed int64) {
 // Returns a new Series.
 func (s *Series) DropRow(index int) *Series {
 	s = s.Copy()
-	s.InPlace().DropRow(index)
+	err := s.InPlace().DropRow(index)
+	if err != nil {
+		return seriesWithError(err)
+	}
 	return s
 }
 
 // DropRow removes the row at the specified index.
 // Modifies the underlying Series in place.
-func (s *SeriesMutator) DropRow(index int) {
+func (s *SeriesMutator) DropRow(index int) error {
 	err := s.series.values.dropRow(index)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("dropping row: %v", err))
-		return
+		return fmt.Errorf("dropping row: %v", err)
 	}
 	for j := range s.series.labels {
 		s.series.labels[j].dropRow(index)
 	}
+	return nil
 }
 
 // DropLabels removes the first label level matching name.
 // Returns a new Series.
 func (s *Series) DropLabels(name string) *Series {
 	s = s.Copy()
-	s.InPlace().DropLabels(name)
+	err := s.InPlace().DropLabels(name)
+	if err != nil {
+		return seriesWithError(err)
+	}
 	return s
 }
 
 // DropLabels removes the first label level matching name.
 // Modifies the underlying Series in place.
-func (s *SeriesMutator) DropLabels(name string) {
+func (s *SeriesMutator) DropLabels(name string) error {
 	newCols, err := dropFromContainers(name, s.series.labels)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("dropping labels: %v", err))
-		return
+		return fmt.Errorf("dropping labels: %v", err)
 	}
 	s.series.labels = newCols
-	return
+	return nil
 }
 
 // Append adds the other labels and values as new rows to the Series.
@@ -530,25 +545,26 @@ func (s *SeriesMutator) DropLabels(name string) {
 // Returns a new Series.
 func (s *Series) Append(other *Series) *Series {
 	s = s.Copy()
-	s.InPlace().Append(other)
+	err := s.InPlace().Append(other)
+	if err != nil {
+		return seriesWithError(err)
+	}
 	return s
 }
 
 // Append adds the other labels and values as new rows to the Series.
 // If the types of any container do not match, all the values in that container are coerced to string.
 // Returns a new Series.
-func (s *SeriesMutator) Append(other *Series) {
+func (s *SeriesMutator) Append(other *Series) error {
 	if len(other.labels) != len(s.series.labels) {
-		s.series.resetWithError(
-			fmt.Errorf("append: other Series must have same number of label levels as original Series (%d != %d)",
-				len(other.labels), len(s.series.labels)))
-		return
+		return fmt.Errorf("append: other Series must have same number of label levels as original Series (%d != %d)",
+			len(other.labels), len(s.series.labels))
 	}
 	for j := range s.series.labels {
 		s.series.labels[j] = s.series.labels[j].append(other.labels[j])
 	}
 	s.series.values = s.series.values.append(other.values)
-	return
+	return nil
 }
 
 // SetName modifies the name of a Series in place and returns the original Series.
@@ -573,6 +589,7 @@ func (s *SeriesMutator) Relabel() {
 }
 
 // SetLabelNames sets the names of all the label levels in the Series and returns the entire Series.
+// If an error is returned, it is written to the Series.
 func (s *Series) SetLabelNames(levelNames []string) *Series {
 	if len(levelNames) != len(s.labels) {
 		return seriesWithError(
@@ -615,7 +632,10 @@ func (s *Series) Name() string {
 // Returns a new Series.
 func (s *Series) Sort(by ...Sorter) *Series {
 	s = s.Copy()
-	s.InPlace().Sort(by...)
+	err := s.InPlace().Sort(by...)
+	if err != nil {
+		return seriesWithError(err)
+	}
 	return s
 }
 
@@ -624,7 +644,7 @@ func (s *Series) Sort(by ...Sorter) *Series {
 // If a Sorter is supplied without a Name or with a name matching the Series name, sorts by Series values.
 // If no DType is supplied in a Sorter, sorts as float64.
 // Modifies the underlying Series in place.
-func (s *SeriesMutator) Sort(by ...Sorter) {
+func (s *SeriesMutator) Sort(by ...Sorter) error {
 	// default for handling no Sorters: values as Float64 in ascending order
 	if len(by) == 0 {
 		by = []Sorter{{Name: s.series.values.name, DType: Float64, Descending: false}}
@@ -638,17 +658,16 @@ func (s *SeriesMutator) Sort(by ...Sorter) {
 	mergedLabelsAndValues := append(s.series.labels, s.series.values)
 	newIndex, err := sortContainers(mergedLabelsAndValues, by)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("sort: %v", err))
-		return
+		return fmt.Errorf("sorting rows: %v", err)
 	}
 	// rearrange the data in place with the final index
 	s.Subset(newIndex)
-	return
+	return nil
 }
 
 // -- FILTERS
 
-// FilterIndex returns the index positions of the rows in container that satsify filterFn.
+// FilterIndex returns the index positions of the rows in container (either the Series name or label name) that satsify filterFn.
 // A filter that matches no rows returns empty []int. An out of range container returns nil.
 // FilterIndex may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
 func (s *Series) FilterIndex(container string, filterFn FilterFn) []int {
@@ -677,7 +696,10 @@ func (s *Series) FilterIndex(container string, filterFn FilterFn) []int {
 // Returns a new Series.
 func (s *Series) Filter(filters map[string]FilterFn) *Series {
 	s = s.Copy()
-	s.InPlace().Filter(filters)
+	err := s.InPlace().Filter(filters)
+	if err != nil {
+		return seriesWithError(err)
+	}
 	return s
 }
 
@@ -689,9 +711,9 @@ func (s *Series) Filter(filters map[string]FilterFn) *Series {
 // If no filter is provided, function does nothing.
 // For equality filtering on one or more containers, consider FilterByValue.
 // Modifies the underlying Series in place.
-func (s *SeriesMutator) Filter(filters map[string]FilterFn) {
+func (s *SeriesMutator) Filter(filters map[string]FilterFn) error {
 	if len(filters) == 0 {
-		return
+		return nil
 	}
 	// replace "" with values container name
 	for k, v := range filters {
@@ -704,10 +726,10 @@ func (s *SeriesMutator) Filter(filters map[string]FilterFn) {
 	mergedLabelsAndValues := append(s.series.labels, s.series.values)
 	index, err := filter(mergedLabelsAndValues, filters)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("filter: %v", err))
-		return
+		return fmt.Errorf("filter: %v", err)
 	}
 	s.Subset(index)
+	return nil
 }
 
 // Where iterates over the rows in s and evaluates whether each one satisfies filters,
@@ -760,7 +782,10 @@ func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{})
 // Returns a new Series.
 func (s *Series) FilterByValue(filters map[string]interface{}) *Series {
 	s = s.Copy()
-	s.InPlace().FilterByValue(filters)
+	err := s.InPlace().FilterByValue(filters)
+	if err != nil {
+		return seriesWithError(err)
+	}
 	return s
 }
 
@@ -769,15 +794,14 @@ func (s *Series) FilterByValue(filters map[string]interface{}) *Series {
 // A filter is satisfied for a given row value if the stringified value in that container at that row matches the stringified interface{} value.
 // FilterByValue may be applied to the Series values by supplying either the Series name or an empty string ("") as a key.
 // Modifies the underlying Series in place.
-func (s *SeriesMutator) FilterByValue(filters map[string]interface{}) {
+func (s *SeriesMutator) FilterByValue(filters map[string]interface{}) error {
 	mergedLabelsAndValues := append(s.series.labels, s.series.values)
 	index, err := filterByValue(mergedLabelsAndValues, filters)
 	if err != nil {
-		s.series.resetWithError(fmt.Errorf("filter by value: %v", err))
-		return
+		return fmt.Errorf("filtering rows by value: %v", err)
 	}
 	s.Subset(index)
-	return
+	return nil
 }
 
 // -- APPLY
@@ -788,7 +812,10 @@ func (s *SeriesMutator) FilterByValue(filters map[string]interface{}) {
 // Returns a new Series.
 func (s *Series) Apply(lambda ApplyFn) *Series {
 	s = s.Copy()
-	s.InPlace().Apply(lambda)
+	err := s.InPlace().Apply(lambda)
+	if err != nil {
+		return seriesWithError(err)
+	}
 	return s
 }
 
@@ -796,18 +823,16 @@ func (s *Series) Apply(lambda ApplyFn) *Series {
 // which is an anonymous function.
 // A row's null status can be changed in-place within the anonymous function.
 // Modifies the underlying Series in place.
-func (s *SeriesMutator) Apply(lambda ApplyFn) {
+func (s *SeriesMutator) Apply(lambda ApplyFn) error {
 	err := lambda.validate()
 	if err != nil {
-		s.series.resetWithError((fmt.Errorf("applying lambda function: %v", err)))
-		return
+		return fmt.Errorf("applying lambda function: %v", err)
 	}
 	err = s.series.values.apply(lambda, nil)
 	if err != nil {
-		s.series.resetWithError((fmt.Errorf("applying lambda function: %v", err)))
-		return
+		return fmt.Errorf("applying lambda function: %v", err)
 	}
-	return
+	return nil
 }
 
 // SetRows applies lambda, an anonymous function,
@@ -816,7 +841,10 @@ func (s *SeriesMutator) Apply(lambda ApplyFn) {
 // Returns a new Series.
 func (s *Series) SetRows(lambda ApplyFn, rows []int) *Series {
 	s = s.Copy()
-	s.InPlace().SetRows(lambda, rows)
+	err := s.InPlace().SetRows(lambda, rows)
+	if err != nil {
+		return seriesWithError(err)
+	}
 	return s
 }
 
@@ -824,18 +852,16 @@ func (s *Series) SetRows(lambda ApplyFn, rows []int) *Series {
 // to set the values at the specified row positions.
 // The new values must be the same type as the existing values.
 // Modifies the underlying Series in place.
-func (s *SeriesMutator) SetRows(lambda ApplyFn, rows []int) {
+func (s *SeriesMutator) SetRows(lambda ApplyFn, rows []int) error {
 	err := lambda.validate()
 	if err != nil {
-		s.series.resetWithError((fmt.Errorf("applying lambda to rows: %v", err)))
-		return
+		return fmt.Errorf("applying lambda to rows: %v", err)
 	}
 	err = s.series.values.apply(lambda, rows)
 	if err != nil {
-		s.series.resetWithError((fmt.Errorf("applying lambda to rows: %v", err)))
-		return
+		return fmt.Errorf("applying lambda to rows: %v", err)
 	}
-	return
+	return nil
 }
 
 // -- MERGERS
@@ -866,37 +892,37 @@ func (s *SeriesMutator) SetRows(lambda ApplyFn, rows []int) {
 // baz corge
 //
 // Returns a new Series.
-func (s *Series) Lookup(other *Series, options ...JoinOption) *Series {
+func (s *Series) Lookup(other *Series, options ...JoinOption) (*Series, error) {
 	config := setJoinConfig(options)
 	var leftKeys, rightKeys []int
 	var err error
 	if len(config.leftOn) == 0 || len(config.rightOn) == 0 {
 		if !(len(config.leftOn) == 0 && len(config.rightOn) == 0) {
-			return seriesWithError(fmt.Errorf("lookup: if either leftOn or rightOn is empty, both must be empty"))
+			return nil, fmt.Errorf("lookup: if either leftOn or rightOn is empty, both must be empty")
 		}
 	}
 	// no join keys specified? find matching labels
 	if len(config.leftOn) == 0 {
 		leftKeys, rightKeys, err = findMatchingKeysBetweenTwoContainers(s.labels, other.labels)
 		if err != nil {
-			return seriesWithError(fmt.Errorf("lookup: %v", err))
+			return nil, fmt.Errorf("lookup: %v", err)
 		}
 	} else {
 		leftKeys, err = indexOfContainers(config.leftOn, s.labels)
 		if err != nil {
-			return seriesWithError(fmt.Errorf("lookup: leftOn: %v", err))
+			return nil, fmt.Errorf("lookup: leftOn: %v", err)
 		}
 		rightKeys, err = indexOfContainers(config.rightOn, other.labels)
 		if err != nil {
-			return seriesWithError(fmt.Errorf("lookup: rightOn: %v", err))
+			return nil, fmt.Errorf("lookup: rightOn: %v", err)
 		}
 	}
 
 	ret, err := lookup(config.how, s.values, s.labels, leftKeys, other.values, other.labels, rightKeys)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("lookup: %v", err))
+		return nil, fmt.Errorf("lookup: %v", err)
 	}
-	return ret
+	return ret, nil
 }
 
 // Merge joins other onto s.
@@ -926,7 +952,7 @@ func (s *Series) Lookup(other *Series, options ...JoinOption) *Series {
 //
 // Finally, all container names (either the Series name or label name) are deduplicated after the merge so that they are unique.
 // Returns a new DataFrame.
-func (s *Series) Merge(other *Series, options ...JoinOption) *DataFrame {
+func (s *Series) Merge(other *Series, options ...JoinOption) (*DataFrame, error) {
 	return s.DataFrame().Merge(other.DataFrame(), options...)
 }
 
@@ -988,6 +1014,7 @@ func (s *Series) Divide(other *Series, ignoreNulls bool) *Series {
 
 // GroupBy groups the Series rows that share the same stringified value
 // in the container(s) (columns or labels) specified by names.
+// If error occurs, writes error to GroupedSeries.
 func (s *Series) GroupBy(names ...string) *GroupedSeries {
 	var index []int
 	var err error
@@ -1192,13 +1219,13 @@ func (s *Series) Rank() *Series {
 // To bin values below or above the bin intervals, or to supply custom labels, supply a tada.Binner as config.
 // If custom labels are supplied, the length must be 1 less than the total number of bin edges.
 // Otherwise, bin labels are auto-generated from the bin intervals.
-func (s *Series) Bin(bins []float64, config *Binner) *Series {
+func (s *Series) Bin(bins []float64, config *Binner) (*Series, error) {
 	if config == nil {
 		config = &Binner{}
 	}
 	retSlice, err := s.values.cut(bins, config.AndLess, config.AndMore, config.Labels)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("Bin(): %v", err))
+		return nil, fmt.Errorf("Bin(): %v", err)
 	}
 	// ducks error because values are []string
 	nulls, _ := setNullsFromInterface(retSlice)
@@ -1210,7 +1237,7 @@ func (s *Series) Bin(bins []float64, config *Binner) *Series {
 	return &Series{
 		values: retVals,
 		labels: s.labels,
-	}
+	}, nil
 }
 
 // Percentile coerces the Series values to float64 returns the percentile rank of each value.
@@ -1245,10 +1272,10 @@ func (s *Series) Percentile() *Series {
 // To bin values below or above the bin intervals, or to supply custom labels, supply a tada.Binner as config.
 // If custom labels are supplied, the length must be 1 less than the total number of bin edges.
 // Otherwise, bin labels are auto-generated from the bin intervals.
-func (s *Series) PercentileBin(bins []float64, config *Binner) *Series {
+func (s *Series) PercentileBin(bins []float64, config *Binner) (*Series, error) {
 	retSlice, err := s.values.pcut(bins, config)
 	if err != nil {
-		return seriesWithError(fmt.Errorf("percentile bin: %v", err))
+		return nil, fmt.Errorf("percentile bin: %v", err)
 	}
 	// ducks error because values are []string
 	nulls, _ := setNullsFromInterface(retSlice)
@@ -1260,7 +1287,7 @@ func (s *Series) PercentileBin(bins []float64, config *Binner) *Series {
 	return &Series{
 		values: retVals,
 		labels: s.labels,
-	}
+	}, nil
 }
 
 // -- Slicers

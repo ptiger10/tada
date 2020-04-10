@@ -4773,7 +4773,7 @@ func Test_nameOfContainer(t *testing.T) {
 					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "foo"}},
 				10},
-			"-out of range-"},
+			"index out of range [10] with length 2"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
