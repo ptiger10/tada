@@ -758,7 +758,7 @@ func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{})
 	}
 	isNull, err := setNullsFromInterface(ret)
 	if err != nil {
-		_, err := setNullsFromInterface([]interface{}{ifTrue})
+		err := isSupportedSlice([]interface{}{ifTrue})
 		// ifTrue is unsupported?
 		if err != nil {
 			return nil, fmt.Errorf("where: ifTrue: %v", err)
