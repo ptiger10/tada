@@ -34,6 +34,7 @@ func (g *GroupedSeries) GetGroup(group string) *Series {
 // Apply applies lambda to every group.
 // Each lambda input will be a slice of grouped values (including values considered null).
 // Each lambda output must be a slice that is the same length as the input.
+// A row's null status can be set in-place within the anonymous function by accessing the []bool argument.
 func (g *GroupedSeries) Apply(lambda ApplyFn) *GroupedSeries {
 	vals, err := groupedApplyFunc(
 		g.series.values.slice, g.series.values.isNull, g.series.values.name, g.rowIndices, lambda)
@@ -632,6 +633,7 @@ func (g *GroupedDataFrame) HavingCount(lambda func(int) bool) *GroupedDataFrame 
 // Apply applies lambda to every group.
 // Each lambda input will be a slice of grouped values (including values considered null) from a single column.
 // Each lambda output must be a slice that is the same length as the input.
+// A row's null status can be set in-place within the anonymous function by accessing the []bool argument.
 func (g *GroupedDataFrame) Apply(cols []string, lambda ApplyFn) *GroupedDataFrame {
 	if len(cols) == 0 {
 		cols = g.df.ListColNames()

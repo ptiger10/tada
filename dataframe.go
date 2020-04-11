@@ -2134,7 +2134,7 @@ func (df *DataFrameMutator) FilterByValue(filters map[string]interface{}) error 
 
 // Apply applies an anonymous function to every row in a container based on lambdas,
 // which is a map of container names (either column or label names) to anonymous functions.
-// A row's null status can be changed in-place within the anonymous function.
+// A row's null status can be set in-place within the anonymous function by accessing the []bool argument.
 // Returns a new DataFrame.
 func (df *DataFrame) Apply(lambdas map[string]ApplyFn) *DataFrame {
 	df = df.Copy()

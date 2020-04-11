@@ -808,7 +808,7 @@ func (s *SeriesMutator) FilterByValue(filters map[string]interface{}) error {
 
 // Apply applies an anonymous function to every row in a container based on lambda,
 // which is an anonymous function.
-// A row's null status can be changed in-place within the anonymous function.
+// A row's null status can be set in-place within the anonymous function by accessing the []bool argument.
 // Returns a new Series.
 func (s *Series) Apply(lambda ApplyFn) *Series {
 	s = s.Copy()
