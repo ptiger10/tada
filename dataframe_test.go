@@ -2827,16 +2827,47 @@ func TestDataFrame_Transpose(t *testing.T) {
 		{"single column",
 			fields{
 				values: []*valueContainer{
-					{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
-				labels:        []*valueContainer{{name: "foo", slice: []string{"bar", "baz"}, isNull: []bool{false, false}}},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "waldo"}},
+				labels:        []*valueContainer{{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo"}},
 				name:          "qux",
 				colLevelNames: []string{"*0"}},
 			&DataFrame{values: []*valueContainer{
-				{slice: []string{"1"}, isNull: []bool{false}, name: "bar"},
-				{slice: []string{"2"}, isNull: []bool{false}, name: "baz"}},
+				{slice: []interface{}{1}, isNull: []bool{false}, name: "bar"},
+				{slice: []interface{}{2}, isNull: []bool{false}, name: "baz"}},
 				labels:        []*valueContainer{{slice: []string{"waldo"}, isNull: []bool{false}, name: "*0"}},
 				name:          "qux",
 				colLevelNames: []string{"foo"}}},
+		{"two columns",
+			fields{
+				values: []*valueContainer{
+					{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "waldo"},
+					{slice: []int{3, 4}, isNull: []bool{false, false}, name: "fred"},
+				},
+				labels:        []*valueContainer{{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo"}},
+				name:          "qux",
+				colLevelNames: []string{"*0"}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []interface{}{1.0, 3}, isNull: []bool{false, false}, name: "bar"},
+				{slice: []interface{}{0.0, 4}, isNull: []bool{true, false}, name: "baz"}},
+				labels:        []*valueContainer{{slice: []string{"waldo", "fred"}, isNull: []bool{false, false}, name: "*0"}},
+				name:          "qux",
+				colLevelNames: []string{"foo"}}},
+		{"two labels",
+			fields{
+				values: []*valueContainer{
+					{slice: []interface{}{1, ""}, isNull: []bool{false, true}, name: "waldo"},
+				},
+				labels: []*valueContainer{
+					{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo"},
+					{slice: []int{3, 4}, isNull: []bool{false, false}, name: "fred"}},
+				name:          "qux",
+				colLevelNames: []string{"*0"}},
+			&DataFrame{values: []*valueContainer{
+				{slice: []interface{}{1}, isNull: []bool{false}, name: "bar|3"},
+				{slice: []interface{}{""}, isNull: []bool{true}, name: "baz|4"}},
+				labels:        []*valueContainer{{slice: []string{"waldo"}, isNull: []bool{false}, name: "*0"}},
+				name:          "qux",
+				colLevelNames: []string{"foo", "fred"}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

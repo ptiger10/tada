@@ -1814,15 +1814,19 @@ func (df *DataFrameMutator) ReorderLabels(levelNames []string) error {
 
 // -- RESHAPING
 
-// Transpose coerces all columns to []string, then switches all row values to column values and label names to column names.
+// Transpose transposes rows into columns.
+// Row values become column values, column names become labels,
+// labels become column names (and multi-level labels become multi-level columns)
+// and label level names swap with column level names.
 // For example a DataFrame with 2 rows and 1 column has 2 columns and 1 row after transposition.
+// Because rows can contain heterogenous types, every column is coerced to []interface{}.
 func (df *DataFrame) Transpose() *DataFrame {
 	// row values become column values: 2 row x 1 col -> 2 col x 1 row
-	vals := make([][]string, df.Len())
+	vals := make([][]interface{}, df.Len())
 	valsIsNull := make([][]bool, df.Len())
 	// each new column has the same number of rows as prior columns
 	for i := range vals {
-		vals[i] = make([]string, df.NumColumns())
+		vals[i] = make([]interface{}, df.NumColumns())
 		valsIsNull[i] = make([]bool, df.NumColumns())
 	}
 	// label names become column names: 2 row x 1 level -> 2 col x 1 level
@@ -1867,9 +1871,10 @@ func (df *DataFrame) Transpose() *DataFrame {
 			labelsIsNull[l][k] = false
 		}
 		// write values
-		v := df.values[k].string().slice
-		for i := range v {
-			vals[i][k] = v[i]
+		v := reflect.ValueOf(df.values[k].slice)
+		for i := 0; i < v.Len(); i++ {
+			src := v.Index(i).Interface()
+			vals[i][k] = src
 			valsIsNull[i][k] = df.values[k].isNull[i]
 		}
 	}
@@ -1878,9 +1883,10 @@ func (df *DataFrame) Transpose() *DataFrame {
 	for k := range colNames {
 		retColNames[k] = joinLevelsIntoName(colNames[k])
 	}
+	slice, _ := readNestedInterfaceByCols(vals)
 	// transfer to valueContainers
 	retLabels := copyStringsIntoValueContainers(labels, labelsIsNull, labelNames)
-	retVals := copyStringsIntoValueContainers(vals, valsIsNull, retColNames)
+	retVals := copyInterfaceIntoValueContainers(slice, valsIsNull, retColNames)
 
 	return &DataFrame{
 		values:        retVals,
