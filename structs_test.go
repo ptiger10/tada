@@ -1,6 +1,7 @@
 package tada
 
 import (
+	"math"
 	"reflect"
 	"testing"
 )
@@ -30,7 +31,7 @@ func Test_readNestedInterfaceByRowsInferType(t *testing.T) {
 			[][]bool{{false, false}, {false, false}},
 			false,
 		},
-		{"pass - nulls - required same type", args{
+		{"pass - nulls after first row", args{
 			[][]interface{}{
 				{"foo", 1},
 				{"bar", ""},
@@ -41,6 +42,45 @@ func Test_readNestedInterfaceByRowsInferType(t *testing.T) {
 				[]int{1, 0},
 			},
 			[][]bool{{false, false}, {false, true}},
+			false,
+		},
+		{"pass - nulls in first row", args{
+			[][]interface{}{
+				{"foo", ""},
+				{"bar", 1},
+			},
+		},
+			[]interface{}{
+				[]string{"foo", "bar"},
+				[]int{0, 1},
+			},
+			[][]bool{{false, false}, {true, false}},
+			false,
+		},
+		{"pass - all nulls, as string", args{
+			[][]interface{}{
+				{"foo", ""},
+				{"bar", math.NaN()},
+			},
+		},
+			[]interface{}{
+				[]string{"foo", "bar"},
+				[]string{"", ""},
+			},
+			[][]bool{{false, false}, {true, true}},
+			false,
+		},
+		{"pass - all nulls, as float", args{
+			[][]interface{}{
+				{"foo", math.NaN()},
+				{"bar", ""},
+			},
+		},
+			[]interface{}{
+				[]string{"foo", "bar"},
+				[]float64{0, 0},
+			},
+			[][]bool{{false, false}, {true, true}},
 			false,
 		},
 		{"fail - no rows", args{

@@ -655,7 +655,7 @@ func TestSeries_DropNull(t *testing.T) {
 	}
 }
 
-func TestSeries_Null(t *testing.T) {
+func TestSeries_IsNull(t *testing.T) {
 	type fields struct {
 		values *valueContainer
 		labels []*valueContainer
@@ -681,8 +681,8 @@ func TestSeries_Null(t *testing.T) {
 				labels: tt.fields.labels,
 				err:    tt.fields.err,
 			}
-			if got := s.Null(); !EqualSeries(got, tt.want) {
-				t.Errorf("Series.Null() = %v, want %v", got, tt.want)
+			if got := s.IsNull(); !EqualSeries(got, tt.want) {
+				t.Errorf("Series.IsNull() = %v, want %v", got, tt.want)
 			}
 		})
 	}

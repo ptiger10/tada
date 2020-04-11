@@ -375,9 +375,9 @@ func (s *SeriesMutator) DropNull() {
 	s.Subset(index)
 }
 
-// Null returns all the rows with null values.
+// IsNull returns all the rows with null values.
 // Returns a new Series.
-func (s *Series) Null() *Series {
+func (s *Series) IsNull() *Series {
 	index := s.values.null()
 	return s.Subset(index)
 }

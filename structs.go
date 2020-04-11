@@ -14,18 +14,13 @@ func readNestedInterfaceByRowsInferType(rows [][]interface{}) (ret []interface{}
 		return nil, nil, fmt.Errorf("reading [][]interface{}: must have at least one row")
 	}
 
-	sampleRow := rows[0]
-	ret = make([]interface{}, len(sampleRow))
-	isNull = make([][]bool, len(sampleRow))
-	for k := range sampleRow {
+	firstRow := rows[0]
+	ret = make([]interface{}, len(firstRow))
+	isNull = make([][]bool, len(firstRow))
+	for k := range firstRow {
 		isNull[k] = make([]bool, len(rows))
 	}
-	colTypes := make([]reflect.Type, len(sampleRow))
-	for k := range sampleRow {
-		colType := reflect.TypeOf(sampleRow[k])
-		colTypes[k] = colType
-		ret[k] = reflect.MakeSlice(reflect.SliceOf(colType), len(rows), len(rows)).Interface()
-	}
+	colTypes := make([]reflect.Type, len(firstRow))
 
 	for i := range rows {
 		// different number of columns than in row 0?
@@ -35,22 +30,42 @@ func readNestedInterfaceByRowsInferType(rows [][]interface{}) (ret []interface{}
 		}
 		for k := range rows[i] {
 			// value is null value?
-			dst := reflect.ValueOf(ret[k]).Index(i)
 			var src reflect.Value
-			// is null value? set to zero type
-			if null := isNullInterface(rows[i][k]); null {
+			null := isNullInterface(rows[i][k])
+			if null {
+				// is null value? set to zero type unless no colType has been set
 				isNull[k][i] = true
+				if colTypes[k] == nil {
+					// if no colType has been set, defer until later, when null value will be backfilled
+					continue
+				}
 				src = reflect.Zero(colTypes[k])
-			}
-			if !isNull[k][i] {
+			} else {
+				// not null? set col type if not already set
+				if colTypes[k] == nil {
+					colType := reflect.TypeOf(rows[i][k])
+					colTypes[k] = colType
+					ret[k] = reflect.MakeSlice(reflect.SliceOf(colType), len(rows), len(rows)).Interface()
+					for backfill := 0; backfill < i; backfill++ {
+						src := reflect.Zero(colType)
+						dst := reflect.ValueOf(ret[k]).Index(backfill)
+						dst.Set(src)
+					}
+				}
 				if reflect.TypeOf(rows[i][k]) != colTypes[k] {
 					return nil, nil, fmt.Errorf("reading [][]interface{} by rows: [%d][%d]: all types must be the same as in row 0 (%v != %v)",
 						i, k, reflect.TypeOf(rows[i][k]).String(), colTypes[k].String())
 				}
 				src = reflect.ValueOf(rows[i][k])
 			}
+			dst := reflect.ValueOf(ret[k]).Index(i)
 			dst.Set(src)
-
+		}
+	}
+	// col type never set? set values as same type as first row
+	for k := range colTypes {
+		if colTypes[k] == nil {
+			ret[k] = reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(firstRow[k])), len(rows), len(rows)).Interface()
 		}
 	}
 	return
