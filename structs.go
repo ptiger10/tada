@@ -149,8 +149,8 @@ func transposeNestedNulls(isNull [][]bool) ([][]bool, error) {
 // Transpose reads the values of a row-oriented struct representation of a DataFrame
 // into a column-oriented struct representation of a DataFrame.
 // If an error is returned, values are still written to structPointer up until the point the error occurred.
-func (st *StructTransposer) Transpose(structPointer interface{}) error {
-	transfer, isNull, err := readNestedInterfaceByRowsInferType(st.Rows)
+func (st StructTransposer) Transpose(structPointer interface{}) error {
+	transfer, isNull, err := readNestedInterfaceByRowsInferType(st)
 	if err != nil {
 		return fmt.Errorf("transposing struct: %v", err)
 	}
@@ -210,12 +210,12 @@ func (st *StructTransposer) Transpose(structPointer interface{}) error {
 }
 
 // Shuffle randomly shuffles the row order in Rows, using a randomizer seeded with seed.
-func (st *StructTransposer) Shuffle(seed int64) {
+func (st StructTransposer) Shuffle(seed int64) {
 	rand.Seed(seed)
 	rand.Shuffle(
-		len(st.Rows),
+		len(st),
 		func(i, j int) {
-			st.Rows[i], st.Rows[j] = st.Rows[j], st.Rows[i]
+			st[i], st[j] = st[j], st[i]
 		})
 	return
 }

@@ -379,9 +379,7 @@ func TestStructTransposer_Transpose(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := StructTransposer{
-				Rows: tt.fields.Rows,
-			}
+			st := StructTransposer(tt.fields.Rows)
 			if err := st.Transpose(tt.args.structPointer); (err != nil) != tt.wantErr {
 				t.Errorf("StructTransposer.Transpose() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -395,8 +393,7 @@ func TestStructTransposer_Transpose(t *testing.T) {
 
 func TestStructTransposer_Shuffle(t *testing.T) {
 	type fields struct {
-		Rows   [][]interface{}
-		IsNull [][]bool
+		Rows [][]interface{}
 	}
 	type args struct {
 		seed int64
@@ -405,7 +402,7 @@ func TestStructTransposer_Shuffle(t *testing.T) {
 		name   string
 		fields fields
 		args   args
-		want   *StructTransposer
+		want   [][]interface{}
 	}{
 		{"pass", fields{
 			Rows: [][]interface{}{
@@ -415,17 +412,14 @@ func TestStructTransposer_Shuffle(t *testing.T) {
 				{3},
 				{4},
 			},
-			IsNull: [][]bool{{true}, {false}, {false}, {false}, {false}},
 		},
 			args{1},
-			&StructTransposer{
-				Rows: [][]interface{}{
-					{2},
-					{0},
-					{1},
-					{4},
-					{3},
-				},
+			[][]interface{}{
+				{2},
+				{0},
+				{1},
+				{4},
+				{3},
 			},
 		},
 		{"pass - no nulls", fields{
@@ -438,25 +432,22 @@ func TestStructTransposer_Shuffle(t *testing.T) {
 			},
 		},
 			args{1},
-			&StructTransposer{
-				Rows: [][]interface{}{
-					{2},
-					{0},
-					{1},
-					{4},
-					{3},
-				},
+
+			[][]interface{}{
+				{2},
+				{0},
+				{1},
+				{4},
+				{3},
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			st := &StructTransposer{
-				Rows: tt.fields.Rows,
-			}
+			st := StructTransposer(tt.fields.Rows)
 			st.Shuffle(tt.args.seed)
-			if !reflect.DeepEqual(st, tt.want) {
-				t.Errorf("StructTransposer.Shuffle() -> got %v, want %v", st, tt.want)
+			if !reflect.DeepEqual([][]interface{}(st), tt.want) {
+				t.Errorf("StructTransposer.Shuffle() -> got %v, want %v", [][]interface{}(st), tt.want)
 			}
 		})
 	}
