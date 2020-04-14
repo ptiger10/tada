@@ -2694,7 +2694,7 @@ func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune
 		}
 
 		var columnNumber int
-		var fieldCount int
+		fieldCount := 1
 		for {
 			// iterate over fields in each row
 			line = bytes.TrimLeftFunc(line, unicode.IsSpace)
@@ -2707,9 +2707,9 @@ func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune
 				// use the remaining line up until the end, which may or may not be \n
 				field = field[:len(field)-lengthLineEnd(field)]
 			}
-			if fieldCount >= len(dstVals) {
-				return fmt.Errorf("row %d: too many fields (max %d)",
-					rowNumber, len(dstVals))
+			if fieldCount > len(dstVals) {
+				return fmt.Errorf("row %d: too many fields [%d] with length %d",
+					rowNumber, fieldCount, len(dstVals))
 			}
 			// write fields into column-oriented receiver
 			// if enclosed in quotation marks, strip the quotations
@@ -2722,9 +2722,9 @@ func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune
 				columnNumber++
 				fieldCount++
 			} else {
-				if fieldCount != len(dstVals)-1 {
-					return fmt.Errorf("row %d: not enough fields (%d < %d)",
-						rowNumber, fieldCount, len(dstVals)-1)
+				if fieldCount != len(dstVals) {
+					return fmt.Errorf("row %d: not enough fields [%d] with length %d",
+						rowNumber, fieldCount, len(dstVals))
 				}
 				break
 			}
