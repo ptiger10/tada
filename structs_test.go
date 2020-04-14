@@ -4,6 +4,8 @@ import (
 	"math"
 	"reflect"
 	"testing"
+
+	"github.com/ptiger10/tablediff"
 )
 
 func Test_readNestedInterfaceByRowsInferType(t *testing.T) {
@@ -505,6 +507,63 @@ func TestStructTransposer_Shuffle(t *testing.T) {
 			st.Shuffle(tt.args.seed)
 			if !reflect.DeepEqual([][]interface{}(st), tt.want) {
 				t.Errorf("StructTransposer.Shuffle() -> got %v, want %v", [][]interface{}(st), tt.want)
+			}
+		})
+	}
+}
+
+func TestPrettyDiff(t *testing.T) {
+	type args struct {
+		got  interface{}
+		want interface{}
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    bool
+		want1   *tablediff.Differences
+		wantErr bool
+	}{
+		{"pass - same",
+			args{
+				testSchema{Foo: []int{1, 2}, Bar: []float64{3, 4}},
+				testSchema{Foo: []int{1, 2}, Bar: []float64{3, 4}},
+			},
+			true,
+			nil,
+			false,
+		},
+		{"fail - bad got",
+			args{
+				"foo",
+				testSchema{Foo: []int{1, 2}, Bar: []float64{3, 4}},
+			},
+			false,
+			nil,
+			true,
+		},
+		{"fail - bad want",
+			args{
+				testSchema{Foo: []int{1, 2}, Bar: []float64{3, 4}},
+				"foo",
+			},
+			false,
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, got1, err := PrettyDiff(tt.args.got, tt.args.want)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("PrettyDiff() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("PrettyDiff() got = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got1, tt.want1) {
+				t.Errorf("PrettyDiff() got1 = %v, want %v", got1, tt.want1)
 			}
 		})
 	}

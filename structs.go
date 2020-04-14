@@ -5,6 +5,8 @@ import (
 	"math/rand"
 	"reflect"
 	"unicode"
+
+	"github.com/ptiger10/tablediff"
 )
 
 // all columns must be of same type.
@@ -248,4 +250,21 @@ func (st StructTransposer) Shuffle(seed int64) {
 			st[i], st[j] = st[j], st[i]
 		})
 	return
+}
+
+// PrettyDiff reads two structs into DataFrames, prints each as a stringified csv table,
+// and returns whether they are equal. If not, returns the differences between the two.
+func PrettyDiff(got, want interface{}) (bool, *tablediff.Differences, error) {
+	df1, err := ReadStruct(got)
+	if err != nil {
+		return false, nil, fmt.Errorf("pretty diffing two structs: reading got: %v", err)
+	}
+	df2, err := ReadStruct((want))
+	if err != nil {
+		return false, nil, fmt.Errorf("pretty diffing two structs: reading want: %v", err)
+	}
+	gotRecords := df1.CSVRecords(WriteOptionExcludeLabels())
+	wantRecords := df2.CSVRecords(WriteOptionExcludeLabels())
+	diffs, eq := tablediff.Diff(gotRecords, wantRecords)
+	return eq, diffs, nil
 }
