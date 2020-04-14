@@ -293,6 +293,7 @@ func Test_isNullInterface(t *testing.T) {
 		{"null float64", args{math.NaN()}, true},
 		{"null string", args{""}, true},
 		{"null time.Time", args{time.Time{}}, true},
+		{"nil", args{nil}, true},
 		{"float64", args{float64(1)}, false},
 		{"string", args{"foo"}, false},
 		{"time.Time", args{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, false},

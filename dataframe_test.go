@@ -5462,6 +5462,11 @@ type testSchema5 struct {
 	Baz []string
 }
 
+type testSchema6 struct {
+	Foo []int         `tada:"foo"`
+	Bar []interface{} `tada:"bar"`
+}
+
 func TestReadStruct(t *testing.T) {
 	type args struct {
 		strct   interface{}

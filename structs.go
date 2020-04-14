@@ -10,6 +10,8 @@ import (
 // all columns must be of same type.
 // return null values for use in StructTransposer
 func readNestedInterfaceByRowsInferType(rows [][]interface{}) (ret []interface{}, isNull [][]bool, err error) {
+	interfaceType := reflect.TypeOf([]interface{}{})
+
 	if len(rows) == 0 {
 		return nil, nil, fmt.Errorf("reading [][]interface{}: must have at least one row")
 	}
@@ -29,19 +31,19 @@ func readNestedInterfaceByRowsInferType(rows [][]interface{}) (ret []interface{}
 				i, len(rows[i]), len(colTypes))
 		}
 		for k := range rows[i] {
-			// value is null value?
-			var src reflect.Value
-			null := isNullInterface(rows[i][k])
-			if null {
+			if isNullInterface(rows[i][k]) {
 				// is null value? set to zero type unless no colType has been set
 				isNull[k][i] = true
-				if colTypes[k] == nil {
-					// if no colType has been set, defer until later, when null value will be backfilled
-					continue
+				if colTypes[k] != nil {
+					// colType has been set? set to zero type. otherwise ignore
+					src := reflect.Zero(colTypes[k])
+					dst := reflect.ValueOf(ret[k]).Index(i)
+					dst.Set(src)
 				}
-				src = reflect.Zero(colTypes[k])
+
+				// not null value?
 			} else {
-				// not null? set col type if not already set
+				// col type not already set? create slice and backfill with zero types.
 				if colTypes[k] == nil {
 					colType := reflect.TypeOf(rows[i][k])
 					colTypes[k] = colType
@@ -52,20 +54,44 @@ func readNestedInterfaceByRowsInferType(rows [][]interface{}) (ret []interface{}
 						dst.Set(src)
 					}
 				}
-				if reflect.TypeOf(rows[i][k]) != colTypes[k] {
-					return nil, nil, fmt.Errorf("reading [][]interface{} by rows: [%d][%d]: all types must be the same as in row 0 (%v != %v)",
-						i, k, reflect.TypeOf(rows[i][k]).String(), colTypes[k].String())
+				// value same type as prior values? set value
+				if reflect.TypeOf(rows[i][k]) == colTypes[k] {
+					src := reflect.ValueOf(rows[i][k])
+					dst := reflect.ValueOf(ret[k]).Index(i)
+					dst.Set(src)
+					// value different type? convert entire slice to []interface{}
+					// replace zero-values with nil
+				} else {
+					if colTypes[k] != interfaceType {
+						colTypes[k] = interfaceType
+						newContainer := make([]interface{}, len(rows))
+						// backfill prior values, replacing null values with nil
+						for backfill := 0; backfill < i; backfill++ {
+							if isNull[k][backfill] {
+								newContainer[backfill] = nil
+							} else {
+								newContainer[backfill] = reflect.ValueOf(ret[k]).Index(backfill).Interface()
+							}
+						}
+						ret[k] = newContainer
+					}
+					// set current value
+					ret[k].([]interface{})[i] = rows[i][k]
 				}
-				src = reflect.ValueOf(rows[i][k])
+
 			}
-			dst := reflect.ValueOf(ret[k]).Index(i)
-			dst.Set(src)
 		}
 	}
-	// col type never set? set values as same type as first row
+	// col type never set?
 	for k := range colTypes {
 		if colTypes[k] == nil {
-			ret[k] = reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(firstRow[k])), len(rows), len(rows)).Interface()
+			// first row is nil? set as []interface{}
+			if firstRow[k] == nil {
+				ret[k] = make([]interface{}, len(rows))
+				// first row has type? set values as same type as first row
+			} else {
+				ret[k] = reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(firstRow[k])), len(rows), len(rows)).Interface()
+			}
 		}
 	}
 	return
@@ -146,8 +172,12 @@ func transposeNestedNulls(isNull [][]bool) ([][]bool, error) {
 	return ret, nil
 }
 
-// Transpose reads the values of a row-oriented struct representation of a DataFrame
-// into a column-oriented struct representation of a DataFrame.
+// Transpose reads the values of an untyped, row-oriented struct representation of a DataFrame
+// into a typed, column-oriented struct representation of a DataFrame.
+// If all non-null values in a column have the same type, then the column will be a slice of that type.
+// If any of the non-null values in a column have different types, then the column will be []interface{}.
+// If all values are considered null by tada, then the column will be a slice of the type in the first row
+// (when all values are null and the first row is nil, the column will be []interface{}).
 // If an error is returned, values are still written to structPointer up until the point the error occurred.
 func (st StructTransposer) Transpose(structPointer interface{}) error {
 	transfer, isNull, err := readNestedInterfaceByRowsInferType(st)

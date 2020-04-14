@@ -31,10 +31,39 @@ func Test_readNestedInterfaceByRowsInferType(t *testing.T) {
 			[][]bool{{false, false}, {false, false}},
 			false,
 		},
+		{"pass - mixed types as []interface{}",
+			args{
+				[][]interface{}{
+					{"foo", 0},
+					{"bar", .5},
+				},
+			},
+			[]interface{}{
+				[]string{"foo", "bar"},
+				[]interface{}{0, .5},
+			},
+			[][]bool{{false, false}, {false, false}},
+			false,
+		},
+		{"pass - mixed types as []interface{} - with null",
+			args{
+				[][]interface{}{
+					{"foo", 0},
+					{"bar", ""},
+					{"baz", .5},
+				},
+			},
+			[]interface{}{
+				[]string{"foo", "bar", "baz"},
+				[]interface{}{0, nil, .5},
+			},
+			[][]bool{{false, false, false}, {false, true, false}},
+			false,
+		},
 		{"pass - nulls after first row", args{
 			[][]interface{}{
 				{"foo", 1},
-				{"bar", ""},
+				{"bar", nil},
 			},
 		},
 			[]interface{}{
@@ -46,7 +75,7 @@ func Test_readNestedInterfaceByRowsInferType(t *testing.T) {
 		},
 		{"pass - nulls in first row", args{
 			[][]interface{}{
-				{"foo", ""},
+				{"foo", nil},
 				{"bar", 1},
 			},
 		},
@@ -60,7 +89,7 @@ func Test_readNestedInterfaceByRowsInferType(t *testing.T) {
 		{"pass - all nulls, as string", args{
 			[][]interface{}{
 				{"foo", ""},
-				{"bar", math.NaN()},
+				{"bar", nil},
 			},
 		},
 			[]interface{}{
@@ -73,12 +102,25 @@ func Test_readNestedInterfaceByRowsInferType(t *testing.T) {
 		{"pass - all nulls, as float", args{
 			[][]interface{}{
 				{"foo", math.NaN()},
-				{"bar", ""},
+				{"bar", nil},
 			},
 		},
 			[]interface{}{
 				[]string{"foo", "bar"},
 				[]float64{0, 0},
+			},
+			[][]bool{{false, false}, {true, true}},
+			false,
+		},
+		{"pass - all nils, as []interface", args{
+			[][]interface{}{
+				{"foo", nil},
+				{"bar", nil},
+			},
+		},
+			[]interface{}{
+				[]string{"foo", "bar"},
+				[]interface{}{nil, nil},
 			},
 			[][]bool{{false, false}, {true, true}},
 			false,
@@ -306,16 +348,19 @@ func TestStructTransposer_Transpose(t *testing.T) {
 			},
 			false,
 		},
-		{"fail - inconsistent types", fields{
+		{"pass - []interface{}", fields{
 			Rows: [][]interface{}{
 				{0, "foo"},
 				{1, 1},
 			}},
 			args{
-				&testSchema{},
+				&testSchema6{},
 			},
-			&testSchema{},
-			true,
+			&testSchema6{
+				Foo: []int{0, 1},
+				Bar: []interface{}{"foo", 1},
+			},
+			false,
 		},
 		{"fail - not pointer", fields{
 			Rows: [][]interface{}{

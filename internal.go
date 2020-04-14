@@ -1870,6 +1870,9 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 }
 
 func isNullInterface(i interface{}) bool {
+	if i == nil {
+		return true
+	}
 	switch i.(type) {
 	case float64:
 		f := i.(float64)
