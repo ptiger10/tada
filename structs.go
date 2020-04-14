@@ -184,13 +184,13 @@ func transposeNestedNulls(isNull [][]bool) ([][]bool, error) {
 func (st StructTransposer) Transpose(structPointer interface{}) error {
 	transfer, isNull, err := readNestedInterfaceByRowsInferType(st)
 	if err != nil {
-		return fmt.Errorf("transposing struct: %v", err)
+		return fmt.Errorf("transposing to struct: %v", err)
 	}
 	if reflect.TypeOf(structPointer).Kind() != reflect.Ptr {
-		return fmt.Errorf("transposing struct: structPointer must be pointer to struct, not %s", reflect.TypeOf(structPointer).Kind())
+		return fmt.Errorf("transposing to struct: structPointer must be pointer to struct, not %s", reflect.TypeOf(structPointer).Kind())
 	}
 	if reflect.TypeOf(structPointer).Elem().Kind() != reflect.Struct {
-		return fmt.Errorf("transposing struct: structPointer must be pointer to struct, not to %s", reflect.TypeOf(structPointer).Elem().Kind())
+		return fmt.Errorf("transposing to struct: structPointer must be pointer to struct, not to %s", reflect.TypeOf(structPointer).Elem().Kind())
 	}
 	v := reflect.ValueOf(structPointer).Elem()
 	var offset int
@@ -208,7 +208,7 @@ func (st StructTransposer) Transpose(structPointer interface{}) error {
 		if field.Tag.Get("tada") == nullTag {
 			offset--
 			if field.Type.String() != "[][]bool" {
-				return fmt.Errorf("writing to struct: field with tag %v must be type [][]bool, not %s", nullTag, field.Type.String())
+				return fmt.Errorf("transposing to struct: field with tag %v must be type [][]bool, not %s", nullTag, field.Type.String())
 			}
 			hasNullTag = true
 			nullField = field.Name
@@ -217,12 +217,13 @@ func (st StructTransposer) Transpose(structPointer interface{}) error {
 		container := k + offset
 		// df does not have enough containers?
 		if container >= len(transfer) {
-			return fmt.Errorf("transposing struct: insufficient columns to write to exported field %s (column count: %d)",
-				field.Name, container)
+			return fmt.Errorf("transposing to struct: writing to exported field %s [%d]: insufficient number of columns [%d]",
+				field.Name, container, len(transfer))
 		}
 		if reflect.TypeOf(transfer[container]) != field.Type {
-			return fmt.Errorf("transposing struct: position %d, StructTransposer has wrong type for field %s (%s != %s)",
-				container, field.Name, reflect.TypeOf(transfer[container]), field.Type)
+			return fmt.Errorf("transposing to struct: writing to exported field %s [%d]: column has wrong type (%s != %s)",
+				field.Name, container,
+				reflect.TypeOf(transfer[container]), field.Type)
 		}
 		src := reflect.ValueOf(reflect.ValueOf(transfer[container]).Interface())
 		dst := v.FieldByName(field.Name)
