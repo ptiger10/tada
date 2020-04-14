@@ -3793,6 +3793,13 @@ func TestDataFrame_CSVRecords(t *testing.T) {
 				colLevelNames: []string{"*0"}},
 			args{},
 			[][]string{{"*0", "foo"}, {"0", "a"}, {"1", "b"}}, false},
+		{"pass - ignore labels",
+			fields{values: []*valueContainer{
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			args{[]WriteOption{WriteOptionExcludeLabels()}},
+			[][]string{{"foo"}, {"a"}, {"b"}}, false},
 		{"fail",
 			fields{values: nil,
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},

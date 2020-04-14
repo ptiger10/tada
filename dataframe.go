@@ -561,7 +561,10 @@ func (df *DataFrame) CSVRecords(options ...WriteOption) [][]string {
 	if err != nil {
 		return nil
 	}
-	mergedLabelsAndCols := append(df.labels, df.values...)
+	mergedLabelsAndCols := df.values
+	if config.includeLabels {
+		mergedLabelsAndCols = append(df.labels, df.values...)
+	}
 	// overwrite null values, skipping headers
 	for i := range transposedStringValues[df.numColLevels():] {
 		for k := range transposedStringValues[i] {
