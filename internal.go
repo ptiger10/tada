@@ -1184,7 +1184,7 @@ func (vc *valueContainer) sort(dtype DType, ascending bool, index []int) []int {
 		sortedIsNull = d.isNull
 		sortedIndex = d.index
 
-	case DateTime:
+	case DateTime, Date, Time:
 		d := vc.dateTime()
 		d.index = index
 		srt = d
@@ -1724,12 +1724,13 @@ func isSupportedSlice(slice interface{}) error {
 	}
 	switch slice.(type) {
 	case []float64, []string, []time.Time,
-		[]civil.Date, []civil.Time, []civil.DateTime,
+		[]civil.Date, []civil.Time,
 		[][]byte, []bool, []float32,
 		[]uint, []uint8, []uint16, []uint32, []uint64,
 		[]int, []int8, []int16, []int32, []int64,
 		// nested types
 		[][]string, [][]float64, [][]time.Time, [][][]byte,
+		[][]civil.Date, [][]civil.Time,
 		[][]bool, [][]float32,
 		[][]uint, [][]uint16, [][]uint32, [][]uint64,
 		[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
@@ -1836,16 +1837,6 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 				ret[i] = false
 			}
 		}
-	case []civil.DateTime:
-		vals := input.([]civil.DateTime)
-		ret = make([]bool, len(vals))
-		for i := range ret {
-			if !vals[i].IsValid() {
-				ret[i] = true
-			} else {
-				ret[i] = false
-			}
-		}
 		// no null value possible
 	case []bool, []uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64, []float32:
 		l := reflect.ValueOf(input).Len()
@@ -1855,6 +1846,7 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 		}
 	// nested slices
 	case [][]string, [][]float64, [][]time.Time, [][][]byte,
+		[][]civil.Date, [][]civil.Time,
 		[][]bool, [][]float32,
 		[][]uint, [][]uint16, [][]uint32, [][]uint64,
 		[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
@@ -2366,6 +2358,13 @@ func resample(t time.Time, by Resampler) time.Time {
 }
 
 func (vc *valueContainer) resample(by Resampler) {
+	var isCivilDate, isCivilTime bool
+	switch vc.slice.(type) {
+	case []civil.Date:
+		isCivilDate = true
+	case []civil.Time:
+		isCivilTime = true
+	}
 	vals := vc.dateTime().slice
 	truncatedVals := make([]time.Time, len(vals))
 	if by.Location == nil {
@@ -2375,14 +2374,13 @@ func (vc *valueContainer) resample(by Resampler) {
 		t := vals[i].In(by.Location)
 		truncatedVals[i] = resample(t, by)
 	}
-
-	if by.AsCivilDate {
+	if isCivilDate {
 		retVals := make([]civil.Date, len(vals))
 		for i := range truncatedVals {
 			retVals[i] = civil.DateOf(truncatedVals[i])
 		}
 		vc.slice = retVals
-	} else if by.AsCivilTime {
+	} else if isCivilTime {
 		retVals := make([]civil.Time, len(vals))
 		for i := range vals {
 			retVals[i] = civil.TimeOf(truncatedVals[i])
@@ -2391,6 +2389,7 @@ func (vc *valueContainer) resample(by Resampler) {
 	} else {
 		vc.slice = truncatedVals
 	}
+
 	vc.resetCache()
 	return
 }

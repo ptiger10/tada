@@ -161,7 +161,8 @@ func ConcatSeries(series ...*Series) (*DataFrame, error) {
 	return ret, nil
 }
 
-// Cast casts the underlying container values (column or label level) to []float64, []string, or []time.Time
+// Cast coerces the underlying container values (column or label level) to
+// []float64, []string, []time.Time (aka timezone-aware DateTime), []civil.Date, or []civil.Time
 // and caches the []byte values of the container (if inexpensive).
 // Use cast to improve performance when calling multiple operations on values.
 func (df *DataFrame) Cast(containerAsType map[string]DType) {
@@ -619,8 +620,8 @@ func (df *DataFrame) Struct(structPointer interface{}, options ...WriteOption) e
 		container := k + offset
 		// df does not have enough containers?
 		if container >= len(mergedLabelsAndCols) {
-			return fmt.Errorf("writing to struct: insufficient containers to write to exported field %s (container count: %d)",
-				field.Name, container)
+			return fmt.Errorf("writing to struct: writing to exported field %s [%d]: insufficient number of containers [%d]",
+				field.Name, container, len(mergedLabelsAndCols))
 		}
 		// use tag as name if it exists, else default to exported name
 		name := tag
@@ -628,12 +629,12 @@ func (df *DataFrame) Struct(structPointer interface{}, options ...WriteOption) e
 			name = field.Name
 		}
 		if mergedLabelsAndCols[container].name != name {
-			return fmt.Errorf("writing to struct: exported field %s (index %d): container name does not match (%s != %s)",
+			return fmt.Errorf("writing to struct: writing to exported field %s [%d]: container name does not match (%s != %s)",
 				field.Name, container,
 				mergedLabelsAndCols[container].name, name)
 		}
 		if mergedLabelsAndCols[container].dtype() != field.Type {
-			return fmt.Errorf("writing to struct: exported field %s (index %d): container (%s) has wrong type: %s != %s",
+			return fmt.Errorf("writing to struct: writing to exported field %s [%d]: container %s has wrong type (%s != %s)",
 				field.Name, container, mergedLabelsAndCols[container].name,
 				mergedLabelsAndCols[container].dtype(), field.Type)
 		}
@@ -2470,7 +2471,8 @@ func (df *DataFrame) dropColLevel(level int) *DataFrame {
 // which is a map of of container names (either column or label names) to tada.Resampler structs.
 // For each container name in the map, the first By field selected (i.e., not left blank)
 // in its Resampler struct provides the resampling logic for that container.
-// If AsCivilDate or AsCivilTime is true, saves slice values as []civil.Date or []civil.Time, respectively.
+// If slice type is civil.Date or civil.Time before resampling, it will be returned as civil.Date or civil.Time after resampling.
+//
 // Returns a new DataFrame.
 func (df *DataFrame) Resample(how map[string]Resampler) *DataFrame {
 	df = df.Copy()
@@ -2485,7 +2487,8 @@ func (df *DataFrame) Resample(how map[string]Resampler) *DataFrame {
 // which is a map of of container names (either column or label names) to tada.Resampler structs.
 // For each container name in the map, the first By field selected (i.e., not left blank)
 // in its Resampler struct provides the resampling logic for that container.
-// If AsCivilDate or AsCivilTime is true, saves slice values as []civil.Date or []civil.Time, respectively.
+// If slice type is civil.Date or civil.Time before resampling, it will be returned as civil.Date or civil.Time after resampling.
+//
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Resample(how map[string]Resampler) error {
 	mergedLabelsAndCols := append(df.dataframe.labels, df.dataframe.values...)

@@ -553,14 +553,9 @@ func Test_valueContainer_dateTime(t *testing.T) {
 		{"[]time.Time", fields{slice: []time.Time{{}, d}, isNull: []bool{true, false}},
 			dateTimeValueContainer{slice: []time.Time{{}, d}, isNull: []bool{true, false}}},
 		{"[]civil.Date", fields{slice: []civil.Date{{}, {Year: 2020, Month: time.January, Day: 1}}, isNull: []bool{true, false}},
-			dateTimeValueContainer{slice: []time.Time{civil.Date{}.In(time.UTC), d}, isNull: []bool{true, false}}},
+			dateTimeValueContainer{slice: []time.Time{{}, d}, isNull: []bool{true, false}}},
 		{"[]civil.Time", fields{slice: []civil.Time{{}, {Second: 1}}, isNull: []bool{true, false}},
-			dateTimeValueContainer{slice: []time.Time{{}, {}}, isNull: []bool{true, true}}},
-		{"[]civil.DateTime",
-			fields{
-				slice:  []civil.DateTime{{}, {Date: civil.Date{Year: 2020, Month: time.January, Day: 1}, Time: civil.Time{Second: 1}}},
-				isNull: []bool{true, false}},
-			dateTimeValueContainer{slice: []time.Time{civil.DateTime{}.In(time.UTC), d.Add(1 * time.Second)}, isNull: []bool{true, false}}},
+			dateTimeValueContainer{slice: []time.Time{{}, time.Date(0, 0, 0, 0, 0, 1, 0, time.UTC)}, isNull: []bool{true, false}}},
 		{"[]bool", fields{slice: []bool{false, true, false}, isNull: []bool{false, false, true}},
 			dateTimeValueContainer{slice: []time.Time{{}, {}, {}}, isNull: []bool{true, true, true}}},
 		{"[]interface", fields{slice: []interface{}{"foo", float64(1), int(1), uint(1), d, false}, isNull: []bool{false, false, false, false, false, false}},
@@ -613,6 +608,10 @@ func Test_valueContainer_cast(t *testing.T) {
 			args{DateTime}, &valueContainer{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"}},
 		{"int to datetime", fields{slice: []int{1}, isNull: []bool{false}, name: "foo"},
 			args{DateTime}, &valueContainer{slice: []time.Time{{}}, isNull: []bool{true}, name: "foo"}},
+		{"datetime to civil.Date", fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},
+			args{Date}, &valueContainer{slice: []civil.Date{civil.DateOf(d)}, isNull: []bool{false}, name: "foo"}},
+		{"datetime to civil.Time", fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo"},
+			args{Time}, &valueContainer{slice: []civil.Time{civil.TimeOf(d)}, isNull: []bool{false}, name: "foo"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -194,7 +194,11 @@ const (
 	// String -> string
 	String
 	// DateTime -> time.Time
-	DateTime
+	DateTime // always tz-aware
+	// Time -> civil.Time
+	Time
+	// Date -> civil.Date
+	Date
 )
 
 // A WriteOption configures a write function.
@@ -245,11 +249,6 @@ type joinConfig struct {
 // `ByWeek` returns the first day of the most recent week (starting on `StartOfWeek`) relative to timestamp.
 // Otherwise, truncates the timestamp `ByDuration`.
 // If `Location` is not provided, time.UTC is used as the default location.
-//
-// In addition, the first `As` field to be selected is applied following truncation.
-// If neither `As` field is selected, slice will be time.Time timestamp.
-// If `AsCivilDate` is true, slice will be civil.Date (location and time-independent).
-// If `AsCivilTime` is true, slice will be civil.Time (location and date-independent).
 type Resampler struct {
 	ByYear      bool
 	ByMonth     bool
@@ -258,9 +257,6 @@ type Resampler struct {
 	StartOfWeek time.Weekday
 	ByDuration  time.Duration
 	Location    *time.Location
-
-	AsCivilDate bool // slice will be civil.Date after truncation
-	AsCivilTime bool // slice will be civil.Time after truncation
 }
 
 // Binner supplies logic for the Bin() function.

@@ -462,14 +462,14 @@ func ExampleSeries_Resample_byHalfHour() {
 	// +---++----------------------+
 }
 
-func ExampleSeries_Resample_asCivilDate() {
+func ExampleSeries_Cast_date() {
 	s := tada.NewSeries([]time.Time{
 		time.Date(2020, 1, 15, 12, 15, 0, 0, time.UTC),
 	}).SetName("foo")
 	fmt.Println(s)
 
-	asCivilDate := tada.Resampler{AsCivilDate: true}
-	fmt.Println(s.Resample(asCivilDate))
+	s.Cast(map[string]tada.DType{"foo": tada.Date})
+	fmt.Println(s)
 	// Output:
 	// +---++----------------------+
 	// | - ||         foo          |
@@ -484,14 +484,14 @@ func ExampleSeries_Resample_asCivilDate() {
 	// +---++------------+
 }
 
-func ExampleSeries_Resample_asCivilTime() {
+func ExampleSeries_Cast_time() {
 	s := tada.NewSeries([]time.Time{
 		time.Date(2020, 1, 15, 12, 15, 0, 0, time.UTC),
 	}).SetName("foo")
 	fmt.Println(s)
 
-	asCivilTime := tada.Resampler{AsCivilTime: true}
-	fmt.Println(s.Resample(asCivilTime))
+	s.Cast(map[string]tada.DType{"foo": tada.Time})
+	fmt.Println(s)
 	// Output:
 	// +---++----------------------+
 	// | - ||         foo          |

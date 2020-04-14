@@ -97,6 +97,26 @@ func (vc *valueContainer) cast(dtype DType) {
 		if !ok {
 			vc.slice = vc.dateTime().slice
 		}
+	case Date:
+		_, ok := vc.slice.([]civil.Date)
+		if !ok {
+			arr := vc.dateTime().slice
+			ret := make([]civil.Date, len(arr))
+			for i := range arr {
+				ret[i] = civil.DateOf(arr[i])
+			}
+			vc.slice = ret
+		}
+	case Time:
+		_, ok := vc.slice.([]civil.Time)
+		if !ok {
+			arr := vc.dateTime().slice
+			ret := make([]civil.Time, len(arr))
+			for i := range arr {
+				ret[i] = civil.TimeOf(arr[i])
+			}
+			vc.slice = ret
+		}
 	}
 	return
 }
@@ -280,14 +300,22 @@ func (vc *valueContainer) dateTime() dateTimeValueContainer {
 	case []civil.Date:
 		arr := vc.slice.([]civil.Date)
 		for i := range arr {
-			newVals[i] = arr[i].In(time.UTC)
+			if isNull[i] {
+				newVals[i] = time.Time{}
+			} else {
+				newVals[i] = arr[i].In(time.UTC)
+			}
 		}
-	case []civil.DateTime:
-		arr := vc.slice.([]civil.DateTime)
+
+	case []civil.Time:
+		arr := vc.slice.([]civil.Time)
 		for i := range arr {
-			newVals[i] = arr[i].In(time.UTC)
+			if isNull[i] {
+				newVals[i] = time.Time{}
+			} else {
+				newVals[i] = time.Date(0, 0, 0, arr[i].Hour, arr[i].Minute, arr[i].Second, arr[i].Nanosecond, time.UTC)
+			}
 		}
-		// []civil.Time are all null when converted to time.Time
 	case []interface{}:
 		arr := vc.slice.([]interface{})
 		for i := range arr {

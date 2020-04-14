@@ -362,6 +362,18 @@ func TestStructTransposer_Transpose(t *testing.T) {
 			},
 			false,
 		},
+		{"fail - misshapen columns", fields{
+			Rows: [][]interface{}{
+				{0, 1},
+				{1},
+			},
+		},
+			args{
+				&testSchema{},
+			},
+			&testSchema{},
+			true,
+		},
 		{"fail - not pointer", fields{
 			Rows: [][]interface{}{
 				{0, float64(0)},
@@ -398,7 +410,7 @@ func TestStructTransposer_Transpose(t *testing.T) {
 			&testSchema4{Foo: []int{0, 1}},
 			true,
 		},
-		{"fail - wrong number of columns", fields{
+		{"fail - wrong number of columns for struct", fields{
 			Rows: [][]interface{}{
 				{0},
 				{1},
@@ -410,7 +422,7 @@ func TestStructTransposer_Transpose(t *testing.T) {
 			&testSchema{Foo: []int{0, 1}},
 			true,
 		},
-		{"fail - wrong data type", fields{
+		{"fail - wrong data type for struct", fields{
 			Rows: [][]interface{}{
 				{0, "foo"},
 				{1, "bar"},

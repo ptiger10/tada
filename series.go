@@ -167,8 +167,9 @@ func (s *Series) numLevels() int {
 	return len(s.labels)
 }
 
-// Cast casts the underlying container values (either label levels or Series values)
-// to []float64, []string, or []time.Time. To apply to Series values, supply empty string name ("") or the Series name.
+// Cast casts the underlying container values (either label levels or Series values) to
+// []float64, []string, []time.Time (aka timezone-aware DateTime), []civil.Date, or []civil.Time.
+// To apply to Series values, supply empty string name ("") or the Series name.
 // Use cast to improve performance when calling multiple operations on values.
 func (s *Series) Cast(containerAsType map[string]DType) {
 	mergedLabelsAndValues := append(s.labels, s.values)
@@ -1155,7 +1156,8 @@ func (s *Series) alignedMath(alignedFunction func([]float64, []bool, []int) []fl
 }
 
 // Resample coerces the Series values to time.Time and truncates them by the logic supplied in tada.Resampler.
-// If AsCivilDate or AsCivilTime is true, saves slice values as []civil.Date or []civil.Time, respectively.
+// If slice type is civil.Date or civil.Time before resampling, it will be returned as civil.Date or civil.Time after resampling.
+//
 // Returns a new Series.
 func (s *Series) Resample(by Resampler) *Series {
 	s = s.Copy()
@@ -1164,7 +1166,8 @@ func (s *Series) Resample(by Resampler) *Series {
 }
 
 // Resample coerces the Series values to time.Time and truncates them by the logic supplied in tada.Resampler.
-// If AsCivilDate or AsCivilTime is true, saves slice values as []civil.Date or []civil.Time, respectively.
+// If slice type is civil.Date or civil.Time before resampling, it will be returned as civil.Date or civil.Time after resampling.
+//
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Resample(by Resampler) {
 	s.series.values.resample(by)
