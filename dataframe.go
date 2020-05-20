@@ -2099,6 +2099,7 @@ func (df *DataFrame) Where(filters map[string]FilterFn, ifTrue, ifFalse interfac
 		values: &valueContainer{
 			slice:  ret,
 			isNull: isNull,
+			id:     makeID(),
 		},
 		labels: copyContainers(df.labels),
 	}, nil
@@ -2551,8 +2552,8 @@ func (df *DataFrame) count(name string, countFunction func(interface{}, []bool, 
 		labelNulls[k] = false
 	}
 	return &Series{
-		values: &valueContainer{slice: retVals, isNull: retNulls, name: name},
-		labels: []*valueContainer{{slice: labels, isNull: labelNulls, name: "*0"}},
+		values: &valueContainer{slice: retVals, isNull: retNulls, name: name, id: makeID()},
+		labels: []*valueContainer{{slice: labels, isNull: labelNulls, name: "*0", id: makeID()}},
 	}
 }
 
@@ -2574,8 +2575,17 @@ func (df *DataFrame) math(name string, mathFunction func([]float64, []bool, []in
 		labelNulls[k] = false
 	}
 	return &Series{
-		values: &valueContainer{slice: retVals, isNull: retNulls, name: name},
-		labels: []*valueContainer{{slice: labels, isNull: labelNulls, name: "*0"}},
+		values: &valueContainer{
+			slice:  retVals,
+			isNull: retNulls,
+			name:   name,
+			id:     makeID(),
+		},
+		labels: []*valueContainer{
+			{slice: labels,
+				isNull: labelNulls,
+				name:   "*0",
+				id:     makeID()}},
 	}
 }
 
@@ -2691,6 +2701,7 @@ func (df *DataFrame) Reduce(name string, lambda ReduceFn) (*Series, error) {
 			slice:  retVals.Interface(),
 			isNull: retNulls,
 			name:   name,
+			id:     makeID(),
 		},
 		labels: retLabels,
 	}, nil
