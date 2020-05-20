@@ -115,11 +115,16 @@ func makeValueContainerFromInterface(slice interface{}, name string) (*valueCont
 	if err != nil {
 		return nil, err
 	}
-	id := tadaID + strconv.Itoa(int(clock.now().UnixNano()))
 	return &valueContainer{
-		slice: slice, isNull: isNull, name: name,
-		id: id,
+		slice:  slice,
+		isNull: isNull,
+		name:   name,
+		id:     makeID(),
 	}, nil
+}
+
+func makeID() string {
+	return tadaID + strconv.Itoa(int(clock.now().UnixNano()))
 }
 
 func makeValueContainersFromInterfaces(slices []interface{}, usePrefix bool) ([]*valueContainer, error) {
@@ -165,6 +170,7 @@ func makeDefaultLabels(min, max int, prefixAsterisk bool) *valueContainer {
 		slice:  labels,
 		isNull: isNull,
 		name:   name,
+		id:     makeID(),
 	}
 }
 
@@ -270,7 +276,11 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 		lvl, err := indexOfContainer(name, cols)
 		if err != nil {
 			// name does not already exist: append new label level
-			cols = append(cols, &valueContainer{slice: input, name: name, isNull: isNull})
+			cols = append(cols, &valueContainer{
+				slice:  input,
+				name:   name,
+				isNull: isNull,
+				id:     makeID()})
 		} else {
 			// name already exists: overwrite existing label level
 			cols[lvl].slice = input
@@ -325,6 +335,7 @@ func copyInterfaceIntoValueContainers(slices []interface{}, isNull [][]bool, nam
 			slice:  slices[k],
 			isNull: isNull[k],
 			name:   names[k],
+			id:     makeID(),
 		}
 	}
 	return ret
@@ -766,6 +777,7 @@ func readStruct(slice interface{}) ([]*valueContainer, error) {
 			slice:  retValues[k],
 			isNull: nulls,
 			name:   retNames[k],
+			id:     makeID(),
 		}
 	}
 	return ret, nil
@@ -1035,6 +1047,7 @@ func (vc *valueContainer) head(n int) *valueContainer {
 		slice:  retVals.Interface(),
 		isNull: retIsNull,
 		name:   vc.name,
+		id:     vc.id,
 	}
 }
 
@@ -1049,6 +1062,7 @@ func (vc *valueContainer) tail(n int) *valueContainer {
 		slice:  retVals.Interface(),
 		isNull: retIsNull,
 		name:   vc.name,
+		id:     vc.id,
 	}
 }
 
@@ -1063,6 +1077,7 @@ func (vc *valueContainer) rangeSlice(first, last int) *valueContainer {
 		slice:  retVals.Interface(),
 		isNull: retIsNull,
 		name:   vc.name,
+		id:     vc.id,
 	}
 }
 
@@ -1083,6 +1098,7 @@ func (vc *valueContainer) shift(n int) *valueContainer {
 		slice:  vals.Interface(),
 		isNull: isNull,
 		name:   vc.name,
+		id:     vc.id,
 	}
 }
 
@@ -1101,6 +1117,7 @@ func (vc *valueContainer) append(other *valueContainer) *valueContainer {
 		slice:  retSlice,
 		isNull: retIsNull,
 		name:   vc.name,
+		id:     vc.id,
 	}
 }
 
@@ -1327,6 +1344,7 @@ func reduceContainers(containers []*valueContainer) (
 			slice:  reflect.MakeSlice(reflect.TypeOf(containers[j].slice), 0, 0).Interface(),
 			name:   containers[j].name,
 			isNull: make([]bool, 0),
+			id:     containers[j].id,
 		}
 	}
 	// create receiver for the original row indexes for each unique label combo
@@ -1377,6 +1395,7 @@ func reduceContainersForPromote(containers []*valueContainer) (
 			slice:  reflect.MakeSlice(reflect.TypeOf(containers[j].slice), 0, 0).Interface(),
 			name:   containers[j].name,
 			isNull: make([]bool, 0),
+			id:     containers[j].id,
 		}
 	}
 	// create receiver for the original row indexes for each unique label combo
@@ -1634,7 +1653,11 @@ func lookupDataFrameWithAnchor(
 			}
 		}
 		retVals = append(retVals, &valueContainer{
-			slice: vals.Interface(), isNull: isNull, name: lookupColumns[k].name})
+			slice:  vals.Interface(),
+			isNull: isNull,
+			name:   lookupColumns[k].name,
+			id:     lookupColumns[k].id,
+		})
 	}
 	// copy labels to avoid sharing data accidentally
 	return &DataFrame{
@@ -1731,6 +1754,7 @@ func (vc *valueContainer) copy() *valueContainer {
 		slice:  copyInterface(vc.slice),
 		isNull: copyNulls(vc.isNull),
 		name:   vc.name,
+		id:     vc.id,
 		cache:  copyCache(vc.cache),
 	}
 }
@@ -2922,6 +2946,7 @@ func (vc *valueContainer) expand(n []int) *valueContainer {
 		slice:  vals.Interface(),
 		isNull: nulls,
 		name:   vc.name,
+		id:     vc.id,
 	}
 	return ret
 }

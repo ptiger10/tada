@@ -42,6 +42,7 @@ func groupedFloat64ReduceFunc(
 		slice:  retVals,
 		isNull: retNulls,
 		name:   name,
+		id:     makeID(),
 	}
 }
 
@@ -126,6 +127,7 @@ func groupedStringReduceFunc(
 		slice:  retVals,
 		isNull: retNulls,
 		name:   name,
+		id:     makeID(),
 	}
 }
 
@@ -210,6 +212,7 @@ func groupedDateTimeReduceFunc(
 		slice:  retVals,
 		isNull: retNulls,
 		name:   name,
+		id:     makeID(),
 	}
 }
 

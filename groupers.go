@@ -798,6 +798,7 @@ func groupedInterfaceReduceFunc(
 		slice:  retVals.Interface(),
 		isNull: retNulls,
 		name:   name,
+		id:     makeID(),
 	}, nil
 }
 
@@ -850,6 +851,7 @@ func groupedApplyFunc(
 		slice:  retVals.Interface(),
 		isNull: retNulls,
 		name:   name,
+		id:     makeID(),
 	}, nil
 }
 
@@ -900,6 +902,7 @@ func groupedIndexReduceFunc(
 		slice:  retVals.Interface(),
 		isNull: retNulls,
 		name:   name,
+		id:     makeID(),
 	}
 }
 
@@ -930,5 +933,6 @@ func groupedCountReduceFunc(slice interface{}, nulls []bool, name string, aligne
 		slice:  retVals,
 		isNull: retNulls,
 		name:   name,
+		id:     makeID(),
 	}
 }
