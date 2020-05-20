@@ -20,7 +20,6 @@ var optionDateTimeFormats = []string{
 	"2006-01-02", "01-02-2006", "01/02/2006", "1/2/06", "1/2/2006", "2006-01-02 15:04:05 -0700 MST",
 	time.Kitchen, strings.ToLower(time.Kitchen),
 	time.RFC3339, time.RFC3339Nano, time.RFC822}
-var randSeed = time.Now().Unix()
 
 // SetOptionDefaultSeparator changes the separator used in group names and multi-level column names to sep
 // (default: "|").

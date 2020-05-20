@@ -38,7 +38,10 @@ type valueContainer struct {
 	isNull []bool
 	cache  []string
 	name   string
+	id     string
 }
+
+var tadaID = "tadaID_"
 
 // A Series is a single column of data with one or more levels of aligned labels.
 type Series struct {
@@ -274,3 +277,16 @@ type Binner struct {
 // that can be randomly shuffled or transposed into a column-oriented struct representation of a DataFrame.
 // It is useful for intuitive row-oriented testing.
 type StructTransposer [][]interface{}
+
+// -- private
+type clocker interface {
+	now() time.Time
+}
+
+type realClock struct{}
+
+func (c realClock) now() time.Time {
+	return time.Now()
+}
+
+var clock clocker = realClock{}

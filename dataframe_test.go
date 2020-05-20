@@ -3426,12 +3426,11 @@ func TestReadStructSlice(t *testing.T) {
 
 func TestWriteMockCSV(t *testing.T) {
 	want1 := `corge,qux
-.5,foo
-.9,baz
-.5,foo
+.5,baz
+.5,baz
+.5,baz
 `
 
-	randSeed = 3
 	type args struct {
 		r          io.Reader
 		outputRows int
@@ -6211,6 +6210,124 @@ func TestDataFrame_Reduce(t *testing.T) {
 			}
 			if !EqualSeries(got, tt.want) {
 				t.Errorf("DataFrame.Reduce() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_UnpackIDs(t *testing.T) {
+	var foo string
+	var bar string
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		receivers []*string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{"pass",
+			fields{
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "foo", id: "1"},
+				},
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "bar", id: "2"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "foobar"},
+			args{[]*string{&foo, &bar}},
+			[]string{"1", "2"},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			err := df.UnpackIDs(tt.args.receivers...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.UnpackIDs() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil {
+				for i := range tt.args.receivers {
+					if *tt.args.receivers[i] != tt.want[i] {
+						t.Errorf("DataFrame.UnpackIDs()[%d] = %v, want %v", i, *tt.args.receivers[i], tt.want[i])
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestDataFrame_UnpackIDsByName(t *testing.T) {
+	var foo string
+	var bar string
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		receivers map[string]*string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    map[string]string
+		wantErr bool
+	}{
+		{"pass",
+			fields{
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, name: "foo", id: "1"},
+				},
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, name: "bar", id: "2"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "foobar"},
+			args{map[string]*string{"foo": &foo, "bar": &bar}},
+			map[string]string{"foo": "1", "bar": "2"},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			err := df.UnpackIDsByName(tt.args.receivers)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.UnpackIDsByName() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil {
+				for k := range tt.args.receivers {
+					if *tt.args.receivers[k] != tt.want[k] {
+						t.Errorf("DataFrame.UnpackIDsByName() -> [%s] = %v, want %v", k, *tt.args.receivers[k], tt.want[k])
+					}
+				}
 			}
 		})
 	}

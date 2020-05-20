@@ -81,6 +81,32 @@ func isSlice(input interface{}) bool {
 	return reflect.TypeOf(input).Kind() == reflect.Slice
 }
 
+func unpackIDsByPosition(containers []*valueContainer, receivers ...*string) error {
+	if len(receivers) > len(containers) {
+		return fmt.Errorf("unpacking container ids by index position:"+
+			"len(receivers) out of range [%d] with length %d",
+			len(receivers), len(containers))
+	}
+	for i := range containers {
+		if i >= len(receivers) {
+			return nil
+		}
+		*receivers[i] = containers[i].id
+	}
+	return nil
+}
+
+func unpackIDsByName(containers []*valueContainer, receivers map[string]*string) error {
+	for k, v := range receivers {
+		i, err := indexOfContainer(k, containers)
+		if err != nil {
+			return fmt.Errorf("unpacking container ids by container name: %v", err)
+		}
+		*v = containers[i].id
+	}
+	return nil
+}
+
 func makeValueContainerFromInterface(slice interface{}, name string) (*valueContainer, error) {
 	if reflect.ValueOf(slice).Len() == 0 {
 		return nil, fmt.Errorf("empty slice: cannot be empty")
@@ -89,8 +115,10 @@ func makeValueContainerFromInterface(slice interface{}, name string) (*valueCont
 	if err != nil {
 		return nil, err
 	}
+	id := tadaID + strconv.Itoa(int(clock.now().UnixNano()))
 	return &valueContainer{
 		slice: slice, isNull: isNull, name: name,
+		id: id,
 	}, nil
 }
 
@@ -192,8 +220,14 @@ func nameOfContainer(containers []*valueContainer, n int) string {
 // case-sensitive
 func indexOfContainer(name string, containers []*valueContainer) (int, error) {
 	for j := range containers {
-		if containers[j].name == name {
-			return j, nil
+		if strings.HasPrefix(name, tadaID) {
+			if containers[j].id == name {
+				return j, nil
+			}
+		} else {
+			if containers[j].name == name {
+				return j, nil
+			}
 		}
 	}
 	return 0, fmt.Errorf("name (%v) not found", name)
@@ -771,7 +805,6 @@ func getDominantDType(dtypes map[string]int) string {
 
 // major dimension of output is rows
 func mockCSVFromDTypes(dtypes []map[string]int, numMockRows int) [][]string {
-	rand.Seed(randSeed)
 	dominantDTypes := make([]string, len(dtypes))
 
 	// determine the dominant data type per column
@@ -807,6 +840,7 @@ func mockString(dtype string, nullPct float64) string {
 	case "bool":
 		options = []string{"true", "false"}
 	}
+	rand.Seed(clock.now().UnixNano())
 	f := rand.Float64()
 	if f < nullPct {
 		return ""

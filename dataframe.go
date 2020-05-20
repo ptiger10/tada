@@ -1043,7 +1043,7 @@ func (df *DataFrameMutator) SwapLabels(i, j string) error {
 	return nil
 }
 
-// SubsetLabels returns only the labels specified at the index positions, in the order specified.
+// SubsetLabels returns only the label levels specified at the index positions, in the order specified.
 // Returns a new DataFrame.
 func (df *DataFrame) SubsetLabels(index []int) *DataFrame {
 	df = df.Copy()
@@ -1054,7 +1054,7 @@ func (df *DataFrame) SubsetLabels(index []int) *DataFrame {
 	return df
 }
 
-// SubsetLabels returns only the labels specified at the index positions, in the order specified.
+// SubsetLabels returns only the label levels specified at the index positions, in the order specified.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) SubsetLabels(index []int) error {
 	labels, err := subsetContainers(df.dataframe.labels, index)
@@ -1065,7 +1065,7 @@ func (df *DataFrameMutator) SubsetLabels(index []int) error {
 	return nil
 }
 
-// SubsetCols returns only the labels specified at the index positions, in the order specified.
+// SubsetCols returns only the columns specified at the index positions, in the order specified.
 // Returns a new DataFrame.
 func (df *DataFrame) SubsetCols(index []int) *DataFrame {
 	df = df.Copy()
@@ -1076,7 +1076,7 @@ func (df *DataFrame) SubsetCols(index []int) *DataFrame {
 	return df
 }
 
-// SubsetCols returns only the labels specified at the index positions, in the order specified.
+// SubsetCols returns only the columns specified at the index positions, in the order specified.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) SubsetCols(index []int) error {
 	cols, err := subsetContainers(df.dataframe.values, index)
@@ -1133,6 +1133,26 @@ func (df *DataFrame) IndexOf(name string, columns bool) int {
 		return -1
 	}
 	return i
+}
+
+// UnpackIDs stores immutable container IDs into the supplied receiver pointers
+// following the current order of label levels and columns.
+// The caller may supply fewer receivers than existing containers.
+// Supplying more receivers than existing containers returns an error.
+// Referencing a container by ID is more robust than by a name or index position.
+// This ID may be supplied to any function expecting a name.
+func (df *DataFrame) UnpackIDs(receivers ...*string) error {
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	return unpackIDsByPosition(mergedLabelsAndCols, receivers...)
+}
+
+// UnpackIDsByName stores immutable container IDs into the receivers map,
+// which maps container names (columns or label levels) to receiver pointers.
+// Referencing a container by ID is more robust than by a name or index position.
+// This ID may be supplied to any function expecting a name.
+func (df *DataFrame) UnpackIDsByName(receivers map[string]*string) error {
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	return unpackIDsByName(mergedLabelsAndCols, receivers)
 }
 
 // GetLabels returns label levels as interface{} slices within an []interface

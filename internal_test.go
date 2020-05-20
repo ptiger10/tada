@@ -15,8 +15,16 @@ import (
 	"cloud.google.com/go/civil"
 )
 
+type mockClock struct{}
+
+func (c mockClock) now() time.Time {
+	return time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+}
+
 func TestMain(m *testing.M) {
 	DisableWarnings()
+	clock = mockClock{}
+	defer func() { clock = realClock{} }()
 	code := m.Run()
 	os.Exit(code)
 }
@@ -139,7 +147,7 @@ func Test_makeValueContainerFromInterface(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("makeValueContainerFromInterface() = %#v, want %#v", got.slice, tt.want.slice)
+				t.Errorf("makeValueContainerFromInterface() = %#v, want %#v", got, tt.want)
 			}
 		})
 	}
@@ -1469,7 +1477,6 @@ func Test_getDominantDType(t *testing.T) {
 }
 
 func Test_mockCSVFromDTypes(t *testing.T) {
-	randSeed = 3
 	type args struct {
 		dtypes      []map[string]int
 		numMockRows int
@@ -1522,6 +1529,7 @@ func Test_mockString(t *testing.T) {
 		want string
 	}{
 		{"pass", args{"string", .99999999}, ""},
+		{"pass", args{"string", .00001}, "baz"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -5022,6 +5030,126 @@ func Test_valueContainer_interfaceSlice(t *testing.T) {
 			}
 			if got := vc.interfaceSlice(tt.args.includeHeader); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("valueContainer.interfaceSlice() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_unpackIDsByPosition(t *testing.T) {
+	var foo string
+	var bar string
+	type args struct {
+		containers []*valueContainer
+		receivers  []*string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{"pass", args{
+			[]*valueContainer{
+				{id: "1"}, {id: "2"},
+			},
+			[]*string{&foo, &bar},
+		},
+			[]string{"1", "2"},
+			false,
+		},
+		{"pass - fewer receivers than columns", args{
+			[]*valueContainer{
+				{id: "1"}, {id: "2"},
+			},
+			[]*string{&foo},
+		},
+			[]string{"1"},
+			false,
+		},
+		{"fail - more receivers than columns", args{
+			[]*valueContainer{
+				{id: "1"}, {id: "2"},
+			},
+			[]*string{&foo, &bar, &bar},
+		},
+			[]string{"", ""},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		foo = ""
+		bar = ""
+		t.Run(tt.name, func(t *testing.T) {
+			err := unpackIDsByPosition(tt.args.containers, tt.args.receivers...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("unpackIDsByPosition() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil {
+				for i := range tt.args.receivers {
+					if *tt.args.receivers[i] != tt.want[i] {
+						t.Errorf("unpackIDsByPosition() -> [%d] = %v, want %v", i, *tt.args.receivers[i], tt.want[i])
+					}
+				}
+			}
+		})
+	}
+}
+
+func Test_unpackIDsByName(t *testing.T) {
+	var foo string
+	var bar string
+	type args struct {
+		containers []*valueContainer
+		receivers  map[string]*string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    map[string]string
+		wantErr bool
+	}{
+		{"pass", args{
+			[]*valueContainer{
+				{name: "foo", id: "1"}, {name: "bar", id: "2"},
+			},
+			map[string]*string{"foo": &foo, "bar": &bar},
+		},
+			map[string]string{"foo": "1", "bar": "2"},
+			false,
+		},
+		{"pass - fewer receivers than containers", args{
+			[]*valueContainer{
+				{name: "foo", id: "1"},
+			},
+			map[string]*string{"foo": &foo},
+		},
+			map[string]string{"foo": "1"},
+			false,
+		},
+		{"fail - invalid container name", args{
+			[]*valueContainer{
+				{name: "foo", id: "1"},
+			},
+			map[string]*string{"corge": &foo},
+		},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			foo = ""
+			bar = ""
+			err := unpackIDsByName(tt.args.containers, tt.args.receivers)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("unpackIDsByName() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil {
+				for k := range tt.args.receivers {
+					if *tt.args.receivers[k] != tt.want[k] {
+						t.Errorf("unpackIDsByName() -> [%s] = %v, want %v", k, *tt.args.receivers[k], tt.want[k])
+					}
+				}
 			}
 		})
 	}
