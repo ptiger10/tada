@@ -1116,11 +1116,11 @@ func (df *DataFrame) NameOfCol(n int) string {
 	return nameOfContainer(df.values, n)
 }
 
-// IndexOfContainer returns the index position of the first container with a name matching name (case-sensitive).
+// IndexOf returns the index position of the first container with a name matching name (case-sensitive).
 // If name does not match any container, -1 is returned.
 // If columns is true, only column names will be searched.
 // If columns is false, only label level names will be searched.
-func (df *DataFrame) IndexOfContainer(name string, columns bool) int {
+func (df *DataFrame) IndexOf(name string, columns bool) int {
 	var i int
 	var err error
 	if !columns {
@@ -1148,38 +1148,15 @@ func (df *DataFrame) GetLabels() []interface{} {
 	return ret
 }
 
-// LabelsAsSeries finds the first label level with matching name
-// and returns the values as a Series.
-// Similar to Col(), but selects label values instead of column values.
-// The labels in the Series are shared with the labels in the DataFrame.
-// If label level name is default (prefixed with *), the prefix is removed.
-func (df *DataFrame) LabelsAsSeries(name string) *Series {
-	index, err := indexOfContainer(name, df.labels)
-	if err != nil {
-		return seriesWithError(fmt.Errorf("converting labels to Series: %v", err))
-	}
-	values := df.labels[index]
-	retValues := &valueContainer{
-		slice:  values.slice,
-		isNull: values.isNull,
-		name:   removeDefaultNameIndicator(values.name),
-	}
-	return &Series{
-		values:     retValues,
-		labels:     df.labels,
-		sharedData: true,
-	}
-}
-
-// Col finds the first column with matching name and returns as a Series.
-// Similar to SelectLabels(), but selects column values instead of label values.
+// Col finds the first column or label level with matching name and returns as a Series with the existing labels.
 func (df *DataFrame) Col(name string) *Series {
-	index, err := indexOfContainer(name, df.values)
+	mergedLabelsAndCols := append(df.labels, df.values...)
+	index, err := indexOfContainer(name, mergedLabelsAndCols)
 	if err != nil {
 		return seriesWithError(fmt.Errorf("getting column: %v", err))
 	}
 	return &Series{
-		values:     df.values[index],
+		values:     mergedLabelsAndCols[index],
 		labels:     df.labels,
 		sharedData: true,
 	}

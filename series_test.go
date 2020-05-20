@@ -2932,53 +2932,6 @@ func TestSeries_Resample(t *testing.T) {
 	}
 }
 
-func TestSeries_LabelsAsSeries(t *testing.T) {
-	type fields struct {
-		values *valueContainer
-		labels []*valueContainer
-		err    error
-	}
-	type args struct {
-		name string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *Series
-	}{
-		{"pass",
-			fields{values: &valueContainer{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}},
-			args{"*0"},
-			&Series{
-				values:     &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "0"},
-				labels:     []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				sharedData: true,
-			},
-		},
-		{"fail",
-			fields{values: &valueContainer{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}}},
-			args{"corge"},
-			&Series{
-				err: errors.New("converting labels to Series: name (corge) not found")},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values: tt.fields.values,
-				labels: tt.fields.labels,
-				err:    tt.fields.err,
-			}
-			if got := s.LabelsAsSeries(tt.args.name); !EqualSeries(got, tt.want) {
-				t.Errorf("Series.LabelsAsSeries() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestSeries_ValueCounts(t *testing.T) {
 	type fields struct {
 		values *valueContainer

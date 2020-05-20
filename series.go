@@ -203,28 +203,6 @@ func (s *Series) IndexOfLabel(name string) int {
 	return i
 }
 
-// LabelsAsSeries finds the first level with matching name and returns as a Series with all existing label levels (including itself).
-// If label level name is default (prefixed with *), removes the prefix.
-// Returns a new Series with shared labels.
-func (s *Series) LabelsAsSeries(name string) *Series {
-	index, err := indexOfContainer(name, s.labels)
-	if err != nil {
-		return seriesWithError(fmt.Errorf("converting labels to Series: %v", err))
-	}
-	values := s.labels[index]
-	retValues := &valueContainer{
-		slice:  values.slice,
-		isNull: values.isNull,
-		name:   removeDefaultNameIndicator(values.name),
-		cache:  values.cache,
-	}
-	return &Series{
-		values:     retValues,
-		labels:     s.labels,
-		sharedData: true,
-	}
-}
-
 // Subset returns only the rows specified at the index positions, in the order specified.
 // Returns a new Series.
 func (s *Series) Subset(index []int) *Series {

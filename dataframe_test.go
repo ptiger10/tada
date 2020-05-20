@@ -4048,61 +4048,6 @@ func TestDataFrame_FilterByValue(t *testing.T) {
 	}
 }
 
-func TestDataFrame_LabelsAsSeries(t *testing.T) {
-	type fields struct {
-		labels        []*valueContainer
-		values        []*valueContainer
-		name          string
-		err           error
-		colLevelNames []string
-	}
-	type args struct {
-		name string
-	}
-	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *Series
-	}{
-		{"pass",
-			fields{values: []*valueContainer{
-				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			args{"*0"},
-			&Series{
-				values:     &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "0"},
-				labels:     []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				sharedData: true,
-			},
-		},
-		{"fail",
-			fields{values: []*valueContainer{
-				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			args{"corge"},
-			&Series{
-				err: fmt.Errorf("converting labels to Series: name (corge) not found")},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			df := &DataFrame{
-				labels:        tt.fields.labels,
-				values:        tt.fields.values,
-				name:          tt.fields.name,
-				err:           tt.fields.err,
-				colLevelNames: tt.fields.colLevelNames,
-			}
-			if got := df.LabelsAsSeries(tt.args.name); !EqualSeries(got, tt.want) {
-				t.Errorf("DataFrame.LabelsAsSeries() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestDataFrame_Col(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
@@ -4706,7 +4651,7 @@ func TestDataFrame_At(t *testing.T) {
 	}
 }
 
-func TestDataFrame_IndexOfContainer(t *testing.T) {
+func TestDataFrame_IndexOf(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -4758,8 +4703,8 @@ func TestDataFrame_IndexOfContainer(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.IndexOfContainer(tt.args.name, tt.args.columns); got != tt.want {
-				t.Errorf("DataFrame.IndexOfContainer() = %v, want %v", got, tt.want)
+			if got := df.IndexOf(tt.args.name, tt.args.columns); got != tt.want {
+				t.Errorf("DataFrame.IndexOf() = %v, want %v", got, tt.want)
 			}
 		})
 	}
