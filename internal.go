@@ -1738,6 +1738,10 @@ func isSupportedSlice(slice interface{}) error {
 	if k := reflect.TypeOf(slice).Kind(); k != reflect.Slice {
 		return fmt.Errorf("unsupported kind (%v); must be slice", k)
 	}
+	// maps are supported
+	if v := reflect.ValueOf(slice); v.Len() > 0 && v.Index(0).Kind() == reflect.Map {
+		return nil
+	}
 	switch slice.(type) {
 	case []float64, []string, []time.Time,
 		[]civil.Date, []civil.Time,
@@ -1783,6 +1787,22 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("setting null values from interface{}: %v", err)
 	}
+	v := reflect.ValueOf(input)
+	if v.Len() == 0 {
+		return []bool{}, nil
+	}
+	// map or nested slice
+	// if len is empty -> null
+	t := v.Index(0).Kind()
+	if t == reflect.Map || t == reflect.Slice {
+		l := v.Len()
+		ret = make([]bool, l)
+		for i := range ret {
+			ret[i] = (v.Index(i).Len() == 0)
+		}
+		return ret, nil
+	}
+
 	switch input.(type) {
 	case []float64:
 		vals := input.([]float64)
@@ -1853,25 +1873,13 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 				ret[i] = false
 			}
 		}
+	default:
 		// no null value possible
-	case []bool, []uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64, []float32:
+		// case []bool, []uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64, []float32:
 		l := reflect.ValueOf(input).Len()
 		ret = make([]bool, l)
 		for i := range ret {
 			ret[i] = false
-		}
-	// nested slices
-	case [][]string, [][]float64, [][]time.Time, [][][]byte,
-		[][]civil.Date, [][]civil.Time,
-		[][]bool, [][]float32,
-		[][]uint, [][]uint16, [][]uint32, [][]uint64,
-		[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
-		v := reflect.ValueOf(input)
-		l := v.Len()
-		ret = make([]bool, l)
-		for i := range ret {
-			// if slice is empty -> null
-			ret[i] = (v.Index(i).Len() == 0)
 		}
 	}
 	return ret, nil

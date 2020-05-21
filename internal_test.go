@@ -275,6 +275,7 @@ func Test_setNullsFromInterface(t *testing.T) {
 				true, true, true}, false},
 		{"nested string", args{[][]string{{"foo"}, {}}}, []bool{false, true}, false},
 		{"nested civil.date", args{[][]civil.Date{{{Year: 2020, Month: 1, Day: 1}, {}}, {}}}, []bool{false, true}, false},
+		{"nested map", args{[]map[string]string{{"foo": "bar"}, {}}}, []bool{false, true}, false},
 		{"fail - not slice", args{"foo"}, nil, true},
 		{"fail - interface with unsupported value", args{[]interface{}{complex64(1)}}, nil, true},
 	}
