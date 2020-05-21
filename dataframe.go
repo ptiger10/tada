@@ -1434,36 +1434,36 @@ func (df *DataFrameMutator) FilterCols(lambda func(string) bool, level int) erro
 
 // -- SETTERS
 
-// WithLabels resolves as follows:
+// WithLabel accepts a name and input, which must be string or slice. It resolves as follows:
 //
-// If a scalar string is supplied as input and a label level exists that matches name: rename the level to match input.
+// If a string is supplied as input and a label level exists that matches name: rename the level to match input.
 // In this case, name must already exist.
 //
 // If a slice is supplied as input and a label level exists that matches name: replace the values at this level to match input.
-// If a slice is supplied as input and a label level does not exist that matches name: append a new level named name and values matching input.
+// If a slice is supplied as input and a label level does not exist that matches name: append a new level with name matching name and values matching input.
 // If input is a slice, it must be the same length as the underlying DataFrame.
 //
 // In all cases, returns a new DataFrame.
-func (df *DataFrame) WithLabels(name string, input interface{}) *DataFrame {
+func (df *DataFrame) WithLabel(name string, input interface{}) *DataFrame {
 	df = df.Copy()
-	err := df.InPlace().WithLabels(name, input)
+	err := df.InPlace().WithLabel(name, input)
 	if err != nil {
 		return dataFrameWithError(err)
 	}
 	return df
 }
 
-// WithLabels resolves as follows:
+// WithLabel accepts a name and input, which must be string or slice. It resolves as follows:
 //
-// If a scalar string is supplied as input and a label level exists that matches name: rename the level to match input.
+// If a string is supplied as input and a label level exists that matches name: rename the level to match input.
 // In this case, name must already exist.
 //
 // If a slice is supplied as input and a label level exists that matches name: replace the values at this level to match input.
-// If a slice is supplied as input and a label level does not exist that matches name: append a new level named name and values matching input.
+// If a slice is supplied as input and a label level does not exist that matches name: append a new level with name matching name and values matching input.
 // If input is a slice, it must be the same length as the underlying DataFrame.
 //
 // In all cases, modifies the underlying DataFrame in place.
-func (df *DataFrameMutator) WithLabels(name string, input interface{}) error {
+func (df *DataFrameMutator) WithLabel(name string, input interface{}) error {
 	labels, err := withColumn(df.dataframe.labels, name, input, df.dataframe.Len())
 	if err != nil {
 		return fmt.Errorf("setting labels: %v", err)
@@ -1472,13 +1472,13 @@ func (df *DataFrameMutator) WithLabels(name string, input interface{}) error {
 	return nil
 }
 
-// WithCol resolves as follows:
+// WithCol accepts a name and input, which must be string or slice. It resolves as follows:
 //
-// If a scalar string is supplied as input and a column exists that matches name: rename the column to match input.
+// If a string is supplied as input and a column exists that matches name: rename the column to match input.
 // In this case, name must already exist.
 //
 // If a slice is supplied as input and a column exists that matches name: replace the values at this column to match input.
-// If a slice is supplied as input and a column does not exist that matches name: append a new column named name and values matching input.
+// If a slice is supplied as input and a column does not exist that matches name: append a new column with name matching name and values matching input.
 // If input is a slice, it must be the same length as the underlying DataFrame.
 //
 // In all cases, returns a new DataFrame.
@@ -1491,13 +1491,13 @@ func (df *DataFrame) WithCol(name string, input interface{}) *DataFrame {
 	return df
 }
 
-// WithCol resolves as follows:
+// WithCol accepts a name and input, which must be string or slice. It resolves as follows:
 //
-// If a scalar string is supplied as input and a column exists that matches name: rename the column to match input.
+// If a string is supplied as input and a column exists that matches name: rename the column to match input.
 // In this case, name must already exist.
 //
 // If a slice is supplied as input and a column exists that matches name: replace the values at this column to match input.
-// If a slice is supplied as input and a column does not exist that matches name: append a new column named name and values matching input.
+// If a slice is supplied as input and a column does not exist that matches name: append a new column with name matching name and values matching input.
 // If input is a slice, it must be the same length as the underlying DataFrame.
 //
 // In all cases, modifies the underlying DataFrame in place.

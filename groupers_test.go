@@ -149,10 +149,9 @@ func Test_groupedInterfaceFunc(t *testing.T) {
 		fn         func(slice interface{}, isNull []bool) (interface{}, bool)
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    *valueContainer
-		wantErr bool
+		name string
+		args args
+		want *valueContainer
 	}{
 		{"grouped", args{
 			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
@@ -168,7 +167,7 @@ func Test_groupedInterfaceFunc(t *testing.T) {
 				name:   "foo",
 				id:     mockID,
 			},
-			false},
+		},
 		{"grouped - new type", args{
 			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
 			name: "foo", aligned: false,
@@ -183,7 +182,7 @@ func Test_groupedInterfaceFunc(t *testing.T) {
 				name:   "foo",
 				id:     mockID,
 			},
-			false},
+		},
 		{"grouped and nested", args{
 			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
 			name: "foo", aligned: false,
@@ -198,7 +197,7 @@ func Test_groupedInterfaceFunc(t *testing.T) {
 				name:   "foo",
 				id:     mockID,
 			},
-			false},
+		},
 		{"aligned", args{
 			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
 			name: "foo", aligned: true,
@@ -213,25 +212,11 @@ func Test_groupedInterfaceFunc(t *testing.T) {
 				name:   "foo",
 				id:     mockID,
 			},
-			false},
-		{"fail - unsupported", args{
-			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
-			name: "foo", aligned: false,
-			rowIndices: [][]int{{0, 1}, {2, 3}},
-			fn: func(slice interface{}, isNull []bool) (interface{}, bool) {
-				vals := slice.([]float64)
-				return [][][]float64{{{vals[0]}}}, false
-			}},
-			nil,
-			true},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := groupedInterfaceReduceFunc(tt.args.slice, tt.args.isNull, tt.args.name, tt.args.aligned, tt.args.rowIndices, tt.args.fn)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("groupedInterfaceReduceFunc() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got := groupedInterfaceReduceFunc(tt.args.slice, tt.args.isNull, tt.args.name, tt.args.aligned, tt.args.rowIndices, tt.args.fn)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("groupedInterfaceFunc() = %v, want %v", got, tt.want)
 			}
@@ -1384,19 +1369,6 @@ func TestGroupedSeries_Reduce(t *testing.T) {
 				labels: []*valueContainer{
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "*0"},
 				}}},
-		{"fail - not aligned", fields{
-			orderedKeys: []string{"foo", "bar"},
-			rowIndices:  [][]int{{0, 1}, {2, 3}},
-			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-			aligned:     false,
-			series: &Series{
-				values: &valueContainer{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, id: mockID, name: "qux"},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, id: mockID, name: "*0"}}}},
-			args{"custom", func(slice interface{}, isNull []bool) (interface{}, bool) {
-				return complex64(1), false
-			}},
-			&Series{err: fmt.Errorf("reducing grouped Series: constructing new slice: unsupported type ([]complex64)")}},
 		// -- no function
 		{"fail", fields{
 			orderedKeys: []string{"foo", "bar"},
@@ -1467,21 +1439,6 @@ func TestGroupedDataFrame_Reduce(t *testing.T) {
 					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
 				colLevelNames: []string{"*0"},
 				name:          "custom_foo"}},
-		{"fail - unsupported type", fields{
-			orderedKeys: []string{"foo", "bar"},
-			rowIndices:  [][]int{{0, 1}, {2, 3}},
-			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-			df: &DataFrame{
-				values: []*valueContainer{{slice: []string{"a", "b", "c", "d"}, isNull: []bool{false, false, false, false}, id: mockID, name: "qux"}},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, id: mockID, name: "*0"}},
-				colLevelNames: []string{"*0"},
-				name:          "foo"}},
-			args{"custom", []string{"qux"}, func(slice interface{}, isNull []bool) (interface{}, bool) {
-				return complex64(1), false
-			}},
-			&DataFrame{err: fmt.Errorf(
-				"reducing grouped DataFrame: constructing new slice: unsupported type ([]complex64)")}},
 
 		// -- no function
 		{"fail", fields{
@@ -3718,11 +3675,7 @@ func TestGroupedSeries_interfaceReduceFunc(t *testing.T) {
 				aligned:     tt.fields.aligned,
 				err:         tt.fields.err,
 			}
-			got, err := g.interfaceReduceFunc(tt.args.name, tt.args.fn)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GroupedSeries.interfaceReduceFunc() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got := g.interfaceReduceFunc(tt.args.name, tt.args.fn)
 			if !EqualSeries(got, tt.want) {
 				t.Errorf("GroupedSeries.interfaceReduceFunc() = %v, want %v", got, tt.want)
 			}
@@ -3813,15 +3766,6 @@ func Test_groupedApplyFunc(t *testing.T) {
 					return 0
 				}
 				return []float64{1, 2}
-			}},
-			nil,
-			true},
-		{"fail - unsupported type", args{
-			slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false},
-			name:       "foo",
-			rowIndices: [][]int{{0, 1}, {2, 3}},
-			fn: func(slice interface{}, _ []bool) interface{} {
-				return []complex64{1, 2}
 			}},
 			nil,
 			true},
@@ -4130,19 +4074,6 @@ func TestGroupedDataFrame_interfaceReduceFunc(t *testing.T) {
 				name:          "custom",
 				colLevelNames: []string{"*0"}},
 			false},
-		{"fail - unsupported type", fields{
-			orderedKeys: []string{"foo", "bar"},
-			rowIndices:  [][]int{{0, 1}, {2, 3}},
-			labels:      []*valueContainer{{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-			df: &DataFrame{values: []*valueContainer{{slice: []float64{1, 1, 3, 4}, isNull: []bool{false, false, false, false}}},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, id: mockID, name: "*0"}}}},
-			args{
-				"foo", nil, func(slice interface{}, isNull []bool) (interface{}, bool) {
-					return complex64(1), false
-				}},
-			nil,
-			true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -4153,11 +4084,7 @@ func TestGroupedDataFrame_interfaceReduceFunc(t *testing.T) {
 				df:          tt.fields.df,
 				err:         tt.fields.err,
 			}
-			got, err := g.interfaceReduceFunc(tt.args.name, tt.args.cols, tt.args.fn)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("GroupedDataFrame.interfaceReduceFunc() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got := g.interfaceReduceFunc(tt.args.name, tt.args.cols, tt.args.fn)
 			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("GroupedDataFrame.interfaceReduceFunc() = %v, want %v", got, tt.want)
 			}

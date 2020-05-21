@@ -402,6 +402,10 @@ func Test_valueContainer_float64(t *testing.T) {
 			floatValueContainer{slice: []float64{1}, isNull: []bool{false}}},
 		{"[][]float64", fields{slice: [][]float64{{1}}, isNull: []bool{false}},
 			floatValueContainer{slice: []float64{0}, isNull: []bool{true}}},
+		{"map[string]string", fields{slice: []map[string]string{{"foo": "bar"}}, isNull: []bool{false}},
+			floatValueContainer{slice: []float64{0}, isNull: []bool{true}}},
+		{"[]complex64", fields{slice: []complex64{1}, isNull: []bool{false}},
+			floatValueContainer{slice: []float64{0}, isNull: []bool{true}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -478,6 +482,9 @@ func Test_valueContainer_string(t *testing.T) {
 			stringValueContainer{slice: []string{"[1 2]", "[0]"}, isNull: []bool{false, true}},
 			[]string{"[1 2]", "[0]"},
 		},
+		{"map[string]string", fields{slice: []map[string]string{{"foo": "bar"}, {}}, isNull: []bool{false, true}},
+			stringValueContainer{slice: []string{"map[foo:bar]", "map[]"}, isNull: []bool{false, true}},
+			[]string{"map[foo:bar]", "map[]"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

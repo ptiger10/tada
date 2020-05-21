@@ -282,32 +282,9 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 			cols[lvl].isNull = isNull
 			cols[lvl].resetCache()
 		}
-		// is Series? append or overwrite
-	case reflect.Ptr:
-		v, ok := input.(*Series)
-		if !ok {
-			return nil, fmt.Errorf("unsupported input: *Series is only supported pointer")
-		}
-
-		if v.Len() != requiredLen {
-			return nil, fmt.Errorf(
-				"cannot replace items in column %s: length of input Series does not match existing length (%d != %d)",
-				name, v.Len(), requiredLen)
-		}
-		// name does not already exist: append new level
-		lvl, err := indexOfContainer(name, cols)
-		if err != nil {
-			cols = append(cols, v.values)
-			cols[len(cols)-1].name = name
-		} else {
-			// name already exists: overwrite existing level
-			cols[lvl] = v.values
-			cols[lvl].name = name
-			cols[lvl].resetCache()
-		}
 
 	default:
-		return nil, fmt.Errorf("unsupported input kind: must be either slice, string, or Series")
+		return nil, fmt.Errorf("unsupported input kind (%v)", reflect.TypeOf(input).Kind())
 	}
 	return cols, nil
 }
@@ -1738,48 +1715,49 @@ func isSupportedSlice(slice interface{}) error {
 	if k := reflect.TypeOf(slice).Kind(); k != reflect.Slice {
 		return fmt.Errorf("unsupported kind (%v); must be slice", k)
 	}
-	// maps are supported
-	if v := reflect.ValueOf(slice); v.Len() > 0 && v.Index(0).Kind() == reflect.Map {
-		return nil
-	}
-	switch slice.(type) {
-	case []float64, []string, []time.Time,
-		[]civil.Date, []civil.Time,
-		[][]byte, []bool, []float32,
-		[]uint, []uint8, []uint16, []uint32, []uint64,
-		[]int, []int8, []int16, []int32, []int64,
-		// nested types
-		[][]string, [][]float64, [][]time.Time, [][][]byte,
-		[][]civil.Date, [][]civil.Time,
-		[][]bool, [][]float32,
-		[][]uint, [][]uint16, [][]uint32, [][]uint64,
-		[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
-		return nil
-	case []interface{}:
-		vals := slice.([]interface{})
-		for i := range vals {
-			err := isSupportedInterface(vals[i])
-			if err != nil {
-				return fmt.Errorf("[]interface{}: %v", err)
-			}
-		}
-		return nil
-	}
-	return fmt.Errorf("unsupported type ([]%v)", reflect.TypeOf(slice).Elem())
+	return nil
+	// // maps are supported
+	// if v := reflect.ValueOf(slice); v.Len() > 0 && v.Index(0).Kind() == reflect.Map {
+	// 	return nil
+	// }
+	// switch slice.(type) {
+	// case []float64, []string, []time.Time,
+	// 	[]civil.Date, []civil.Time,
+	// 	[][]byte, []bool, []float32,
+	// 	[]uint, []uint8, []uint16, []uint32, []uint64,
+	// 	[]int, []int8, []int16, []int32, []int64,
+	// 	// nested types
+	// 	[][]string, [][]float64, [][]time.Time, [][][]byte,
+	// 	[][]civil.Date, [][]civil.Time,
+	// 	[][]bool, [][]float32,
+	// 	[][]uint, [][]uint16, [][]uint32, [][]uint64,
+	// 	[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
+	// 	return nil
+	// case []interface{}:
+	// 	vals := slice.([]interface{})
+	// 	for i := range vals {
+	// 		err := isSupportedInterface(vals[i])
+	// 		if err != nil {
+	// 			return fmt.Errorf("[]interface{}: %v", err)
+	// 		}
+	// 	}
+	// 	return nil
+	// }
+	// return fmt.Errorf("unsupported type ([]%v)", reflect.TypeOf(slice).Elem())
 }
 
-func isSupportedInterface(val interface{}) error {
-	switch val.(type) {
-	case float64, string, time.Time,
-		[]float64, []string, []time.Time,
-		bool, uint, uint8, uint16, uint32, uint64,
-		int, int8, int16, int32, int64, float32,
-		[]bool, []uint, []uint8, []uint16, []uint32, []uint64,
-		[]int, []int8, []int16, []int32, []int64, []float32:
-		return nil
-	}
-	return fmt.Errorf("unsupported type (%v)", reflect.TypeOf(val))
-}
+// func isSupportedInterface(val interface{}) error {
+// 	switch val.(type) {
+// 	case float64, string, time.Time,
+// 		[]float64, []string, []time.Time,
+// 		bool, uint, uint8, uint16, uint32, uint64,
+// 		int, int8, int16, int32, int64, float32,
+// 		[]bool, []uint, []uint8, []uint16, []uint32, []uint64,
+// 		[]int, []int8, []int16, []int32, []int64, []float32:
+// 		return nil
+// 	}
+// 	return fmt.Errorf("unsupported type (%v)", reflect.TypeOf(val))
+// }
 
 func setNullsFromInterface(input interface{}) ([]bool, error) {
 	var ret []bool
@@ -1874,8 +1852,7 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 			}
 		}
 	default:
-		// no null value possible
-		// case []bool, []uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64, []float32:
+		// all other types are considered non-null
 		l := reflect.ValueOf(input).Len()
 		ret = make([]bool, l)
 		for i := range ret {
@@ -1895,22 +1872,28 @@ func isNullInterface(i interface{}) bool {
 		if isNullFloat(f) {
 			return true
 		}
-		return false
 	case string:
 		s := i.(string)
 		if isNullString(s) {
 			return true
 		}
-		return false
 	case time.Time:
 		t := i.(time.Time)
 		if (time.Time{}) == t {
 			return true
 		}
-		return false
-	default:
-		return false
+	case civil.Date:
+		t := i.(civil.Date)
+		if !t.IsValid() {
+			return true
+		}
+	case civil.Time:
+		t := i.(civil.Time)
+		if !t.IsValid() {
+			return true
+		}
 	}
+	return false
 }
 
 func isNullString(s string) bool {

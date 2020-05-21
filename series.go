@@ -393,13 +393,13 @@ func (s *Series) InPlace() *SeriesMutator {
 	return &SeriesMutator{series: s}
 }
 
-// WithLabels resolves as follows:
+// WithLabels accepts a name and input, which must be string or slice. It resolves as follows:
 //
-// If a scalar string is supplied as input and a label level exists that matches name: rename the level to match input.
+// If a string is supplied as input and a label level exists that matches name: rename the level to match input.
 // In this case, name must already exist.
 //
 // If a slice is supplied as input and a label level exists that matches name: replace the values at this level to match input.
-// If a slice is supplied as input and a label level does not exist that matches name: append a new level named name and values matching input.
+// If a slice is supplied as input and a label level does not exist that matches name: append a new level with name matching name and values matching input.
 // If input is a slice, it must be the same length as the underlying Series.
 //
 // In all cases, returns a new Series.
@@ -412,13 +412,13 @@ func (s *Series) WithLabels(name string, input interface{}) *Series {
 	return s
 }
 
-// WithLabels resolves as follows:
+// WithLabels accepts a name and input, which must be string or slice. It resolves as follows:
 //
-// If a scalar string is supplied as input and a label level exists that matches name: rename the level to match input.
+// If a string is supplied as input and a label level exists that matches name: rename the level to match input.
 // In this case, name must already exist.
 //
 // If a slice is supplied as input and a label level exists that matches name: replace the values at this level to match input.
-// If a slice is supplied as input and a label level does not exist that matches name: append a new level named name and values matching input.
+// If a slice is supplied as input and a label level does not exist that matches name: append a new level with name matching name and values matching input.
 // If input is a slice, it must be the same length as the underlying Series.
 //
 // In all cases, modifies the underlying Series in place.
@@ -432,7 +432,7 @@ func (s *SeriesMutator) WithLabels(name string, input interface{}) error {
 }
 
 // WithValues replaces the Series values with input.
-// input must be a supported slice type of the same length as the original Series.
+// Input must be a slice of the same length as the original Series.
 // Returns a new Series.
 func (s *Series) WithValues(input interface{}) *Series {
 	s = s.Copy()
@@ -444,7 +444,7 @@ func (s *Series) WithValues(input interface{}) *Series {
 }
 
 // WithValues replaces the Series values with input.
-// input must be a supported slice type of the same length as the original Series.
+// Input must be a slice of the same length as the original Series.
 // Modifies the underlying Series.
 func (s *SeriesMutator) WithValues(input interface{}) error {
 	// synthesize a collection of valueContainers, ensuring that name already exists
@@ -717,7 +717,7 @@ func (s *SeriesMutator) Filter(filters map[string]FilterFn) error {
 // If not, returns ifFalse at that row position.
 // Values are coerced from their original type to the selected field type for filtering, but after filtering retains their original type.
 //
-// Returns an unnamed Series a copy of the labels from the original Series and null status based on the supplied values.
+// Returns an unnamed Series with a copy of the labels from the original Series and null status based on the supplied values.
 // If an unsupported value type is supplied as either ifTrue or ifFalse, returns an error.
 func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{}) (*Series, error) {
 	ret := make([]interface{}, s.Len())
@@ -735,16 +735,8 @@ func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{})
 	for _, i := range inverseIndex {
 		ret[i] = ifFalse
 	}
-	isNull, err := setNullsFromInterface(ret)
-	if err != nil {
-		err := isSupportedSlice([]interface{}{ifTrue})
-		// ifTrue is unsupported?
-		if err != nil {
-			return nil, fmt.Errorf("where: ifTrue: %v", err)
-		}
-		// ifFalse is unsupported?
-		return nil, fmt.Errorf("where: ifFalse: %v", err)
-	}
+	// ducks error because ret is a supported slice
+	isNull, _ := setNullsFromInterface(ret)
 	return &Series{
 		values: newValueContainer(ret, isNull, ""),
 		labels: copyContainers(s.labels),

@@ -136,8 +136,6 @@ func Test_makeValueContainerFromInterface(t *testing.T) {
 			&valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "0"}, false},
 		{"fail - empty slice", args{[]float64{}, "0"},
 			nil, true},
-		{"fail - unsupported slice", args{[]complex64{1}, "0"},
-			nil, true},
 		{"fail - not slice", args{"foo", "0"},
 			nil, true},
 	}
@@ -275,9 +273,9 @@ func Test_setNullsFromInterface(t *testing.T) {
 				true, true, true}, false},
 		{"nested string", args{[][]string{{"foo"}, {}}}, []bool{false, true}, false},
 		{"nested civil.date", args{[][]civil.Date{{{Year: 2020, Month: 1, Day: 1}, {}}, {}}}, []bool{false, true}, false},
-		{"nested map", args{[]map[string]string{{"foo": "bar"}, {}}}, []bool{false, true}, false},
+		{"map", args{[]map[string]string{{"foo": "bar"}, {}}}, []bool{false, true}, false},
+		{"not explicitly supported value", args{[]complex64{1}}, []bool{false}, false},
 		{"fail - not slice", args{"foo"}, nil, true},
-		{"fail - interface with unsupported value", args{[]interface{}{complex64(1)}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -310,7 +308,7 @@ func Test_isNullInterface(t *testing.T) {
 		{"time.Time", args{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, false},
 		{"other", args{true}, false},
 		{"other - slice", args{[]bool{true}}, false},
-		{"unsupported", args{complex64(1)}, false},
+		{"other - not explicitly supported", args{complex64(1)}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1766,72 +1764,11 @@ func Test_withColumn(t *testing.T) {
 				{slice: []int{3, 4}, isNull: []bool{false, false}, id: mockID, name: "corge"},
 			}, false,
 		},
-		{"overwrite Series",
-			args{
-				cols: []*valueContainer{
-					{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo",
-						cache: []string{"1", "2"}},
-					{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
-				},
-				name: "foo",
-				input: &Series{values: &valueContainer{
-					slice: []float64{3, 4}, isNull: []bool{false, false}, id: mockID,
-				}},
-				requiredLen: 2,
-			},
-			[]*valueContainer{
-				{slice: []float64{3, 4}, isNull: []bool{false, false}, id: mockID, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
-			}, false,
-		},
-		{"append Series", args{
-			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
-			}, name: "corge", input: &Series{values: &valueContainer{
-				slice: []float64{3, 4}, isNull: []bool{false, false}, id: mockID,
-			}}, requiredLen: 2},
-			[]*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
-				{slice: []float64{3, 4}, isNull: []bool{false, false}, id: mockID, name: "corge"},
-			}, false,
-		},
-		{"fail - unsupported type", args{
-			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
-			}, name: "corge", input: []complex64{3, 4}, requiredLen: 2},
-			nil, true,
-		},
 		{"fail - wrong length", args{
 			cols: []*valueContainer{
 				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
 				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
 			}, name: "foo", input: []float64{0, 1, 2, 3, 4}, requiredLen: 2},
-			nil, true,
-		},
-		{"fail - wrong length", args{
-			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
-			}, name: "foo", input: []float64{0, 1, 2, 3, 4}, requiredLen: 2},
-			nil, true,
-		},
-		{"fail - not Series pointer", args{
-			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
-			}, name: "foo", input: &time.Time{}, requiredLen: 2},
-			nil, true,
-		},
-		{"fail - Series of wrong length", args{
-			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
-			}, name: "foo", input: &Series{values: &valueContainer{
-				slice: []float64{1, 2, 3}, isNull: []bool{false, false, false},
-			}}, requiredLen: 2},
 			nil, true,
 		},
 		{"fail - unsupported input", args{
@@ -2090,10 +2027,6 @@ type testStruct struct {
 	Age  int
 }
 
-type testStructUnsupported struct {
-	Age complex64
-}
-
 type testStructNoFields struct {
 }
 
@@ -2124,8 +2057,6 @@ func Test_readStruct(t *testing.T) {
 		{"fail - empty", args{[]testStruct{}},
 			nil, true},
 		{"fail - no fields", args{[]testStructNoFields{{}}},
-			nil, true},
-		{"fail - unsupported value", args{[]testStructUnsupported{{complex64(1)}}},
 			nil, true},
 	}
 	for _, tt := range tests {

@@ -734,34 +734,12 @@ func TestSeries_WithLabels(t *testing.T) {
 					{slice: []string{""}, isNull: []bool{true}, id: mockID, name: "qux"},
 				}},
 		},
-		{"append new Series - ignore new Series labels",
-			fields{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
-				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}}},
-			args{"qux", &Series{
-				values: &valueContainer{slice: []string{""}, isNull: []bool{true}, id: mockID},
-				labels: []*valueContainer{{slice: []string{"anything"}, isNull: []bool{false}, id: mockID, name: "bar"}}},
-			},
-			&Series{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
-				labels: []*valueContainer{
-					{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"},
-					{slice: []string{""}, isNull: []bool{true}, id: mockID, name: "qux"},
-				}},
-		},
 		{"fail: string name not in labels",
 			fields{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}}},
 			args{"corge", "baz"},
 			&Series{err: errors.New("with labels: cannot rename container: name (corge) not found")},
-		},
-		{"fail: unsupported slice type",
-			fields{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
-				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}}},
-			args{"qux", []complex64{1}},
-			&Series{err: errors.New("with labels: unable to calculate null values ([]complex64 not supported)")},
 		},
 		{"fail: length of labels does not match length of series",
 			fields{
@@ -775,7 +753,7 @@ func TestSeries_WithLabels(t *testing.T) {
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}}},
 			args{"qux", map[string]interface{}{"foo": "bar"}},
-			&Series{err: errors.New("with labels: unsupported input kind: must be either slice, string, or Series")},
+			&Series{err: errors.New("with labels: unsupported input kind (map)")},
 		},
 	}
 	for _, tt := range tests {
@@ -2390,18 +2368,6 @@ func TestSeries_Where(t *testing.T) {
 				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "qux"}}},
 			args{"foo", map[string]FilterFn{"corge": func(val interface{}) bool { return true }}, "yes", 0},
-			nil, true},
-		{"fail - unsupported ifTrue",
-			fields{
-				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "qux"}}},
-			args{"foo", map[string]FilterFn{"qux": func(val interface{}) bool { return true }}, complex64(1), 0},
-			nil, true},
-		{"fail - unsupported ifFalse",
-			fields{
-				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "qux"}}},
-			args{"foo", map[string]FilterFn{"qux": func(val interface{}) bool { return false }}, 0, complex64(1)},
 			nil, true},
 	}
 	for _, tt := range tests {

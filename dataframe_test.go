@@ -1003,36 +1003,6 @@ func TestDataFrame_WithCol(t *testing.T) {
 				colLevelNames: []string{"*0"},
 				name:          "bar"},
 		},
-		{"replace with Series", fields{
-			values: []*valueContainer{
-				{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
-			labels: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
-			colLevelNames: []string{"*0"},
-			name:          "bar"},
-			args{"baz", &Series{
-				values: &valueContainer{slice: []float64{10}, isNull: []bool{false}, id: mockID, name: "baz"},
-				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
-			}},
-			&DataFrame{values: []*valueContainer{
-				{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
-				{slice: []float64{10}, isNull: []bool{false}, id: mockID, name: "baz"}},
-				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
-				colLevelNames: []string{"*0"},
-				name:          "bar"},
-		},
-		{"fail - bad input", fields{
-			values: []*valueContainer{
-				{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
-			labels: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
-			colLevelNames: []string{"*0"},
-			name:          "bar"},
-			args{"baz", []complex64{10}},
-			&DataFrame{err: fmt.Errorf("setting column: unable to calculate null values ([]complex64 not supported)")},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1054,7 +1024,7 @@ func TestDataFrame_WithCol(t *testing.T) {
 	}
 }
 
-func TestDataFrame_WithLabels(t *testing.T) {
+func TestDataFrame_WithLabel(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
 		values        []*valueContainer
@@ -1118,16 +1088,6 @@ func TestDataFrame_WithLabels(t *testing.T) {
 				colLevelNames: []string{"*0"},
 				name:          "bar"},
 		},
-		{"fail - bad input", fields{
-			values: []*valueContainer{
-				{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
-			labels: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
-			colLevelNames: []string{"*0"},
-			name:          "bar"},
-			args{"baz", []complex64{10}},
-			&DataFrame{err: fmt.Errorf("setting labels: unable to calculate null values ([]complex64 not supported)")},
-		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1138,12 +1098,12 @@ func TestDataFrame_WithLabels(t *testing.T) {
 				colLevelNames: tt.fields.colLevelNames,
 				err:           tt.fields.err,
 			}
-			got := df.WithLabels(tt.args.name, tt.args.input)
+			got := df.WithLabel(tt.args.name, tt.args.input)
 			if !EqualDataFrames(got, tt.want) {
-				t.Errorf("DataFrame.WithLabels() = %v, want %v", got, tt.want)
+				t.Errorf("DataFrame.WithLabel() = %v, want %v", got, tt.want)
 			}
 			if !dataFrameIsDistinct(got, df) {
-				t.Errorf("DataFrame.WithLabels() changed underlying values, want copy")
+				t.Errorf("DataFrame.WithLabel() changed underlying values, want copy")
 			}
 		})
 	}
@@ -1911,18 +1871,6 @@ func TestDataFrame_Where(t *testing.T) {
 				values: []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "qux"}}},
 			args{"foo", map[string]FilterFn{"corge": func(val interface{}) bool { return true }}, "yes", 0},
-			nil, true},
-		{"fail - unsupported ifTrue",
-			fields{
-				values: []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "qux"}}},
-			args{"foo", map[string]FilterFn{"qux": func(val interface{}) bool { return true }}, complex64(1), 0},
-			nil, true},
-		{"fail - unsupported ifFalse",
-			fields{
-				values: []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}}},
-				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "qux"}}},
-			args{"foo", map[string]FilterFn{"qux": func(val interface{}) bool { return false }}, 0, complex64(1)},
 			nil, true},
 	}
 	for _, tt := range tests {
@@ -3401,10 +3349,6 @@ func TestReadStructSlice(t *testing.T) {
 			false,
 		},
 		{"fail - bad input", args{"foo"},
-			nil,
-			true,
-		},
-		{"fail - unsupported value", args{[]testStructUnsupported{{complex64(1)}}},
 			nil,
 			true,
 		},
@@ -5839,16 +5783,6 @@ func TestReadInterfaceRecords(t *testing.T) {
 		{"fail - unevenly shaped",
 			args{
 				[][]interface{}{{"foo"}, {1, 2}}, nil},
-			nil, true,
-		},
-		{"fail - unsupported type - no labels",
-			args{
-				[][]interface{}{{"foo"}, {[]complex64{1}}}, nil},
-			nil, true,
-		},
-		{"fail - unsupported type - with labels",
-			args{
-				[][]interface{}{{"foo", "bar"}, {[]complex64{1}, []complex64{2}}}, []ReadOption{ReadOptionLabels(1)}},
 			nil, true,
 		},
 	}
