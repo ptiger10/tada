@@ -21,6 +21,15 @@ import (
 	"cloud.google.com/go/civil"
 )
 
+func newValueContainer(slice interface{}, isNull []bool, name string) *valueContainer {
+	return &valueContainer{
+		slice:  slice,
+		isNull: isNull,
+		name:   name,
+		id:     makeID(),
+	}
+}
+
 func errorWarning(err error) {
 	if optionWarnings {
 		log.Println("Warning:", err)
@@ -115,12 +124,7 @@ func makeValueContainerFromInterface(slice interface{}, name string) (*valueCont
 	if err != nil {
 		return nil, err
 	}
-	return &valueContainer{
-		slice:  slice,
-		isNull: isNull,
-		name:   name,
-		id:     makeID(),
-	}, nil
+	return newValueContainer(slice, isNull, name), nil
 }
 
 func makeID() string {
@@ -166,12 +170,7 @@ func makeDefaultLabels(min, max int, prefixAsterisk bool) *valueContainer {
 	if prefixAsterisk {
 		name = "*0"
 	}
-	return &valueContainer{
-		slice:  labels,
-		isNull: isNull,
-		name:   name,
-		id:     makeID(),
-	}
+	return newValueContainer(labels, isNull, name)
 }
 
 // makeIntRange returns a sequential series of numbers (inclusive of min, exclusive of max)
@@ -276,11 +275,7 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 		lvl, err := indexOfContainer(name, cols)
 		if err != nil {
 			// name does not already exist: append new label level
-			cols = append(cols, &valueContainer{
-				slice:  input,
-				name:   name,
-				isNull: isNull,
-				id:     makeID()})
+			cols = append(cols, newValueContainer(input, isNull, name))
 		} else {
 			// name already exists: overwrite existing label level
 			cols[lvl].slice = input
@@ -331,12 +326,7 @@ func copyInterfaceIntoValueContainers(slices []interface{}, isNull [][]bool, nam
 		}
 	}
 	for k := range slices {
-		ret[k] = &valueContainer{
-			slice:  slices[k],
-			isNull: isNull[k],
-			name:   names[k],
-			id:     makeID(),
-		}
+		ret[k] = newValueContainer(slices[k], isNull[k], names[k])
 	}
 	return ret
 }
@@ -773,12 +763,7 @@ func readStruct(slice interface{}) ([]*valueContainer, error) {
 		if err != nil {
 			return nil, fmt.Errorf("field %v: %v", k, err)
 		}
-		ret[k] = &valueContainer{
-			slice:  retValues[k],
-			isNull: nulls,
-			name:   retNames[k],
-			id:     makeID(),
-		}
+		ret[k] = newValueContainer(retValues[k], nulls, retNames[k])
 	}
 	return ret, nil
 }
@@ -1043,12 +1028,7 @@ func (vc *valueContainer) head(n int) *valueContainer {
 	retVals := v.Slice(0, n)
 	retIsNull = vc.isNull[:n]
 
-	return &valueContainer{
-		slice:  retVals.Interface(),
-		isNull: retIsNull,
-		name:   vc.name,
-		id:     vc.id,
-	}
+	return newValueContainer(retVals.Interface(), retIsNull, vc.name)
 }
 
 // tail returns the last number of rows specified by n
@@ -1058,12 +1038,7 @@ func (vc *valueContainer) tail(n int) *valueContainer {
 	retVals := v.Slice(len(vc.isNull)-n, len(vc.isNull))
 	retIsNull = vc.isNull[len(vc.isNull)-n : len(vc.isNull)]
 
-	return &valueContainer{
-		slice:  retVals.Interface(),
-		isNull: retIsNull,
-		name:   vc.name,
-		id:     vc.id,
-	}
+	return newValueContainer(retVals.Interface(), retIsNull, vc.name)
 }
 
 // rangeSlice returns the rows starting with first and ending with last (exclusive)
@@ -1073,12 +1048,7 @@ func (vc *valueContainer) rangeSlice(first, last int) *valueContainer {
 	retVals := v.Slice(first, last)
 	retIsNull = vc.isNull[first:last]
 
-	return &valueContainer{
-		slice:  retVals.Interface(),
-		isNull: retIsNull,
-		name:   vc.name,
-		id:     vc.id,
-	}
+	return newValueContainer(retVals.Interface(), retIsNull, vc.name)
 }
 
 func (vc *valueContainer) shift(n int) *valueContainer {
@@ -1094,15 +1064,10 @@ func (vc *valueContainer) shift(n int) *valueContainer {
 			isNull[i] = vc.isNull[position]
 		}
 	}
-	return &valueContainer{
-		slice:  vals.Interface(),
-		isNull: isNull,
-		name:   vc.name,
-		id:     vc.id,
-	}
+	return newValueContainer(vals.Interface(), isNull, vc.name)
 }
 
-// convert to string as lowest common denominator
+// convert to string as lowest common denominator if types are not the same
 func (vc *valueContainer) append(other *valueContainer) *valueContainer {
 	var retSlice interface{}
 	if reflect.TypeOf(vc.slice) == reflect.TypeOf(other.slice) {
@@ -1113,12 +1078,7 @@ func (vc *valueContainer) append(other *valueContainer) *valueContainer {
 	}
 
 	retIsNull := append(vc.isNull, other.isNull...)
-	return &valueContainer{
-		slice:  retSlice,
-		isNull: retIsNull,
-		name:   vc.name,
-		id:     vc.id,
-	}
+	return newValueContainer(retSlice, retIsNull, vc.name)
 }
 
 func (vc *valueContainer) iterRow(index int) Element {
@@ -1505,7 +1465,7 @@ func (s *Series) combineMath(other *Series, ignoreNulls bool, fn func(v1 float64
 	}
 	// copy the labels to avoid sharing data with derivative Series
 	return &Series{
-		values: &valueContainer{slice: retFloat, isNull: retIsNull, name: s.values.name},
+		values: newValueContainer(retFloat, retIsNull, s.values.name),
 		labels: copyContainers(s.labels)}
 }
 
@@ -1593,7 +1553,7 @@ func lookupWithAnchor(
 		}
 	}
 	return &Series{
-		values: &valueContainer{slice: vals.Interface(), isNull: isNull, name: name},
+		values: newValueContainer(vals.Interface(), isNull, name),
 		labels: copyContainers(sourceLabels),
 	}
 }
@@ -1652,12 +1612,10 @@ func lookupDataFrameWithAnchor(
 				isNull[i] = true
 			}
 		}
-		retVals = append(retVals, &valueContainer{
-			slice:  vals.Interface(),
-			isNull: isNull,
-			name:   lookupColumns[k].name,
-			id:     lookupColumns[k].id,
-		})
+		retVals = append(
+			retVals,
+			newValueContainer(vals.Interface(), isNull, lookupColumns[k].name),
+		)
 	}
 	// copy labels to avoid sharing data accidentally
 	return &DataFrame{

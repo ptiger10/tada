@@ -2096,11 +2096,7 @@ func (df *DataFrame) Where(filters map[string]FilterFn, ifTrue, ifFalse interfac
 		return nil, fmt.Errorf("where: ifFalse: %v", err)
 	}
 	return &Series{
-		values: &valueContainer{
-			slice:  ret,
-			isNull: isNull,
-			id:     makeID(),
-		},
+		values: newValueContainer(ret, isNull, ""),
 		labels: copyContainers(df.labels),
 	}, nil
 }
@@ -2552,8 +2548,8 @@ func (df *DataFrame) count(name string, countFunction func(interface{}, []bool, 
 		labelNulls[k] = false
 	}
 	return &Series{
-		values: &valueContainer{slice: retVals, isNull: retNulls, name: name, id: makeID()},
-		labels: []*valueContainer{{slice: labels, isNull: labelNulls, name: "*0", id: makeID()}},
+		values: newValueContainer(retVals, retNulls, name),
+		labels: []*valueContainer{newValueContainer(labels, labelNulls, "*0")},
 	}
 }
 
@@ -2575,17 +2571,9 @@ func (df *DataFrame) math(name string, mathFunction func([]float64, []bool, []in
 		labelNulls[k] = false
 	}
 	return &Series{
-		values: &valueContainer{
-			slice:  retVals,
-			isNull: retNulls,
-			name:   name,
-			id:     makeID(),
-		},
+		values: newValueContainer(retVals, retNulls, name),
 		labels: []*valueContainer{
-			{slice: labels,
-				isNull: labelNulls,
-				name:   "*0",
-				id:     makeID()}},
+			newValueContainer(labels, labelNulls, "*0")},
 	}
 }
 
@@ -2697,12 +2685,7 @@ func (df *DataFrame) Reduce(name string, lambda ReduceFn) (*Series, error) {
 		df.colLevelNames,
 	)
 	return &Series{
-		values: &valueContainer{
-			slice:  retVals.Interface(),
-			isNull: retNulls,
-			name:   name,
-			id:     makeID(),
-		},
+		values: newValueContainer(retVals.Interface(), retNulls, name),
 		labels: retLabels,
 	}, nil
 }

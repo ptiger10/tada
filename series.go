@@ -27,7 +27,7 @@ func NewSeries(slice interface{}, labels ...interface{}) *Series {
 	if slice == nil && labels == nil {
 		return seriesWithError(fmt.Errorf("constructing new Series: slice and labels cannot both be nil"))
 	}
-	values := &valueContainer{}
+	values := new(valueContainer)
 	var err error
 	if slice != nil {
 		// handle values
@@ -746,10 +746,7 @@ func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{})
 		return nil, fmt.Errorf("where: ifFalse: %v", err)
 	}
 	return &Series{
-		values: &valueContainer{
-			slice:  ret,
-			isNull: isNull,
-		},
+		values: newValueContainer(ret, isNull, ""),
 		labels: copyContainers(s.labels),
 	}, nil
 }
@@ -1156,14 +1153,10 @@ func (s *SeriesMutator) Resample(by Resampler) {
 func (s *Series) CumSum() *Series {
 	isNull := make([]bool, s.Len())
 	for i := range isNull {
-		isNull[i] = false
+		isNull[i] = false // no null values possible
 	}
 	return &Series{
-		values: &valueContainer{
-			slice: s.alignedMath(cumsum),
-			// no null values possible
-			isNull: isNull,
-			name:   "cumsum"},
+		values: newValueContainer(s.alignedMath(cumsum), isNull, "cumsum"),
 		labels: s.labels,
 	}
 }
@@ -1181,11 +1174,7 @@ func (s *Series) Rank() *Series {
 		}
 	}
 	return &Series{
-		values: &valueContainer{
-			slice:  slice,
-			isNull: isNull,
-			name:   "rank",
-		},
+		values: newValueContainer(slice, isNull, "rank"),
 		labels: s.labels,
 	}
 }
@@ -1210,13 +1199,8 @@ func (s *Series) Bin(bins []float64, config *Binner) (*Series, error) {
 	}
 	// ducks error because values are []string
 	nulls, _ := setNullsFromInterface(retSlice)
-	retVals := &valueContainer{
-		slice:  retSlice,
-		isNull: nulls,
-		name:   s.values.name,
-	}
 	return &Series{
-		values: retVals,
+		values: newValueContainer(retSlice, nulls, s.values.name),
 		labels: s.labels,
 	}, nil
 }
@@ -1235,7 +1219,7 @@ func (s *Series) Percentile() *Series {
 		}
 	}
 	return &Series{
-		values: &valueContainer{slice: retVals, isNull: retNulls, name: "percentile"},
+		values: newValueContainer(retVals, retNulls, "percentile"),
 		labels: copyContainers(s.labels),
 	}
 }
@@ -1260,13 +1244,8 @@ func (s *Series) PercentileBin(bins []float64, config *Binner) (*Series, error) 
 	}
 	// ducks error because values are []string
 	nulls, _ := setNullsFromInterface(retSlice)
-	retVals := &valueContainer{
-		slice:  retSlice,
-		isNull: nulls,
-		name:   s.values.name,
-	}
 	return &Series{
-		values: retVals,
+		values: newValueContainer(retSlice, nulls, s.values.name),
 		labels: s.labels,
 	}, nil
 }

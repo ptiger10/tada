@@ -794,12 +794,7 @@ func groupedInterfaceReduceFunc(
 	if err != nil {
 		return nil, fmt.Errorf("constructing new slice: %v", err)
 	}
-	return &valueContainer{
-		slice:  retVals.Interface(),
-		isNull: retNulls,
-		name:   name,
-		id:     makeID(),
-	}, nil
+	return newValueContainer(retVals.Interface(), retNulls, name), nil
 }
 
 func groupedApplyFunc(
@@ -847,12 +842,7 @@ func groupedApplyFunc(
 		}
 	}
 
-	return &valueContainer{
-		slice:  retVals.Interface(),
-		isNull: retNulls,
-		name:   name,
-		id:     makeID(),
-	}, nil
+	return newValueContainer(retVals.Interface(), retNulls, name), nil
 }
 
 func groupedIndexReduceFunc(
@@ -898,12 +888,7 @@ func groupedIndexReduceFunc(
 			}
 		}
 	}
-	return &valueContainer{
-		slice:  retVals.Interface(),
-		isNull: retNulls,
-		name:   name,
-		id:     makeID(),
-	}
+	return newValueContainer(retVals.Interface(), retNulls, name)
 }
 
 func groupedCountReduceFunc(slice interface{}, nulls []bool, name string, aligned bool, rowIndices [][]int,
@@ -929,10 +914,5 @@ func groupedCountReduceFunc(slice interface{}, nulls []bool, name string, aligne
 			}
 		}
 	}
-	return &valueContainer{
-		slice:  retVals,
-		isNull: retNulls,
-		name:   name,
-		id:     makeID(),
-	}
+	return newValueContainer(retVals, retNulls, name)
 }
