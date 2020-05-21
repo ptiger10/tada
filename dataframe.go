@@ -279,7 +279,7 @@ func ReadCSVFromRecords(records [][]string, options ...ReadOption) (ret *DataFra
 	return ret, nil
 }
 
-// ReadInterfaceRecords reads records into a DataFrame (configured by options).
+// ReadInterfaceFromRecords reads records into a DataFrame (configured by options).
 // All columns will be read as []interface{}.
 // Available options: ReadOptionHeaders, ReadOptionLabels, ReadOptionSwitchDims.
 //
@@ -289,7 +289,7 @@ func ReadCSVFromRecords(records [][]string, options ...ReadOption) (ret *DataFra
 // If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
 // If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing.
 // Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
-func ReadInterfaceRecords(records [][]interface{}, options ...ReadOption) (ret *DataFrame, err error) {
+func ReadInterfaceFromRecords(records [][]interface{}, options ...ReadOption) (ret *DataFrame, err error) {
 	if len(records) == 0 {
 		return nil, fmt.Errorf("reading records from [][]interface{}: must have at least one record")
 	}
@@ -338,15 +338,9 @@ func ReadInterfaceRecords(records [][]interface{}, options ...ReadOption) (ret *
 
 	if len(labels) > 0 {
 		ret = NewDataFrame(slices, labels...)
-		if ret.err != nil {
-			return nil, fmt.Errorf("reading records from [][]interface{}: %v", ret.err)
-		}
 		ret = ret.SetLabelNames(labelNames).SetColNames(colNames)
 	} else {
 		ret = NewDataFrame(slices)
-		if ret.err != nil {
-			return nil, fmt.Errorf("reading records from [][]interface{}: %v", ret.err)
-		}
 		if config.numHeaderRows > 0 {
 			ret = ret.SetColNames(colNames)
 		}
@@ -1141,8 +1135,11 @@ func (df *DataFrame) IndexOf(name string, columns bool) int {
 // Supplying more receivers than existing containers returns an error.
 // Referencing a container by ID is more robust than by a name or index position.
 // This ID may be supplied to any function expecting a name.
-func (df *DataFrame) UnpackIDs(receivers ...*string) error {
+func (df *DataFrame) UnpackIDs(excludeLabels bool, receivers ...*string) error {
 	mergedLabelsAndCols := append(df.labels, df.values...)
+	if excludeLabels {
+		mergedLabelsAndCols = df.values
+	}
 	return unpackIDsByPosition(mergedLabelsAndCols, receivers...)
 }
 
@@ -2085,16 +2082,8 @@ func (df *DataFrame) Where(filters map[string]FilterFn, ifTrue, ifFalse interfac
 	for _, i := range inverseIndex {
 		ret[i] = ifFalse
 	}
-	isNull, err := setNullsFromInterface(ret)
-	if err != nil {
-		err := isSupportedSlice([]interface{}{ifTrue})
-		// ifTrue is unsupported?
-		if err != nil {
-			return nil, fmt.Errorf("where: ifTrue: %v", err)
-		}
-		// ifFalse is unsupported
-		return nil, fmt.Errorf("where: ifFalse: %v", err)
-	}
+	// ducks error because this is known to be slice
+	isNull, _ := setNullsFromInterface(ret)
 	return &Series{
 		values: newValueContainer(ret, isNull, ""),
 		labels: copyContainers(df.labels),

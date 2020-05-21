@@ -278,15 +278,5 @@ type Binner struct {
 // It is useful for intuitive row-oriented testing.
 type StructTransposer [][]interface{}
 
-// -- private
-type clocker interface {
-	now() time.Time
-}
-
-type realClock struct{}
-
-func (c realClock) now() time.Time {
-	return time.Now()
-}
-
+// clocker interface for generating random numbers
 var clock clocker = realClock{}

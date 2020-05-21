@@ -805,10 +805,6 @@ func groupedApplyFunc(
 			return nil, fmt.Errorf("constructing new values: group %d: output must be slice (not %v)",
 				i, reflect.TypeOf(output).Kind())
 		}
-		err := isSupportedSlice(output)
-		if err != nil {
-			return nil, fmt.Errorf("constructing new values: group %d: %v", i, err)
-		}
 		if reflect.ValueOf(output).Len() != reflect.ValueOf(subsetRows).Len() {
 			return nil, fmt.Errorf("constructing new values: group %d: length of output slice must match length of input slice "+
 				"(%d != %d)", i, reflect.ValueOf(output).Len(), reflect.ValueOf(subsetRows).Len())

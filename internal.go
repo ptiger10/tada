@@ -262,10 +262,8 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 		}
 		cols[lvl].name = input.(string)
 	case reflect.Slice:
-		isNull, err := setNullsFromInterface(input)
-		if err != nil {
-			return nil, fmt.Errorf("unable to calculate null values ([]%v not supported)", reflect.TypeOf(input).Elem())
-		}
+		// duck error because it is known to be a slice
+		isNull, _ := setNullsFromInterface(input)
 		if l := reflect.ValueOf(input).Len(); l != requiredLen {
 			return nil, fmt.Errorf(
 				"cannot replace slice in container %s: length of input (%d) does not match existing length (%d)",
@@ -736,10 +734,8 @@ func readStruct(slice interface{}) ([]*valueContainer, error) {
 	// transfer to final container
 	ret := make([]*valueContainer, numCols)
 	for k := range ret {
-		nulls, err := setNullsFromInterface(retValues[k])
-		if err != nil {
-			return nil, fmt.Errorf("field %v: %v", k, err)
-		}
+		// ducks error because each column is known to be slice
+		nulls, _ := setNullsFromInterface(retValues[k])
 		ret[k] = newValueContainer(retValues[k], nulls, retNames[k])
 	}
 	return ret, nil
@@ -1760,6 +1756,9 @@ func isSupportedSlice(slice interface{}) error {
 // }
 
 func setNullsFromInterface(input interface{}) ([]bool, error) {
+	if input == nil {
+		return []bool{}, nil
+	}
 	var ret []bool
 	err := isSupportedSlice(input)
 	if err != nil {
@@ -1770,7 +1769,7 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 		return []bool{}, nil
 	}
 	// map or nested slice
-	// if len is empty -> null
+	// if len is empty -> null (this includes [][]byte, instead of treating them as strings)
 	t := v.Index(0).Kind()
 	if t == reflect.Map || t == reflect.Slice {
 		l := v.Len()
@@ -1794,16 +1793,6 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 		ret = make([]bool, len(vals))
 		for i := range ret {
 			if isNullString(vals[i]) {
-				ret[i] = true
-			} else {
-				ret[i] = false
-			}
-		}
-	case [][]byte:
-		vals := input.([][]byte)
-		ret = make([]bool, len(vals))
-		for i := range ret {
-			if isNullString(string(vals[i])) {
 				ret[i] = true
 			} else {
 				ret[i] = false
@@ -2915,4 +2904,15 @@ func (vc *valueContainer) interfaceSlice(includeHeader bool) []interface{} {
 		ret = append([]interface{}{vc.name}, ret...)
 	}
 	return ret
+}
+
+// -- private
+type clocker interface {
+	now() time.Time
+}
+
+type realClock struct{}
+
+func (c realClock) now() time.Time {
+	return time.Now()
 }

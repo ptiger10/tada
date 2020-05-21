@@ -1003,6 +1003,16 @@ func TestDataFrame_WithCol(t *testing.T) {
 				colLevelNames: []string{"*0"},
 				name:          "bar"},
 		},
+		{"fail - unsupported int", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "bar"},
+			args{"baz", 10},
+			&DataFrame{err: fmt.Errorf("setting column: unsupported input kind (int)")},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1087,6 +1097,16 @@ func TestDataFrame_WithLabel(t *testing.T) {
 					{slice: []float64{10}, isNull: []bool{false}, id: mockID, name: "baz"}},
 				colLevelNames: []string{"*0"},
 				name:          "bar"},
+		},
+		{"fail - unsupported int", fields{
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
+			colLevelNames: []string{"*0"},
+			name:          "bar"},
+			args{"baz", 10},
+			&DataFrame{err: fmt.Errorf("setting labels: unsupported input kind (int)")},
 		},
 	}
 	for _, tt := range tests {
@@ -5683,7 +5703,7 @@ func TestDataFrame_Struct(t *testing.T) {
 	}
 }
 
-func TestReadInterfaceRecords(t *testing.T) {
+func TestReadInterfaceFromRecords(t *testing.T) {
 	type args struct {
 		records [][]interface{}
 		options []ReadOption
@@ -5788,13 +5808,13 @@ func TestReadInterfaceRecords(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotRet, err := ReadInterfaceRecords(tt.args.records, tt.args.options...)
+			gotRet, err := ReadInterfaceFromRecords(tt.args.records, tt.args.options...)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ReadInterfaceRecords() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ReadInterfaceFromRecords() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !EqualDataFrames(gotRet, tt.wantRet) {
-				t.Errorf("ReadInterfaceRecords() = %v, want %v", gotRet, tt.wantRet)
+				t.Errorf("ReadInterfaceFromRecords() = %v, want %v", gotRet, tt.wantRet)
 			}
 		})
 	}
@@ -6159,7 +6179,8 @@ func TestDataFrame_UnpackIDs(t *testing.T) {
 		colLevelNames []string
 	}
 	type args struct {
-		receivers []*string
+		excludeLabels bool
+		receivers     []*string
 	}
 	tests := []struct {
 		name    string
@@ -6178,8 +6199,22 @@ func TestDataFrame_UnpackIDs(t *testing.T) {
 				},
 				colLevelNames: []string{"*0"},
 				name:          "foobar"},
-			args{[]*string{&foo, &bar}},
+			args{false, []*string{&foo, &bar}},
 			[]string{"1", "2"},
+			false,
+		},
+		{"pass - exclude labels",
+			fields{
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, id: "1", name: "foo"},
+				},
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, id: "2", name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "foobar"},
+			args{true, []*string{&bar}},
+			[]string{"2"},
 			false,
 		},
 	}
@@ -6192,7 +6227,7 @@ func TestDataFrame_UnpackIDs(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			err := df.UnpackIDs(tt.args.receivers...)
+			err := df.UnpackIDs(tt.args.excludeLabels, tt.args.receivers...)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.UnpackIDs() error = %v, wantErr %v", err, tt.wantErr)
 			}

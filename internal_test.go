@@ -264,7 +264,6 @@ func Test_setNullsFromInterface(t *testing.T) {
 		{"string", args{[]string{"foo", ""}}, []bool{false, true}, false},
 		{"civil.date", args{[]civil.Date{civil.DateOf(time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC)), {}}}, []bool{false, true}, false},
 		{"civil.time", args{[]civil.Time{civil.TimeOf(time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC)), {Second: -1}}}, []bool{false, true}, false},
-		{"bytes", args{[][]byte{[]byte("foo"), []byte("")}}, []bool{false, true}, false},
 		{"dateTime", args{[]time.Time{time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC), {}}}, []bool{false, true, true}, false},
 		{"interface", args{[]interface{}{
 			int(1), uint(1), float32(1), float64(1), time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), "foo",
@@ -275,6 +274,8 @@ func Test_setNullsFromInterface(t *testing.T) {
 		{"nested civil.date", args{[][]civil.Date{{{Year: 2020, Month: 1, Day: 1}, {}}, {}}}, []bool{false, true}, false},
 		{"map", args{[]map[string]string{{"foo": "bar"}, {}}}, []bool{false, true}, false},
 		{"not explicitly supported value", args{[]complex64{1}}, []bool{false}, false},
+		{"empty", args{[]int{}}, []bool{}, false},
+		{"nil", args{nil}, []bool{}, false},
 		{"fail - not slice", args{"foo"}, nil, true},
 	}
 	for _, tt := range tests {
@@ -302,13 +303,16 @@ func Test_isNullInterface(t *testing.T) {
 		{"null float64", args{math.NaN()}, true},
 		{"null string", args{""}, true},
 		{"null time.Time", args{time.Time{}}, true},
+		{"null civil.Date", args{civil.Date{}}, true},
+		{"null civil.Time", args{civil.Time{Second: -1}}, true},
 		{"nil", args{nil}, true},
 		{"float64", args{float64(1)}, false},
 		{"string", args{"foo"}, false},
 		{"time.Time", args{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, false},
-		{"other", args{true}, false},
-		{"other - slice", args{[]bool{true}}, false},
-		{"other - not explicitly supported", args{complex64(1)}, false},
+		{"civil.Date", args{civil.Date{Year: 2020, Month: 1, Day: 1}}, false},
+		{"civil.Time", args{civil.Time{Hour: 12}}, false},
+		{"not explicitly supported - bool", args{[]bool{true}}, false},
+		{"not explicitly supported - complex64", args{complex64(1)}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1046,6 +1050,9 @@ func Test_indexOfContainer(t *testing.T) {
 		{"pass - number as name", args{"1", []*valueContainer{
 			{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "1"}}},
 			0, false},
+		{"pass - search by id", args{mockID, []*valueContainer{
+			{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "1"}}},
+			0, false},
 		{"fail - uppercase search", args{"FOO", []*valueContainer{
 			{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 			{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "foo"}}},
@@ -1775,7 +1782,7 @@ func Test_withColumn(t *testing.T) {
 			cols: []*valueContainer{
 				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
 				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
-			}, name: "foo", input: map[string]int{}, requiredLen: 2},
+			}, name: "foo", input: 1, requiredLen: 2},
 			nil, true,
 		},
 	}
@@ -5142,5 +5149,12 @@ func Test_unpackIDsByName(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRealClock(t *testing.T) {
+	c := realClock{}
+	if !c.now().After(time.Time{}) {
+		t.Errorf("expected realClock to return a non-zero time")
 	}
 }
