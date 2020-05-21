@@ -38,12 +38,7 @@ func groupedFloat64ReduceFunc(
 			}
 		}
 	}
-	return &valueContainer{
-		slice:  retVals,
-		isNull: retNulls,
-		name:   name,
-		id:     makeID(),
-	}
+	return newValueContainer(retVals, retNulls, name)
 }
 
 func (g *GroupedSeries) float64ReduceFunc(name string, fn func(slice []float64, isNull []bool, index []int) (float64, bool)) *Series {
@@ -123,12 +118,7 @@ func groupedStringReduceFunc(
 			}
 		}
 	}
-	return &valueContainer{
-		slice:  retVals,
-		isNull: retNulls,
-		name:   name,
-		id:     makeID(),
-	}
+	return newValueContainer(retVals, retNulls, name)
 }
 
 func (g *GroupedSeries) stringReduceFunc(name string, fn func(slice []string, isNull []bool, index []int) (string, bool)) *Series {
@@ -208,12 +198,7 @@ func groupedDateTimeReduceFunc(
 			}
 		}
 	}
-	return &valueContainer{
-		slice:  retVals,
-		isNull: retNulls,
-		name:   name,
-		id:     makeID(),
-	}
+	return newValueContainer(retVals, retNulls, name)
 }
 
 func (g *GroupedSeries) dateTimeReduceFunc(name string, fn func(slice []time.Time, isNull []bool, index []int) (time.Time, bool)) *Series {

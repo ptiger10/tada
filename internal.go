@@ -21,12 +21,19 @@ import (
 	"cloud.google.com/go/civil"
 )
 
-func newValueContainer(slice interface{}, isNull []bool, name string) *valueContainer {
+func newValueContainer(slice interface{}, isNull []bool, name string, opts ...string) *valueContainer {
+	var id string
+	if len(opts) > 0 {
+		id = opts[0]
+	} else {
+		id = makeID()
+	}
+
 	return &valueContainer{
 		slice:  slice,
 		isNull: isNull,
 		name:   name,
-		id:     makeID(),
+		id:     id,
 	}
 }
 
@@ -1001,7 +1008,7 @@ func (vc *valueContainer) head(n int) *valueContainer {
 	retVals := v.Slice(0, n)
 	retIsNull = vc.isNull[:n]
 
-	return newValueContainer(retVals.Interface(), retIsNull, vc.name)
+	return newValueContainer(retVals.Interface(), retIsNull, vc.name, vc.id)
 }
 
 // tail returns the last number of rows specified by n
@@ -1011,7 +1018,7 @@ func (vc *valueContainer) tail(n int) *valueContainer {
 	retVals := v.Slice(len(vc.isNull)-n, len(vc.isNull))
 	retIsNull = vc.isNull[len(vc.isNull)-n : len(vc.isNull)]
 
-	return newValueContainer(retVals.Interface(), retIsNull, vc.name)
+	return newValueContainer(retVals.Interface(), retIsNull, vc.name, vc.id)
 }
 
 // rangeSlice returns the rows starting with first and ending with last (exclusive)
@@ -1021,7 +1028,7 @@ func (vc *valueContainer) rangeSlice(first, last int) *valueContainer {
 	retVals := v.Slice(first, last)
 	retIsNull = vc.isNull[first:last]
 
-	return newValueContainer(retVals.Interface(), retIsNull, vc.name)
+	return newValueContainer(retVals.Interface(), retIsNull, vc.name, vc.id)
 }
 
 func (vc *valueContainer) shift(n int) *valueContainer {
@@ -1037,9 +1044,10 @@ func (vc *valueContainer) shift(n int) *valueContainer {
 			isNull[i] = vc.isNull[position]
 		}
 	}
-	return newValueContainer(vals.Interface(), isNull, vc.name)
+	return newValueContainer(vals.Interface(), isNull, vc.name, vc.id)
 }
 
+// append values to the end of a valueContainer
 // convert to string as lowest common denominator if types are not the same
 func (vc *valueContainer) append(other *valueContainer) *valueContainer {
 	var retSlice interface{}
@@ -1051,7 +1059,7 @@ func (vc *valueContainer) append(other *valueContainer) *valueContainer {
 	}
 
 	retIsNull := append(vc.isNull, other.isNull...)
-	return newValueContainer(retSlice, retIsNull, vc.name)
+	return newValueContainer(retSlice, retIsNull, vc.name, vc.id)
 }
 
 func (vc *valueContainer) iterRow(index int) Element {
@@ -1273,12 +1281,12 @@ func reduceContainers(containers []*valueContainer) (
 	// create receiver for unique labels of same type as original levels
 	newContainers = make([]*valueContainer, len(containers))
 	for j := range containers {
-		newContainers[j] = &valueContainer{
-			slice:  reflect.MakeSlice(reflect.TypeOf(containers[j].slice), 0, 0).Interface(),
-			name:   containers[j].name,
-			isNull: make([]bool, 0),
-			id:     containers[j].id,
-		}
+		newContainers[j] = newValueContainer(
+			reflect.MakeSlice(reflect.TypeOf(containers[j].slice), 0, 0).Interface(),
+			make([]bool, 0),
+			containers[j].name,
+			containers[j].id,
+		)
 	}
 	// create receiver for the original row indexes for each unique label combo
 	uniqueLabelRows := make(map[string][]int)
@@ -1324,12 +1332,12 @@ func reduceContainersForPromote(containers []*valueContainer) (
 	// create receiver for unique labels of same type as original levels
 	newContainers = make([]*valueContainer, len(containers))
 	for j := range containers {
-		newContainers[j] = &valueContainer{
-			slice:  reflect.MakeSlice(reflect.TypeOf(containers[j].slice), 0, 0).Interface(),
-			name:   containers[j].name,
-			isNull: make([]bool, 0),
-			id:     containers[j].id,
-		}
+		newContainers[j] = newValueContainer(
+			reflect.MakeSlice(reflect.TypeOf(containers[j].slice), 0, 0).Interface(),
+			make([]bool, 0),
+			containers[j].name,
+			containers[j].id,
+		)
 	}
 	// create receiver for the original row indexes for each unique label combo
 	uniqueLabelRows := make(map[string][]int)
@@ -2880,12 +2888,12 @@ func (vc *valueContainer) expand(n []int) *valueContainer {
 			counter++
 		}
 	}
-	ret := &valueContainer{
-		slice:  vals.Interface(),
-		isNull: nulls,
-		name:   vc.name,
-		id:     vc.id,
-	}
+	ret := newValueContainer(
+		vals.Interface(),
+		nulls,
+		vc.name,
+		vc.id,
+	)
 	return ret
 }
 

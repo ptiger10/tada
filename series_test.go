@@ -2278,7 +2278,7 @@ func TestSeries_Shift(t *testing.T) {
 				}},
 			args{1},
 			&Series{
-				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{true, false}, id: mockID},
+				values: &valueContainer{slice: []float64{0, 1}, isNull: []bool{true, false}},
 				labels: []*valueContainer{
 					{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "a"},
 				}},
@@ -2291,7 +2291,7 @@ func TestSeries_Shift(t *testing.T) {
 				}},
 			args{5},
 			&Series{
-				values: &valueContainer{slice: []float64{0, 0}, isNull: []bool{true, true}, id: mockID},
+				values: &valueContainer{slice: []float64{0, 0}, isNull: []bool{true, true}},
 				labels: []*valueContainer{
 					{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "a"},
 				}}},

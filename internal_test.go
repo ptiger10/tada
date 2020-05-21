@@ -932,6 +932,7 @@ func Test_valueContainer_shift(t *testing.T) {
 				slice:  tt.fields.slice,
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
+				id:     tt.fields.id,
 			}
 			if got := vc.shift(tt.args.n); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("vc.shift() = %v, want %v", got, tt.want)
