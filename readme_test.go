@@ -41,7 +41,7 @@ func Test_sampleDataPipeline(t *testing.T) {
 			jane doe, 9
 			john doe, 5`
 
-	df, _ := tada.ReadCSV(strings.NewReader(data))
+	df, _ := tada.NewReader(strings.NewReader(data)).ReadDF()
 
 	ret := sampleDataPipeline(df)
 	eq, diffs, _ := ret.EqualsCSV(true, strings.NewReader(want))
@@ -69,11 +69,12 @@ func Test_sampleDataPipelineTyped(t *testing.T) {
 		MeanScore: []float64{9, 5},
 	}
 
-	df, _ := tada.ReadCSV(strings.NewReader(data))
+	df, _ := tada.NewReader(strings.NewReader(data)).ReadDF()
 
 	out := sampleDataPipeline(df)
 	var got output
-	out.Struct(&got)
+	w := tada.StructWriter{Struct: &got}
+	out.Write(&w)
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("sampleDataPipelineTyped(): got %v, want %v", got, want)
 	}
@@ -104,14 +105,15 @@ func Test_sampleDataPipelineTypedInput(t *testing.T) {
 		NullMap:   [][]bool{{false, false}, {false, false}},
 	}
 
-	df, err := tada.ReadStruct(data)
+	df, err := tada.NewStructReader(data, false).ReadDF()
 	if err != nil {
 		log.Fatal(err)
 	}
 	out := sampleDataPipeline(df)
 
 	var got output
-	err = out.Struct(&got)
+	w := tada.StructWriter{Struct: &got}
+	out.Write(&w)
 	if err != nil {
 		log.Fatal(err)
 	}

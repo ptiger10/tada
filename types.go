@@ -205,7 +205,7 @@ const (
 )
 
 // A WriteOption configures a write function.
-// Available write options: WriteOptionExcludeLabels, WriteOptionDelimiter.
+// Available write options: ExcludeLabels, WriteOptionDelimiter.
 type WriteOption func(*writeConfig)
 
 // A writeConfig configures a read function.
@@ -216,18 +216,29 @@ type writeConfig struct {
 	delimiter     rune
 }
 
+// A Reader can read in a DataFrame from various data sources.
+type Reader interface {
+	ReadDF(...ReadOption) (*DataFrame, error)
+}
+
+// A Writer can write a DataFrame into various receivers.
+type Writer interface {
+	writeDF(*DataFrame, ...WriteOption) error
+}
+
 // A ReadOption configures a read function.
-// Available read options: ReadOptionHeaders, ReadOptionLabels, ReadOptionDelimiter, and ReadOptionSwitchDims.
+// Available read options: WithHeaders, WithLabels, WithDelimiter, and SwitchDims.
 type ReadOption func(*readConfig)
 
 // A readConfig configures a read function.
 // All read functions accept zero or more modifiers that alter the default read config, which is:
 // 1 header row, 0 label levels, "," as field delimiter, and rows as the major dimension of a nested slice.
 type readConfig struct {
-	numHeaderRows  int
-	numLabelLevels int
-	delimiter      rune
-	majorDimIsCols bool
+	numHeaderRows     int
+	numLabelLevels    int
+	delimiter         rune
+	majorDimIsCols    bool
+	emptyStringAsNull bool
 }
 
 // A JoinOption configures a lookup or merge function.

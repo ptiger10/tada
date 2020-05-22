@@ -254,56 +254,56 @@ func TestSeries_EqualsCSV(t *testing.T) {
 	}
 }
 
-func TestSeries_CSV(t *testing.T) {
-	type fields struct {
-		values *valueContainer
-		labels []*valueContainer
-		err    error
-	}
-	type args struct {
-		options []WriteOption
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    [][]string
-		wantErr bool
-	}{
-		{"pass", fields{
-			values: &valueContainer{slice: []float64{1}, id: mockID, name: "foo", isNull: []bool{false}},
-			labels: []*valueContainer{{slice: []int{1}, id: mockID, name: "bar", isNull: []bool{false}}}},
-			args{},
-			[][]string{{"bar", "foo"}, {"1", "1"}}, false},
-		{"with nulls", fields{
-			values: &valueContainer{slice: []float64{0}, id: mockID, name: "foo", isNull: []bool{true}},
-			labels: []*valueContainer{{slice: []int{1}, id: mockID, name: "bar", isNull: []bool{false}}}},
-			args{},
-			[][]string{{"bar", "foo"}, {"1", "(null)"}}, false},
-		{"fail - empty", fields{
-			values: nil,
-			labels: nil},
-			args{},
-			nil, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values: tt.fields.values,
-				labels: tt.fields.labels,
-				err:    tt.fields.err,
-			}
-			got, err := s.CSV(tt.args.options...)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("DataFrame.CSV() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("Series.CSV() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+// func TestSeries_CSV(t *testing.T) {
+// 	type fields struct {
+// 		values *valueContainer
+// 		labels []*valueContainer
+// 		err    error
+// 	}
+// 	type args struct {
+// 		options []WriteOption
+// 	}
+// 	tests := []struct {
+// 		name    string
+// 		fields  fields
+// 		args    args
+// 		want    [][]string
+// 		wantErr bool
+// 	}{
+// 		{"pass", fields{
+// 			values: &valueContainer{slice: []float64{1}, id: mockID, name: "foo", isNull: []bool{false}},
+// 			labels: []*valueContainer{{slice: []int{1}, id: mockID, name: "bar", isNull: []bool{false}}}},
+// 			args{},
+// 			[][]string{{"bar", "foo"}, {"1", "1"}}, false},
+// 		{"with nulls", fields{
+// 			values: &valueContainer{slice: []float64{0}, id: mockID, name: "foo", isNull: []bool{true}},
+// 			labels: []*valueContainer{{slice: []int{1}, id: mockID, name: "bar", isNull: []bool{false}}}},
+// 			args{},
+// 			[][]string{{"bar", "foo"}, {"1", "(null)"}}, false},
+// 		{"fail - empty", fields{
+// 			values: nil,
+// 			labels: nil},
+// 			args{},
+// 			nil, true},
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			s := &Series{
+// 				values: tt.fields.values,
+// 				labels: tt.fields.labels,
+// 				err:    tt.fields.err,
+// 			}
+// 			got, err := s.CSV(tt.args.options...)
+// 			if (err != nil) != tt.wantErr {
+// 				t.Errorf("DataFrame.CSV() error = %v, wantErr %v", err, tt.wantErr)
+// 				return
+// 			}
+// 			if !reflect.DeepEqual(got, tt.want) {
+// 				t.Errorf("Series.CSV() = %v, want %v", got, tt.want)
+// 			}
+// 		})
+// 	}
+// }
 
 func TestSeries_Err(t *testing.T) {
 	type fields struct {
@@ -3597,100 +3597,100 @@ func TestSeries_HasLabels(t *testing.T) {
 	}
 }
 
-func TestSeries_Struct(t *testing.T) {
-	type fields struct {
-		values     *valueContainer
-		labels     []*valueContainer
-		sharedData bool
-		err        error
-	}
-	type args struct {
-		structPointer interface{}
-		options       []WriteOption
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    interface{}
-		wantErr bool
-	}{
-		{"pass",
-			fields{values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, id: mockID, name: "bar"},
-				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "foo"}},
-			},
-			args{&testSchema{}, nil},
-			&testSchema{
-				Foo: []int{0},
-				Bar: []float64{0},
-			},
-			false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values:     tt.fields.values,
-				labels:     tt.fields.labels,
-				sharedData: tt.fields.sharedData,
-				err:        tt.fields.err,
-			}
-			if err := s.Struct(tt.args.structPointer, tt.args.options...); (err != nil) != tt.wantErr {
-				t.Errorf("Series.Struct() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(tt.args.structPointer, tt.want) {
-				t.Errorf("Series.Struct() -> %v, want %v", tt.args.structPointer, tt.want)
+// func TestSeries_Struct(t *testing.T) {
+// 	type fields struct {
+// 		values     *valueContainer
+// 		labels     []*valueContainer
+// 		sharedData bool
+// 		err        error
+// 	}
+// 	type args struct {
+// 		structPointer interface{}
+// 		options       []WriteOption
+// 	}
+// 	tests := []struct {
+// 		name    string
+// 		fields  fields
+// 		args    args
+// 		want    interface{}
+// 		wantErr bool
+// 	}{
+// 		{"pass",
+// 			fields{values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+// 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "foo"}},
+// 			},
+// 			args{&testSchema{}, nil},
+// 			&testSchema{
+// 				Foo: []int{0},
+// 				Bar: []float64{0},
+// 			},
+// 			false},
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			s := &Series{
+// 				values:     tt.fields.values,
+// 				labels:     tt.fields.labels,
+// 				sharedData: tt.fields.sharedData,
+// 				err:        tt.fields.err,
+// 			}
+// 			if err := s.Struct(tt.args.structPointer, tt.args.options...); (err != nil) != tt.wantErr {
+// 				t.Errorf("Series.Struct() error = %v, wantErr %v", err, tt.wantErr)
+// 				return
+// 			}
+// 			if !reflect.DeepEqual(tt.args.structPointer, tt.want) {
+// 				t.Errorf("Series.Struct() -> %v, want %v", tt.args.structPointer, tt.want)
 
-			}
-		})
-	}
-}
+// 			}
+// 		})
+// 	}
+// }
 
-func TestSeries_WriteCSV(t *testing.T) {
-	type fields struct {
-		values     *valueContainer
-		labels     []*valueContainer
-		sharedData bool
-		err        error
-	}
-	type args struct {
-		options []WriteOption
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		wantW   string
-		wantErr bool
-	}{
-		{"pass",
-			fields{values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, id: mockID, name: "bar"},
-				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "foo"}},
-			},
-			args{nil},
-			"foo,bar\n0,0\n",
-			false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values:     tt.fields.values,
-				labels:     tt.fields.labels,
-				sharedData: tt.fields.sharedData,
-				err:        tt.fields.err,
-			}
-			w := &bytes.Buffer{}
-			if err := s.WriteCSV(w, tt.args.options...); (err != nil) != tt.wantErr {
-				t.Errorf("Series.WriteCSV() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("Series.WriteCSV() = %v, want %v", gotW, tt.wantW)
-			}
-		})
-	}
-}
+// func TestSeries_WriteCSV(t *testing.T) {
+// 	type fields struct {
+// 		values     *valueContainer
+// 		labels     []*valueContainer
+// 		sharedData bool
+// 		err        error
+// 	}
+// 	type args struct {
+// 		options []WriteOption
+// 	}
+// 	tests := []struct {
+// 		name    string
+// 		fields  fields
+// 		args    args
+// 		wantW   string
+// 		wantErr bool
+// 	}{
+// 		{"pass",
+// 			fields{values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+// 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "foo"}},
+// 			},
+// 			args{nil},
+// 			"foo,bar\n0,0\n",
+// 			false,
+// 		},
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			s := &Series{
+// 				values:     tt.fields.values,
+// 				labels:     tt.fields.labels,
+// 				sharedData: tt.fields.sharedData,
+// 				err:        tt.fields.err,
+// 			}
+// 			w := &bytes.Buffer{}
+// 			if err := s.WriteCSV(w, tt.args.options...); (err != nil) != tt.wantErr {
+// 				t.Errorf("Series.WriteCSV() error = %v, wantErr %v", err, tt.wantErr)
+// 				return
+// 			}
+// 			if gotW := w.String(); gotW != tt.wantW {
+// 				t.Errorf("Series.WriteCSV() = %v, want %v", gotW, tt.wantW)
+// 			}
+// 		})
+// 	}
+// }
 
 func TestSeries_Shuffle(t *testing.T) {
 	type fields struct {

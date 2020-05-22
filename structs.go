@@ -9,7 +9,7 @@ import (
 	"github.com/ptiger10/tablediff"
 )
 
-// all columns must be of same type.
+// all columns in a column must be of same type.
 // return null values for use in StructTransposer
 func readNestedInterfaceByRowsInferType(rows [][]interface{}) (ret []interface{}, isNull [][]bool, err error) {
 	interfaceType := reflect.TypeOf([]interface{}{})
@@ -256,16 +256,19 @@ func (st StructTransposer) Shuffle(seed int64) {
 // PrettyDiff reads two structs into DataFrames, prints each as a stringified csv table,
 // and returns whether they are equal. If not, returns the differences between the two.
 func PrettyDiff(got, want interface{}) (bool, *tablediff.Differences, error) {
-	df1, err := ReadStruct(got)
+	df1, err := NewStructReader(got, false).ReadDF()
 	if err != nil {
 		return false, nil, fmt.Errorf("pretty diffing two structs: reading got: %v", err)
 	}
-	df2, err := ReadStruct((want))
+	df2, err := NewStructReader(want, false).ReadDF()
 	if err != nil {
 		return false, nil, fmt.Errorf("pretty diffing two structs: reading want: %v", err)
 	}
-	gotRecords := df1.CSVRecords(WriteOptionExcludeLabels())
-	wantRecords := df2.CSVRecords(WriteOptionExcludeLabels())
-	diffs, eq := tablediff.Diff(gotRecords, wantRecords)
+	gotRecords := new(CSVWriter)
+	wantRecords := new(CSVWriter)
+	// ducking error because writing to [][]string known to not cause errors
+	df1.Write(gotRecords, ExcludeLabels())
+	df2.Write(wantRecords, ExcludeLabels())
+	diffs, eq := tablediff.Diff(gotRecords.Records, wantRecords.Records)
 	return eq, diffs, nil
 }

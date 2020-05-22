@@ -13,7 +13,7 @@ var optionsNullPrinter = "(null)"
 var optionMergeRepeats = true
 var optionWrapLines = false
 var optionWarnings = true
-var optionNullStrings = map[string]bool{"": true, optionsNullPrinter: true}
+var optionNullStrings = map[string]bool{optionsNullPrinter: true}
 var optionNaNIsNull = true
 var optionPrefix = "*"
 var optionDateTimeFormats = []string{
@@ -35,7 +35,7 @@ func SetOptionAddTimeFormat(format string) {
 
 // GetOptionDefaultNullStrings returns the default list of strings that tada considers null.
 func GetOptionDefaultNullStrings() []string {
-	return []string{"", optionsNullPrinter}
+	return []string{optionsNullPrinter}
 }
 
 // SetOptionNullStrings replaces the default list of strings that tada considers null with list.

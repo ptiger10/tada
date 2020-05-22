@@ -96,40 +96,40 @@ func (s *Series) EqualsCSV(includeLabels bool, want io.Reader, wantOptions ...Re
 	return df.EqualsCSV(includeLabels, want, wantOptions...)
 }
 
-// CSV converts a Series to a DataFrame and returns as [][]string.
-func (s *Series) CSV(options ...WriteOption) ([][]string, error) {
-	if s.values == nil {
-		return nil, fmt.Errorf("converting to csv: cannot export empty Series")
-	}
-	df := &DataFrame{
-		values:        []*valueContainer{s.values},
-		labels:        s.labels,
-		colLevelNames: []string{"*0"},
-		err:           s.err,
-	}
-	csv := df.CSVRecords(options...)
-	return csv, nil
-}
+// // CSV converts a Series to a DataFrame and returns as [][]string.
+// func (s *Series) CSV(options ...WriteOption) ([][]string, error) {
+// 	if s.values == nil {
+// 		return nil, fmt.Errorf("converting to csv: cannot export empty Series")
+// 	}
+// 	df := &DataFrame{
+// 		values:        []*valueContainer{s.values},
+// 		labels:        s.labels,
+// 		colLevelNames: []string{"*0"},
+// 		err:           s.err,
+// 	}
+// 	csv := df.CSVRecords(options...)
+// 	return csv, nil
+// }
 
-// Struct writes the values of the df containers into structPointer.
-// Returns an error if df does not contain, from left-to-right, the same container names and types
-// as the exported fields that appear, from top-to-bottom, in structPointer.
-// Exported struct fields must be types that are supported by NewDataFrame().
-// If a "tada" tag is present with the value "isNull", this field must be [][]bool.
-// The null status of each value container in the DataFrame, from left-to-right, will be written into this field in equal-lengthed slices.
-// If df contains additional containers beyond those in structPointer, those are ignored.
-func (s *Series) Struct(structPointer interface{}, options ...WriteOption) error {
-	df := s.DataFrame()
-	return df.Struct(structPointer, options...)
-}
+// // Struct writes the values of the df containers into structPointer.
+// // Returns an error if df does not contain, from left-to-right, the same container names and types
+// // as the exported fields that appear, from top-to-bottom, in structPointer.
+// // Exported struct fields must be types that are supported by NewDataFrame().
+// // If a "tada" tag is present with the value "isNull", this field must be [][]bool.
+// // The null status of each value container in the DataFrame, from left-to-right, will be written into this field in equal-lengthed slices.
+// // If df contains additional containers beyond those in structPointer, those are ignored.
+// func (s *Series) Struct(structPointer interface{}, options ...WriteOption) error {
+// 	df := s.DataFrame()
+// 	return df.Struct(structPointer, options...)
+// }
 
-// WriteCSV converts a DataFrame to a csv with rows as the major dimension,
-// and writes the output to w.
-// Null values are replaced with "(null)".
-func (s *Series) WriteCSV(w io.Writer, options ...WriteOption) error {
-	df := s.DataFrame()
-	return df.WriteCSV(w, options...)
-}
+// // WriteCSV converts a DataFrame to a csv with rows as the major dimension,
+// // and writes the output to w.
+// // Null values are replaced with "(null)".
+// func (s *Series) WriteCSV(w io.Writer, options ...WriteOption) error {
+// 	df := s.DataFrame()
+// 	return df.WriteCSV(w, options...)
+// }
 
 // -- GETTERS
 

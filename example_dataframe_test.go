@@ -8,9 +8,9 @@ import (
 	"github.com/ptiger10/tada"
 )
 
-func ExampleReadCSV() {
+func ExampleNewReader() {
 	data := "foo, bar\n baz, qux\n corge, fred"
-	df, _ := tada.ReadCSV(strings.NewReader(data))
+	df, _ := tada.NewReader(strings.NewReader(data)).ReadDF()
 	fmt.Println(df)
 	// Output:
 	// +---++-------+------+
@@ -21,9 +21,9 @@ func ExampleReadCSV() {
 	// +---++-------+------+
 }
 
-func ExampleReadCSV_noHeaders() {
+func ExampleNewReader_noHeaders() {
 	data := "foo, bar\n baz, qux\n corge, fred"
-	df, _ := tada.ReadCSV(strings.NewReader(data), tada.ReadOptionHeaders(0))
+	df, _ := tada.NewReader(strings.NewReader(data)).ReadDF(tada.WithHeaders(0))
 	fmt.Println(df)
 	// Output:
 	// +---++-------+------+
@@ -35,9 +35,9 @@ func ExampleReadCSV_noHeaders() {
 	// +---++-------+------+
 }
 
-func ExampleReadCSV_multipleHeaders() {
+func ExampleNewReader_multipleHeaders() {
 	data := "foo, bar\n baz, qux\n corge, fred"
-	df, _ := tada.ReadCSV(strings.NewReader(data), tada.ReadOptionHeaders(2))
+	df, _ := tada.NewReader(strings.NewReader(data)).ReadDF(tada.WithHeaders(2))
 	fmt.Println(df)
 	// Output:
 	// +---++-------+------+
@@ -48,9 +48,9 @@ func ExampleReadCSV_multipleHeaders() {
 	// +---++-------+------+
 }
 
-func ExampleReadCSV_multipleHeadersWithLabels() {
+func ExampleNewReader_multipleHeadersWithLabels() {
 	data := ", foo, bar\n labels, baz, qux\n 1, corge, fred"
-	df, _ := tada.ReadCSV(strings.NewReader(data), tada.ReadOptionHeaders(2), tada.ReadOptionLabels(1))
+	df, _ := tada.NewReader(strings.NewReader(data)).ReadDF(tada.WithHeaders(2), tada.WithLabels(1))
 	fmt.Println(df)
 	// Output:
 	// +--------++-------+------+
@@ -61,11 +61,11 @@ func ExampleReadCSV_multipleHeadersWithLabels() {
 	// +--------++-------+------+
 }
 
-func ExampleReadCSV_withLabels() {
+func ExampleNewReader_withLabels() {
 	data := `foo, bar
 	baz, qux
 	corge, fred`
-	df, _ := tada.ReadCSV(strings.NewReader(data), tada.ReadOptionLabels(1))
+	df, _ := tada.NewReader(strings.NewReader(data)).ReadDF(tada.WithLabels(1))
 	fmt.Println(df)
 	// Output:
 	// +-------++------+
@@ -76,11 +76,11 @@ func ExampleReadCSV_withLabels() {
 	// +-------++------+
 }
 
-func ExampleReadCSV_delimiter() {
+func ExampleNewReader_delimiter() {
 	data := `foo|bar
 	baz|qux
 	corge|fred`
-	df, _ := tada.ReadCSV(strings.NewReader(data), tada.ReadOptionDelimiter('|'))
+	df, _ := tada.NewReader(strings.NewReader(data)).ReadDF(tada.WithDelimiter('|'))
 	fmt.Println(df)
 	// Output:
 	// +---++-------+------+
@@ -91,13 +91,13 @@ func ExampleReadCSV_delimiter() {
 	// +---++-------+------+
 }
 
-func ExampleReadCSVFromRecords() {
+func ExampleNewCSVReader() {
 	data := [][]string{
 		{"foo", "bar"},
 		{"baz", "qux"},
 		{"corge", "fred"},
 	}
-	df, _ := tada.ReadCSVFromRecords(data)
+	df, _ := tada.NewCSVReader(data).ReadDF()
 	fmt.Println(df)
 	// Output:
 	// +---++-------+------+
@@ -108,13 +108,13 @@ func ExampleReadCSVFromRecords() {
 	// +---++-------+------+
 }
 
-func ExampleReadCSVFromRecords_colsAsMajorDimension() {
+func ExampleNewCSVReader_colsAsMajorDimension() {
 	data := [][]string{
 		{"foo", "bar"},
 		{"baz", "qux"},
 		{"corge", "fred"},
 	}
-	df, _ := tada.ReadCSVFromRecords(data, tada.ReadOptionSwitchDims())
+	df, _ := tada.NewCSVReader(data).ReadDF(tada.ByColumn())
 	fmt.Println(df)
 	// Output:
 	// +---++-----+-----+-------+
@@ -459,7 +459,8 @@ func ExampleDataFrame_Struct() {
 		Bar []float64 `tada:"bar"`
 	}
 	var out output
-	df.Struct(&out)
+	w := tada.StructWriter{Struct: &out}
+	df.Write(&w)
 	fmt.Printf("%#v", out)
 	// Output:
 	// tada_test.output{Foo:[]string{"baz", "qux"}, Bar:[]float64{1, 2}}
@@ -479,7 +480,8 @@ func ExampleDataFrame_Struct_withNulls() {
 		Nulls [][]bool  `tada:"isNull"`
 	}
 	var out output
-	df.Struct(&out)
+	w := tada.StructWriter{Struct: &out}
+	df.Write(&w)
 	fmt.Printf("%#v", out)
 	// Output:
 	// tada_test.output{Foo:[]string{"", "qux"}, Bar:[]float64{1, 2}, Nulls:[][]bool{[]bool{true, false}, []bool{false, false}}}

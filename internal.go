@@ -650,7 +650,7 @@ func readCSVByCols(csv [][]string, cfg *readConfig) (*DataFrame, error) {
 			// write label values as slice, offset for header rows
 			valsToWrite := csv[container][cfg.numHeaderRows:]
 			labels[container] = valsToWrite
-			// duck error because values are all string, and therefore supported
+			// duck error because values are []string
 			nulls, _ := setNullsFromInterface(valsToWrite)
 			labelsIsNull[container] = nulls
 		} else {
@@ -658,7 +658,7 @@ func readCSVByCols(csv [][]string, cfg *readConfig) (*DataFrame, error) {
 			offsetFromLabelCols := container - cfg.numLabelLevels
 			valsToWrite := csv[container][cfg.numHeaderRows:]
 			vals[offsetFromLabelCols] = valsToWrite
-			// duck error because values are all string, and therefore supported
+			// duck error because values are []string
 			nulls, _ := setNullsFromInterface(valsToWrite)
 			valsIsNull[offsetFromLabelCols] = nulls
 		}
@@ -709,7 +709,7 @@ func defaultColsIfNoHeader(numHeaderRows int, columns []*valueContainer) ([]stri
 
 // each struct becomes a different row
 // each field becomes a different column
-func readStruct(slice interface{}) ([]*valueContainer, error) {
+func readStructSlice(slice interface{}) ([]*valueContainer, error) {
 	if !isSlice(slice) {
 		return nil, fmt.Errorf("unsupported kind (%v); must be slice", reflect.TypeOf(slice).Kind())
 	}
@@ -1720,48 +1720,7 @@ func isSupportedSlice(slice interface{}) error {
 		return fmt.Errorf("unsupported kind (%v); must be slice", k)
 	}
 	return nil
-	// // maps are supported
-	// if v := reflect.ValueOf(slice); v.Len() > 0 && v.Index(0).Kind() == reflect.Map {
-	// 	return nil
-	// }
-	// switch slice.(type) {
-	// case []float64, []string, []time.Time,
-	// 	[]civil.Date, []civil.Time,
-	// 	[][]byte, []bool, []float32,
-	// 	[]uint, []uint8, []uint16, []uint32, []uint64,
-	// 	[]int, []int8, []int16, []int32, []int64,
-	// 	// nested types
-	// 	[][]string, [][]float64, [][]time.Time, [][][]byte,
-	// 	[][]civil.Date, [][]civil.Time,
-	// 	[][]bool, [][]float32,
-	// 	[][]uint, [][]uint16, [][]uint32, [][]uint64,
-	// 	[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
-	// 	return nil
-	// case []interface{}:
-	// 	vals := slice.([]interface{})
-	// 	for i := range vals {
-	// 		err := isSupportedInterface(vals[i])
-	// 		if err != nil {
-	// 			return fmt.Errorf("[]interface{}: %v", err)
-	// 		}
-	// 	}
-	// 	return nil
-	// }
-	// return fmt.Errorf("unsupported type ([]%v)", reflect.TypeOf(slice).Elem())
 }
-
-// func isSupportedInterface(val interface{}) error {
-// 	switch val.(type) {
-// 	case float64, string, time.Time,
-// 		[]float64, []string, []time.Time,
-// 		bool, uint, uint8, uint16, uint32, uint64,
-// 		int, int8, int16, int32, int64, float32,
-// 		[]bool, []uint, []uint8, []uint16, []uint32, []uint64,
-// 		[]int, []int8, []int16, []int32, []int64, []float32:
-// 		return nil
-// 	}
-// 	return fmt.Errorf("unsupported type (%v)", reflect.TypeOf(val))
-// }
 
 func setNullsFromInterface(input interface{}) ([]bool, error) {
 	if input == nil {
@@ -1862,6 +1821,12 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 func isNullInterface(i interface{}) bool {
 	if i == nil {
 		return true
+	}
+	if v := reflect.ValueOf(i); v.Kind() == reflect.Slice {
+		if v.Len() == 0 {
+			return true
+		}
+		return false
 	}
 	switch i.(type) {
 	case float64:
@@ -2923,4 +2888,12 @@ type realClock struct{}
 
 func (c realClock) now() time.Time {
 	return time.Now()
+}
+
+func copySet(m map[string]bool) map[string]bool {
+	ret := make(map[string]bool)
+	for k, v := range m {
+		ret[k] = v
+	}
+	return ret
 }

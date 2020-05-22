@@ -267,13 +267,15 @@ func Test_setNullsFromInterface(t *testing.T) {
 		{"dateTime", args{[]time.Time{time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC), {}}}, []bool{false, true, true}, false},
 		{"interface", args{[]interface{}{
 			int(1), uint(1), float32(1), float64(1), time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), "foo",
-			math.NaN(), "", time.Time{}}},
+			math.NaN(), "(null)", time.Time{}}},
 			[]bool{false, false, false, false, false, false,
 				true, true, true}, false},
 		{"nested string", args{[][]string{{"foo"}, {}}}, []bool{false, true}, false},
 		{"nested civil.date", args{[][]civil.Date{{{Year: 2020, Month: 1, Day: 1}, {}}, {}}}, []bool{false, true}, false},
 		{"map", args{[]map[string]string{{"foo": "bar"}, {}}}, []bool{false, true}, false},
 		{"not explicitly supported value", args{[]complex64{1}}, []bool{false}, false},
+		{"[]interface with slice", args{[]interface{}{[]float64{}, "foo"}}, []bool{true, false}, false},
+		{"[][]interface with first value slice", args{[][]interface{}{{[]float64{1}, "foo"}}}, []bool{false}, false},
 		{"empty", args{[]int{}}, []bool{}, false},
 		{"nil", args{nil}, []bool{}, false},
 		{"fail - not slice", args{"foo"}, nil, true},
@@ -2038,7 +2040,7 @@ type testStruct struct {
 type testStructNoFields struct {
 }
 
-func Test_readStruct(t *testing.T) {
+func Test_readStructSlice(t *testing.T) {
 	type args struct {
 		slice interface{}
 	}
@@ -2069,13 +2071,13 @@ func Test_readStruct(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := readStruct(tt.args.slice)
+			got, err := readStructSlice(tt.args.slice)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("readStruct() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("readStructSlice() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readStruct() = %v, want %v", got, tt.want)
+				t.Errorf("readStructSlice() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -4803,10 +4805,10 @@ func Test_setReadConfig(t *testing.T) {
 			majorDimIsCols: false,
 		}},
 		{"pass", args{[]ReadOption{
-			ReadOptionHeaders(2),
-			ReadOptionLabels(2),
-			ReadOptionDelimiter('|'),
-			ReadOptionSwitchDims(),
+			WithHeaders(2),
+			WithLabels(2),
+			WithDelimiter('|'),
+			ByColumn(),
 		}}, &readConfig{
 			numHeaderRows:  2,
 			numLabelLevels: 2,
