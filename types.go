@@ -41,6 +41,13 @@ type valueContainer struct {
 	id     string
 }
 
+type valueContainerAlias struct {
+	Slice  interface{} `json:"slice"`
+	IsNull []bool      `json:"isNull"`
+	Name   string      `json:"name"`
+	ID     string      `json:"id"`
+}
+
 var tadaID = "tadaID_"
 
 // A Series is a single column of data with one or more levels of aligned labels.
@@ -70,6 +77,13 @@ type DataFrame struct {
 	name          string
 	err           error
 	colLevelNames []string
+}
+
+type dataFrameAlias struct {
+	Labels        []*valueContainer `json:"labels"`
+	Values        []*valueContainer `json:"values"`
+	Name          string            `json:"name"`
+	ColLevelNames []string          `json:"colLevelNames"`
 }
 
 // A DataFrameIterator iterates over the rows in a DataFrame.
@@ -214,16 +228,6 @@ type WriteOption func(*writeConfig)
 type writeConfig struct {
 	includeLabels bool
 	delimiter     rune
-}
-
-// A Reader can read in a DataFrame from various data sources.
-type Reader interface {
-	ReadDF(...ReadOption) (*DataFrame, error)
-}
-
-// A Writer can write a DataFrame into various receivers.
-type Writer interface {
-	writeDF(*DataFrame, ...WriteOption) error
 }
 
 // A ReadOption configures a read function.

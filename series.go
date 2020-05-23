@@ -2,7 +2,6 @@ package tada
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"math/rand"
 	"reflect"
@@ -85,15 +84,12 @@ func (s *Series) DataFrame() *DataFrame {
 	}
 }
 
-// EqualsCSV reads want (configured by wantOptions) into a dataframe,
-// converts both s and want into [][]string records,
+// EqualRecords reduces s to [][]string records, reads [][]string records from want,
 // and evaluates whether the stringified values match.
 // If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
-//
-// If includeLabels is true, then s's labels are included as columns.
-func (s *Series) EqualsCSV(includeLabels bool, want io.Reader, wantOptions ...ReadOption) (bool, *tablediff.Differences, error) {
+func (s *Series) EqualRecords(got RecordWriter, want CSVReader) (bool, *tablediff.Differences, error) {
 	df := s.DataFrame()
-	return df.EqualsCSV(includeLabels, want, wantOptions...)
+	return df.EqualRecords(got, want)
 }
 
 // // CSV converts a Series to a DataFrame and returns as [][]string.

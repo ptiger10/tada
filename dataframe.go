@@ -3,7 +3,6 @@ package tada
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"math/rand"
 	"reflect"
 
@@ -186,25 +185,16 @@ func (df *DataFrame) Series() *Series {
 	}
 }
 
-// EqualsCSV reads want (configured by wantOptions) into a dataframe,
-// converts both df and want into [][]string records,
+// EqualRecords reduces df to [][]string records, reads [][]string records from want,
 // and evaluates whether the stringified values match.
 // If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
-//
-// If includeLabels is true, then df's labels are included as columns.
-func (df *DataFrame) EqualsCSV(includeLabels bool, want io.Reader, wantOptions ...ReadOption) (bool, *tablediff.Differences, error) {
-	config := setReadConfig(wantOptions)
-	df2, err := NewReader(want).ReadDF(wantOptions...)
+func (df *DataFrame) EqualRecords(got RecordWriter, want CSVReader) (bool, *tablediff.Differences, error) {
+	got.Write(df)
+	_, err := want.Read()
 	if err != nil {
 		return false, nil, fmt.Errorf("comparing csv: reading want: %v", err)
 	}
-
-	got := new(CSVWriter)
-	wantDF := new(CSVWriter)
-	df.Write(got, writeOptionIncludeLabels(includeLabels))
-	// df2 has default labels? exclude them
-	df2.Write(wantDF, writeOptionIncludeLabels(config.numLabelLevels > 0))
-	diffs, eq := tablediff.Diff(got.Records, wantDF.Records)
+	diffs, eq := tablediff.Diff(got.Records(), want.records)
 	return eq, diffs, nil
 }
 
@@ -221,24 +211,24 @@ func (df *DataFrame) String() string {
 	}
 	var data [][]string
 	if df.Len() <= optionMaxRows {
-		w := new(CSVWriter)
-		// w := CSVWriter{data}
-		df.Write(w)
-		data = w.Records
+		w := NewRecordWriter()
+		w.IncludeLabels = true
+		df.WriteTo(w)
+		data = w.Records()
 	} else {
 		// truncate rows
 		n := optionMaxRows / 2
-		topHalf := new(CSVWriter)
-		df.Head(n).Write(topHalf)
-		bottomHalf := new(CSVWriter)
-		df.Tail(n).Write(bottomHalf)
+		topHalf := NewRecordWriter()
+		df.Head(n).WriteTo(topHalf)
+		bottomHalf := NewRecordWriter()
+		df.Tail(n).WriteTo(bottomHalf)
 		filler := make([]string, df.NumLevels()+df.NumColumns())
 		for k := range filler {
 			filler[k] = "..."
 		}
 		data = append(
-			append(topHalf.Records, filler),
-			bottomHalf.Records[df.numColLevels():]...)
+			append(topHalf.Records(), filler),
+			bottomHalf.Records()[df.numColLevels():]...)
 	}
 	// do not print *0-type label names
 	for j := 0; j < df.NumLevels(); j++ {

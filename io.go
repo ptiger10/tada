@@ -1,55 +1,13 @@
 package tada
 
 import (
-	"bytes"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"reflect"
-	"strings"
 	"unicode"
 )
-
-// Write writes from a Series to a Writer, configured by options.
-func (s *Series) Write(w Writer, options ...WriteOption) error {
-	df := s.DataFrame()
-	return w.writeDF(df, options...)
-}
-
-// Write writes from a DataFrame to a Writer, configured by options.
-func (df *DataFrame) Write(w Writer, options ...WriteOption) error {
-	return w.writeDF(df, options...)
-}
-
-// -- READ OPTIONS
-
-// WithHeaders configures a read function to expect n rows to be column headers (default: 1).
-func WithHeaders(n int) ReadOption {
-	return func(r *readConfig) {
-		r.numHeaderRows = n
-	}
-}
-
-// WithLabels configures a read function to expect the first n columns to be label levels (default: 0).
-func WithLabels(n int) ReadOption {
-	return func(r *readConfig) {
-		r.numLabelLevels = n
-	}
-}
-
-// WithDelimiter configures a read function to use sep as a field delimiter for use in ReadCSV (default: ",").
-func WithDelimiter(sep rune) ReadOption {
-	return func(r *readConfig) {
-		r.delimiter = sep
-	}
-}
-
-// EmptyStringAsNull configures a read function to read "" as a null value
-func EmptyStringAsNull() ReadOption {
-	return func(r *readConfig) {
-		r.emptyStringAsNull = true
-	}
-}
 
 // ByColumn configures a read function to expect columns to be the major dimension of csv data
 // (default: expects rows to be the major dimension).
@@ -61,311 +19,322 @@ func EmptyStringAsNull() ReadOption {
 // (major dimension: rows)			(major dimension: columns)
 //	foo bar							foo baz
 //  baz qux							bar qux
-func ByColumn() ReadOption {
-	return func(r *readConfig) {
-		r.majorDimIsCols = true
+
+// -- custom Encoder/Decoder
+
+func (vc valueContainerAlias) vc() valueContainer {
+	return valueContainer{
+		slice:  vc.Slice,
+		isNull: vc.IsNull,
+		name:   vc.Name,
+		id:     vc.ID,
 	}
 }
 
-// -- WRITE OPTIONS
-
-// ExcludeLabels excludes the label levels from the output.
-func ExcludeLabels() WriteOption {
-	return func(w *writeConfig) {
-		w.includeLabels = false
+func (vc valueContainer) alias() valueContainerAlias {
+	return valueContainerAlias{
+		Slice:  vc.slice,
+		IsNull: vc.isNull,
+		Name:   vc.name,
+		ID:     vc.id,
 	}
 }
 
-// for internal use
-func writeOptionIncludeLabels(set bool) func(w *writeConfig) {
-	return func(w *writeConfig) {
-		w.includeLabels = set
+func (vc valueContainer) MarshalJSON() ([]byte, error) {
+	return json.Marshal(vc.alias())
+}
+
+func (vc *valueContainer) UnmarshalJSON(b []byte) error {
+	if string(b) == "null" {
+		return nil
+	}
+	var alias valueContainerAlias
+	json.Unmarshal(b, &alias)
+	*vc = alias.vc()
+	return nil
+}
+
+func (df dataFrameAlias) df() DataFrame {
+	return DataFrame{
+		labels:        df.Labels,
+		values:        df.Values,
+		name:          df.Name,
+		colLevelNames: df.ColLevelNames,
 	}
 }
 
-// Delimiter configures a write function to use sep as a field delimiter for use in write functions (default: ",").
-func Delimiter(sep rune) WriteOption {
-	return func(w *writeConfig) {
-		w.delimiter = sep
+func (df *DataFrame) alias() dataFrameAlias {
+	return dataFrameAlias{
+		Labels:        df.labels,
+		Values:        df.values,
+		Name:          df.name,
+		ColLevelNames: df.colLevelNames,
 	}
+}
+
+// MarshalJSON satisifies the json.Marshaler interface for writing a DataFrame to JSON.
+func (df *DataFrame) MarshalJSON() ([]byte, error) {
+	return json.Marshal(df.alias())
+}
+
+// UnmarshalJSON satisifies the json.Unmarshaler interface for reading a DataFrame from JSON.
+func (df *DataFrame) UnmarshalJSON(b []byte) error {
+	if string(b) == "null" {
+		return nil
+	}
+	var alias dataFrameAlias
+	json.Unmarshal(b, &alias)
+	*df = alias.df()
+	return nil
+}
+
+// A Reader can read in a DataFrame from various data sources.
+type Reader interface {
+	Read() (*DataFrame, error)
+}
+
+// A Writer can write a DataFrame into various receivers.
+type Writer interface {
+	Write(*DataFrame) error
+}
+
+// WriteTo writes from a Series to a Writer.
+func (s *Series) WriteTo(w Writer) error {
+	df := s.DataFrame()
+	err := w.Write(df)
+	if err != nil {
+		return fmt.Errorf("writing from Series: %v", err)
+	}
+	return nil
+}
+
+// WriteTo writes a DataFrame to a Writer.
+func (df *DataFrame) WriteTo(w Writer) error {
+	err := w.Write(df)
+	if err != nil {
+		return fmt.Errorf("writing to Writer: %v", err)
+	}
+	return nil
 }
 
 // -- READ/WRITERS
 
-// io.Reader/Writer
-
-// ioReader reads from an io.Reader
-type ioReader struct {
-	r io.Reader
-}
-
-// NewReader creates a Reader from an io.Reader.
-func NewReader(r io.Reader) Reader {
-	return ioReader{r}
-}
-
-// IOWriter writes to an io.Writer.
-type IOWriter struct {
-	W io.Writer
-}
-
-// ReadDF reads records from an io.Reader into a Dataframe (configured by options).
-// Rows must be the major dimension of the records.
-// For advanced cases, use the standard csv library NewReader().ReadAll() + tada.csvReader.
-// Available options: WithHeaders, WithLabels, WithDelimiter, EmptyStringAsNull.
-//
-// Default if no options are supplied:
-// 1 header row; no labels; field delimiter is ","
-//
-// If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
-// If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing
-// Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
-func (r ioReader) ReadDF(options ...ReadOption) (*DataFrame, error) {
-	config := setReadConfig(options)
-	if config.emptyStringAsNull {
-		archive := copySet(optionNullStrings)
-		optionNullStrings[""] = true
-		defer func() {
-			optionNullStrings = archive
-		}()
-	}
-	b := new(bytes.Buffer)
-	io.Copy(b, r.r)
-	numRows, numCols, err := extractCSVDimensions(b.Bytes(), config.delimiter)
-	if err != nil {
-		return nil, fmt.Errorf("reading csv: %v", err)
-	}
-	retVals := makeStringMatrix(numCols, numRows)
-	retNulls := makeBoolMatrix(numCols, numRows)
-	err = readCSVBytes(bytes.NewReader(b.Bytes()), retVals, retNulls, config.delimiter)
-	if err != nil {
-		return nil, fmt.Errorf("reading csv: %s", err)
-	}
-	return makeDataFrameFromMatrices(retVals, retNulls, config), nil
-}
-
-func (w *IOWriter) writeDF(df *DataFrame, options ...WriteOption) error {
-	config := setWriteConfig(options)
-	cw := new(CSVWriter)
-	err := df.Write(cw, writeOptionIncludeLabels(config.includeLabels))
-	if err != nil {
-		return err
-	}
-	var b bytes.Buffer
-	csvw := csv.NewWriter(&b)
-	csvw.Comma = config.delimiter
-	csvw.WriteAll(cw.Records)
-	_, err = w.W.Write(b.Bytes())
-	return err
-}
-
 // -- [][]string records
 
-// csvReader reads [][]string records to a DataFrame.
-// Can be used with encoding/csv.NewReader().ReadAll() for max configuration.
-type csvReader struct {
-	records [][]string
+// RecordReader reads [][]string records into a DataFrame.
+type RecordReader struct {
+	HeaderRows  int
+	LabelLevels int
+	ByColumn    bool
+	records     [][]string
 }
 
-// NewCSVReader returns a new [][]string reader.
-func NewCSVReader(records [][]string) Reader {
-	return csvReader{records}
+// NewRecordReader returns a default RecordReader.
+func NewRecordReader(records [][]string) RecordReader {
+	return RecordReader{
+		HeaderRows:  1,
+		LabelLevels: 0,
+		ByColumn:    false,
+		records:     records,
+	}
 }
 
-// CSVWriter writes [][]string records to a DataFrame.
-// Can be used with encoding/csv.NewReader().ReadAll() for max configuration.
-type CSVWriter struct {
-	Records [][]string
-}
-
-// ReadDF reads [][]string records to a DataFrame.
+// Read reads [][]string records to a DataFrame.
 // All columns will be read as []string.
-// Available options: WithHeaders, WithLabels, EmptyStringAsNull, ByColumn.
+// Records are read with row as the major dimension, unless r.ByColumn = true.
 //
-// Default if no options are supplied:
-// 1 header row; no labels; rows as major dimension
-//
-// If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
+// If no label levels are supplied, a default label level is inserted ([]int incrementing from 0).
 // If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing.
 // Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
-func (r csvReader) ReadDF(options ...ReadOption) (ret *DataFrame, err error) {
+func (r RecordReader) Read() (*DataFrame, error) {
 	if len(r.records) == 0 {
 		return nil, fmt.Errorf("reading csv from records: must have at least one record")
 	}
 	if len(r.records[0]) == 0 {
 		return nil, fmt.Errorf("reading csv from records: first record cannot be empty")
 	}
-	config := setReadConfig(options)
-
-	if config.emptyStringAsNull {
-		archive := copySet(optionNullStrings)
-		optionNullStrings[""] = true
-		defer func() {
-			optionNullStrings = archive
-		}()
-	}
-	if config.majorDimIsCols {
-		ret, err = readCSVByCols(r.records, config)
-	} else {
-		ret, err = readCSVByRows(r.records, config)
-	}
+	vc, err := readRecords(r.records, r.ByColumn, r.HeaderRows)
 	if err != nil {
 		return nil, fmt.Errorf("reading csv from records: %v", err)
 	}
-	return ret, nil
+	df := containersToDF(vc, r.HeaderRows, r.LabelLevels)
+	return df, nil
 }
 
-// writeDF writes a DataFrame to a [][]string with rows as the major dimension.
-// Null values are replaced with "(null)".
-func (w *CSVWriter) writeDF(df *DataFrame, options ...WriteOption) error {
-	config := setWriteConfig(options)
-	transposedStringValues, err := df.toCSVByRows(config.includeLabels)
-	if err != nil {
-		return err
+// RecordWriter writes [][]string records from a DataFrame.
+type RecordWriter struct {
+	IncludeLabels bool
+	ByColumn      bool
+	records       [][]string
+}
+
+// NewRecordWriter returns a *RecordWriter with default settings
+func NewRecordWriter() *RecordWriter {
+	return &RecordWriter{
+		ByColumn:      false,
+		IncludeLabels: false,
 	}
-	mergedLabelsAndCols := df.values
-	if config.includeLabels {
-		mergedLabelsAndCols = append(df.labels, df.values...)
+}
+
+// Records returns the [][]string records written to w.
+func (w RecordWriter) Records() [][]string {
+	return w.records
+}
+
+// Write reduces a DataFrame to [][]string and writes the result to w.
+// Null values are replaced with (null).
+func (w *RecordWriter) Write(df *DataFrame) error {
+	containers := df.values
+	if w.IncludeLabels {
+		containers = append(df.labels, df.values...)
 	}
-	// overwrite null values, skipping headers
-	for i := range transposedStringValues[df.numColLevels():] {
-		for k := range transposedStringValues[i] {
-			if mergedLabelsAndCols[k].isNull[i] {
-				transposedStringValues[i+df.numColLevels()][k] = optionsNullPrinter
-			}
-		}
-	}
-	// b := new(http.ResponseWriter)
-	// reflect.ValueOf(&w.Records).Elem().Set(reflect.ValueOf(transposedStringValues))
-	w.Records = transposedStringValues
+	w.records = writeRecords(containers, w.ByColumn, df.numColLevels())
 	return nil
+}
+
+// -- encoding/csv
+
+// CSVReader reads encoding/csv.Reader into a DataFrame.
+type CSVReader struct {
+	RecordReader
+	*csv.Reader
+}
+
+// NewCSVReader creates a new CSVReader with embedded encoding/csv reader and default settings.
+func NewCSVReader(r io.Reader) CSVReader {
+	return CSVReader{
+		RecordReader: RecordReader{
+			HeaderRows:  1,
+			LabelLevels: 0,
+		},
+		Reader: csv.NewReader(r),
+	}
+}
+
+func (r CSVReader) Read() (*DataFrame, error) {
+	records, err := r.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("CSVReader: %v", err)
+	}
+	r.records = records
+	df, err := r.RecordReader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("CSVReader: %v", err)
+	}
+	return df, nil
+}
+
+// CSVWriter writes DataFrame values into an encoding/csv.Writer.
+type CSVWriter struct {
+	RecordWriter
+	*csv.Writer
+}
+
+// NewCSVWriter creates a new *CSVWriter with embedded encoding/csv.Writer and default settings.
+func NewCSVWriter(w io.Writer) *CSVWriter {
+	return &CSVWriter{
+		RecordWriter: RecordWriter{
+			IncludeLabels: false,
+			ByColumn:      false,
+		},
+		Writer: csv.NewWriter(w),
+	}
+}
+
+func (w CSVWriter) Write(df *DataFrame) error {
+	w.RecordWriter.Write(df)
+	return w.Writer.WriteAll(w.Records())
 }
 
 // -- [][]interface{} records
 
-// interfaceReader reads [][]interface records to a DataFrame.
-type interfaceReader struct {
-	records [][]interface{}
+// InterfaceRecordReader reads [][]interface{} records into a DataFrame.
+type InterfaceRecordReader struct {
+	HeaderRows  int
+	LabelLevels int
+	ByColumn    bool
+	records     [][]interface{}
 }
 
-// NewInterfaceReader returns a new [][]interface{} reader.
-func NewInterfaceReader(records [][]interface{}) Reader {
-	return interfaceReader{records}
+// NewInterfaceRecordReader returns a default InterfaceRecordReader.
+func NewInterfaceRecordReader(records [][]interface{}) InterfaceRecordReader {
+	return InterfaceRecordReader{
+		HeaderRows:  1,
+		LabelLevels: 0,
+		ByColumn:    false,
+		records:     records,
+	}
 }
 
-// InterfaceWriter writes [][]interface records from a DataFrame.
-type InterfaceWriter struct {
-	Records [][]interface{}
-}
-
-// ReadDF reads [][]interface{} records into a DataFrame (configured by options).
+// Read reads [][]interface{} records into a DataFrame.
 // All columns will be read as []interface{}.
-// Available options: WithHeaders, WithLabels, EmptyStringAsNull, ByColumn.
-//
-// Default if no options are supplied:
-// 1 header row; no labels; rows as major dimension
 //
 // If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
 // If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing.
 // Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
-func (r interfaceReader) ReadDF(options ...ReadOption) (ret *DataFrame, err error) {
+func (r InterfaceRecordReader) Read() (*DataFrame, error) {
 	if len(r.records) == 0 {
-		return nil, fmt.Errorf("reading records from [][]interface{}: must have at least one record")
+		return nil, fmt.Errorf("reading csv from records: must have at least one record")
 	}
 	if len(r.records[0]) == 0 {
-		return nil, fmt.Errorf("reading records from [][]interface{}: first record cannot be empty")
+		return nil, fmt.Errorf("reading csv from records: first record cannot be empty")
 	}
-	config := setReadConfig(options)
-	if config.emptyStringAsNull {
-		archive := copySet(optionNullStrings)
-		optionNullStrings[""] = true
-		defer func() {
-			optionNullStrings = archive
-		}()
-	}
-
-	var slices []interface{}
-	if !config.majorDimIsCols {
-		slices, err = readNestedInterfaceByRows(r.records)
-	} else {
-		slices, err = readNestedInterfaceByCols(r.records)
-	}
+	vc, err := readInterfaceRecords(r.records, r.ByColumn, r.HeaderRows)
 	if err != nil {
-		return nil, fmt.Errorf("reading records from [][]interface{}: %v", err)
+		return nil, fmt.Errorf("reading csv from records: %v", err)
 	}
-
-	numCols := len(slices) - config.numLabelLevels
-	labelNames := make([]string, config.numLabelLevels)
-	colNames := make([]string, numCols)
-
-	// iterate over all containers to get header names
-	for j := 0; j < config.numLabelLevels; j++ {
-		// write label headers, no offset
-		fields := make([]string, config.numHeaderRows)
-		for i := range fields {
-			fields[i] = fmt.Sprint(slices[j].([]interface{})[i])
-		}
-		labelNames[j] = strings.Join(fields, optionLevelSeparator)
-		// remove label headers from input
-		slices[j] = slices[j].([]interface{})[config.numHeaderRows:]
-	}
-	for k := 0; k < numCols; k++ {
-		// write col headers, offset for label cols
-		offsetFromLabelCols := k + config.numLabelLevels
-		fields := make([]string, config.numHeaderRows)
-		for i := range fields {
-			fields[i] = fmt.Sprint(slices[offsetFromLabelCols].([]interface{})[i])
-		}
-		colNames[k] = strings.Join(fields, optionLevelSeparator)
-		// remove column headers from input
-		slices[offsetFromLabelCols] = slices[offsetFromLabelCols].([]interface{})[config.numHeaderRows:]
-	}
-	labels := slices[:config.numLabelLevels]
-	slices = slices[config.numLabelLevels:]
-
-	if len(labels) > 0 {
-		ret = NewDataFrame(slices, labels...)
-		ret = ret.SetLabelNames(labelNames).SetColNames(colNames)
-	} else {
-		ret = NewDataFrame(slices)
-		if config.numHeaderRows > 0 {
-			ret = ret.SetColNames(colNames)
-		}
-	}
-	return ret, nil
+	df := containersToDF(vc, r.HeaderRows, r.LabelLevels)
+	return df, nil
 }
 
-// writeDF writes a DataFrame to a [][]interface{} with columns as the major dimension.
-// Null values are replaced with "(null)".
-func (w *InterfaceWriter) writeDF(df *DataFrame, options ...WriteOption) error {
-	config := setWriteConfig(options)
-	containers := append(df.labels, df.values...)
-	if !config.includeLabels {
-		containers = df.values
+// InterfaceRecordWriter writes DataFrame values into [][]interface{} records.
+type InterfaceRecordWriter struct {
+	IncludeLabels bool
+	ByColumn      bool
+	records       [][]interface{}
+}
+
+// NewInterfaceRecordWriter returns an *InterfaceRecordWriter with default settings.
+func NewInterfaceRecordWriter() *InterfaceRecordWriter {
+	return &InterfaceRecordWriter{
+		ByColumn:      false,
+		IncludeLabels: false,
 	}
-	ret := make([][]interface{}, len(containers))
-	for k := range ret {
-		ret[k] = containers[k].interfaceSlice(true)
+}
+
+// Records returns the [][]interface{} written to w.
+func (w InterfaceRecordWriter) Records() [][]interface{} {
+	return w.records
+}
+
+// Write reduces a DataFrame to [][]interface{} and writes the result to w.
+// Null values are replaced with nil.
+func (w *InterfaceRecordWriter) Write(df *DataFrame) error {
+	containers := df.values
+	if w.IncludeLabels {
+		containers = append(df.labels, df.values...)
 	}
-	w.Records = ret
+	w.records = writeInterfaceRecords(containers, w.ByColumn, df.numColLevels())
 	return nil
 }
 
+// -- structs
+
 // StructReader reads a single struct or slice of structs into a DataFrame.
-type structReader struct {
-	s       interface{}
-	isSlice bool
+type StructReader struct {
+	s           interface{}
+	IsNull      [][]bool
+	IsSlice     bool
+	LabelLevels int
 }
 
 // NewStructReader returns a new reader for a struct or slice of structs.
-func NewStructReader(s interface{}, isSlice bool) Reader {
-	return structReader{s, isSlice}
-}
-
-// StructWriter writes a single struct or slice of structs from a DataFrame.
-type StructWriter struct {
-	Struct  interface{}
-	IsSlice bool
+func NewStructReader(s interface{}) StructReader {
+	return StructReader{
+		s:           s,
+		IsSlice:     false,
+		LabelLevels: 0,
+	}
 }
 
 // ReadStruct reads the exported fields in the StructReader into a DataFrame.
@@ -376,9 +345,8 @@ type StructWriter struct {
 // These values will set the null status for each of the resulting value containers in the DataFrame, from left-to-right.
 // If a "tada" tag has any other value, the resulting value container will have the same name as the tag value.
 // Otherwise, the value container will have the same name as the exported field.
-func (r structReader) ReadDF(options ...ReadOption) (*DataFrame, error) {
-	config := setReadConfig(options)
-	if r.isSlice {
+func (r StructReader) Read() (*DataFrame, error) {
+	if r.IsSlice {
 		values, err := readStructSlice(r.s)
 		if err != nil {
 			return nil, fmt.Errorf("reading struct slice: %v", err)
@@ -436,7 +404,7 @@ func (r structReader) ReadDF(options ...ReadOption) (*DataFrame, error) {
 			name = field.Name
 		}
 		// write to label
-		if container < config.numLabelLevels {
+		if container < r.LabelLevels {
 			labelNames = append(labelNames, name)
 			labels = append(labels, v.Field(k).Interface())
 			// write to column
@@ -450,7 +418,7 @@ func (r structReader) ReadDF(options ...ReadOption) (*DataFrame, error) {
 		return nil, fmt.Errorf("reading struct as schema: %v", df.err)
 	}
 	// not default labels? apply label names
-	if config.numLabelLevels > 0 {
+	if r.LabelLevels > 0 {
 		df = df.SetLabelNames(labelNames)
 	}
 	df = df.SetColNames(colNames)
@@ -458,7 +426,7 @@ func (r structReader) ReadDF(options ...ReadOption) (*DataFrame, error) {
 	if hasNullTag {
 		var min int
 		// default labels? do not change nulls
-		if config.numLabelLevels == 0 {
+		if r.LabelLevels == 0 {
 			min = 1
 		}
 		containers := makeIntRange(min, df.NumLevels()+df.NumColumns())
@@ -475,27 +443,51 @@ func (r structReader) ReadDF(options ...ReadOption) (*DataFrame, error) {
 	return df, nil
 }
 
-// writeDF writes the values of the df containers into structPointer.
+// StructWriter writes a single struct or slice of structs from a DataFrame.
+type StructWriter struct {
+	s             interface{}
+	isNull        [][]bool
+	IsSlice       bool
+	IncludeLabels bool
+}
+
+// NewStructWriter creates a new *StructWriter.
+// s should be a pointer to either a slice of structs or single struct with only slice fields.
+// After writing, s can be accessed directly outside of this writer.
+func NewStructWriter(s interface{}) *StructWriter {
+	return &StructWriter{
+		s:             s,
+		IsSlice:       true,
+		IncludeLabels: false,
+	}
+}
+
+func (w StructWriter) IsNull() [][]bool {
+	return w.isNull
+}
+
+// Write writes the values of the df containers into structPointer.
 // Returns an error if df does not contain, from left-to-right, the same container names and types
 // as the exported fields that appear, from top-to-bottom, in structPointer.
 // Exported struct fields must be types that are supported by NewDataFrame().
 // If a "tada" tag is present with the value "isNull", this field must be [][]bool.
 // The null status of each value container in the DataFrame, from left-to-right, will be written into this field in equal-lengthed slices.
 // If df contains additional containers beyond those in structPointer, those are ignored.
-func (w *StructWriter) writeDF(df *DataFrame, options ...WriteOption) error {
+func (w *StructWriter) Write(df *DataFrame) error {
 	if w.IsSlice {
 		return nil
 	}
-	config := setWriteConfig(options)
-	if reflect.TypeOf(w.Struct).Kind() != reflect.Ptr {
-		return fmt.Errorf("writing to struct: structPointer must be pointer to struct, not %s", reflect.TypeOf(w.Struct).Kind())
+	if reflect.TypeOf(w.s).Kind() != reflect.Ptr {
+		return fmt.Errorf("writing to struct: structPointer must be pointer to struct, not %s",
+			reflect.TypeOf(w.s).Kind())
 	}
-	if reflect.TypeOf(w.Struct).Elem().Kind() != reflect.Struct {
-		return fmt.Errorf("writing to struct: structPointer must be pointer to struct, not to %s", reflect.TypeOf(w.Struct).Elem().Kind())
+	if reflect.TypeOf(w.s).Elem().Kind() != reflect.Struct {
+		return fmt.Errorf("writing to struct: structPointer must be pointer to struct, not to %s",
+			reflect.TypeOf(w.s).Elem().Kind())
 	}
-	v := reflect.ValueOf(w.Struct).Elem()
+	v := reflect.ValueOf(w.s).Elem()
 	var mergedLabelsAndCols []*valueContainer
-	if config.includeLabels {
+	if w.IncludeLabels {
 		mergedLabelsAndCols = append(df.labels, df.values...)
 	} else {
 		mergedLabelsAndCols = df.values
@@ -505,7 +497,7 @@ func (w *StructWriter) writeDF(df *DataFrame, options ...WriteOption) error {
 	var nullField string
 	nullTag := "isNull"
 	for k := 0; k < v.NumField(); k++ {
-		field := reflect.TypeOf(w.Struct).Elem().Field(k)
+		field := reflect.TypeOf(w.s).Elem().Field(k)
 		// is unexported field?
 		if unicode.IsLower([]rune(field.Name)[0]) {
 			offset--
@@ -580,105 +572,105 @@ func ReadMatrix(mat Matrix) *DataFrame {
 
 // -- WRITERS
 
-// WriteMockCSV reads r (configured by options) and writes n mock rows to w,
-// with column names and types inferred based on the data in src.
-// Regardless of the major dimension of src, the major dimension of the output is rows.
-// Available options: WithHeaders, WithLabels, ByColumn.
-//
-// Default if no options are supplied:
-// 1 header row, no labels, rows as major dimension
-func WriteMockCSV(w io.Writer, n int, r io.Reader, options ...ReadOption) error {
-	config := setReadConfig(options)
-	numSampleRows := 10
-	inferredTypes := make([]map[string]int, 0)
-	dtypes := []string{"float", "int", "string", "datetime", "time", "bool"}
-	var headers [][]string
-	var rowCount int
-	data, err := NewReader(r).ReadDF(options...)
-	if err != nil {
-		return fmt.Errorf("writing mock csv: reading r: %v", err)
-	}
-	// data has default labels? exclude them
-	receiver := new(CSVWriter)
-	err = data.Write(receiver, writeOptionIncludeLabels(config.numLabelLevels > 0))
-	if err != nil {
-		return fmt.Errorf("writing mock csv: reading r: %v", err)
-	}
-	src := receiver.Records
+// // WriteMockCSV reads r (configured by options) and writes n mock rows to w,
+// // with column names and types inferred based on the data in src.
+// // Regardless of the major dimension of src, the major dimension of the output is rows.
+// // Available options: WithHeaders, WithLabels, ByColumn.
+// //
+// // Default if no options are supplied:
+// // 1 header row, no labels, rows as major dimension
+// func WriteMockCSV(w io.Writer, n int, r Reader) error {
+// 	config := &readConfig{}
+// 	numSampleRows := 10
+// 	inferredTypes := make([]map[string]int, 0)
+// 	dtypes := []string{"float", "int", "string", "datetime", "time", "bool"}
+// 	var headers [][]string
+// 	var rowCount int
+// 	data, err := r.Read()
+// 	if err != nil {
+// 		return fmt.Errorf("writing mock csv: reading r: %v", err)
+// 	}
+// 	// data has default labels? exclude them
+// 	receiver := new(CSVWriter)
+// 	err = data.Write(receiver, writeOptionIncludeLabels(config.numLabelLevels > 0))
+// 	if err != nil {
+// 		return fmt.Errorf("writing mock csv: reading r: %v", err)
+// 	}
+// 	src := receiver.Records()
 
-	if !config.majorDimIsCols {
-		rowCount = len(src)
-	} else {
-		rowCount = len(src[0])
-	}
-	// numSampleRows must not exceed total number of non-header rows in src
-	maxRows := rowCount - config.numHeaderRows
-	if maxRows < numSampleRows {
-		numSampleRows = maxRows
-	}
+// 	if !config.majorDimIsCols {
+// 		rowCount = len(src)
+// 	} else {
+// 		rowCount = len(src[0])
+// 	}
+// 	// numSampleRows must not exceed total number of non-header rows in src
+// 	maxRows := rowCount - config.numHeaderRows
+// 	if maxRows < numSampleRows {
+// 		numSampleRows = maxRows
+// 	}
 
-	// major dimension is rows?
-	if !config.majorDimIsCols {
-		// copy headers
-		for i := 0; i < config.numHeaderRows; i++ {
-			headers = append(headers, src[i])
-		}
-		// prepare one inferredTypes map per column
-		for range src[0] {
-			emptyMap := map[string]int{}
-			for _, dtype := range dtypes {
-				emptyMap[dtype] = 0
-			}
-			inferredTypes = append(inferredTypes, emptyMap)
-		}
+// 	// major dimension is rows?
+// 	if !config.majorDimIsCols {
+// 		// copy headers
+// 		for i := 0; i < config.numHeaderRows; i++ {
+// 			headers = append(headers, src[i])
+// 		}
+// 		// prepare one inferredTypes map per column
+// 		for range src[0] {
+// 			emptyMap := map[string]int{}
+// 			for _, dtype := range dtypes {
+// 				emptyMap[dtype] = 0
+// 			}
+// 			inferredTypes = append(inferredTypes, emptyMap)
+// 		}
 
-		// for each row, infer type column-by-column
-		// offset data sample by header rows
-		dataSample := src[config.numHeaderRows : numSampleRows+config.numHeaderRows]
-		for i := range dataSample {
-			for k := range dataSample[i] {
-				value := dataSample[i][k]
-				dtype := inferType(value)
-				inferredTypes[k][dtype]++
-			}
-		}
+// 		// for each row, infer type column-by-column
+// 		// offset data sample by header rows
+// 		dataSample := src[config.numHeaderRows : numSampleRows+config.numHeaderRows]
+// 		for i := range dataSample {
+// 			for k := range dataSample[i] {
+// 				value := dataSample[i][k]
+// 				dtype := inferType(value)
+// 				inferredTypes[k][dtype]++
+// 			}
+// 		}
 
-		// major dimension is columns?
-	} else {
+// 		// major dimension is columns?
+// 	} else {
 
-		// prepare one inferredTypes map per column
-		for range src {
-			emptyMap := map[string]int{}
-			for _, dtype := range dtypes {
-				emptyMap[dtype] = 0
-			}
-			inferredTypes = append(inferredTypes, emptyMap)
-		}
+// 		// prepare one inferredTypes map per column
+// 		for range src {
+// 			emptyMap := map[string]int{}
+// 			for _, dtype := range dtypes {
+// 				emptyMap[dtype] = 0
+// 			}
+// 			inferredTypes = append(inferredTypes, emptyMap)
+// 		}
 
-		// copy headers
-		headers = make([][]string, 0)
-		for l := 0; l < config.numHeaderRows; l++ {
-			headers = append(headers, make([]string, len(src)))
-			for k := range src {
-				// NB: major dimension of output is rows
-				headers[l][k] = src[k][l]
-			}
-		}
+// 		// copy headers
+// 		headers = make([][]string, 0)
+// 		for l := 0; l < config.numHeaderRows; l++ {
+// 			headers = append(headers, make([]string, len(src)))
+// 			for k := range src {
+// 				// NB: major dimension of output is rows
+// 				headers[l][k] = src[k][l]
+// 			}
+// 		}
 
-		// for each column, infer type row-by-row
-		for k := range src {
-			// offset by header rows
-			// infer type of only the sample rows
-			dataSample := src[k][config.numHeaderRows : numSampleRows+config.numHeaderRows]
-			for i := range dataSample {
-				dtype := inferType(dataSample[i])
-				inferredTypes[k][dtype]++
-			}
-		}
-	}
-	// major dimension of output is rows, for compatibility with csv.NewWriter
-	mockCSV := mockCSVFromDTypes(inferredTypes, n)
-	mockCSV = append(headers, mockCSV...)
-	writer := csv.NewWriter(w)
-	return writer.WriteAll(mockCSV)
-}
+// 		// for each column, infer type row-by-row
+// 		for k := range src {
+// 			// offset by header rows
+// 			// infer type of only the sample rows
+// 			dataSample := src[k][config.numHeaderRows : numSampleRows+config.numHeaderRows]
+// 			for i := range dataSample {
+// 				dtype := inferType(dataSample[i])
+// 				inferredTypes[k][dtype]++
+// 			}
+// 		}
+// 	}
+// 	// major dimension of output is rows, for compatibility with csv.NewWriter
+// 	mockCSV := mockCSVFromDTypes(inferredTypes, n)
+// 	mockCSV = append(headers, mockCSV...)
+// 	writer := csv.NewWriter(w)
+// 	return writer.WriteAll(mockCSV)
+// }

@@ -1,10 +1,8 @@
 package tada
 
 import (
-	"bytes"
 	"fmt"
-	"io"
-	"strings"
+	"reflect"
 	"testing"
 )
 
@@ -106,164 +104,322 @@ import (
 // 	}
 // }
 
-// func TestReadCSVFromRecords(t *testing.T) {
+// func TestDataFrame_WriteCSV(t *testing.T) {
+// 	type fields struct {
+// 		labels        []*valueContainer
+// 		values        []*valueContainer
+// 		name          string
+// 		err           error
+// 		colLevelNames []string
+// 	}
 // 	type args struct {
-// 		csv    [][]string
-// 		config []ReadOption
+// 		w       io.Writer
+// 		options []WriteOption
 // 	}
 // 	tests := []struct {
 // 		name    string
+// 		fields  fields
 // 		args    args
-// 		want    *DataFrame
+// 		want    string
 // 		wantErr bool
 // 	}{
-// 		{"1 header row, 2 columns, no index",
-// 			args{
-// 				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-// 				config: nil},
-// 			&DataFrame{values: []*valueContainer{
-// 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, id: mockID, name: "foo"},
-// 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
+// 		{"pass",
+// 			fields{values: []*valueContainer{
+// 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 // 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
 // 				colLevelNames: []string{"*0"}},
+// 			args{new(bytes.Buffer), nil},
+// 			"*0,foo\n0,a\n1,b\n",
 // 			false},
-// 		{"1 header row, 2 columns, no index, nil config",
-// 			args{
-// 				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-// 				config: nil},
-// 			&DataFrame{values: []*valueContainer{
-// 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, id: mockID, name: "foo"},
-// 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
+// 		{"pass - delimiter",
+// 			fields{values: []*valueContainer{
+// 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 // 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
 // 				colLevelNames: []string{"*0"}},
+// 			args{new(bytes.Buffer), []WriteOption{Delimiter('|')}},
+// 			"*0|foo\n0|a\n1|b\n",
 // 			false},
-// 		{"column as major dimension",
-// 			args{
-// 				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
-// 				config: []ReadOption{ByColumn()}},
-// 			&DataFrame{values: []*valueContainer{
-// 				{slice: []string{"1", "2"}, isNull: []bool{false, false}, id: mockID, name: "foo"},
-// 				{slice: []string{"5", "6"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
+// 		{"pass - exclude labels",
+// 			fields{values: []*valueContainer{
+// 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 // 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
 // 				colLevelNames: []string{"*0"}},
+// 			args{new(bytes.Buffer), []WriteOption{ExcludeLabels()}},
+// 			"foo\na\nb\n",
 // 			false},
-// 		{"fail - no rows",
-// 			args{csv: nil,
-// 				config: nil},
-// 			nil,
-// 			true},
-// 		{"fail - no columns",
-// 			args{csv: [][]string{{}},
-// 				config: nil},
-// 			nil,
-// 			true},
-// 		{"fail - misaligned",
-// 			args{csv: [][]string{{"foo"}, {"bar", "baz"}},
-// 				config: nil},
-// 			nil,
-// 			true},
+// 		{"fail - bad writer", fields{values: nil,
+// 			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
+// 			colLevelNames: []string{"*0"}},
+// 			args{badWriter{}, nil}, "", true},
 // 	}
 // 	for _, tt := range tests {
 // 		t.Run(tt.name, func(t *testing.T) {
-// 			got, err := ReadCSVFromRecords(tt.args.csv, tt.args.config...)
+// 			df := &DataFrame{
+// 				labels:        tt.fields.labels,
+// 				values:        tt.fields.values,
+// 				name:          tt.fields.name,
+// 				err:           tt.fields.err,
+// 				colLevelNames: tt.fields.colLevelNames,
+// 			}
+// 			w := tt.args.w
+// 			err := df.WriteCSV(w, tt.args.options...)
 // 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("ReadCSVFromRecords() error = %v, wantErr %v", err, tt.wantErr)
+// 				t.Errorf("DataFrame.WriteCSV() error = %v, wantErr %v", err, tt.wantErr)
 // 				return
 // 			}
-// 			if !EqualDataFrames(got, tt.want) {
-// 				t.Errorf("ReadCSVFromRecords() = %v, want %v", got, tt.want)
+// 			if tt.wantErr == false {
+// 				if w.(*bytes.Buffer).String() != tt.want {
+// 					t.Errorf("DataFrame.WriteCSV() -> w = %v, want %v", w.(*bytes.Buffer).String(), tt.want)
+// 				}
 // 			}
+
 // 		})
 // 	}
 // }
 
-type testMatrix struct {
-	values [][]float64
-}
-
-func (mat testMatrix) Dims() (r, c int) {
-	return len(mat.values), len(mat.values[0])
-}
-
-func (mat testMatrix) At(i, j int) float64 {
-	return mat.values[i][j]
-}
-
-func TestReadMatrix(t *testing.T) {
-	type args struct {
-		mat Matrix
+func TestRecordReader_Read(t *testing.T) {
+	type fields struct {
+		HeaderRows  int
+		LabelLevels int
+		ByColumn    bool
+		records     [][]string
 	}
 	tests := []struct {
-		name string
-		args args
-		want *DataFrame
+		name    string
+		fields  fields
+		want    *DataFrame
+		wantErr bool
 	}{
-		{name: "matrix with same signature as gonum mat/matrix",
-			args: args{mat: testMatrix{values: [][]float64{{1, 2}}}},
-			want: &DataFrame{
-				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "0"},
-					{slice: []float64{2}, isNull: []bool{false}, id: mockID, name: "1"}},
-				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
-				name:          "",
+		{"by row",
+			fields{
+				HeaderRows:  1,
+				LabelLevels: 0,
+				ByColumn:    false,
+				records:     [][]string{{"foo", "bar"}, {"", "5"}, {"2", "6"}},
+			},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"", "2"}, isNull: []bool{false, false}, id: mockID, name: "foo"},
+				{slice: []string{"5", "6"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
+				labels: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
 				colLevelNames: []string{"*0"}},
+			false},
+		{"fail - no rows",
+			fields{records: nil},
+			nil,
+			true},
+		{"fail - no columns",
+			fields{records: [][]string{{}}},
+			nil,
+			true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := RecordReader{
+				HeaderRows:  tt.fields.HeaderRows,
+				LabelLevels: tt.fields.LabelLevels,
+				ByColumn:    tt.fields.ByColumn,
+				records:     tt.fields.records,
+			}
+			got, err := r.Read()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("RecordReader.Read() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !EqualDataFrames(got, tt.want) {
+				t.Errorf("RecordReader.Read() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestRecordWriter_Write(t *testing.T) {
+	type fields struct {
+		IncludeLabels bool
+		ByColumn      bool
+		records       [][]string
+	}
+	type args struct {
+		df *DataFrame
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    [][]string
+		wantErr bool
+	}{
+		{"pass - include labels - by column",
+			fields{
+				IncludeLabels: true,
+				ByColumn:      true,
+			},
+			args{&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"a", ""}, isNull: []bool{false, true}, id: mockID, name: "foo"},
+					{slice: []interface{}{1, "qux"}, isNull: []bool{false, false}, id: mockID, name: "bar"},
+				},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			},
+			[][]string{{"*0", "0", "1"}, {"foo", "a", "(null)"}, {"bar", "1", "qux"}},
+			false},
+		{"pass - exclude labels - by row",
+			fields{
+				IncludeLabels: false,
+				ByColumn:      false,
+			},
+			args{&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"a", ""}, isNull: []bool{false, true}, id: mockID, name: "foo"},
+					{slice: []interface{}{1, "qux"}, isNull: []bool{false, false}, id: mockID, name: "bar"},
+				},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			},
+			[][]string{{"foo", "bar"}, {"a", "1"}, {"(null)", "qux"}},
+			false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &RecordWriter{
+				IncludeLabels: tt.fields.IncludeLabels,
+				ByColumn:      tt.fields.ByColumn,
+				records:       tt.fields.records,
+			}
+			if err := w.Write(tt.args.df); (err != nil) != tt.wantErr {
+				t.Errorf("RecordWriter.Write() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(w.Records(), tt.want) {
+				t.Errorf("RecordWriter.Write().Records() = %v, want %v", w.Records(), tt.want)
+			}
+		})
+	}
+}
+
+func TestInterfaceRecordReader_Read(t *testing.T) {
+	type fields struct {
+		HeaderRows  int
+		LabelLevels int
+		ByColumn    bool
+		records     [][]interface{}
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		want    *DataFrame
+		wantErr bool
+	}{
+		{"pass - by rows - 1 header",
+			fields{
+				HeaderRows:  1,
+				LabelLevels: 0,
+				ByColumn:    false,
+				records: [][]interface{}{
+					{"foo", "bar"},
+					{float64(1), float64(2)},
+				},
+			},
+			&DataFrame{
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
+				values: []*valueContainer{
+					{slice: []interface{}{float64(1)}, isNull: []bool{false}, id: mockID, name: "foo"},
+					{slice: []interface{}{float64(2)}, isNull: []bool{false}, id: mockID, name: "bar"},
+				},
+				colLevelNames: []string{"*0"}},
+			false,
+		},
+		{"fail - no records",
+			fields{records: [][]interface{}{}},
+			nil, true,
+		},
+		{"fail - first record empty",
+			fields{records: [][]interface{}{{}, {0}}},
+			nil, true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := ReadMatrix(tt.args.mat); !EqualDataFrames(got, tt.want) {
-				t.Errorf("ReadMatrix() = %v, want %v", got, tt.want)
+			r := InterfaceRecordReader{
+				HeaderRows:  tt.fields.HeaderRows,
+				LabelLevels: tt.fields.LabelLevels,
+				ByColumn:    tt.fields.ByColumn,
+				records:     tt.fields.records,
+			}
+			got, err := r.Read()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("InterfaceRecordReader.Read() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !EqualDataFrames(got, tt.want) {
+				t.Errorf("InterfaceRecordReader.Read() = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestWriteMockCSV(t *testing.T) {
-	want1 := `corge,qux
-.5,baz
-.5,baz
-.5,baz
-`
-
+func TestInterfaceRecordWriter_Write(t *testing.T) {
+	type fields struct {
+		IncludeLabels bool
+		ByColumn      bool
+		records       [][]interface{}
+	}
 	type args struct {
-		r          io.Reader
-		outputRows int
-		config     []ReadOption
+		df *DataFrame
 	}
 	tests := []struct {
 		name    string
+		fields  fields
 		args    args
-		wantW   string
+		want    [][]interface{}
 		wantErr bool
 	}{
-		{"pass",
-			args{
-				r:          strings.NewReader("corge, qux\n 1.5, foo\n 2.5, foo"),
-				config:     nil,
-				outputRows: 3},
-			want1, false},
-		{"columns as major dim",
-			args{
-				r:          strings.NewReader("corge, 1.5, 2.5\n qux, foo, foo"),
-				outputRows: 3,
-				config:     []ReadOption{ByColumn()}},
-			want1, false},
-		{"fail - no data", args{r: strings.NewReader(""), config: nil, outputRows: 3},
-			"", true},
+		{"pass - include labels - by column",
+			fields{
+				IncludeLabels: true,
+				ByColumn:      true,
+			},
+			args{&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"a", ""}, isNull: []bool{false, true}, id: mockID, name: "foo"},
+					{slice: []interface{}{1, "qux"}, isNull: []bool{false, false}, id: mockID, name: "bar"},
+				},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			},
+			[][]interface{}{{"*0", 0, 1}, {"foo", "a", nil}, {"bar", 1, "qux"}},
+			false},
+		{"pass - exclude labels - by row",
+			fields{
+				IncludeLabels: false,
+				ByColumn:      false,
+			},
+			args{&DataFrame{
+				values: []*valueContainer{
+					{slice: []string{"a", ""}, isNull: []bool{false, true}, id: mockID, name: "foo"},
+					{slice: []interface{}{1, "qux"}, isNull: []bool{false, false}, id: mockID, name: "bar"},
+				},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			},
+			[][]interface{}{{"foo", "bar"}, {"a", 1}, {nil, "qux"}},
+			false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			w := &bytes.Buffer{}
-			if err := WriteMockCSV(w, tt.args.outputRows, tt.args.r, tt.args.config...); (err != nil) != tt.wantErr {
-				t.Errorf("WriteMockCSV() error = %v, wantErr %v", err, tt.wantErr)
-				return
+			w := &InterfaceRecordWriter{
+				IncludeLabels: tt.fields.IncludeLabels,
+				ByColumn:      tt.fields.ByColumn,
+				records:       tt.fields.records,
 			}
-			if gotW := w.String(); gotW != tt.wantW {
-				t.Errorf("WriteMockCSV() = %v, want %v", gotW, tt.wantW)
+			if err := w.Write(tt.args.df); (err != nil) != tt.wantErr {
+				t.Errorf("InterfaceRecordWriter.Write() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(w.Records(), tt.want) {
+				t.Errorf("InterfaceRecordWriter.Write().Records() = %v, want %v", w.Records(), tt.want)
 			}
 		})
 	}
-
 }
 
 type badReader struct{}
@@ -668,306 +824,130 @@ type testSchema6 struct {
 // 	}
 // }
 
-// func TestReadInterfaceFromRecords(t *testing.T) {
-// 	type args struct {
-// 		records [][]interface{}
-// 		options []ReadOption
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		args    args
-// 		wantRet *DataFrame
-// 		wantErr bool
-// 	}{
-// 		{"pass - major dim rows - 1 header",
-// 			args{
-// 				[][]interface{}{
-// 					{"foo", "bar"},
-// 					{float64(1), float64(2)},
-// 				}, nil},
-// 			&DataFrame{
-// 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
-// 				values: []*valueContainer{
-// 					{slice: []interface{}{float64(1)}, isNull: []bool{false}, id: mockID, name: "foo"},
-// 					{slice: []interface{}{float64(2)}, isNull: []bool{false}, id: mockID, name: "bar"},
-// 				},
-// 				colLevelNames: []string{"*0"}},
-// 			false,
-// 		},
-// 		{"pass - major dim cols - 1 header",
-// 			args{
-// 				[][]interface{}{
-// 					{"foo", float64(1)},
-// 					{"bar", float64(2)},
-// 				}, []ReadOption{ByColumn()}},
-// 			&DataFrame{
-// 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
-// 				values: []*valueContainer{
-// 					{slice: []interface{}{float64(1)}, isNull: []bool{false}, id: mockID, name: "foo"},
-// 					{slice: []interface{}{float64(2)}, isNull: []bool{false}, id: mockID, name: "bar"},
-// 				},
-// 				colLevelNames: []string{"*0"}},
-// 			false,
-// 		},
-// 		{"pass - major dim cols - 1 header - not string",
-// 			args{
-// 				[][]interface{}{
-// 					{0, float64(1)},
-// 					{1, float64(2)},
-// 				}, []ReadOption{ByColumn()}},
-// 			&DataFrame{
-// 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
-// 				values: []*valueContainer{
-// 					{slice: []interface{}{float64(1)}, isNull: []bool{false}, id: mockID, name: "0"},
-// 					{slice: []interface{}{float64(2)}, isNull: []bool{false}, id: mockID, name: "1"},
-// 				},
-// 				colLevelNames: []string{"*0"}},
-// 			false,
-// 		},
-// 		{"pass - major dim cols - 1 label",
-// 			args{
-// 				[][]interface{}{
-// 					{"foo", float64(1)},
-// 					{"bar", float64(2)},
-// 				}, []ReadOption{ByColumn(), WithLabels(1)}},
-// 			&DataFrame{
-// 				labels: []*valueContainer{
-// 					{slice: []interface{}{float64(1)}, isNull: []bool{false}, id: mockID, name: "foo"}},
-// 				values: []*valueContainer{
-// 					{slice: []interface{}{float64(2)}, isNull: []bool{false}, id: mockID, name: "bar"},
-// 				},
-// 				colLevelNames: []string{"*0"}},
-// 			false,
-// 		},
-// 		{"pass - major dim cols - 0 headers",
-// 			args{
-// 				[][]interface{}{
-// 					{float64(1)},
-// 					{float64(2)},
-// 				}, []ReadOption{ByColumn(), WithHeaders(0)}},
-// 			&DataFrame{
-// 				labels: []*valueContainer{
-// 					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
-// 				values: []*valueContainer{
-// 					{slice: []interface{}{float64(1)}, isNull: []bool{false}, id: mockID, name: "0"},
-// 					{slice: []interface{}{float64(2)}, isNull: []bool{false}, id: mockID, name: "1"},
-// 				},
-// 				colLevelNames: []string{"*0"}},
-// 			false,
-// 		},
-// 		{"fail - no records",
-// 			args{
-// 				[][]interface{}{}, nil},
-// 			nil, true,
-// 		},
-// 		{"fail - first record empty",
-// 			args{
-// 				[][]interface{}{{}, {0}}, nil},
-// 			nil, true,
-// 		},
-// 		{"fail - unevenly shaped",
-// 			args{
-// 				[][]interface{}{{"foo"}, {1, 2}}, nil},
-// 			nil, true,
-// 		},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			gotRet, err := ReadInterfaceFromRecords(tt.args.records, tt.args.options...)
-// 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("ReadInterfaceFromRecords() error = %v, wantErr %v", err, tt.wantErr)
-// 				return
-// 			}
-// 			if !EqualDataFrames(gotRet, tt.wantRet) {
-// 				t.Errorf("ReadInterfaceFromRecords() = %v, want %v", gotRet, tt.wantRet)
-// 			}
-// 		})
-// 	}
-// }
-
-// func TestDataFrame_CSVRecords(t *testing.T) {
-// 	type fields struct {
-// 		labels        []*valueContainer
-// 		values        []*valueContainer
-// 		name          string
-// 		err           error
-// 		colLevelNames []string
-// 	}
-// 	type args struct {
-// 		options []WriteOption
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		fields  fields
-// 		args    args
-// 		want    [][]string
-// 		wantErr bool
-// 	}{
-// 		{"pass",
-// 			fields{values: []*valueContainer{
-// 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
-// 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-// 				colLevelNames: []string{"*0"}},
-// 			args{},
-// 			[][]string{{"*0", "foo"}, {"0", "a"}, {"1", "b"}}, false},
-// 		{"pass - ignore labels",
-// 			fields{values: []*valueContainer{
-// 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
-// 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-// 				colLevelNames: []string{"*0"}},
-// 			args{[]WriteOption{ExcludeLabels()}},
-// 			[][]string{{"foo"}, {"a"}, {"b"}}, false},
-// 		{"fail",
-// 			fields{values: nil,
-// 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-// 				colLevelNames: []string{"*0"}},
-// 			args{},
-// 			nil, true},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			df := &DataFrame{
-// 				labels:        tt.fields.labels,
-// 				values:        tt.fields.values,
-// 				name:          tt.fields.name,
-// 				err:           tt.fields.err,
-// 				colLevelNames: tt.fields.colLevelNames,
-// 			}
-// 			got := df.CSVRecords(tt.args.options...)
-// 			if !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("DataFrame.CSVRecords() = %v, want %v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
-
-// func TestDataFrame_InterfaceRecords(t *testing.T) {
-// 	type fields struct {
-// 		labels        []*valueContainer
-// 		values        []*valueContainer
-// 		name          string
-// 		err           error
-// 		colLevelNames []string
-// 	}
-// 	type args struct {
-// 		options []WriteOption
-// 	}
-// 	tests := []struct {
-// 		name   string
-// 		fields fields
-// 		args   args
-// 		want   [][]interface{}
-// 	}{
-// 		{"pass",
-// 			fields{values: []*valueContainer{
-// 				{slice: []string{"a", ""}, isNull: []bool{false, true}, id: mockID, name: "foo"},
-// 				{slice: []interface{}{1, "qux"}, isNull: []bool{false, false}, id: mockID, name: "bar"},
-// 			},
-// 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-// 				colLevelNames: []string{"*0"}},
-// 			args{nil},
-// 			[][]interface{}{{"*0", 0, 1}, {"foo", "a", "(null)"}, {"bar", 1, "qux"}}},
-// 		{"pass - exclude labels",
-// 			fields{values: []*valueContainer{
-// 				{slice: []string{"a", ""}, isNull: []bool{false, true}, id: mockID, name: "foo"},
-// 				{slice: []interface{}{1, "qux"}, isNull: []bool{false, false}, id: mockID, name: "bar"},
-// 			},
-// 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-// 				colLevelNames: []string{"*0"}},
-// 			args{[]WriteOption{ExcludeLabels()}},
-// 			[][]interface{}{{"foo", "a", "(null)"}, {"bar", 1, "qux"}}},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			df := &DataFrame{
-// 				labels:        tt.fields.labels,
-// 				values:        tt.fields.values,
-// 				name:          tt.fields.name,
-// 				err:           tt.fields.err,
-// 				colLevelNames: tt.fields.colLevelNames,
-// 			}
-// 			if got := df.InterfaceRecords(tt.args.options...); !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("DataFrame.InterfaceRecords() = %v, want %v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
-
 // type badWriter struct{}
 
 // func (w badWriter) Write([]byte) (int, error) {
 // 	return 0, fmt.Errorf("foo")
 // }
 
-// func TestDataFrame_WriteCSV(t *testing.T) {
-// 	type fields struct {
-// 		labels        []*valueContainer
-// 		values        []*valueContainer
-// 		name          string
-// 		err           error
-// 		colLevelNames []string
-// 	}
+// func TestWriteMockCSV(t *testing.T) {
+// 	want1 := `corge,qux
+// .5,baz
+// .5,baz
+// .5,baz
+// `
+
 // 	type args struct {
-// 		w       io.Writer
-// 		options []WriteOption
+// 		r          io.Reader
+// 		outputRows int
+// 		config     []ReadOption
 // 	}
 // 	tests := []struct {
 // 		name    string
-// 		fields  fields
 // 		args    args
-// 		want    string
+// 		wantW   string
 // 		wantErr bool
 // 	}{
 // 		{"pass",
-// 			fields{values: []*valueContainer{
-// 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
-// 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-// 				colLevelNames: []string{"*0"}},
-// 			args{new(bytes.Buffer), nil},
-// 			"*0,foo\n0,a\n1,b\n",
-// 			false},
-// 		{"pass - delimiter",
-// 			fields{values: []*valueContainer{
-// 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
-// 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-// 				colLevelNames: []string{"*0"}},
-// 			args{new(bytes.Buffer), []WriteOption{Delimiter('|')}},
-// 			"*0|foo\n0|a\n1|b\n",
-// 			false},
-// 		{"pass - exclude labels",
-// 			fields{values: []*valueContainer{
-// 				{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
-// 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-// 				colLevelNames: []string{"*0"}},
-// 			args{new(bytes.Buffer), []WriteOption{ExcludeLabels()}},
-// 			"foo\na\nb\n",
-// 			false},
-// 		{"fail - bad writer", fields{values: nil,
-// 			labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-// 			colLevelNames: []string{"*0"}},
-// 			args{badWriter{}, nil}, "", true},
+// 			args{
+// 				r:          strings.NewReader("corge, qux\n 1.5, foo\n 2.5, foo"),
+// 				config:     nil,
+// 				outputRows: 3},
+// 			want1, false},
+// 		{"columns as major dim",
+// 			args{
+// 				r:          strings.NewReader("corge, 1.5, 2.5\n qux, foo, foo"),
+// 				outputRows: 3,
+// 				config:     []ReadOption{ByColumn()}},
+// 			want1, false},
+// 		{"fail - no data", args{r: strings.NewReader(""), config: nil, outputRows: 3},
+// 			"", true},
 // 	}
 // 	for _, tt := range tests {
 // 		t.Run(tt.name, func(t *testing.T) {
-// 			df := &DataFrame{
-// 				labels:        tt.fields.labels,
-// 				values:        tt.fields.values,
-// 				name:          tt.fields.name,
-// 				err:           tt.fields.err,
-// 				colLevelNames: tt.fields.colLevelNames,
-// 			}
-// 			w := tt.args.w
-// 			err := df.WriteCSV(w, tt.args.options...)
-// 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("DataFrame.WriteCSV() error = %v, wantErr %v", err, tt.wantErr)
+// 			w := &bytes.Buffer{}
+// 			if err := WriteMockCSV(w, tt.args.outputRows, tt.args.r, tt.args.config...); (err != nil) != tt.wantErr {
+// 				t.Errorf("WriteMockCSV() error = %v, wantErr %v", err, tt.wantErr)
 // 				return
 // 			}
-// 			if tt.wantErr == false {
-// 				if w.(*bytes.Buffer).String() != tt.want {
-// 					t.Errorf("DataFrame.WriteCSV() -> w = %v, want %v", w.(*bytes.Buffer).String(), tt.want)
-// 				}
+// 			if gotW := w.String(); gotW != tt.wantW {
+// 				t.Errorf("WriteMockCSV() = %v, want %v", gotW, tt.wantW)
 // 			}
-
 // 		})
 // 	}
+
 // }
+
+type testMatrix struct {
+	values [][]float64
+}
+
+func (mat testMatrix) Dims() (r, c int) {
+	return len(mat.values), len(mat.values[0])
+}
+
+func (mat testMatrix) At(i, j int) float64 {
+	return mat.values[i][j]
+}
+
+func TestReadMatrix(t *testing.T) {
+	type args struct {
+		mat Matrix
+	}
+	tests := []struct {
+		name string
+		args args
+		want *DataFrame
+	}{
+		{name: "matrix with same signature as gonum mat/matrix",
+			args: args{mat: testMatrix{values: [][]float64{{1, 2}}}},
+			want: &DataFrame{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "0"},
+					{slice: []float64{2}, isNull: []bool{false}, id: mockID, name: "1"}},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
+				name:          "",
+				colLevelNames: []string{"*0"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ReadMatrix(tt.args.mat); !EqualDataFrames(got, tt.want) {
+				t.Errorf("ReadMatrix() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_UnmarshalJSON(t *testing.T) {
+	type args struct {
+		b []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *DataFrame
+		wantErr bool
+	}{
+		{"pass",
+			args{[]byte(`
+			{"name": "foobar", 
+			"values": [{"slice": ["foo"], "isNull": [false], "id": "1", "name": "bar"}], 
+			"colLevelNames": ["*0"]}`)},
+			&DataFrame{
+				name:          "foobar",
+				values:        []*valueContainer{{slice: []interface{}{"foo"}, isNull: []bool{false}, name: "bar", id: "1"}},
+				colLevelNames: []string{"*0"},
+			},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := new(DataFrame)
+			if err := df.UnmarshalJSON(tt.args.b); (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}

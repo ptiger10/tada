@@ -4789,41 +4789,41 @@ func Test_nameOfContainer(t *testing.T) {
 	}
 }
 
-func Test_setReadConfig(t *testing.T) {
-	type args struct {
-		options []ReadOption
-	}
-	tests := []struct {
-		name string
-		args args
-		want *readConfig
-	}{
-		{"default", args{nil}, &readConfig{
-			numHeaderRows:  1,
-			numLabelLevels: 0,
-			delimiter:      ',',
-			majorDimIsCols: false,
-		}},
-		{"pass", args{[]ReadOption{
-			WithHeaders(2),
-			WithLabels(2),
-			WithDelimiter('|'),
-			ByColumn(),
-		}}, &readConfig{
-			numHeaderRows:  2,
-			numLabelLevels: 2,
-			delimiter:      '|',
-			majorDimIsCols: true,
-		}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := setReadConfig(tt.args.options); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("setReadConfig() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
+// func Test_setReadConfig(t *testing.T) {
+// 	type args struct {
+// 		options []ReadOption
+// 	}
+// 	tests := []struct {
+// 		name string
+// 		args args
+// 		want *readConfig
+// 	}{
+// 		{"default", args{nil}, &readConfig{
+// 			numHeaderRows:  1,
+// 			numLabelLevels: 0,
+// 			delimiter:      ',',
+// 			majorDimIsCols: false,
+// 		}},
+// 		{"pass", args{[]ReadOption{
+// 			WithHeaders(2),
+// 			WithLabels(2),
+// 			WithDelimiter('|'),
+// 			ByColumn(),
+// 		}}, &readConfig{
+// 			numHeaderRows:  2,
+// 			numLabelLevels: 2,
+// 			delimiter:      '|',
+// 			majorDimIsCols: true,
+// 		}},
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			if got := setReadConfig(tt.args.options); !reflect.DeepEqual(got, tt.want) {
+// 				t.Errorf("setReadConfig() = %v, want %v", got, tt.want)
+// 			}
+// 		})
+// 	}
+// }
 
 func Test_valueContainer_expand(t *testing.T) {
 	type fields struct {
@@ -4996,28 +4996,17 @@ func Test_valueContainer_interfaceSlice(t *testing.T) {
 		cache  []string
 		name   string
 	}
-	type args struct {
-		includeHeader bool
-	}
 	tests := []struct {
 		name   string
 		fields fields
-		args   args
-		want   []interface{}
+
+		want []interface{}
 	}{
 		{"pass - exclude header", fields{
 			slice:  []int{1, 0, 2},
 			isNull: []bool{false, true, false},
 			name:   "foobar"},
-			args{false},
 			[]interface{}{1, "(null)", 2},
-		},
-		{"pass - include header", fields{
-			slice:  []int{1, 0, 2},
-			isNull: []bool{false, true, false},
-			name:   "foobar"},
-			args{true},
-			[]interface{}{"foobar", 1, "(null)", 2},
 		},
 	}
 	for _, tt := range tests {
@@ -5028,7 +5017,7 @@ func Test_valueContainer_interfaceSlice(t *testing.T) {
 				cache:  tt.fields.cache,
 				name:   tt.fields.name,
 			}
-			if got := vc.interfaceSlice(tt.args.includeHeader); !reflect.DeepEqual(got, tt.want) {
+			if got := vc.interfaceSlice(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("valueContainer.interfaceSlice() = %v, want %v", got, tt.want)
 			}
 		})
@@ -5159,5 +5148,193 @@ func TestRealClock(t *testing.T) {
 	c := realClock{}
 	if !c.now().After(time.Time{}) {
 		t.Errorf("expected realClock to return a non-zero time")
+	}
+}
+
+func Test_transposeRecords(t *testing.T) {
+	type args struct {
+		records [][]string
+	}
+	tests := []struct {
+		name string
+		args args
+		want [][]string
+	}{
+		{"pass",
+			args{[][]string{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}}},
+			[][]string{{"foo", "quz"}, {"bar", "qux"}, {"baz", "quuz"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := transposeRecords(tt.args.records); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("transposeRecords() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_readRecords(t *testing.T) {
+	type args struct {
+		records    [][]string
+		byColumns  bool
+		numHeaders int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*valueContainer
+		wantErr bool
+	}{
+		{"pass - by row, no headers",
+			args{[][]string{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}}, false, 0},
+			[]*valueContainer{
+				{slice: []string{"foo", "quz"}, isNull: []bool{false, false}, name: "", id: mockID},
+				{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, name: "", id: mockID},
+				{slice: []string{"baz", "quuz"}, isNull: []bool{false, false}, name: "", id: mockID},
+			},
+			false,
+		},
+		{"pass - by row, with header",
+			args{[][]string{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}}, false, 1},
+			[]*valueContainer{
+				{slice: []string{"quz"}, isNull: []bool{false}, name: "foo", id: mockID},
+				{slice: []string{"qux"}, isNull: []bool{false}, name: "bar", id: mockID},
+				{slice: []string{"quuz"}, isNull: []bool{false}, name: "baz", id: mockID},
+			},
+			false,
+		},
+		{"pass - by column, with header",
+			args{[][]string{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}}, true, 1},
+			[]*valueContainer{
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo", id: mockID},
+				{slice: []string{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz", id: mockID},
+			},
+			false,
+		},
+		{"fail - misshapen",
+			args{[][]string{{"foo", "bar"}, {"quz", "qux", "quuz"}}, false, 1},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := readRecords(tt.args.records, tt.args.byColumns, tt.args.numHeaders)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readRecords() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("readRecords() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_writeRecords(t *testing.T) {
+	type args struct {
+		containers   []*valueContainer
+		byColumn     bool
+		numColLevels int
+	}
+	tests := []struct {
+		name string
+		args args
+		want [][]string
+	}{
+		{"pass - transpose rows - with null", args{
+			[]*valueContainer{
+				{slice: []string{"quz"}, isNull: []bool{false}, name: "foo", id: mockID},
+				{slice: []string{""}, isNull: []bool{true}, name: "bar", id: mockID},
+				{slice: []string{"quuz"}, isNull: []bool{false}, name: "baz", id: mockID},
+			}, false, 1,
+		},
+			[][]string{{"foo", "bar", "baz"}, {"quz", "(null)", "quuz"}},
+		},
+		{"pass - by column", args{
+			[]*valueContainer{
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo", id: mockID},
+				{slice: []string{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz", id: mockID},
+			}, true, 1,
+		},
+			[][]string{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}},
+		},
+		{"pass - by column - multi-level", args{
+			[]*valueContainer{
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo|corge", id: mockID},
+				{slice: []string{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz|fred", id: mockID},
+			}, true, 2,
+		},
+			[][]string{{"foo", "corge", "bar", "baz"}, {"quz", "fred", "qux", "quuz"}},
+		},
+		{"pass - by column - multi-level (uneven)", args{
+			[]*valueContainer{
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo", id: mockID},
+				{slice: []string{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz|fred", id: mockID},
+			}, true, 2,
+		},
+			[][]string{{"foo", "", "bar", "baz"}, {"quz", "fred", "qux", "quuz"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := writeRecords(tt.args.containers, tt.args.byColumn, tt.args.numColLevels); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("writeRecords() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_writeInterfaceRecords(t *testing.T) {
+	type args struct {
+		containers   []*valueContainer
+		byColumn     bool
+		numColLevels int
+	}
+	tests := []struct {
+		name string
+		args args
+		want [][]interface{}
+	}{
+		{"pass - transpose rows - with null", args{
+			[]*valueContainer{
+				{slice: []string{"quz"}, isNull: []bool{false}, name: "foo", id: mockID},
+				{slice: []string{""}, isNull: []bool{true}, name: "bar", id: mockID},
+				{slice: []string{"quuz"}, isNull: []bool{false}, name: "baz", id: mockID},
+			}, false, 1,
+		},
+			[][]interface{}{{"foo", "bar", "baz"}, {"quz", "(null)", "quuz"}},
+		},
+		{"pass - by column", args{
+			[]*valueContainer{
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo", id: mockID},
+				{slice: []string{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz", id: mockID},
+			}, true, 1,
+		},
+			[][]interface{}{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}},
+		},
+		{"pass - by column - multi-level", args{
+			[]*valueContainer{
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo|corge", id: mockID},
+				{slice: []string{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz|fred", id: mockID},
+			}, true, 2,
+		},
+			[][]interface{}{{"foo", "corge", "bar", "baz"}, {"quz", "fred", "qux", "quuz"}},
+		},
+		{"pass - by column - multi-level (uneven)", args{
+			[]*valueContainer{
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo", id: mockID},
+				{slice: []string{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz|fred", id: mockID},
+			}, true, 2,
+		},
+			[][]interface{}{{"foo", nil, "bar", "baz"}, {"quz", "fred", "qux", "quuz"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := writeInterfaceRecords(tt.args.containers, tt.args.byColumn, tt.args.numColLevels); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("writeInterfaceRecords() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

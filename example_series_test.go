@@ -34,20 +34,20 @@ func ExampleSeries_setNaNStatus() {
 	// isNull: [false false]
 }
 
-func ExampleSeries_setSentinelNulls() {
+func ExampleSeries_setEmptyStringAsNull() {
 	s := tada.NewSeries([]string{"foo", "", "(null)"})
 	fmt.Println("default sentinel null values\n isNull:", s.GetNulls())
 
-	tada.SetOptionNullStrings(nil)
+	tada.SetOptionEmptyStringAsNull(true)
 	s = tada.NewSeries([]string{"foo", "", "(null)"})
 	fmt.Println("remove defaults\n isNull:", s.GetNulls())
 
-	tada.SetOptionNullStrings(tada.GetOptionDefaultNullStrings())
+	tada.SetOptionEmptyStringAsNull(false)
 	// Output:
 	// default sentinel null values
-	//  isNull: [false true true]
+	//  isNull: [false false true]
 	// remove defaults
-	//  isNull: [false false false]
+	//  isNull: [false true true]
 }
 
 func ExampleSeries_nestedSlice() {

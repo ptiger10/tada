@@ -4,15 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/ptiger10/tablediff"
 )
 
 func TestNewSeries(t *testing.T) {
@@ -205,54 +202,54 @@ func TestSeries_DataFrame(t *testing.T) {
 	}
 }
 
-func TestSeries_EqualsCSV(t *testing.T) {
-	type fields struct {
-		values *valueContainer
-		labels []*valueContainer
-		err    error
-	}
-	type args struct {
-		r             io.Reader
-		includeLabels bool
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    bool
-		want1   *tablediff.Differences
-		wantErr bool
-	}{
-		{name: "pass",
-			fields: fields{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
-				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}}},
-			args:    args{r: strings.NewReader("*0, foo\n 0, 1"), includeLabels: true},
-			want:    true,
-			want1:   nil,
-			wantErr: false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := &Series{
-				values: tt.fields.values,
-				labels: tt.fields.labels,
-				err:    tt.fields.err,
-			}
-			got, got1, err := s.EqualsCSV(tt.args.includeLabels, tt.args.r)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("Series.EqualsCSV() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if got != tt.want {
-				t.Errorf("Series.EqualsCSV() got = %v, want %v", got, tt.want)
-			}
-			if !reflect.DeepEqual(got1, tt.want1) {
-				t.Errorf("Series.EqualsCSV() got1 = %v, want %v", got1, tt.want1)
-			}
-		})
-	}
-}
+// func TestSeries_EqualsCSV(t *testing.T) {
+// 	type fields struct {
+// 		values *valueContainer
+// 		labels []*valueContainer
+// 		err    error
+// 	}
+// 	type args struct {
+// 		r             io.Reader
+// 		includeLabels bool
+// 	}
+// 	tests := []struct {
+// 		name    string
+// 		fields  fields
+// 		args    args
+// 		want    bool
+// 		want1   *tablediff.Differences
+// 		wantErr bool
+// 	}{
+// 		{name: "pass",
+// 			fields: fields{
+// 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
+// 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}}},
+// 			args:    args{r: strings.NewReader("*0, foo\n 0, 1"), includeLabels: true},
+// 			want:    true,
+// 			want1:   nil,
+// 			wantErr: false},
+// 	}
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			s := &Series{
+// 				values: tt.fields.values,
+// 				labels: tt.fields.labels,
+// 				err:    tt.fields.err,
+// 			}
+// 			got, got1, err := s.EqualsCSV(tt.args.includeLabels, tt.args.r)
+// 			if (err != nil) != tt.wantErr {
+// 				t.Errorf("Series.EqualsCSV() error = %v, wantErr %v", err, tt.wantErr)
+// 				return
+// 			}
+// 			if got != tt.want {
+// 				t.Errorf("Series.EqualsCSV() got = %v, want %v", got, tt.want)
+// 			}
+// 			if !reflect.DeepEqual(got1, tt.want1) {
+// 				t.Errorf("Series.EqualsCSV() got1 = %v, want %v", got1, tt.want1)
+// 			}
+// 		})
+// 	}
+// }
 
 // func TestSeries_CSV(t *testing.T) {
 // 	type fields struct {

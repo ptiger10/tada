@@ -38,13 +38,19 @@ func GetOptionDefaultNullStrings() []string {
 	return []string{optionsNullPrinter}
 }
 
-// SetOptionNullStrings replaces the default list of strings that tada considers null with list.
-func SetOptionNullStrings(list []string) {
-	newList := make(map[string]bool, 0)
-	for _, s := range list {
-		newList[s] = true
+// SetOptionAddNullString appends a value to the list of strings that tada considers null.
+func SetOptionAddNullString(s string) {
+	optionNullStrings[s] = true
+}
+
+// SetOptionEmptyStringAsNull changes whether tada considers "" to be a null value when reading in data (default: false).
+func SetOptionEmptyStringAsNull(set bool) {
+	if set {
+		optionNullStrings[""] = true
 	}
-	optionNullStrings = newList
+	if !set {
+		delete(optionNullStrings, "")
+	}
 }
 
 // SetOptionNaNStatus sets whether math.NaN() is considered a null value or not (default: true).
