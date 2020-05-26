@@ -34,11 +34,11 @@ func TestNewSeries(t *testing.T) {
 		{"unsupported input: nil slice, nil labels", args{slice: nil},
 			&Series{err: errors.New("constructing new Series: slice and labels cannot both be nil")}},
 		{"unsupported input: empty slice", args{slice: []float64{}},
-			&Series{err: errors.New("constructing new Series: slice: empty slice: cannot be empty")}},
+			&Series{err: errors.New("constructing new Series: slice: setting null values from interface{}: empty slice: cannot be empty")}},
 		{"unsupported label input: scalar", args{slice: []float64{1}, labels: []interface{}{"foo"}},
-			&Series{err: errors.New("constructing new Series: labels: position 0: setting null values from interface{}: unsupported kind (string); must be slice")}},
+			&Series{err: errors.New("constructing new Series: labels: slice[0]: setting null values from interface{}: unsupported kind (string), must be slice")}},
 		{"fail - different lengths", args{slice: []float64{1}, labels: []interface{}{[]int{0, 1}}},
-			&Series{err: errors.New("constructing new Series: labels: position 0: slice does not match required length (2 != 1)")}},
+			&Series{err: errors.New("constructing new Series: labels: slice[0] does not match required length (2 != 1)")}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -723,12 +723,12 @@ func TestSeries_WithLabels(t *testing.T) {
 			fields{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}}},
-			args{"qux", []string{""}},
+			args{"qux", []string{"quz"}},
 			&Series{
 				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}},
 				labels: []*valueContainer{
 					{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"},
-					{slice: []string{""}, isNull: []bool{true}, id: mockID, name: "qux"},
+					{slice: []string{"quz"}, isNull: []bool{false}, id: mockID, name: "qux"},
 				}},
 		},
 		{"fail: string name not in labels",
@@ -2328,7 +2328,7 @@ func TestSeries_Where(t *testing.T) {
 	}{
 		{"pass",
 			fields{
-				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, id: mockID},
+				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "", id: mockID},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "qux"}}},
 			args{
 				name: "foo",
@@ -2346,7 +2346,7 @@ func TestSeries_Where(t *testing.T) {
 			false},
 		{"pass - nulls",
 			fields{
-				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, id: mockID},
+				values: &valueContainer{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, name: "", id: mockID},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "qux"}}},
 			args{
 				name: "foo",
@@ -2357,7 +2357,7 @@ func TestSeries_Where(t *testing.T) {
 				ifTrue:  "yes",
 				ifFalse: ""},
 			&Series{
-				values: &valueContainer{slice: []interface{}{"", "", "yes"}, isNull: []bool{true, true, false}, id: mockID, name: ""},
+				values: &valueContainer{slice: []interface{}{"", "", "yes"}, isNull: []bool{false, false, false}, id: mockID, name: ""},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "qux"}}},
 			false},
 		{"fail - bad container name",
@@ -2409,7 +2409,7 @@ func TestSeries_Bin(t *testing.T) {
 			args{
 				bins: []float64{1, 2}, config: &Binner{AndLess: false, AndMore: true, Labels: nil}},
 			&Series{
-				values: &valueContainer{slice: []string{"", "1-2", ">2"}, isNull: []bool{true, false, false}, id: mockID},
+				values: &valueContainer{slice: []string{optionsNullPrinter, "1-2", ">2"}, isNull: []bool{true, false, false}, id: mockID},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "qux"}}},
 			false,
 		},
@@ -2419,7 +2419,7 @@ func TestSeries_Bin(t *testing.T) {
 			args{
 				bins: []float64{1, 2}, config: nil},
 			&Series{
-				values: &valueContainer{slice: []string{"", "1-2", ""}, isNull: []bool{true, false, true}, id: mockID},
+				values: &valueContainer{slice: []string{optionsNullPrinter, "1-2", optionsNullPrinter}, isNull: []bool{true, false, true}, id: mockID},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "qux"}}},
 			false,
 		},

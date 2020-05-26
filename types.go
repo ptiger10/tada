@@ -137,6 +137,7 @@ type GroupedDataFrameIterator struct {
 type Matrix interface {
 	Dims() (r, c int)
 	At(i, j int) float64
+	T() Matrix
 }
 
 type floatValueContainer struct {
@@ -206,10 +207,10 @@ type ReduceFn func(slice interface{}, isNull []bool) (value interface{}, null bo
 type DType int
 
 const (
-	// Float64 -> float64
-	Float64 DType = iota
 	// String -> string
-	String
+	String DType = iota
+	// Float64 -> float64
+	Float64
 	// DateTime -> time.Time
 	DateTime // always tz-aware
 	// Time -> civil.Time

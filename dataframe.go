@@ -12,62 +12,6 @@ import (
 
 // -- CONSTRUCTORS
 
-// NewDataFrame creates a new DataFrame with slices (akin to column values) and optional labels.
-// Slices must be comprised of supported slices, and each label must be a supported slice.
-//
-// If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
-// Columns are named sequentially (e.g., 0, 1, etc) by default. Default column names are displayed on printing.
-// Label levels are named *n (e.g., *0, *1, etc) by default. Default label names are hidden on printing.
-//
-// Supported slice types: all variants of []float, []int, & []uint,
-// []string, []bool, []time.Time, []interface{},
-// and 2-dimensional variants of each (e.g., [][]string, [][]float64).
-func NewDataFrame(slices []interface{}, labels ...interface{}) *DataFrame {
-	if slices == nil && labels == nil {
-		return dataFrameWithError(fmt.Errorf("constructing new DataFrame: slices and labels cannot both be nil"))
-	}
-	values := make([]*valueContainer, 0)
-	var err error
-	if slices != nil {
-		// handle values
-		values, err = makeValueContainersFromInterfaces(slices, false)
-		if err != nil {
-			return dataFrameWithError(fmt.Errorf("constructing new DataFrame: slices: %v", err))
-		}
-	}
-	// handle labels
-	retLabels, err := makeValueContainersFromInterfaces(labels, true)
-	if err != nil {
-		return dataFrameWithError(fmt.Errorf("constructing new DataFrame: labels: %v", err))
-	}
-	if len(retLabels) == 0 {
-		// handle default labels case
-		numRows := reflect.ValueOf(slices[0]).Len()
-		defaultLabels := makeDefaultLabels(0, numRows, true)
-		retLabels = append(retLabels, defaultLabels)
-	}
-
-	// ensure equal-lengthed slices
-	var requiredLength int
-	if len(values) > 0 {
-		requiredLength = values[0].len()
-	} else {
-		// handle null values case
-		requiredLength = retLabels[0].len()
-	}
-	err = ensureEqualLengths(retLabels, requiredLength)
-	if err != nil {
-		return dataFrameWithError(fmt.Errorf("constructing new DataFrame: labels: %v", err))
-	}
-	if len(values) > 0 {
-		err = ensureEqualLengths(values, requiredLength)
-		if err != nil {
-			return dataFrameWithError(fmt.Errorf("constructing new DataFrame: columns: %v", err))
-		}
-	}
-	return &DataFrame{values: values, labels: retLabels, colLevelNames: []string{"*0"}}
-}
-
 // MakeMultiLevelLabels expects labels to be a slice of slices.
 // It returns a product of these slices by repeating each label value n times,
 // where n is the number of unique label values in the other slices.
@@ -188,7 +132,7 @@ func (df *DataFrame) Series() *Series {
 // EqualRecords reduces df to [][]string records, reads [][]string records from want,
 // and evaluates whether the stringified values match.
 // If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
-func (df *DataFrame) EqualRecords(got RecordWriter, want CSVReader) (bool, *tablediff.Differences, error) {
+func (df *DataFrame) EqualRecords(got *RecordWriter, want *CSVReader) (bool, *tablediff.Differences, error) {
 	got.Write(df)
 	_, err := want.Read()
 	if err != nil {
@@ -1167,29 +1111,27 @@ func (df *DataFrame) Name() string {
 
 // SetLabelNames sets the names of all the label levels in the DataFrame and returns the entire DataFrame.
 // If an error is returned, it is written to the DataFrame.
-func (df *DataFrame) SetLabelNames(levelNames []string) *DataFrame {
+func (df *DataFrame) SetLabelNames(levelNames []string) error {
 	if len(levelNames) != len(df.labels) {
-		return dataFrameWithError(
-			fmt.Errorf("setting label names: number of levelNames must match number of levels in DataFrame (%d != %d)", len(levelNames), len(df.labels)))
+		return fmt.Errorf("setting label names: number of levelNames (%d) does not match number of levels in DataFrame (%d)",
+			len(levelNames), len(df.labels))
 	}
 	for j := range levelNames {
 		df.labels[j].name = levelNames[j]
 	}
-	return df
+	return nil
 }
 
 // SetColNames sets the names of all the columns in the DataFrame and returns the entire DataFrame.
-// If an error is returned, it is written to the DataFrame.
-func (df *DataFrame) SetColNames(colNames []string) *DataFrame {
+func (df *DataFrame) SetColNames(colNames []string) error {
 	if len(colNames) != len(df.values) {
-		return dataFrameWithError(
-			fmt.Errorf("setting column names: number of colNames must match number of columns in DataFrame (%d != %d)",
-				len(colNames), len(df.values)))
+		return fmt.Errorf("setting column names: number of colNames (%d) does not match number of columns in DataFrame (%d)",
+			len(colNames), len(df.values))
 	}
 	for k := range colNames {
 		df.values[k].name = colNames[k]
 	}
-	return df
+	return nil
 }
 
 // ReorderCols reorders the columns to be in the same order as specified by colNames.
@@ -1502,8 +1444,8 @@ func (df *DataFrame) FilterIndex(container string, filterFn FilterFn) []int {
 // If not, returns ifFalse at that row position.
 // Values are coerced from their original type to the selected field type for filtering, but after filtering retains their original type.
 //
-// Returns an unnamed Series with a copy of the labels from the original Series and null status based on the supplied values.
-// If an unsupported value type is supplied as either ifTrue or ifFalse, returns an error.
+// Within the supplied containers, if any of the values in a row is a null, the resulting row is considered null.
+// Returns an unnamed Series with a copy of the labels from the original Series.
 func (df *DataFrame) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{}) (*Series, error) {
 	ret := make([]interface{}, df.Len())
 	// []int of positions where all filters are true
@@ -1512,6 +1454,7 @@ func (df *DataFrame) Where(filters map[string]FilterFn, ifTrue, ifFalse interfac
 	if err != nil {
 		return nil, fmt.Errorf("where: %v", err)
 	}
+
 	for _, i := range index {
 		ret[i] = ifTrue
 	}
@@ -1520,8 +1463,25 @@ func (df *DataFrame) Where(filters map[string]FilterFn, ifTrue, ifFalse interfac
 	for _, i := range inverseIndex {
 		ret[i] = ifFalse
 	}
-	// ducks error because this is known to be slice
-	isNull, _ := setNullsFromInterface(ret)
+
+	// set nulls
+	var containerIndex []int
+	for k := range filters {
+		i, _ := indexOfContainer(k, mergedLabelsAndCols)
+		containerIndex = append(containerIndex, i)
+	}
+
+	subIndexes := make([][]int, len(containerIndex))
+	for incrementor, k := range containerIndex {
+		subIndexes[incrementor] = mergedLabelsAndCols[k].valid()
+	}
+	allValid := intersection(subIndexes, df.Len())
+	anyNull := difference(makeIntRange(0, df.Len()), allValid)
+	isNull := make([]bool, df.Len())
+	for _, i := range anyNull {
+		isNull[i] = true
+	}
+
 	return &Series{
 		values: newValueContainer(ret, isNull, ""),
 		labels: copyContainers(df.labels),
@@ -1774,7 +1734,7 @@ func (df *DataFrame) Lookup(other *DataFrame, options ...JoinOption) (*DataFrame
 
 // Sort sorts the values by zero or more Sorter specifications.
 // If no Sorter is supplied, does not sort.
-// If no DType is supplied for a Sorter, sorts as float64.
+// If no DType is supplied for a Sorter, sorts as string.
 // DType is only used for the process of sorting. Once it has been sorted, data retains its original type.
 // Returns a new DataFrame.
 func (df *DataFrame) Sort(by ...Sorter) *DataFrame {
@@ -1788,7 +1748,7 @@ func (df *DataFrame) Sort(by ...Sorter) *DataFrame {
 
 // Sort sorts the values by zero or more Sorter specifications.
 // If no Sorter is supplied, does not sort.
-// If no DType is supplied for a Sorter, sorts as float64.
+// If no DType is supplied for a Sorter, sorts as string.
 // Modifies the underlying DataFrame in place.
 func (df *DataFrameMutator) Sort(by ...Sorter) error {
 	if len(by) == 0 {
@@ -2002,29 +1962,6 @@ func (df *DataFrame) math(name string, mathFunction func([]float64, []bool, []in
 		labels: []*valueContainer{
 			newValueContainer(labels, labelNulls, "*0")},
 	}
-}
-
-// SumCols finds each column matching a supplied colName, coerces its values to float64, and adds them row-wise.
-// The resulting Series is named name.
-// If any column has a null value for a given row, that row is considered null.
-func (df *DataFrame) SumCols(name string, colNames ...string) (*Series, error) {
-	if len(colNames) == 0 {
-		return nil, fmt.Errorf("sum columns: colNames cannot be empty")
-	}
-	var ret *Series
-	for i, name := range colNames {
-		_, err := indexOfContainer(name, df.values)
-		if err != nil {
-			return nil, fmt.Errorf("sum columns: %v", err)
-		}
-		if i == 0 {
-			ret = df.Col(name)
-		} else {
-			ret = ret.Add(df.Col(name), false)
-		}
-	}
-	ret.SetName(name)
-	return ret, nil
 }
 
 // Sum coerces the values in each column to float64 and sums each column.

@@ -87,7 +87,7 @@ func (s *Series) DataFrame() *DataFrame {
 // EqualRecords reduces s to [][]string records, reads [][]string records from want,
 // and evaluates whether the stringified values match.
 // If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
-func (s *Series) EqualRecords(got RecordWriter, want CSVReader) (bool, *tablediff.Differences, error) {
+func (s *Series) EqualRecords(got *RecordWriter, want *CSVReader) (bool, *tablediff.Differences, error) {
 	df := s.DataFrame()
 	return df.EqualRecords(got, want)
 }
@@ -600,9 +600,9 @@ func (s *Series) Name() string {
 // -- SORT
 
 // Sort sorts the values by zero or more Sorter specifications.
-// If no Sorter is supplied, sorts by Series values (as float64) in ascending order.
+// If no Sorter is supplied, sorts by Series values (as string) in ascending order.
 // If a Sorter is supplied without a Name or with a name matching the Series name, sorts by Series values.
-// If no DType is supplied in a Sorter, sorts as float64.
+// If no DType is supplied in a Sorter, sorts as string.
 // DType is only used for the process of sorting. Once it has been sorted, data retains its original type.
 // Returns a new Series.
 func (s *Series) Sort(by ...Sorter) *Series {
@@ -615,9 +615,9 @@ func (s *Series) Sort(by ...Sorter) *Series {
 }
 
 // Sort sorts the values by zero or more Sorter specifications.
-// If no Sorter is supplied, sorts by Series values (as float64) in ascending order.
+// If no Sorter is supplied, sorts by Series values (as string) in ascending order.
 // If a Sorter is supplied without a Name or with a name matching the Series name, sorts by Series values.
-// If no DType is supplied in a Sorter, sorts as float64.
+// If no DType is supplied in a Sorter, sorts as string.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Sort(by ...Sorter) error {
 	// default for handling no Sorters: values as Float64 in ascending order
@@ -711,10 +711,10 @@ func (s *SeriesMutator) Filter(filters map[string]FilterFn) error {
 // which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
 // If yes, returns ifTrue at that row position.
 // If not, returns ifFalse at that row position.
-// Values are coerced from their original type to the selected field type for filtering, but after filtering retains their original type.
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retain their original type.
+// Null values are retained.
 //
 // Returns an unnamed Series with a copy of the labels from the original Series and null status based on the supplied values.
-// If an unsupported value type is supplied as either ifTrue or ifFalse, returns an error.
 func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{}) (*Series, error) {
 	ret := make([]interface{}, s.Len())
 	// []int of positions where all filters are true
@@ -731,10 +731,8 @@ func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{})
 	for _, i := range inverseIndex {
 		ret[i] = ifFalse
 	}
-	// ducks error because ret is a supported slice
-	isNull, _ := setNullsFromInterface(ret)
 	return &Series{
-		values: newValueContainer(ret, isNull, ""),
+		values: newValueContainer(ret, s.values.isNull, ""),
 		labels: copyContainers(s.labels),
 	}, nil
 }

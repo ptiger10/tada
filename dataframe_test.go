@@ -49,79 +49,6 @@ func TestMakeMultiLevelLabels(t *testing.T) {
 	}
 }
 
-func TestNewDataFrame(t *testing.T) {
-	type args struct {
-		slices []interface{}
-		labels []interface{}
-	}
-	tests := []struct {
-		name string
-		args args
-		want *DataFrame
-	}{
-		{"pass - supplied values and labels", args{
-			[]interface{}{[]float64{1, 2}, []string{"foo", "bar"}},
-			[]interface{}{[]string{"a", "b"}}},
-			&DataFrame{
-				values: []*valueContainer{
-					{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "0"},
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "1"}},
-				labels:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-		},
-		{"pass - default labels", args{
-			[]interface{}{[]float64{1, 2}, []string{"foo", "bar"}},
-			nil},
-			&DataFrame{
-				values: []*valueContainer{
-					{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "0"},
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "1"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-		},
-		{"pass - default values", args{
-			nil,
-			[]interface{}{[]string{"a", "b"}}},
-			&DataFrame{
-				values:        []*valueContainer{},
-				labels:        []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-		},
-		{"fail - slices and labels nil", args{nil, nil},
-			&DataFrame{
-				err: errors.New("constructing new DataFrame: slices and labels cannot both be nil")},
-		},
-		{"fail - unsupported kind", args{
-			[]interface{}{"foo"}, nil},
-			&DataFrame{
-				err: errors.New("constructing new DataFrame: slices: position 0: setting null values from interface{}: unsupported kind (string); must be slice")},
-		},
-		{"fail - unsupported label kind", args{
-			[]interface{}{[]float64{1}}, []interface{}{"foo"}},
-			&DataFrame{
-				err: errors.New("constructing new DataFrame: labels: position 0: setting null values from interface{}: unsupported kind (string); must be slice")},
-		},
-		{"fail - wrong length labels", args{
-			[]interface{}{[]int{0}},
-			[]interface{}{[]string{"a", "b"}}},
-			&DataFrame{
-				err: errors.New("constructing new DataFrame: labels: position 0: slice does not match required length (2 != 1)")},
-		},
-		{"fail - wrong length columns", args{
-			[]interface{}{[]int{0}, []string{"a", "b"}}, nil},
-			&DataFrame{
-				err: errors.New("constructing new DataFrame: columns: position 1: slice does not match required length (2 != 1)")},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := NewDataFrame(tt.args.slices, tt.args.labels...); !EqualDataFrames(got, tt.want) {
-				t.Errorf("NewDataFrame() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestDataFrame_Err_String(t *testing.T) {
 	type fields struct {
 		values        []*valueContainer
@@ -1365,10 +1292,11 @@ func TestDataFrame_SetLabelNames(t *testing.T) {
 		colNames []string
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *DataFrame
+		name    string
+		fields  fields
+		args    args
+		want    *DataFrame
+		wantErr bool
 	}{
 		{"pass", fields{
 			values: []*valueContainer{
@@ -1385,6 +1313,7 @@ func TestDataFrame_SetLabelNames(t *testing.T) {
 					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				name:          "baz",
 				colLevelNames: []string{"*0"}},
+			false,
 		},
 		{"fail - too many", fields{
 			values: []*valueContainer{
@@ -1395,7 +1324,13 @@ func TestDataFrame_SetLabelNames(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{[]string{"bar", "qux"}},
 			&DataFrame{
-				err: fmt.Errorf("setting label names: number of levelNames must match number of levels in DataFrame (2 != 1)")},
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
+				name:          "baz",
+				colLevelNames: []string{"*0"}},
+			true,
 		},
 		{"fail - too few", fields{
 			values: []*valueContainer{
@@ -1407,7 +1342,14 @@ func TestDataFrame_SetLabelNames(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{[]string{"qux"}},
 			&DataFrame{
-				err: fmt.Errorf("setting label names: number of levelNames must match number of levels in DataFrame (1 != 2)")},
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "*1"}},
+				name:          "baz",
+				colLevelNames: []string{"*0"}},
+			true,
 		},
 	}
 	for _, tt := range tests {
@@ -1419,8 +1361,12 @@ func TestDataFrame_SetLabelNames(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.SetLabelNames(tt.args.colNames); !EqualDataFrames(got, tt.want) {
-				t.Errorf("DataFrame.SetLabelNames() = %v, want %v", got, tt.want)
+			if err := df.SetLabelNames(tt.args.colNames); (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.SetLabelNames() error = %v, want %v", err, tt.wantErr)
+			}
+
+			if !EqualDataFrames(df, tt.want) {
+				t.Errorf("DataFrame.SetLabelNames() -> %v, want %v", df, tt.want)
 			}
 		})
 	}
@@ -1438,10 +1384,11 @@ func TestDataFrame_SetColNames(t *testing.T) {
 		colNames []string
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
-		want   *DataFrame
+		name    string
+		fields  fields
+		args    args
+		want    *DataFrame
+		wantErr bool
 	}{
 		{"pass", fields{
 			values: []*valueContainer{
@@ -1458,6 +1405,7 @@ func TestDataFrame_SetColNames(t *testing.T) {
 					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
 				name:          "baz",
 				colLevelNames: []string{"*0"}},
+			false,
 		},
 		{"fail - too many", fields{
 			values: []*valueContainer{
@@ -1468,7 +1416,13 @@ func TestDataFrame_SetColNames(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{[]string{"bar", "qux"}},
 			&DataFrame{
-				err: fmt.Errorf("setting column names: number of colNames must match number of columns in DataFrame (2 != 1)")},
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
+				name:          "baz",
+				colLevelNames: []string{"*0"}},
+			true,
 		},
 		{"fail - too few", fields{
 			values: []*valueContainer{
@@ -1480,7 +1434,14 @@ func TestDataFrame_SetColNames(t *testing.T) {
 			colLevelNames: []string{"*0"}},
 			args{[]string{"qux"}},
 			&DataFrame{
-				err: fmt.Errorf("setting column names: number of colNames must match number of columns in DataFrame (1 != 2)")},
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "bar"}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
+				name:          "baz",
+				colLevelNames: []string{"*0"}},
+			true,
 		},
 	}
 	for _, tt := range tests {
@@ -1492,8 +1453,12 @@ func TestDataFrame_SetColNames(t *testing.T) {
 				err:           tt.fields.err,
 				colLevelNames: tt.fields.colLevelNames,
 			}
-			if got := df.SetColNames(tt.args.colNames); !EqualDataFrames(got, tt.want) {
-				t.Errorf("DataFrame.SetColNames() = %v, want %v", got, tt.want)
+			if err := df.SetColNames(tt.args.colNames); (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.SetColNames() error = %v, want %v", err, tt.wantErr)
+			}
+
+			if !EqualDataFrames(df, tt.want) {
+				t.Errorf("DataFrame.SetColNames() -> %v, want %v", df, tt.want)
 			}
 		})
 	}
@@ -1701,7 +1666,7 @@ func TestDataFrame_Where(t *testing.T) {
 			false},
 		{"pass - nulls",
 			fields{
-				values: []*valueContainer{{slice: []string{"foo", "bar", "baz"}, isNull: []bool{false, false, false}, id: mockID}},
+				values: []*valueContainer{{slice: []string{"", "bar", "baz"}, isNull: []bool{true, false, false}, id: mockID}},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "qux"}}},
 			args{
 				name: "foo",
@@ -1712,7 +1677,7 @@ func TestDataFrame_Where(t *testing.T) {
 				ifTrue:  "yes",
 				ifFalse: ""},
 			&Series{
-				values: &valueContainer{slice: []interface{}{"", "", "yes"}, isNull: []bool{true, true, false}, id: mockID, name: ""},
+				values: &valueContainer{slice: []interface{}{"", "", "yes"}, isNull: []bool{true, false, false}, id: mockID, name: ""},
 				labels: []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "qux"}}},
 			false},
 		{"fail - bad container name",
@@ -4417,85 +4382,6 @@ func TestDataFrame_NameOfCol(t *testing.T) {
 			}
 			if got := df.NameOfCol(tt.args.n); got != tt.want {
 				t.Errorf("DataFrame.NameOfCol() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestDataFrame_SumCols(t *testing.T) {
-	type fields struct {
-		labels        []*valueContainer
-		values        []*valueContainer
-		name          string
-		err           error
-		colLevelNames []string
-	}
-	type args struct {
-		name     string
-		colNames []string
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		args    args
-		want    *Series
-		wantErr bool
-	}{
-		{"pass",
-			fields{
-				values: []*valueContainer{
-					{slice: []int{0, 1}, isNull: []bool{true, false}, id: mockID, name: "foo"},
-					{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "qux"},
-				},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			args{"sum", []string{"foo", "qux"}},
-			&Series{
-				values: &valueContainer{slice: []float64{0, 3}, isNull: []bool{true, false}, id: mockID, name: "sum"},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-			},
-			false,
-		},
-		{"fail - bad name",
-			fields{
-				values: []*valueContainer{
-					{slice: []int{0, 1}, isNull: []bool{true, false}, id: mockID, name: "foo"},
-					{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "qux"},
-				},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			args{"", []string{"corge", "qux"}},
-			nil,
-			true,
-		},
-		{"fail - no columns",
-			fields{
-				values: []*valueContainer{
-					{slice: []int{0, 1}, isNull: []bool{true, false}, id: mockID, name: "foo"},
-					{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "qux"},
-				},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			args{"", nil},
-			nil,
-			true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			df := &DataFrame{
-				labels:        tt.fields.labels,
-				values:        tt.fields.values,
-				name:          tt.fields.name,
-				err:           tt.fields.err,
-				colLevelNames: tt.fields.colLevelNames,
-			}
-			got, err := df.SumCols(tt.args.name, tt.args.colNames...)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("DataFrame.SumCols() error = %v, want %v", err, tt.wantErr)
-				return
-			}
-			if !EqualSeries(got, tt.want) {
-				t.Errorf("DataFrame.SumCols() = %v, want %v", got, tt.want)
 			}
 		})
 	}

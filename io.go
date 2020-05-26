@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"reflect"
-	"unicode"
 )
 
 // ByColumn configures a read function to expect columns to be the major dimension of csv data
@@ -108,6 +106,15 @@ func (s *Series) WriteTo(w Writer) error {
 	return nil
 }
 
+// NewDataFrame constructs a new DataFrame from Reader.
+func NewDataFrame(r Reader) (*DataFrame, error) {
+	df, err := r.Read()
+	if err != nil {
+		return nil, fmt.Errorf("constructing new DataFrame: %v", err)
+	}
+	return df, nil
+}
+
 // WriteTo writes a DataFrame to a Writer.
 func (df *DataFrame) WriteTo(w Writer) error {
 	err := w.Write(df)
@@ -119,6 +126,77 @@ func (df *DataFrame) WriteTo(w Writer) error {
 
 // -- READ/WRITERS
 
+// -- slice of slices
+
+// SliceReader reads slices into a DataFrame.
+type SliceReader struct {
+	ColSlices    []interface{}
+	LabelSlices  []interface{}
+	ColNames     []string
+	LabelNames   []string
+	Name         string
+	NumColLevels int // advanced: allows for multiple levels of column header names
+}
+
+// NewSliceReader returns a default SliceReader.
+func NewSliceReader(columnSlices []interface{}) SliceReader {
+	return SliceReader{
+		ColSlices: columnSlices,
+	}
+}
+
+// MustRead reads from SliceReader and returns a DataFrame. Any errors are written to the DataFrame directly.
+func (r SliceReader) MustRead() *DataFrame {
+	df, err := r.Read()
+	if err != nil {
+		return dataFrameWithError(err)
+	}
+	return df
+}
+
+// Read creates a new DataFrame from a SliceReader.
+// Each element in columnSlices and labelSlices must itself be a slice.
+//
+// If no labels are supplied, a default label level is inserted ([]int incrementing from 0).
+// Columns are named sequentially (e.g., 0, 1, etc) by default. Default column names are displayed on printing.
+// Label levels are named sequentially with a prefix (e.g., *0, *1, etc) by default. Default label names are hidden on printing.
+func (r SliceReader) Read() (*DataFrame, error) {
+	if r.ColSlices == nil && r.LabelSlices == nil {
+		return nil, fmt.Errorf("slice reader: values and labels cannot both be nil")
+	}
+	labels, err := makeValueContainersFromInterfaces(r.LabelSlices, true)
+	if err != nil {
+		return nil, fmt.Errorf("slice reader: labels: %v", err)
+	}
+	columns, err := makeValueContainersFromInterfaces(r.ColSlices, false)
+	if err != nil {
+		return nil, fmt.Errorf("slice reader: columns: %v", err)
+	}
+	containers := append(labels, columns...)
+	df := containersToDF(containers, r.NumColLevels, len(r.LabelSlices), r.Name)
+
+	// set container names
+	if len(r.LabelNames) > 0 {
+		err = df.SetLabelNames(r.LabelNames)
+		if err != nil {
+			return nil, fmt.Errorf("slice reader: %v", err)
+		}
+	}
+	if len(r.ColNames) > 0 {
+		err = df.SetColNames(r.ColNames)
+		if err != nil {
+			return nil, fmt.Errorf("slice reader: %v", err)
+		}
+	}
+	requiredLength := containers[0].len()
+	err = ensureEqualLengths(containers, requiredLength)
+	if err != nil {
+		return nil, fmt.Errorf("slice reader: %v", err)
+	}
+
+	return df, nil
+}
+
 // -- [][]string records
 
 // RecordReader reads [][]string records into a DataFrame.
@@ -126,6 +204,8 @@ type RecordReader struct {
 	HeaderRows  int
 	LabelLevels int
 	ByColumn    bool
+	Name        string
+	InferTypes  bool
 	records     [][]string
 }
 
@@ -157,7 +237,10 @@ func (r RecordReader) Read() (*DataFrame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading csv from records: %v", err)
 	}
-	df := containersToDF(vc, r.HeaderRows, r.LabelLevels)
+	if r.InferTypes {
+		castToInferredTypes(vc)
+	}
+	df := containersToDF(vc, r.HeaderRows, r.LabelLevels, r.Name)
 	return df, nil
 }
 
@@ -198,20 +281,37 @@ func (w *RecordWriter) Write(df *DataFrame) error {
 type CSVReader struct {
 	RecordReader
 	*csv.Reader
+	BlankStringAsNull bool
 }
 
-// NewCSVReader creates a new CSVReader with embedded encoding/csv reader and default settings.
-func NewCSVReader(r io.Reader) CSVReader {
-	return CSVReader{
+// Records returns the [][]string records after they have been read.
+func (r *CSVReader) Records() [][]string {
+	return r.records
+}
+
+// NewCSVReader creates a new CSVReader with embedded encoding/csv.Reader and default settings.
+func NewCSVReader(r io.Reader) *CSVReader {
+	return &CSVReader{
 		RecordReader: RecordReader{
 			HeaderRows:  1,
 			LabelLevels: 0,
 		},
-		Reader: csv.NewReader(r),
+		Reader:            csv.NewReader(r),
+		BlankStringAsNull: false,
 	}
 }
 
-func (r CSVReader) Read() (*DataFrame, error) {
+// Read reads a DataFrame from a encoding/csv.Reader
+func (r *CSVReader) Read() (*DataFrame, error) {
+	if r.BlankStringAsNull {
+		_, ok := optionNullStrings[""]
+		if !ok {
+			defer func() {
+				SetOptionEmptyStringAsNull(false)
+			}()
+		}
+		SetOptionEmptyStringAsNull(true)
+	}
 	records, err := r.ReadAll()
 	if err != nil {
 		return nil, fmt.Errorf("CSVReader: %v", err)
@@ -226,14 +326,14 @@ func (r CSVReader) Read() (*DataFrame, error) {
 
 // CSVWriter writes DataFrame values into an encoding/csv.Writer.
 type CSVWriter struct {
-	RecordWriter
+	*RecordWriter
 	*csv.Writer
 }
 
 // NewCSVWriter creates a new *CSVWriter with embedded encoding/csv.Writer and default settings.
 func NewCSVWriter(w io.Writer) *CSVWriter {
 	return &CSVWriter{
-		RecordWriter: RecordWriter{
+		RecordWriter: &RecordWriter{
 			IncludeLabels: false,
 			ByColumn:      false,
 		},
@@ -241,7 +341,7 @@ func NewCSVWriter(w io.Writer) *CSVWriter {
 	}
 }
 
-func (w CSVWriter) Write(df *DataFrame) error {
+func (w *CSVWriter) Write(df *DataFrame) error {
 	w.RecordWriter.Write(df)
 	return w.Writer.WriteAll(w.Records())
 }
@@ -253,6 +353,7 @@ type InterfaceRecordReader struct {
 	HeaderRows  int
 	LabelLevels int
 	ByColumn    bool
+	Name        string
 	records     [][]interface{}
 }
 
@@ -283,7 +384,7 @@ func (r InterfaceRecordReader) Read() (*DataFrame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading csv from records: %v", err)
 	}
-	df := containersToDF(vc, r.HeaderRows, r.LabelLevels)
+	df := containersToDF(vc, r.HeaderRows, r.LabelLevels, r.Name)
 	return df, nil
 }
 
@@ -322,355 +423,123 @@ func (w *InterfaceRecordWriter) Write(df *DataFrame) error {
 
 // StructReader reads a single struct or slice of structs into a DataFrame.
 type StructReader struct {
-	s           interface{}
-	IsNull      [][]bool
-	IsSlice     bool
-	LabelLevels int
+	sliceOfStructs interface{}
+	IsNull         [][]bool
+	LabelLevels    int
+	Name           string
 }
 
 // NewStructReader returns a new reader for a struct or slice of structs.
-func NewStructReader(s interface{}) StructReader {
+func NewStructReader(sliceOfStructs interface{}) StructReader {
 	return StructReader{
-		s:           s,
-		IsSlice:     false,
-		LabelLevels: 0,
+		sliceOfStructs: sliceOfStructs,
+		LabelLevels:    0,
 	}
 }
 
 // ReadStruct reads the exported fields in the StructReader into a DataFrame.
-// strct must be a struct or pointer to a struct.
-// If any exported field in strct is nil, returns an error.
 //
-// If a "tada" tag is present with the value "isNull", this field must be [][]bool with one equal-lengthed slice for each exported field.
-// These values will set the null status for each of the resulting value containers in the DataFrame, from left-to-right.
-// If a "tada" tag has any other value, the resulting value container will have the same name as the tag value.
-// Otherwise, the value container will have the same name as the exported field.
+// If a "json" tag is present, the column will have the same name as the tag value.
+// Otherwise, the column will have the same name as the exported field.
 func (r StructReader) Read() (*DataFrame, error) {
-	if r.IsSlice {
-		values, err := readStructSlice(r.s)
-		if err != nil {
-			return nil, fmt.Errorf("reading struct slice: %v", err)
-		}
-		defaultLabels := makeDefaultLabels(0, reflect.ValueOf(r.s).Len(), true)
-		return &DataFrame{
-			values:        values,
-			labels:        []*valueContainer{defaultLabels},
-			colLevelNames: []string{"*0"},
-		}, nil
+	values, err := readStructSlice(r.sliceOfStructs, r.IsNull)
+	if err != nil {
+		return nil, fmt.Errorf("reading from StructReader: %v", err)
 	}
-	if reflect.TypeOf(r.s).Kind() == reflect.Ptr {
-		r.s = reflect.ValueOf(r.s).Elem().Interface()
-	}
-	if reflect.TypeOf(r.s).Kind() != reflect.Struct {
-		return nil, fmt.Errorf("reading struct: strct must be reflect.Kind struct, not %s",
-			reflect.TypeOf(r.s).Kind())
-	}
-	labels := make([]interface{}, 0)
-	values := make([]interface{}, 0)
-	labelNames := make([]string, 0)
-	colNames := make([]string, 0)
-	v := reflect.ValueOf(r.s)
-	var hasNullTag bool
-	var nullField string
-	nullTag := "isNull"
-	var offset int
-	for k := 0; k < v.NumField(); k++ {
-		field := reflect.TypeOf(r.s).Field(k)
-		// is unexported field?
-		if unicode.IsLower([]rune(field.Name)[0]) {
-			offset--
-			continue
-		}
-		// has null tag?
-		if field.Tag.Get("tada") == nullTag {
-			offset--
-			if field.Type.String() != "[][]bool" {
-				return nil, fmt.Errorf("reading struct: field with tag %v must be type [][]bool, not %s",
-					nullTag, field.Type.String())
-			}
-			hasNullTag = true
-			nullField = field.Name
-			continue
-		}
-		// is nil?
-		if v.Field(k).IsZero() {
-			return nil, fmt.Errorf("reading struct: field %s: strct cannot contain a nil exported field",
-				field.Name)
-		}
-		container := k + offset
-		var name string
-		// check tada tag first, then default to exported name
-		if name = field.Tag.Get("tada"); name == "" {
-			name = field.Name
-		}
-		// write to label
-		if container < r.LabelLevels {
-			labelNames = append(labelNames, name)
-			labels = append(labels, v.Field(k).Interface())
-			// write to column
-		} else {
-			colNames = append(colNames, name)
-			values = append(values, v.Field(k).Interface())
-		}
-	}
-	df := NewDataFrame(values, labels...)
-	if df.err != nil {
-		return nil, fmt.Errorf("reading struct as schema: %v", df.err)
-	}
-	// not default labels? apply label names
-	if r.LabelLevels > 0 {
-		df = df.SetLabelNames(labelNames)
-	}
-	df = df.SetColNames(colNames)
-
-	if hasNullTag {
-		var min int
-		// default labels? do not change nulls
-		if r.LabelLevels == 0 {
-			min = 1
-		}
-		containers := makeIntRange(min, df.NumLevels()+df.NumColumns())
-		nullTable := v.FieldByName(nullField).Interface().([][]bool)
-		if len(nullTable) > 0 {
-			for incrementor, k := range containers {
-				err := df.SetNulls(k, nullTable[incrementor])
-				if err != nil {
-					return nil, fmt.Errorf("reading struct: writing nulls [%d]: %v", incrementor, err)
-				}
-			}
-		}
-	}
+	df := containersToDF(values, 1, r.LabelLevels, r.Name)
 	return df, nil
 }
 
 // StructWriter writes a single struct or slice of structs from a DataFrame.
 type StructWriter struct {
-	s             interface{}
-	isNull        [][]bool
-	IsSlice       bool
-	IncludeLabels bool
+	sliceOfStructs interface{}
+	isNull         [][]bool
+	IncludeLabels  bool
 }
 
 // NewStructWriter creates a new *StructWriter.
-// s should be a pointer to either a slice of structs or single struct with only slice fields.
-// After writing, s can be accessed directly outside of this writer.
-func NewStructWriter(s interface{}) *StructWriter {
+// ptrSliceOfStructs should be a pointer to an empty slice of structs.
+// After writing, ptrSliceOfStructs can be accessed directly outside of this writer.
+func NewStructWriter(ptrSliceOfStructs interface{}) *StructWriter {
 	return &StructWriter{
-		s:             s,
-		IsSlice:       true,
-		IncludeLabels: false,
+		sliceOfStructs: ptrSliceOfStructs,
+		IncludeLabels:  false,
 	}
 }
 
+// IsNull returns a boolean matrix indicating whether each value is null.
 func (w StructWriter) IsNull() [][]bool {
 	return w.isNull
 }
 
-// Write writes the values of the df containers into structPointer.
-// Returns an error if df does not contain, from left-to-right, the same container names and types
-// as the exported fields that appear, from top-to-bottom, in structPointer.
-// Exported struct fields must be types that are supported by NewDataFrame().
-// If a "tada" tag is present with the value "isNull", this field must be [][]bool.
-// The null status of each value container in the DataFrame, from left-to-right, will be written into this field in equal-lengthed slices.
-// If df contains additional containers beyond those in structPointer, those are ignored.
+// Write writes the values of the df into a slice of structs.
 func (w *StructWriter) Write(df *DataFrame) error {
-	if w.IsSlice {
-		return nil
-	}
-	if reflect.TypeOf(w.s).Kind() != reflect.Ptr {
-		return fmt.Errorf("writing to struct: structPointer must be pointer to struct, not %s",
-			reflect.TypeOf(w.s).Kind())
-	}
-	if reflect.TypeOf(w.s).Elem().Kind() != reflect.Struct {
-		return fmt.Errorf("writing to struct: structPointer must be pointer to struct, not to %s",
-			reflect.TypeOf(w.s).Elem().Kind())
-	}
-	v := reflect.ValueOf(w.s).Elem()
-	var mergedLabelsAndCols []*valueContainer
+	containers := df.values
 	if w.IncludeLabels {
-		mergedLabelsAndCols = append(df.labels, df.values...)
-	} else {
-		mergedLabelsAndCols = df.values
+		containers = append(df.labels, df.values...)
 	}
-	var offset int
-	var hasNullTag bool
-	var nullField string
-	nullTag := "isNull"
-	for k := 0; k < v.NumField(); k++ {
-		field := reflect.TypeOf(w.s).Elem().Field(k)
-		// is unexported field?
-		if unicode.IsLower([]rune(field.Name)[0]) {
-			offset--
-			continue
-		}
-		tag := field.Tag.Get("tada")
-		// has null tag?
-		if tag == nullTag {
-			offset--
-			if field.Type.String() != "[][]bool" {
-				return fmt.Errorf("writing to struct: field with tag %v must be type [][]bool, not %s", nullTag, field.Type.String())
-			}
-			hasNullTag = true
-			nullField = field.Name
-			continue
-		}
-		container := k + offset
-		// df does not have enough containers?
-		if container >= len(mergedLabelsAndCols) {
-			return fmt.Errorf("writing to struct: writing to exported field %s [%d]: insufficient number of containers [%d]",
-				field.Name, container, len(mergedLabelsAndCols))
-		}
-		// use tag as name if it exists, else default to exported name
-		name := tag
-		if tag == "" {
-			name = field.Name
-		}
-		if mergedLabelsAndCols[container].name != name {
-			return fmt.Errorf("writing to struct: writing to exported field %s [%d]: container name does not match (%s != %s)",
-				field.Name, container,
-				mergedLabelsAndCols[container].name, name)
-		}
-		if mergedLabelsAndCols[container].dtype() != field.Type {
-			return fmt.Errorf("writing to struct: writing to exported field %s [%d]: container %s has wrong type (%s != %s)",
-				field.Name, container, mergedLabelsAndCols[container].name,
-				mergedLabelsAndCols[container].dtype(), field.Type)
-		}
-		src := reflect.ValueOf(mergedLabelsAndCols[container].slice)
-		dst := v.FieldByName(field.Name)
-		dst.Set(src)
+	isNull, err := writeStructSlice(containers, w.sliceOfStructs)
+	if err != nil {
+		return fmt.Errorf("writing to StructWriter: %v", err)
 	}
-	if hasNullTag {
-		copiedFields := v.NumField() + offset
-		nullTable := make([][]bool, copiedFields)
-		for k := 0; k < copiedFields; k++ {
-			nullTable[k] = mergedLabelsAndCols[k].isNull
-		}
-		src := reflect.ValueOf(nullTable).Interface()
-		dst := v.FieldByName(nullField)
-		dst.Set(reflect.ValueOf(src))
-	}
-
+	w.isNull = isNull
 	return nil
+}
+
+// gonum.Matrix
+
+// MatrixReader reads from a data structure that implements the gonum.Matrix interface.
+type MatrixReader struct {
+	mat Matrix
+}
+
+// NewMatrixReader creates a MatrixReader with default settings.
+func NewMatrixReader(mat Matrix) MatrixReader {
+	return MatrixReader{
+		mat: mat,
+	}
 }
 
 // ReadMatrix reads data satisfying the gonum Matrix interface into a DataFrame.
 // Panics if any slices in the matrix are shorter than the first slice.
-func ReadMatrix(mat Matrix) *DataFrame {
-	numRows, numCols := mat.Dims()
+func (r MatrixReader) Read() (*DataFrame, error) {
+	numRows, numCols := r.mat.Dims()
 	// major dimension: columns
 	data := make([]interface{}, numCols)
 	for k := range data {
 		floats := make([]float64, numRows)
 		for i := 0; i < numRows; i++ {
-			floats[i] = mat.At(i, k)
+			floats[i] = r.mat.At(i, k)
 		}
 		data[k] = floats
 	}
-	ret := NewDataFrame(data)
-	return ret
+	ret := NewSliceReader(data)
+	df := ret.MustRead()
+	return df, nil
 }
 
 // -- WRITERS
 
-// // WriteMockCSV reads r (configured by options) and writes n mock rows to w,
-// // with column names and types inferred based on the data in src.
-// // Regardless of the major dimension of src, the major dimension of the output is rows.
-// // Available options: WithHeaders, WithLabels, ByColumn.
-// //
-// // Default if no options are supplied:
-// // 1 header row, no labels, rows as major dimension
-// func WriteMockCSV(w io.Writer, n int, r Reader) error {
-// 	config := &readConfig{}
-// 	numSampleRows := 10
-// 	inferredTypes := make([]map[string]int, 0)
-// 	dtypes := []string{"float", "int", "string", "datetime", "time", "bool"}
-// 	var headers [][]string
-// 	var rowCount int
-// 	data, err := r.Read()
-// 	if err != nil {
-// 		return fmt.Errorf("writing mock csv: reading r: %v", err)
-// 	}
-// 	// data has default labels? exclude them
-// 	receiver := new(CSVWriter)
-// 	err = data.Write(receiver, writeOptionIncludeLabels(config.numLabelLevels > 0))
-// 	if err != nil {
-// 		return fmt.Errorf("writing mock csv: reading r: %v", err)
-// 	}
-// 	src := receiver.Records()
-
-// 	if !config.majorDimIsCols {
-// 		rowCount = len(src)
-// 	} else {
-// 		rowCount = len(src[0])
-// 	}
-// 	// numSampleRows must not exceed total number of non-header rows in src
-// 	maxRows := rowCount - config.numHeaderRows
-// 	if maxRows < numSampleRows {
-// 		numSampleRows = maxRows
-// 	}
-
-// 	// major dimension is rows?
-// 	if !config.majorDimIsCols {
-// 		// copy headers
-// 		for i := 0; i < config.numHeaderRows; i++ {
-// 			headers = append(headers, src[i])
-// 		}
-// 		// prepare one inferredTypes map per column
-// 		for range src[0] {
-// 			emptyMap := map[string]int{}
-// 			for _, dtype := range dtypes {
-// 				emptyMap[dtype] = 0
-// 			}
-// 			inferredTypes = append(inferredTypes, emptyMap)
-// 		}
-
-// 		// for each row, infer type column-by-column
-// 		// offset data sample by header rows
-// 		dataSample := src[config.numHeaderRows : numSampleRows+config.numHeaderRows]
-// 		for i := range dataSample {
-// 			for k := range dataSample[i] {
-// 				value := dataSample[i][k]
-// 				dtype := inferType(value)
-// 				inferredTypes[k][dtype]++
-// 			}
-// 		}
-
-// 		// major dimension is columns?
-// 	} else {
-
-// 		// prepare one inferredTypes map per column
-// 		for range src {
-// 			emptyMap := map[string]int{}
-// 			for _, dtype := range dtypes {
-// 				emptyMap[dtype] = 0
-// 			}
-// 			inferredTypes = append(inferredTypes, emptyMap)
-// 		}
-
-// 		// copy headers
-// 		headers = make([][]string, 0)
-// 		for l := 0; l < config.numHeaderRows; l++ {
-// 			headers = append(headers, make([]string, len(src)))
-// 			for k := range src {
-// 				// NB: major dimension of output is rows
-// 				headers[l][k] = src[k][l]
-// 			}
-// 		}
-
-// 		// for each column, infer type row-by-row
-// 		for k := range src {
-// 			// offset by header rows
-// 			// infer type of only the sample rows
-// 			dataSample := src[k][config.numHeaderRows : numSampleRows+config.numHeaderRows]
-// 			for i := range dataSample {
-// 				dtype := inferType(dataSample[i])
-// 				inferredTypes[k][dtype]++
-// 			}
-// 		}
-// 	}
-// 	// major dimension of output is rows, for compatibility with csv.NewWriter
-// 	mockCSV := mockCSVFromDTypes(inferredTypes, n)
-// 	mockCSV = append(headers, mockCSV...)
-// 	writer := csv.NewWriter(w)
-// 	return writer.WriteAll(mockCSV)
-// }
+// WriteMockCSV reads r, infers the types, and writes n mock rows to w.
+func WriteMockCSV(r *CSVReader, w *CSVWriter, n int) error {
+	r.InferTypes = false
+	df, err := r.Read()
+	if err != nil {
+		return fmt.Errorf("writing mock csv: %v", err)
+	}
+	containers := df.values
+	if w.IncludeLabels {
+		containers = append(df.labels, df.values...)
+	}
+	dtypes := make([]DType, len(containers))
+	for k := range containers {
+		dtypes[k] = containers[k].inferType()
+	}
+	containers = mockContainersFromDTypes(listNames(containers), dtypes, n)
+	df = containersToDF(containers, r.HeaderRows, r.LabelLevels, r.Name)
+	err = w.Write(df)
+	if err != nil {
+		return fmt.Errorf("writing mock csv: %v", err)
+	}
+	return nil
+}

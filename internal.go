@@ -124,9 +124,6 @@ func unpackIDsByName(containers []*valueContainer, receivers map[string]*string)
 }
 
 func makeValueContainerFromInterface(slice interface{}, name string) (*valueContainer, error) {
-	if reflect.ValueOf(slice).Len() == 0 {
-		return nil, fmt.Errorf("empty slice: cannot be empty")
-	}
 	isNull, err := setNullsFromInterface(slice)
 	if err != nil {
 		return nil, err
@@ -147,7 +144,7 @@ func makeValueContainersFromInterfaces(slices []interface{}, usePrefix bool) ([]
 	for i, slice := range slices {
 		vc, err := makeValueContainerFromInterface(slice, namePrefix+fmt.Sprint(i))
 		if err != nil {
-			return nil, fmt.Errorf("position %d: %v", i, err)
+			return nil, fmt.Errorf("slice[%d]: %v", i, err)
 		}
 		ret[i] = vc
 	}
@@ -157,7 +154,7 @@ func makeValueContainersFromInterfaces(slices []interface{}, usePrefix bool) ([]
 func ensureEqualLengths(containers []*valueContainer, length int) error {
 	for k := range containers {
 		if containers[k].len() != length {
-			return fmt.Errorf("position %d: slice does not match required length (%d != %d)",
+			return fmt.Errorf("slice[%d] does not match required length (%d != %d)",
 				k, containers[k].len(), length)
 		}
 	}
@@ -367,6 +364,7 @@ func makeBoolMatrix(numCols, numRows int) [][]bool {
 	return ret
 }
 
+// returns []int that are shared by all slices
 func intersection(slices [][]int, maxLen int) []int {
 	// only one slice? intersection is that slice
 	if len(slices) == 1 {
@@ -535,17 +533,19 @@ func setJoinConfig(options []JoinOption) *joinConfig {
 	return config
 }
 
-func containersToDF(containers []*valueContainer, numHeaders int, numLabels int) *DataFrame {
-	var colLevelNames []string
-	colLevelNames, containers = setColLevelNames(numHeaders, containers)
+func containersToDF(containers []*valueContainer, numHeaders int, numLabels int, name string) *DataFrame {
 	labels := containers[:numLabels]
 	if numLabels == 0 {
 		labels = []*valueContainer{makeDefaultLabels(0, containers[0].len(), true)}
 	}
+	columns := containers[numLabels:]
+	var colLevelNames []string
+	colLevelNames, columns = setColLevelNames(numHeaders, columns)
 	df := &DataFrame{
 		labels:        labels,
-		values:        containers[numLabels:],
+		values:        columns,
 		colLevelNames: colLevelNames,
+		name:          name,
 	}
 	return df
 }
@@ -826,30 +826,102 @@ func setColLevelNames(numHeaderRows int, columns []*valueContainer) ([]string, [
 	return ret, columns
 }
 
+func validateStructSlice(sliceOfStructs interface{}) error {
+	if !isSlice(sliceOfStructs) {
+		return fmt.Errorf("unsupported kind (%v), must be slice", reflect.TypeOf(sliceOfStructs).Kind())
+	}
+	if kind := reflect.TypeOf(sliceOfStructs).Elem().Kind(); kind != reflect.Struct {
+		return fmt.Errorf("unsupported kind (%v), must be slice of structs", reflect.TypeOf(sliceOfStructs).Elem().Kind())
+	}
+	return nil
+}
+
+func writeStructSlice(containers []*valueContainer, slice interface{}) ([][]bool, error) {
+	if reflect.TypeOf(slice).Kind() != reflect.Ptr ||
+		reflect.TypeOf(slice).Elem().Kind() != reflect.Slice ||
+		reflect.TypeOf(slice).Elem().Elem().Kind() != reflect.Struct {
+		return nil, fmt.Errorf("writing to slice of structs: unsupported input type (%v), must be *[]struct", reflect.TypeOf(slice))
+	}
+	if len(containers) == 0 {
+		return nil, fmt.Errorf("writing to slice of structs: dataframe must have at least one container (label level or column)")
+	}
+	// {structFieldIndex: containerIndex}
+	m := make(map[int]int)
+	t := reflect.TypeOf(slice)
+	protoStruct := t.Elem().Elem()
+	for i := 0; i < protoStruct.NumField(); i++ {
+		var name string
+		if js := protoStruct.Field(i).Tag.Get("json"); js != "" {
+			name = js
+		} else {
+			name = protoStruct.Field(i).Name
+		}
+		k, err := indexOfContainer(name, containers)
+		if err == nil {
+			m[i] = k
+		}
+	}
+
+	numRows := containers[0].len()
+
+	v := reflect.ValueOf(slice)
+	v.Elem().Set(reflect.MakeSlice(reflect.SliceOf(protoStruct), numRows, numRows))
+
+	for i := 0; i < numRows; i++ {
+		s := reflect.New(protoStruct)
+		for key, value := range m {
+			dst := s.Elem().Field(key)
+			dst.Set(reflect.ValueOf(containers[value].slice).Index(i))
+		}
+		v.Elem().Index(i).Set(s.Elem())
+	}
+	// set nulls
+	nulls := make([][]bool, len(m))
+	fieldOrder := make([]int, 0, 5)
+	for k := range m {
+		fieldOrder = append(fieldOrder, k)
+	}
+	sort.Ints(fieldOrder)
+
+	for incrementor, field := range fieldOrder {
+		k := m[field]
+		nulls[incrementor] = containers[k].isNull
+	}
+
+	// return ret.Interface(), nulls, nil
+	return nulls, nil
+
+}
+
 // each struct becomes a different row
 // each field becomes a different column
-func readStructSlice(slice interface{}) ([]*valueContainer, error) {
-	if !isSlice(slice) {
-		return nil, fmt.Errorf("unsupported kind (%v); must be slice", reflect.TypeOf(slice).Kind())
-	}
-	if kind := reflect.TypeOf(slice).Elem().Kind(); kind != reflect.Struct {
-		return nil, fmt.Errorf("unsupported kind (%v); must be slice of structs", reflect.TypeOf(slice).Elem().Kind())
+func readStructSlice(slice interface{}, isNull [][]bool) ([]*valueContainer, error) {
+	if !isSlice(slice) || reflect.TypeOf(slice).Elem().Kind() != reflect.Struct {
+		return nil, fmt.Errorf("unsupported input type (%v), must be []struct", reflect.TypeOf(slice))
 	}
 	v := reflect.ValueOf(slice)
 	if v.Len() == 0 {
 		return nil, fmt.Errorf("slice must contain at least one struct")
 	}
-	firstStruct := v.Index(0)
-	numCols := firstStruct.NumField()
+	protoStruct := reflect.TypeOf(slice).Elem()
+	numCols := protoStruct.NumField()
 	if numCols == 0 {
 		return nil, fmt.Errorf("struct must contain at least one field")
 	}
 	retValues := make([]interface{}, numCols)
 	retNames := make([]string, numCols)
 	for k := 0; k < numCols; k++ {
-		colType := reflect.TypeOf(firstStruct.Field(k).Interface())
+		field := protoStruct.Field(k)
+		colType := field.Type
 		colValues := reflect.MakeSlice(reflect.SliceOf(colType), v.Len(), v.Len())
-		retNames[k] = v.Index(0).Type().Field(k).Name
+		// setting container name
+		var name string
+		if js := field.Tag.Get("json"); js != "" {
+			name = js
+		} else {
+			name = field.Name
+		}
+		retNames[k] = name
 		for i := 0; i < v.Len(); i++ {
 			dst := colValues.Index(i)
 			src := v.Index(i).Field(k)
@@ -859,90 +931,120 @@ func readStructSlice(slice interface{}) ([]*valueContainer, error) {
 	}
 	// transfer to final container
 	ret := make([]*valueContainer, numCols)
+
+	// set null values
+	if isNull == nil {
+		isNull = makeBoolMatrix(len(ret), v.Len())
+	} else {
+		if len(ret) != len(isNull[0]) {
+			return nil, fmt.Errorf("setting null values: number of columns in [][]bool (%d) does not match number of exported fields (%d)",
+				len(ret), len(isNull[0]))
+		}
+		if v.Len() != len(isNull) {
+			return nil, fmt.Errorf("setting null values: number of rows in [][]bool (%d) does not match number of structs in slice (%d)",
+				v.Len(), len(isNull))
+		}
+		var err error
+		isNull, err = transposeNestedNulls(isNull)
+		if err != nil {
+			return nil, fmt.Errorf("reading slice of structs: setting null values: %v", err)
+		}
+	}
 	for k := range ret {
-		// ducks error because each column is known to be slice
-		nulls, _ := setNullsFromInterface(retValues[k])
-		ret[k] = newValueContainer(retValues[k], nulls, retNames[k])
+		ret[k] = newValueContainer(retValues[k], isNull[k], retNames[k])
 	}
 	return ret, nil
 }
 
-func inferType(input string) string {
-	if _, err := strconv.ParseInt(input, 10, 64); err == nil {
-		return "int"
-	}
+func inferType(input string) DType {
 	if _, err := strconv.ParseFloat(input, 64); err == nil {
-		return "float"
+		return Float64
 	}
 	if t, null := convertStringToDateTime(input); !null {
 		if t.Hour() == 0 && t.Minute() == 0 && t.Second() == 0 && t.Nanosecond() == 0 {
-			return "date"
+			return Date
 		}
-		return "datetime"
+		if t.Year() == 0 && t.Month() == 1 && t.Day() == 1 {
+			return Time
+		}
+		return DateTime
 	}
-	if _, err := strconv.ParseBool(input); err == nil {
-		return "bool"
-	}
-	return "string"
+	return String
 }
 
-func getDominantDType(dtypes map[string]int) string {
+// cast valueContainers in place
+func castToInferredTypes(containers []*valueContainer) {
+	for k := range containers {
+		dtype := containers[k].inferType()
+		containers[k].cast(dtype)
+	}
+	return
+}
+
+// expects vc.slice to be []string
+func (vc *valueContainer) inferType() DType {
+	s := vc.slice.([]string)
+	sampleSize := 10
+	if len(s) < sampleSize {
+		sampleSize = len(s)
+	}
+	inferredTypes := make(map[DType]int)
+	sample := s[:sampleSize]
+	for i := range sample {
+		dtype := inferType(sample[i])
+		inferredTypes[dtype]++
+	}
 	var highestCount int
-	var dominantDType string
-	for key, v := range dtypes {
+	var dtype DType
+	for key, v := range inferredTypes {
 		// tie resolves randomly
 		if v > highestCount {
-			dominantDType = key
+			dtype = key
 			highestCount = v
 		}
 	}
-	return dominantDType
+	return dtype
 }
 
 // major dimension of output is rows
-func mockCSVFromDTypes(dtypes []map[string]int, numMockRows int) [][]string {
-	dominantDTypes := make([]string, len(dtypes))
-
-	// determine the dominant data type per column
-	for k := range dtypes {
-		dominantDTypes[k] = getDominantDType(dtypes[k])
-	}
-	ret := make([][]string, numMockRows)
-	for i := range ret {
-		ret[i] = make([]string, len(dtypes))
-		for k := range ret[i] {
-			ret[i][k] = mockString(dominantDTypes[k], .1)
+func mockContainersFromDTypes(names []string, dtypes []DType, numMockRows int) []*valueContainer {
+	ret := make([]*valueContainer, len(dtypes))
+	for k := range ret {
+		s := make([]string, numMockRows)
+		isNull := make([]bool, numMockRows)
+		for i := range s {
+			s[i], isNull[i] = mockString(dtypes[k], .1)
 		}
+		ret[k] = newValueContainer(s, isNull, names[k])
+		ret[k].cast(dtypes[k])
 	}
 	return ret
 }
 
-func mockString(dtype string, nullPct float64) string {
+func mockString(dtype DType, nullPct float64) (string, bool) {
 	var options []string
 	switch dtype {
 	// overwrite the options based on the dtype
-	case "float":
+	case Float64:
 		options = []string{".1", ".25", ".5", ".75", ".9"}
-	case "int":
-		options = []string{"1", "2", "3", "4", "5"}
-	case "string":
+	case String:
 		options = []string{"foo", "bar", "baz", "qux", "quuz"}
-	case "datetime":
+	case DateTime:
 		options = []string{
 			"2020-01-01T00:00:00Z00:00", "2020-01-01T12:00:00Z00:00", "2020-01-01T12:30:00Z00:00",
 			"2020-01-02T00:00:00Z00:00", "2020-01-01T12:30:00Z00:00"}
-	case "date":
+	case Date:
 		options = []string{"2019-12-31", "2020-01-01", "2020-01-02", "2020-02-01", "2020-02-02"}
-	case "bool":
-		options = []string{"true", "false"}
+	case Time:
+		options = []string{"10:00am", "11:00am", "1:00pm", "2:00pm", "3:30pm"}
 	}
 	rand.Seed(clock.now().UnixNano())
 	f := rand.Float64()
 	if f < nullPct {
-		return ""
+		return optionsNullPrinter, true
 	}
 	randomIndex := rand.Intn(len(options))
-	return options[randomIndex]
+	return options[randomIndex], false
 }
 
 // modifies vc in place
@@ -1008,6 +1110,7 @@ func (vc *valueContainer) valid() []int {
 	return index[:counter]
 }
 
+// index positions of any null value
 func (vc *valueContainer) null() []int {
 	index := make([]int, len(vc.isNull))
 	// increment counter for every null row
@@ -1836,7 +1939,10 @@ func isNullFloat(v float64) bool {
 
 func isSupportedSlice(slice interface{}) error {
 	if k := reflect.TypeOf(slice).Kind(); k != reflect.Slice {
-		return fmt.Errorf("unsupported kind (%v); must be slice", k)
+		return fmt.Errorf("unsupported kind (%v), must be slice", k)
+	}
+	if reflect.ValueOf(slice).Len() == 0 {
+		return fmt.Errorf("empty slice: cannot be empty")
 	}
 	return nil
 }
@@ -2267,23 +2373,29 @@ func cut(vals []float64, isNull []bool,
 			"must be one more than number of supplied labels: (%d + %d + %d) != (%d + 1)",
 			originalBinCount, andLessEdge, andMoreEdge, len(labels))
 	}
+	// write final results
 	ret := make([]string, len(vals))
 	for i, val := range vals {
 		if isNull[i] {
+			ret[i] = optionsNullPrinter
 			continue
 		}
+		// check for value within every bin interval
 		// do not iterate over the last edge to avoid range error
+		// check if value is within bin
+		var found bool
 		for binEdge := 0; binEdge < len(bins)-1; binEdge++ {
-			// check if value is within bin
 			if leftInclusive && rightExclusive {
 				if val >= bins[binEdge] && val < bins[binEdge+1] {
 					ret[i] = labels[binEdge]
+					found = true
 					break
 				}
 			} else if !leftInclusive && !rightExclusive {
 				// default: leftExclusive and rightInclusive
 				if val > bins[binEdge] && val <= bins[binEdge+1] {
 					ret[i] = labels[binEdge]
+					found = true
 					break
 				}
 			} else {
@@ -2291,8 +2403,10 @@ func cut(vals []float64, isNull []bool,
 				return nil, fmt.Errorf("internal error: bad cut() conditions")
 			}
 		}
+		if !found {
+			ret[i] = optionsNullPrinter
+		}
 	}
-
 	return ret, nil
 }
 

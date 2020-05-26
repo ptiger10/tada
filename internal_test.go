@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"os"
@@ -261,7 +260,7 @@ func Test_setNullsFromInterface(t *testing.T) {
 	}{
 		{"float", args{[]float64{1, math.NaN()}}, []bool{false, true}, false},
 		{"int", args{[]int{0}}, []bool{false}, false},
-		{"string", args{[]string{"foo", ""}}, []bool{false, true}, false},
+		{"string", args{[]string{"foo", optionsNullPrinter}}, []bool{false, true}, false},
 		{"civil.date", args{[]civil.Date{civil.DateOf(time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC)), {}}}, []bool{false, true}, false},
 		{"civil.time", args{[]civil.Time{civil.TimeOf(time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC)), {Second: -1}}}, []bool{false, true}, false},
 		{"dateTime", args{[]time.Time{time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC), {}}}, []bool{false, true, true}, false},
@@ -276,8 +275,8 @@ func Test_setNullsFromInterface(t *testing.T) {
 		{"not explicitly supported value", args{[]complex64{1}}, []bool{false}, false},
 		{"[]interface with slice", args{[]interface{}{[]float64{}, "foo"}}, []bool{true, false}, false},
 		{"[][]interface with first value slice", args{[][]interface{}{{[]float64{1}, "foo"}}}, []bool{false}, false},
-		{"empty", args{[]int{}}, []bool{}, false},
 		{"nil", args{nil}, []bool{}, false},
+		{"empty", args{[]int{}}, nil, true},
 		{"fail - not slice", args{"foo"}, nil, true},
 	}
 	for _, tt := range tests {
@@ -303,7 +302,7 @@ func Test_isNullInterface(t *testing.T) {
 		want bool
 	}{
 		{"null float64", args{math.NaN()}, true},
-		{"null string", args{""}, true},
+		{"null string", args{optionsNullPrinter}, true},
 		{"null time.Time", args{time.Time{}}, true},
 		{"null civil.Date", args{civil.Date{}}, true},
 		{"null civil.Time", args{civil.Time{Second: -1}}, true},
@@ -784,12 +783,12 @@ func Test_copyInterfaceIntoValueContainers(t *testing.T) {
 			},
 		},
 		{"create nulls from interface", args{
-			slices: []interface{}{[]string{"foo", ""}, []float64{1, 2}},
+			slices: []interface{}{[]interface{}{"foo", nil}, []float64{1, 2}},
 			isNull: nil,
 			names:  []string{"corge", "waldo"},
 		},
 			[]*valueContainer{
-				{slice: []string{"foo", ""}, isNull: []bool{false, true}, id: mockID, name: "corge"},
+				{slice: []interface{}{"foo", nil}, isNull: []bool{false, true}, id: mockID, name: "corge"},
 				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "waldo"},
 			},
 		},
@@ -1105,37 +1104,37 @@ func Test_cut(t *testing.T) {
 			leftInclusive: false, rightExclusive: false,
 			includeLess: false, includeMore: false,
 			labels: nil},
-			[]string{"", "1-2", ""}, false},
+			[]string{optionsNullPrinter, "1-2", optionsNullPrinter}, false},
 		{"pass - supplied labels", args{
 			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
 			leftInclusive: false, rightExclusive: false,
 			includeLess: false, includeMore: false,
 			labels: []string{"qualifies"}},
-			[]string{"", "qualifies", ""}, false},
+			[]string{optionsNullPrinter, "qualifies", optionsNullPrinter}, false},
 		{"skip nulls", args{
 			vals: []float64{1, 2, 3}, isNull: []bool{false, true, false}, bins: []float64{1, 2},
 			leftInclusive: false, rightExclusive: false,
 			includeLess: false, includeMore: false,
 			labels: []string{"qualifies"}},
-			[]string{"", "", ""}, false},
+			[]string{optionsNullPrinter, optionsNullPrinter, optionsNullPrinter}, false},
 		{"inlcudeLeft - default labels", args{
 			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
 			leftInclusive: false, rightExclusive: false,
 			includeLess: true, includeMore: false,
 			labels: nil},
-			[]string{"<=1", "1-2", ""}, false},
+			[]string{"<=1", "1-2", optionsNullPrinter}, false},
 		{"inlcudeLeft - default labels - leftInclusive/rightExclusive", args{
 			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{2, 3},
 			leftInclusive: true, rightExclusive: true,
 			includeLess: true, includeMore: false,
 			labels: nil},
-			[]string{"<2", "2-3", ""}, false},
+			[]string{"<2", "2-3", optionsNullPrinter}, false},
 		{"includeMore - default labels", args{
 			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
 			leftInclusive: false, rightExclusive: false,
 			includeLess: false, includeMore: true,
 			labels: nil},
-			[]string{"", "1-2", ">2"}, false},
+			[]string{optionsNullPrinter, "1-2", ">2"}, false},
 		{"includeMore - default labels - leftInclusive/rightExclusive", args{
 			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
 			leftInclusive: true, rightExclusive: true,
@@ -1202,15 +1201,15 @@ func Test_valueContainer_cut(t *testing.T) {
 		{"supplied labels, no less, no more, with null",
 			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, true}, id: mockID, name: "foo"},
 			args{bins: []float64{0, 2, 4}, andLess: false, andMore: false, labels: []string{"low", "high"}},
-			[]string{"low", "low", "high", ""}, false},
+			[]string{"low", "low", "high", optionsNullPrinter}, false},
 		{"supplied labels, less, no more",
 			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: true, andMore: false, labels: []string{"low", "medium", "high"}},
-			[]string{"low", "medium", "high", ""}, false},
+			[]string{"low", "medium", "high", optionsNullPrinter}, false},
 		{"supplied labels, no less, more",
 			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: false, andMore: true, labels: []string{"low", "medium", "high"}},
-			[]string{"", "low", "medium", "high"}, false},
+			[]string{optionsNullPrinter, "low", "medium", "high"}, false},
 		{"supplied labels, less, more",
 			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: true, andMore: true, labels: []string{"low", "medium", "high", "higher"}},
@@ -1222,11 +1221,11 @@ func Test_valueContainer_cut(t *testing.T) {
 		{"default labels, less, no more",
 			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: true, andMore: false, labels: nil},
-			[]string{"<=1", "1-2", "2-3", ""}, false},
+			[]string{"<=1", "1-2", "2-3", optionsNullPrinter}, false},
 		{"default labels, no less, more",
 			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: false, andMore: true, labels: nil},
-			[]string{"", "1-2", "2-3", ">3"}, false},
+			[]string{optionsNullPrinter, "1-2", "2-3", ">3"}, false},
 		{"default labels, less, more",
 			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: true, andMore: true, labels: nil},
@@ -1306,7 +1305,7 @@ func Test_valueContainer_pcut(t *testing.T) {
 			fields{slice: []float64{5, 0, 6, 7, 7, 7, 8},
 				isNull: []bool{false, true, false, false, false, false, false}},
 			args{bins: []float64{0, .2, .4, .6, .8, 1}, config: nil},
-			[]string{"0-0.2", "", "0-0.2", "0.2-0.4", "0.2-0.4", "0.2-0.4", "0.8-1"}, false},
+			[]string{"0-0.2", optionsNullPrinter, "0-0.2", "0.2-0.4", "0.2-0.4", "0.2-0.4", "0.8-1"}, false},
 		{"fail: above 1",
 			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{0, .5, 1.5}, config: nil},
@@ -1476,85 +1475,28 @@ func Test_sortContainers(t *testing.T) {
 	}
 }
 
-func Test_getDominantDType(t *testing.T) {
-	type args struct {
-		dtypes map[string]int
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{
-		{"pass", args{map[string]int{"int": 0, "float": 1, "string": 2, "datetime": 3}}, "datetime"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := getDominantDType(tt.args.dtypes); got != tt.want {
-				t.Errorf("getDominantDType() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_mockCSVFromDTypes(t *testing.T) {
-	type args struct {
-		dtypes      []map[string]int
-		numMockRows int
-	}
-	tests := []struct {
-		name string
-		args args
-		want [][]string
-	}{
-		{"2x rows",
-			args{
-				dtypes: []map[string]int{
-					{"float": 3, "int": 1, "string": 1, "datetime": 1, "date": 1, "bool": 1},
-					{"float": 1, "int": 3, "string": 1, "datetime": 1, "date": 1, "bool": 1},
-					{"float": 1, "int": 1, "string": 3, "datetime": 1, "date": 1, "bool": 1},
-					{"float": 1, "int": 1, "string": 1, "datetime": 3, "date": 1, "bool": 1},
-					{"float": 1, "int": 1, "string": 1, "datetime": 1, "date": 3, "bool": 1},
-					{"float": 1, "int": 1, "string": 1, "datetime": 1, "date": 1, "bool": 3}},
-				numMockRows: 2},
-			[][]string{
-				{".5", "3", "baz", "2020-01-01T12:30:00Z00:00", "2020-01-02", "true"},
-				{".5", "3", "baz", "2020-01-01T12:30:00Z00:00", "2020-01-02", "true"}},
-		},
-		{"3x rows",
-			args{
-				[]map[string]int{
-					{"float": 1, "string": 0},
-					{"float": 0, "string": 1}},
-				3},
-			[][]string{{".5", "baz"}, {".5", "baz"}, {".5", "baz"}},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := mockCSVFromDTypes(tt.args.dtypes, tt.args.numMockRows); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("mockCSVFromDTypes() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_mockString(t *testing.T) {
 	type args struct {
-		dtype   string
+		dtype   DType
 		nullPct float64
 	}
 	tests := []struct {
-		name string
-		args args
-		want string
+		name     string
+		args     args
+		want     string
+		wantNull bool
 	}{
-		{"pass", args{"string", .99999999}, ""},
-		{"pass", args{"string", .00001}, "baz"},
+		{"pass", args{String, .99999999}, optionsNullPrinter, true},
+		{"pass", args{String, .00001}, "baz", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := mockString(tt.args.dtype, tt.args.nullPct); got != tt.want {
+			got, got1 := mockString(tt.args.dtype, tt.args.nullPct)
+			if got != tt.want {
 				t.Errorf("mockString() = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.wantNull {
+				t.Errorf("mockString() got1 = %v, want %v", got, tt.wantNull)
 			}
 		})
 	}
@@ -1567,14 +1509,13 @@ func Test_inferType(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want string
+		want DType
 	}{
-		{"float", args{"1.5"}, "float"},
-		{"int", args{"1"}, "int"},
-		{"string", args{"foo"}, "string"},
-		{"datetime", args{"2020-01-01 03:00:00 +0000 UTC"}, "datetime"},
-		{"date", args{"2020-01-01"}, "date"},
-		{"bool", args{"true"}, "bool"},
+		{"float", args{"1.5"}, Float64},
+		{"string", args{"foo"}, String},
+		{"datetime", args{"2020-01-01 03:00:00 +0000 UTC"}, DateTime},
+		{"date", args{"2020-01-01"}, Date},
+		{"time", args{"1:00pm"}, Time},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2027,57 +1968,6 @@ func Test_readCSVByCols(t *testing.T) {
 			}
 			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("readCSVByCols() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-type testStruct struct {
-	Name string
-	Age  int
-}
-
-type testStructNoFields struct {
-}
-
-func Test_readStructSlice(t *testing.T) {
-	type args struct {
-		slice interface{}
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    []*valueContainer
-		wantErr bool
-	}{
-		{"pass", args{[]testStruct{{"foo", 1}, {"bar", 2}}},
-			[]*valueContainer{
-				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "Name"},
-				{slice: []int{1, 2}, isNull: []bool{false, false}, id: mockID, name: "Age"}},
-			false},
-		{"pass - partial", args{[]testStruct{{Name: "foo"}, {Name: "bar"}}},
-			[]*valueContainer{
-				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "Name"},
-				{slice: []int{0, 0}, isNull: []bool{false, false}, id: mockID, name: "Age"}},
-			false},
-		{"fail - not slice", args{testStruct{"foo", 1}},
-			nil, true},
-		{"fail - not struct", args{[]string{"foo"}},
-			nil, true},
-		{"fail - empty", args{[]testStruct{}},
-			nil, true},
-		{"fail - no fields", args{[]testStructNoFields{{}}},
-			nil, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := readStructSlice(tt.args.slice)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readStructSlice() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readStructSlice() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -3595,7 +3485,7 @@ func Test_isNullString(t *testing.T) {
 		args args
 		want bool
 	}{
-		{"is null", args{""}, true},
+		{"is null", args{""}, false},
 		{"is null", args{"(null)"}, true},
 		{"not null", args{"foo"}, false},
 	}
@@ -3638,197 +3528,6 @@ func Test_extractCSVDimensions(t *testing.T) {
 			}
 			if gotNumCols != tt.wantNumCols {
 				t.Errorf("extractCSVDimensions() gotNumCols = %v, want %v", gotNumCols, tt.wantNumCols)
-			}
-		})
-	}
-}
-
-func Test_readCSVBytes(t *testing.T) {
-	b0 := "\"foo\",\"bar\"\n\"qux\",\"quz\"\n"
-	b1 := "foo,bar,baz\nqux,quux,quz\n"
-	b2 := "foo, bar\nqux, quz\n"
-	b3 := ",foo\n"
-	b4 := "foo,bar\nqux,quz"
-	b5 := "foo\nbaz\r\n"
-	b6 := "foo\nbaz\r"
-	b7 := "foo, bar\n qux, \n quux, quz\n"
-
-	f0 := "foo\nbar,baz\n"
-	f1 := "foo,bar\nbaz\n"
-	type args struct {
-		r        io.Reader
-		dstVals  [][]string
-		dstNulls [][]bool
-		comma    rune
-	}
-	tests := []struct {
-		name      string
-		args      args
-		wantVals  [][]string
-		wantNulls [][]bool
-		wantErr   bool
-	}{
-		{name: "pass with quotes",
-			args: args{
-				r: bytes.NewBuffer([]byte(b0)),
-				dstVals: [][]string{
-					{"", ""},
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}, {false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "qux"},
-				{"bar", "quz"}},
-			wantNulls: [][]bool{{false, false}, {false, false}},
-			wantErr:   false,
-		},
-		{name: "pass normal",
-			args: args{
-				r: bytes.NewBuffer([]byte(b1)),
-				dstVals: [][]string{
-					{"", ""},
-					{"", ""},
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}, {false, false}, {false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "qux"},
-				{"bar", "quux"},
-				{"baz", "quz"}},
-			wantNulls: [][]bool{{false, false}, {false, false}, {false, false}},
-			wantErr:   false,
-		},
-		{name: "pass with leading whitespace",
-			args: args{
-				r: bytes.NewBuffer([]byte(b2)),
-				dstVals: [][]string{
-					{"", ""},
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}, {false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "qux"},
-				{"bar", "quz"}},
-			wantNulls: [][]bool{{false, false}, {false, false}},
-			wantErr:   false,
-		},
-		{name: "pass with nil",
-			args: args{
-				r: bytes.NewBuffer([]byte(b3)),
-				dstVals: [][]string{
-					{""},
-					{""}},
-				dstNulls: [][]bool{{true}, {false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{""},
-				{"foo"}},
-			wantNulls: [][]bool{{true}, {false}},
-			wantErr:   false,
-		},
-		{name: "pass with no final \n",
-			args: args{
-				r: bytes.NewBuffer([]byte(b4)),
-				dstVals: [][]string{
-					{"", ""},
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}, {false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "qux"},
-				{"bar", "quz"}},
-			wantNulls: [][]bool{{false, false}, {false, false}},
-			wantErr:   false,
-		},
-		{name: "pass with \r\n",
-			args: args{
-				r: bytes.NewBuffer([]byte(b5)),
-				dstVals: [][]string{
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "baz"}},
-			wantNulls: [][]bool{{false, false}},
-			wantErr:   false,
-		},
-		{name: "pass with final \r",
-			args: args{
-				r: bytes.NewBuffer([]byte(b6)),
-				dstVals: [][]string{
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "baz"}},
-			wantNulls: [][]bool{{false, false}},
-			wantErr:   false,
-		},
-		{name: "pass with missing value",
-			args: args{
-				r: bytes.NewBuffer([]byte(b7)),
-				dstVals: [][]string{
-					{"", "", ""},
-					{"", "", ""},
-				},
-				dstNulls: [][]bool{
-					{false, false, false},
-					{false, false, false},
-				},
-				comma: ','},
-			wantVals: [][]string{
-				{"foo", "qux", "quux"},
-				{"bar", "", "quz"},
-			},
-			wantNulls: [][]bool{
-				{false, false, false},
-				{false, true, false},
-			},
-			wantErr: false,
-		},
-		{name: "fail - too many fields",
-			args: args{
-				r: bytes.NewBuffer([]byte(f0)),
-				dstVals: [][]string{
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "bar"}},
-			wantNulls: [][]bool{{false, false}},
-			wantErr:   true,
-		},
-		{name: "fail - too few fields",
-			args: args{
-				r: bytes.NewBuffer([]byte(f1)),
-				dstVals: [][]string{
-					{"", ""},
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}, {false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "baz"},
-				{"bar", ""}},
-			wantNulls: [][]bool{{false, false}, {false, false}},
-			wantErr:   true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := readCSVBytes(tt.args.r, tt.args.dstVals, tt.args.dstNulls, tt.args.comma)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readCSVBytes() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if !reflect.DeepEqual(tt.args.dstVals, tt.wantVals) {
-				t.Errorf("readCSVBytes() -> dstVals = %#v, wantVals %#v", tt.args.dstVals, tt.wantVals)
-				for i := range tt.args.dstVals {
-					for j := range tt.args.dstVals[i] {
-						fmt.Println(string(tt.args.dstVals[i][j]))
-					}
-				}
-			}
-			if !reflect.DeepEqual(tt.args.dstNulls, tt.wantNulls) {
-				t.Errorf("readCSVBytes() -> dstNulls = %v, wantNulls %v", tt.args.dstNulls, tt.wantNulls)
 			}
 		})
 	}
@@ -5006,7 +4705,7 @@ func Test_valueContainer_interfaceSlice(t *testing.T) {
 			slice:  []int{1, 0, 2},
 			isNull: []bool{false, true, false},
 			name:   "foobar"},
-			[]interface{}{1, "(null)", 2},
+			[]interface{}{1, nil, 2},
 		},
 	}
 	for _, tt := range tests {
@@ -5303,7 +5002,7 @@ func Test_writeInterfaceRecords(t *testing.T) {
 				{slice: []string{"quuz"}, isNull: []bool{false}, name: "baz", id: mockID},
 			}, false, 1,
 		},
-			[][]interface{}{{"foo", "bar", "baz"}, {"quz", "(null)", "quuz"}},
+			[][]interface{}{{"foo", "bar", "baz"}, {"quz", nil, "quuz"}},
 		},
 		{"pass - by column", args{
 			[]*valueContainer{
@@ -5334,6 +5033,269 @@ func Test_writeInterfaceRecords(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := writeInterfaceRecords(tt.args.containers, tt.args.byColumn, tt.args.numColLevels); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("writeInterfaceRecords() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+type testStruct struct {
+	Name string `json:"name"`
+	Age  int    `json:"age"`
+}
+
+type testStructNoFields struct {
+}
+
+func Test_readStructSlice(t *testing.T) {
+	type args struct {
+		slice  interface{}
+		isNull [][]bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*valueContainer
+		wantErr bool
+	}{
+		{"pass",
+			args{
+				[]testStruct{{"foo", 1}, {"bar", 2}},
+				nil,
+			},
+			[]*valueContainer{
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "name"},
+				{slice: []int{1, 2}, isNull: []bool{false, false}, id: mockID, name: "age"}},
+			false},
+		{"pass - missing field",
+			args{
+				[]testStruct{{Name: "foo"}, {Name: "bar"}},
+				nil,
+			},
+			[]*valueContainer{
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "name"},
+				{slice: []int{0, 0}, isNull: []bool{false, false}, id: mockID, name: "age"}},
+			false},
+		{"pass - with nulls",
+			args{
+				[]testStruct{
+					{"", 1},
+					{"bar", 2},
+					{"baz", 0},
+				},
+				[][]bool{
+					{true, false},
+					{false, false},
+					{false, true},
+				},
+			},
+			[]*valueContainer{
+				{slice: []string{"", "bar", "baz"}, isNull: []bool{true, false, false}, id: mockID, name: "name"},
+				{slice: []int{1, 2, 0}, isNull: []bool{false, false, true}, id: mockID, name: "age"}},
+			false},
+		{"fail - wrong number of null columns",
+			args{
+				[]testStruct{
+					{"", 1},
+					{"bar", 2},
+					{"baz", 3},
+				},
+				[][]bool{
+					{true, false},
+				},
+			},
+			nil, true},
+		{"fail - wrong number of null rows",
+			args{
+				[]testStruct{
+					{"", 1},
+					{"bar", 2},
+				},
+				[][]bool{
+					{true},
+					{false},
+				},
+			},
+			nil, true},
+		{"fail - uneven null rows",
+			args{
+				[]testStruct{
+					{"", 1},
+					{"bar", 2},
+				},
+				[][]bool{
+					{true, true},
+					{},
+				},
+			},
+			nil, true},
+		{"fail - not slice", args{testStruct{"foo", 1}, nil},
+			nil, true},
+		{"fail - not struct", args{[]string{"foo"}, nil},
+			nil, true},
+		{"fail - empty", args{[]testStruct{}, nil},
+			nil, true},
+		{"fail - no fields", args{[]testStructNoFields{{}}, nil},
+			nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := readStructSlice(tt.args.slice, tt.args.isNull)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readStructSlice() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("readStructSlice() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_writeStructSlice(t *testing.T) {
+	type args struct {
+		containers []*valueContainer
+		slice      interface{}
+	}
+	tests := []struct {
+		name      string
+		args      args
+		want      interface{}
+		wantNulls [][]bool
+		wantErr   bool
+	}{
+		{"pass", args{
+			[]*valueContainer{
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "name", id: mockID},
+				{slice: []int{1, 2}, isNull: []bool{false, false}, name: "age", id: mockID},
+			}, &[]testStruct{},
+		},
+			&[]testStruct{
+				{"foo", 1},
+				{"bar", 2},
+			},
+			[][]bool{
+				{false, false},
+				{false, false},
+			},
+			false,
+		},
+		{"pass - nulls", args{
+			[]*valueContainer{
+				{slice: []string{"", "bar"}, isNull: []bool{true, false}, name: "name", id: mockID},
+				{slice: []int{1, 2}, isNull: []bool{false, false}, name: "age", id: mockID},
+			}, &[]testStruct{},
+		},
+			&[]testStruct{
+				{"", 1},
+				{"bar", 2},
+			},
+			[][]bool{
+				{true, false},
+				{false, false},
+			},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := writeStructSlice(tt.args.containers, tt.args.slice)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeStructSlice() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(tt.args.slice, tt.want) {
+				t.Errorf("writeStructSlice() -> = %v, wantErr %v", tt.args.slice, tt.want)
+			}
+			if !reflect.DeepEqual(got, tt.wantNulls) {
+				t.Errorf("writeStructSlice() got1 = %v, want %v", got, tt.wantNulls)
+			}
+		})
+	}
+}
+
+func Test_mockContainersFromDTypes(t *testing.T) {
+	type args struct {
+		names       []string
+		dtypes      []DType
+		numMockRows int
+	}
+	tests := []struct {
+		name string
+		args args
+		want []*valueContainer
+	}{
+		{"pass", args{[]string{"foo", "bar"}, []DType{String, Float64}, 1},
+			[]*valueContainer{
+				{slice: []string{"baz"}, isNull: []bool{false}, name: "foo", id: mockID, cache: []string{"baz"}},
+				{slice: []float64{.5}, isNull: []bool{false}, name: "bar", id: mockID, cache: []string{".5"}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := mockContainersFromDTypes(tt.args.names, tt.args.dtypes, tt.args.numMockRows); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("mockContainersFromDTypes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_inferType(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		cache  []string
+		name   string
+		id     string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   DType
+	}{
+		{"string", fields{slice: []string{"foo", "bar", "baz"}}, String},
+		{"float", fields{slice: []string{"3.5", "1", ""}}, Float64},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				cache:  tt.fields.cache,
+				name:   tt.fields.name,
+				id:     tt.fields.id,
+			}
+			if got := vc.inferType(); got != tt.want {
+				t.Errorf("valueContainer.inferType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_castToInferredTypes(t *testing.T) {
+	type args struct {
+		containers []*valueContainer
+	}
+	tests := []struct {
+		name string
+		args args
+		want []*valueContainer
+	}{
+		{"pass", args{[]*valueContainer{
+			{slice: []string{"baz"}, isNull: []bool{false}, name: "foo", id: mockID},
+			{slice: []string{".5"}, isNull: []bool{false}, name: "bar", id: mockID},
+		}},
+			[]*valueContainer{
+				{slice: []string{"baz"}, isNull: []bool{false}, name: "foo", id: mockID, cache: []string{"baz"}},
+				{slice: []float64{.5}, isNull: []bool{false}, name: "bar", id: mockID, cache: []string{".5"}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			castToInferredTypes(tt.args.containers)
+			if !reflect.DeepEqual(tt.args.containers, tt.want) {
+				t.Errorf("castToInferredTypes() -> %v, want %v", tt.args.containers, tt.want)
 			}
 		})
 	}
