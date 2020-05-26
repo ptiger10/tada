@@ -396,7 +396,7 @@ func ExamplePrintOptionMaxRows() {
 	tada.PrintOptionMaxRows(50)
 	// Output:
 	// +-----++-----+
-	// |  -  ||  foo  |
+	// |  -  || foo |
 	// |-----||-----|
 	// |   0 ||   1 |
 	// |   1 ||   2 |

@@ -6,6 +6,9 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"cloud.google.com/go/civil"
+	"github.com/ptiger10/tablediff"
 )
 
 func TestSliceReader_Read(t *testing.T) {
@@ -164,10 +167,12 @@ func TestSliceReader_Read(t *testing.T) {
 
 func TestRecordReader_Read(t *testing.T) {
 	type fields struct {
-		HeaderRows  int
-		LabelLevels int
-		ByColumn    bool
-		records     [][]string
+		HeaderRows        int
+		LabelLevels       int
+		ByColumn          bool
+		BlankStringAsNull bool
+		InferTypes        bool
+		records           [][]string
 	}
 	tests := []struct {
 		name    string
@@ -175,12 +180,45 @@ func TestRecordReader_Read(t *testing.T) {
 		want    *DataFrame
 		wantErr bool
 	}{
-		{"by row",
+		{"empty space as null",
+			fields{
+				HeaderRows:        1,
+				LabelLevels:       0,
+				ByColumn:          false,
+				InferTypes:        false,
+				BlankStringAsNull: true,
+				records:           [][]string{{"foo", "bar"}, {"", "5"}, {"2", "6"}},
+			},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"", "2"}, isNull: []bool{true, false}, id: mockID, name: "foo"},
+				{slice: []string{"5", "6"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
+				labels: []*valueContainer{
+					{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			false},
+		{"infer types",
 			fields{
 				HeaderRows:  1,
 				LabelLevels: 0,
 				ByColumn:    false,
-				records:     [][]string{{"foo", "bar"}, {"", "5"}, {"2", "6"}},
+				InferTypes:  true,
+				records:     [][]string{{"foo", "bar", "baz"}, {"qux", "2", "1/1/2020"}},
+			},
+			&DataFrame{values: []*valueContainer{
+				{slice: []string{"qux"}, isNull: []bool{false}, id: mockID, name: "foo", cache: []string{"qux"}},
+				{slice: []float64{2}, isNull: []bool{false}, id: mockID, name: "bar", cache: []string{"2"}},
+				{slice: []civil.Date{{Year: 2020, Month: 1, Day: 1}}, isNull: []bool{false}, id: mockID, name: "baz", cache: []string{"1/1/2020"}}},
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
+				colLevelNames: []string{"*0"}},
+			false},
+		{"by row",
+			fields{
+				HeaderRows:        1,
+				LabelLevels:       0,
+				ByColumn:          false,
+				BlankStringAsNull: false,
+				records:           [][]string{{"foo", "bar"}, {"", "5"}, {"2", "6"}},
 			},
 			&DataFrame{values: []*valueContainer{
 				{slice: []string{"", "2"}, isNull: []bool{false, false}, id: mockID, name: "foo"},
@@ -201,10 +239,12 @@ func TestRecordReader_Read(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := RecordReader{
-				HeaderRows:  tt.fields.HeaderRows,
-				LabelLevels: tt.fields.LabelLevels,
-				ByColumn:    tt.fields.ByColumn,
-				records:     tt.fields.records,
+				HeaderRows:        tt.fields.HeaderRows,
+				LabelLevels:       tt.fields.LabelLevels,
+				ByColumn:          tt.fields.ByColumn,
+				BlankStringAsNull: tt.fields.BlankStringAsNull,
+				InferTypes:        tt.fields.InferTypes,
+				records:           tt.fields.records,
 			}
 			got, err := r.Read()
 			if (err != nil) != tt.wantErr {
@@ -413,10 +453,11 @@ func TestCSVReader_Read(t *testing.T) {
 		Reader       *csv.Reader
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		want    *DataFrame
-		wantErr bool
+		name        string
+		fields      fields
+		want        *DataFrame
+		wantRecords [][]string
+		wantErr     bool
 	}{
 		{"pass", fields{
 			RecordReader: RecordReader{
@@ -431,6 +472,11 @@ func TestCSVReader_Read(t *testing.T) {
 				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
 				name:          "",
 				colLevelNames: []string{"*0"},
+			},
+			[][]string{
+				{"Name", "Age"},
+				{"foo", "1"},
+				{"bar", "2"},
 			},
 			false,
 		},
@@ -449,6 +495,9 @@ func TestCSVReader_Read(t *testing.T) {
 			}
 			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("CSVReader.Read() = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(r.Records(), tt.wantRecords) {
+				t.Errorf("CSVReader.Read() [][]string = %v, want %v", r.Records(), tt.wantRecords)
 			}
 		})
 	}
@@ -532,6 +581,40 @@ func (mat testMatrix) T() Matrix {
 	return mat
 }
 
+func Test_valueContainer_UnmarshalJSON(t *testing.T) {
+	type args struct {
+		b []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    *valueContainer
+		wantErr bool
+	}{
+		{"nil",
+			args{[]byte(`null`)},
+			&valueContainer{},
+			false,
+		},
+		{"err",
+			args{[]byte(`foo`)},
+			&valueContainer{},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := new(valueContainer)
+			if err := vc.UnmarshalJSON(tt.args.b); (err != nil) != tt.wantErr {
+				t.Errorf("valueContainer.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !reflect.DeepEqual(vc, tt.want) {
+				t.Errorf("DataFrame.UnmarshalJSON() -> = %v, want %v", vc, tt.want)
+			}
+		})
+	}
+}
+
 func TestDataFrame_UnmarshalJSON(t *testing.T) {
 	type args struct {
 		b []byte
@@ -544,8 +627,8 @@ func TestDataFrame_UnmarshalJSON(t *testing.T) {
 	}{
 		{"pass",
 			args{[]byte(`
-			{"name": "foobar", 
-			"values": [{"slice": ["foo"], "isNull": [false], "id": "1", "name": "bar"}], 
+			{"name": "foobar",
+			"values": [{"slice": ["foo"], "isNull": [false], "id": "1", "name": "bar"}],
 			"colLevelNames": ["*0"]}`)},
 			&DataFrame{
 				name:          "foobar",
@@ -554,12 +637,25 @@ func TestDataFrame_UnmarshalJSON(t *testing.T) {
 			},
 			false,
 		},
+		{"nil",
+			args{[]byte(`null`)},
+			&DataFrame{},
+			false,
+		},
+		{"err",
+			args{[]byte(`foo`)},
+			&DataFrame{},
+			true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			df := new(DataFrame)
 			if err := df.UnmarshalJSON(tt.args.b); (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.UnmarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !EqualDataFrames(df, tt.want) {
+				t.Errorf("DataFrame.UnmarshalJSON() -> = %v, want %v", df, tt.want)
 			}
 		})
 	}
@@ -739,6 +835,175 @@ func TestMatrixReader_Read(t *testing.T) {
 			}
 			if !EqualDataFrames(got, tt.want) {
 				t.Errorf("MatrixReader.Read() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataFrame_EqualRecords(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		got  *RecordWriter
+		want *CSVReader
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		want    bool
+		want1   *tablediff.Differences
+		wantErr bool
+	}{
+		{"pass",
+			fields{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
+				},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"},
+			args{
+				got:  NewRecordWriter(),
+				want: NewCSVReader(strings.NewReader("foo\n1")),
+			},
+			true,
+			nil,
+			false,
+		},
+		{"fail - bad read",
+			fields{
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
+				},
+				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
+				colLevelNames: []string{"*0"},
+				name:          "baz"},
+			args{
+				got:  NewRecordWriter(),
+				want: NewCSVReader(strings.NewReader("foo\n1,2,3")),
+			},
+			false,
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			got, got1, err := df.EqualRecords(tt.args.got, tt.args.want)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.EqualRecords() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.want {
+				t.Errorf("DataFrame.EqualRecords() got = %v, want %v", got, tt.want)
+			}
+			if !reflect.DeepEqual(got1, tt.want1) {
+				t.Errorf("DataFrame.EqualRecords() got1 = %v, want %v", got1, tt.want1)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_alias(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		cache  []string
+		name   string
+		id     string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   valueContainerAlias
+	}{
+		{"pass",
+			fields{
+				[]string{"foo"},
+				[]bool{false},
+				nil,
+				"foo",
+				"123",
+			},
+			valueContainerAlias{
+				[]string{"foo"},
+				[]bool{false},
+				"foo",
+				"123",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				cache:  tt.fields.cache,
+				name:   tt.fields.name,
+				id:     tt.fields.id,
+			}
+			if got := vc.alias(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.alias() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_MarshalJSON(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		cache  []string
+		name   string
+		id     string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		want    []byte
+		wantErr bool
+	}{
+		{"pass",
+			fields{
+				[]string{"foo"},
+				[]bool{false},
+				nil,
+				"foo",
+				"123",
+			},
+			[]byte(`{"slice":["foo"],"isNull":[false],"name":"foo","id":"123"}`),
+			false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				cache:  tt.fields.cache,
+				name:   tt.fields.name,
+				id:     tt.fields.id,
+			}
+			got, err := vc.MarshalJSON()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("valueContainer.MarshalJSON() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("valueContainer.MarshalJSON() = %v, want %v", string(got), tt.want)
 			}
 		})
 	}

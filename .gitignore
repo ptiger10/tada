@@ -5,5 +5,3 @@ cleanGeneratedCode.sh
 *.out
 *.test
 benchmarks_*
-
-

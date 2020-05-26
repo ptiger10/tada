@@ -1430,12 +1430,12 @@ func Test_sortContainers(t *testing.T) {
 		want    []int
 		wantErr bool
 	}{
-		// {"multi sort - floats",
-		// 	args{[]*valueContainer{
-		// 		{slice: []float64{2, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "foo"},
-		// 		{slice: []float64{3, 2, 1}, isNull: []bool{false, false, false}, id: mockID, name: "bar"},
-		// 	}, []Sorter{{Name: "foo"}, {Name: "bar"}}},
-		// 	[]int{1, 2, 0}, false},
+		{"multi sort - floats",
+			args{[]*valueContainer{
+				{slice: []float64{2, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "foo"},
+				{slice: []float64{3, 2, 1}, isNull: []bool{false, false, false}, id: mockID, name: "bar"},
+			}, []Sorter{{Name: "foo"}, {Name: "bar"}}},
+			[]int{1, 2, 0}, false},
 		{"multi sort - floats - ordered repeats",
 			args{[]*valueContainer{
 				{slice: []float64{2, 2, 1}, isNull: []bool{false, false, false}, id: mockID, name: "foo"},
@@ -1486,8 +1486,12 @@ func Test_mockString(t *testing.T) {
 		want     string
 		wantNull bool
 	}{
-		{"pass", args{String, .99999999}, optionsNullPrinter, true},
-		{"pass", args{String, .00001}, "baz", false},
+		{"pass", args{String, .99}, optionsNullPrinter, true},
+		{"pass", args{String, .01}, "baz", false},
+		{"pass", args{Float64, .01}, ".5", false},
+		{"pass", args{DateTime, .01}, "2020-01-01T12:30:00Z00:00", false},
+		{"pass", args{Date, .01}, "2020-01-02", false},
+		{"pass", args{Time, .01}, "1:00pm", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1851,123 +1855,6 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 			}
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.toCSVByRows() err = %v, want %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_readCSVByRows(t *testing.T) {
-	type args struct {
-		csv    [][]string
-		config *readConfig
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *DataFrame
-		wantErr bool
-	}{
-		{"1 header row, 2 columns, no label levels",
-			args{
-				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				config: &readConfig{numHeaderRows: 1}},
-			&DataFrame{values: []*valueContainer{
-				{slice: []string{"1", "2"}, isNull: []bool{false, false}, id: mockID, name: "foo"},
-				{slice: []string{"5", "6"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			false},
-		{"1 header row, 1 column, 1 label level",
-			args{
-				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				config: &readConfig{numHeaderRows: 1, numLabelLevels: 1}},
-			&DataFrame{values: []*valueContainer{
-				{slice: []string{"5", "6"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
-				labels: []*valueContainer{
-					{slice: []string{"1", "2"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
-				colLevelNames: []string{"*0"}},
-			false},
-		{"misaligned: wrong numbers of columns: too many",
-			args{
-				csv:    [][]string{{"foo", "bar"}, {"1", "2", "3"}},
-				config: &readConfig{numHeaderRows: 1}},
-			nil,
-			true},
-		{"misaligned: wrong numbers of columns: too few",
-			args{
-				csv:    [][]string{{"foo", "bar"}, {"1"}},
-				config: &readConfig{numHeaderRows: 1}},
-			nil,
-			true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := readCSVByRows(tt.args.csv, tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readCSVByRows() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !EqualDataFrames(got, tt.want) {
-				t.Errorf("readCSVByRows() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_readCSVByCols(t *testing.T) {
-	type args struct {
-		csv    [][]string
-		config *readConfig
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *DataFrame
-		wantErr bool
-	}{
-		{"1 header row, 2 columns, no label levels",
-			args{
-				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
-				config: &readConfig{numHeaderRows: 1}},
-			&DataFrame{values: []*valueContainer{
-				{slice: []string{"1", "2"}, isNull: []bool{false, false}, id: mockID, name: "foo"},
-				{slice: []string{"5", "6"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			false},
-		{"1 header row, 1 column, 1 label levels",
-			args{
-				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
-				config: &readConfig{numHeaderRows: 1, numLabelLevels: 1}},
-			&DataFrame{values: []*valueContainer{
-				{slice: []string{"5", "6"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
-				labels: []*valueContainer{
-					{slice: []string{"1", "2"}, isNull: []bool{false, false}, id: mockID, name: "foo"},
-				},
-				colLevelNames: []string{"*0"}},
-			false},
-		{"misaligned lines: too few",
-			args{
-				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5"}},
-				config: &readConfig{numHeaderRows: 1, numLabelLevels: 1}},
-			nil,
-			true},
-		{"misaligned lines: too many",
-			args{
-				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6,", "6"}},
-				config: &readConfig{numHeaderRows: 1, numLabelLevels: 1}},
-			nil,
-			true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := readCSVByCols(tt.args.csv, tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readCSVByRows() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !EqualDataFrames(got, tt.want) {
-				t.Errorf("readCSVByCols() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -3533,73 +3420,6 @@ func Test_extractCSVDimensions(t *testing.T) {
 	}
 }
 
-func Test_makeDataFrameFromMatrices(t *testing.T) {
-	type args struct {
-		values [][]string
-		isNull [][]bool
-		config *readConfig
-	}
-	tests := []struct {
-		name string
-		args args
-		want *DataFrame
-	}{
-		{"pass - 1 header col", args{
-			values: [][]string{
-				{"foo", "bar"},
-				{"baz", ""}},
-			isNull: [][]bool{{false, false}, {false, true}},
-			config: &readConfig{numHeaderRows: 1}},
-			&DataFrame{
-				values: []*valueContainer{
-					{slice: []string{"bar"}, isNull: []bool{false}, id: mockID, name: "foo"},
-					{slice: []string{""}, isNull: []bool{true}, id: mockID, name: "baz"},
-				},
-				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"},
-				},
-				colLevelNames: []string{"*0"},
-			}},
-		{"pass - 1 header col, 1 label level", args{
-			values: [][]string{
-				{"foo", "bar"},
-				{"baz", ""}},
-			isNull: [][]bool{{false, false}, {false, true}},
-			config: &readConfig{numHeaderRows: 1, numLabelLevels: 1}},
-			&DataFrame{
-				values: []*valueContainer{
-					{slice: []string{""}, isNull: []bool{true}, id: mockID, name: "baz"},
-				},
-				labels: []*valueContainer{
-					{slice: []string{"bar"}, isNull: []bool{false}, id: mockID, name: "foo"},
-				},
-				colLevelNames: []string{"*0"},
-			}},
-		{"pass - 1 label level", args{
-			values: [][]string{
-				{"foo", "bar"},
-				{"baz", ""}},
-			isNull: [][]bool{{false, false}, {false, true}},
-			config: &readConfig{numLabelLevels: 1}},
-			&DataFrame{
-				values: []*valueContainer{
-					{slice: []string{"baz", ""}, isNull: []bool{false, true}, id: mockID, name: "0"},
-				},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "*0"},
-				},
-				colLevelNames: []string{"*0"},
-			}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := makeDataFrameFromMatrices(tt.args.values, tt.args.isNull, tt.args.config); !EqualDataFrames(got, tt.want) {
-				t.Errorf("makeDataFrameFromMatrices() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestSeries_combineMath(t *testing.T) {
 	type fields struct {
 		values     *valueContainer
@@ -4488,42 +4308,6 @@ func Test_nameOfContainer(t *testing.T) {
 	}
 }
 
-// func Test_setReadConfig(t *testing.T) {
-// 	type args struct {
-// 		options []ReadOption
-// 	}
-// 	tests := []struct {
-// 		name string
-// 		args args
-// 		want *readConfig
-// 	}{
-// 		{"default", args{nil}, &readConfig{
-// 			numHeaderRows:  1,
-// 			numLabelLevels: 0,
-// 			delimiter:      ',',
-// 			majorDimIsCols: false,
-// 		}},
-// 		{"pass", args{[]ReadOption{
-// 			WithHeaders(2),
-// 			WithLabels(2),
-// 			WithDelimiter('|'),
-// 			ByColumn(),
-// 		}}, &readConfig{
-// 			numHeaderRows:  2,
-// 			numLabelLevels: 2,
-// 			delimiter:      '|',
-// 			majorDimIsCols: true,
-// 		}},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			if got := setReadConfig(tt.args.options); !reflect.DeepEqual(got, tt.want) {
-// 				t.Errorf("setReadConfig() = %v, want %v", got, tt.want)
-// 			}
-// 		})
-// 	}
-// }
-
 func Test_valueContainer_expand(t *testing.T) {
 	type fields struct {
 		slice  interface{}
@@ -4930,6 +4714,64 @@ func Test_readRecords(t *testing.T) {
 	}
 }
 
+func Test_readInterfaceRecords(t *testing.T) {
+	type args struct {
+		records    [][]interface{}
+		byColumns  bool
+		numHeaders int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*valueContainer
+		wantErr bool
+	}{
+		{"pass - by row, no headers",
+			args{[][]interface{}{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}}, false, 0},
+			[]*valueContainer{
+				{slice: []interface{}{"foo", "quz"}, isNull: []bool{false, false}, name: "", id: mockID},
+				{slice: []interface{}{"bar", "qux"}, isNull: []bool{false, false}, name: "", id: mockID},
+				{slice: []interface{}{"baz", "quuz"}, isNull: []bool{false, false}, name: "", id: mockID},
+			},
+			false,
+		},
+		{"pass - by row, with header",
+			args{[][]interface{}{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}}, false, 1},
+			[]*valueContainer{
+				{slice: []interface{}{"quz"}, isNull: []bool{false}, name: "foo", id: mockID},
+				{slice: []interface{}{"qux"}, isNull: []bool{false}, name: "bar", id: mockID},
+				{slice: []interface{}{"quuz"}, isNull: []bool{false}, name: "baz", id: mockID},
+			},
+			false,
+		},
+		{"pass - by column, with header",
+			args{[][]interface{}{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}}, true, 1},
+			[]*valueContainer{
+				{slice: []interface{}{"bar", "baz"}, isNull: []bool{false, false}, name: "foo", id: mockID},
+				{slice: []interface{}{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz", id: mockID},
+			},
+			false,
+		},
+		{"fail - misshapen",
+			args{[][]interface{}{{"foo", "bar"}, {"quz", "qux", "quuz"}}, false, 1},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := readInterfaceRecords(tt.args.records, tt.args.byColumns, tt.args.numHeaders)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readInterfaceRecords() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("readInterfaceRecords() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func Test_writeRecords(t *testing.T) {
 	type args struct {
 		containers   []*valueContainer
@@ -5043,6 +4885,11 @@ type testStruct struct {
 	Age  int    `json:"age"`
 }
 
+type testStructNoTags struct {
+	Name string
+	Age  int
+}
+
 type testStructNoFields struct {
 }
 
@@ -5091,6 +4938,23 @@ func Test_readStructSlice(t *testing.T) {
 			[]*valueContainer{
 				{slice: []string{"", "bar", "baz"}, isNull: []bool{true, false, false}, id: mockID, name: "name"},
 				{slice: []int{1, 2, 0}, isNull: []bool{false, false, true}, id: mockID, name: "age"}},
+			false},
+		{"pass - no tags",
+			args{
+				[]testStructNoTags{
+					{"", 1},
+					{"bar", 2},
+					{"baz", 0},
+				},
+				[][]bool{
+					{true, false},
+					{false, false},
+					{false, true},
+				},
+			},
+			[]*valueContainer{
+				{slice: []string{"", "bar", "baz"}, isNull: []bool{true, false, false}, id: mockID, name: "Name"},
+				{slice: []int{1, 2, 0}, isNull: []bool{false, false, true}, id: mockID, name: "Age"}},
 			false},
 		{"fail - wrong number of null columns",
 			args{
@@ -5195,6 +5059,42 @@ func Test_writeStructSlice(t *testing.T) {
 			},
 			false,
 		},
+		{"pass - no tags",
+			args{
+				[]*valueContainer{
+					{slice: []string{"", "bar"}, isNull: []bool{true, false}, name: "Name", id: mockID},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "Age", id: mockID},
+				}, &[]testStructNoTags{},
+			},
+			&[]testStructNoTags{
+				{"", 1},
+				{"bar", 2},
+			},
+			[][]bool{
+				{true, false},
+				{false, false},
+			},
+			false,
+		},
+		{"fail - wrong type",
+			args{
+				[]*valueContainer{
+					{slice: []string{"", "bar"}, isNull: []bool{true, false}, name: "Name", id: mockID},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "Age", id: mockID},
+				}, "foo",
+			},
+			nil,
+			nil,
+			true,
+		},
+		{"fail - empty df",
+			args{
+				[]*valueContainer{}, &[]testStructNoTags{},
+			},
+			nil,
+			nil,
+			true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -5203,11 +5103,11 @@ func Test_writeStructSlice(t *testing.T) {
 				t.Errorf("writeStructSlice() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
-			if !reflect.DeepEqual(tt.args.slice, tt.want) {
-				t.Errorf("writeStructSlice() -> = %v, wantErr %v", tt.args.slice, tt.want)
-			}
 			if !reflect.DeepEqual(got, tt.wantNulls) {
 				t.Errorf("writeStructSlice() got1 = %v, want %v", got, tt.wantNulls)
+			}
+			if err == nil && !reflect.DeepEqual(tt.args.slice, tt.want) {
+				t.Errorf("writeStructSlice() -> = %v, want %v", tt.args.slice, tt.want)
 			}
 		})
 	}

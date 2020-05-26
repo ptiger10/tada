@@ -3314,89 +3314,6 @@ func TestDataFrame_HasLabels(t *testing.T) {
 	}
 }
 
-// func TestDataFrame_EqualsCSV(t *testing.T) {
-// 	type fields struct {
-// 		labels        []*valueContainer
-// 		values        []*valueContainer
-// 		name          string
-// 		err           error
-// 		colLevelNames []string
-// 	}
-// 	type args struct {
-// 		r             io.Reader
-// 		includeLabels bool
-// 		options       []ReadOption
-// 	}
-// 	tests := []struct {
-// 		name    string
-// 		fields  fields
-// 		args    args
-// 		want    bool
-// 		want1   *tablediff.Differences
-// 		wantErr bool
-// 	}{
-// 		{name: "pass - read in labels",
-// 			fields: fields{
-// 				values: []*valueContainer{
-// 					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
-// 				},
-// 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
-// 				colLevelNames: []string{"*0"},
-// 				name:          "baz"},
-// 			args: args{r: strings.NewReader("*0, foo\n 0, 1"), includeLabels: true,
-// 				options: []ReadOption{WithLabels(1)}},
-// 			want:    true,
-// 			want1:   nil,
-// 			wantErr: false},
-// 		{name: "pass - ignore labels",
-// 			fields: fields{
-// 				values: []*valueContainer{
-// 					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
-// 				},
-// 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
-// 				colLevelNames: []string{"*0"},
-// 				name:          "baz"},
-// 			args:    args{r: strings.NewReader("foo\n 1"), includeLabels: false},
-// 			want:    true,
-// 			want1:   nil,
-// 			wantErr: false},
-// 		{name: "fail - misaligned",
-// 			fields: fields{
-// 				values: []*valueContainer{
-// 					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
-// 				},
-// 				labels:        []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
-// 				colLevelNames: []string{"*0"},
-// 				name:          "baz"},
-// 			args:    args{r: strings.NewReader("*0, foo\n 0"), includeLabels: false},
-// 			want:    false,
-// 			want1:   nil,
-// 			wantErr: true},
-// 	}
-// 	for _, tt := range tests {
-// 		t.Run(tt.name, func(t *testing.T) {
-// 			df := &DataFrame{
-// 				labels:        tt.fields.labels,
-// 				values:        tt.fields.values,
-// 				name:          tt.fields.name,
-// 				err:           tt.fields.err,
-// 				colLevelNames: tt.fields.colLevelNames,
-// 			}
-// 			got, got1, err := df.EqualsCSV(tt.args.includeLabels, tt.args.r)
-// 			if (err != nil) != tt.wantErr {
-// 				t.Errorf("DataFrame.EqualsCSV() error = %v, wantErr %v", err, tt.wantErr)
-// 				return
-// 			}
-// 			if got != tt.want {
-// 				t.Errorf("DataFrame.EqualsCSV() got = %v, want %v", got, tt.want)
-// 			}
-// 			if !reflect.DeepEqual(got1, tt.want1) {
-// 				t.Errorf("DataFrame.EqualsCSV() got1 = %v, want %v", got1, tt.want1)
-// 			}
-// 		})
-// 	}
-// }
-
 func TestDataFrame_Err(t *testing.T) {
 	type fields struct {
 		labels        []*valueContainer
@@ -5224,6 +5141,60 @@ func TestDataFrame_UnpackIDsByName(t *testing.T) {
 						t.Errorf("DataFrame.UnpackIDsByName() -> [%s] = %v, want %v", k, *tt.args.receivers[k], tt.want[k])
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestDataFrame_SetName(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		name string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   *DataFrame
+	}{
+		{"pass", fields{
+			labels: []*valueContainer{
+				{slice: []int{0}, isNull: []bool{false}, id: "1", name: "foo"},
+			},
+			values: []*valueContainer{
+				{slice: []float64{1}, isNull: []bool{false}, id: "2", name: "bar"},
+			},
+			colLevelNames: []string{"*0"},
+			name:          "foobar"},
+			args{"corge"},
+			&DataFrame{
+				labels: []*valueContainer{
+					{slice: []int{0}, isNull: []bool{false}, id: "1", name: "foo"},
+				},
+				values: []*valueContainer{
+					{slice: []float64{1}, isNull: []bool{false}, id: "2", name: "bar"},
+				},
+				colLevelNames: []string{"*0"},
+				name:          "corge"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			if got := df.SetName(tt.args.name); !EqualDataFrames(got, tt.want) {
+				t.Errorf("DataFrame.SetName() = %v, want %v", got, tt.want)
 			}
 		})
 	}

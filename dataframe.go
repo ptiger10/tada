@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"reflect"
 
-	"github.com/ptiger10/tablediff"
 	"github.com/ptiger10/tablewriter"
 )
 
@@ -129,19 +128,6 @@ func (df *DataFrame) Series() *Series {
 	}
 }
 
-// EqualRecords reduces df to [][]string records, reads [][]string records from want,
-// and evaluates whether the stringified values match.
-// If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
-func (df *DataFrame) EqualRecords(got *RecordWriter, want *CSVReader) (bool, *tablediff.Differences, error) {
-	got.Write(df)
-	_, err := want.Read()
-	if err != nil {
-		return false, nil, fmt.Errorf("comparing csv: reading want: %v", err)
-	}
-	diffs, eq := tablediff.Diff(got.Records(), want.records)
-	return eq, diffs, nil
-}
-
 // -- GETTERS
 
 // String prints the DataFrame in table form, with the number of rows constrained by optionMaxRows,
@@ -163,8 +149,10 @@ func (df *DataFrame) String() string {
 		// truncate rows
 		n := optionMaxRows / 2
 		topHalf := NewRecordWriter()
+		topHalf.IncludeLabels = true
 		df.Head(n).WriteTo(topHalf)
 		bottomHalf := NewRecordWriter()
+		bottomHalf.IncludeLabels = true
 		df.Tail(n).WriteTo(bottomHalf)
 		filler := make([]string, df.NumLevels()+df.NumColumns())
 		for k := range filler {

@@ -1,11 +1,9 @@
 package tada
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/csv"
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"math/rand"
@@ -15,8 +13,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
 	"cloud.google.com/go/civil"
 )
@@ -496,32 +492,6 @@ func (df *DataFrame) toCSVByRows(includeLabels bool) ([][]string, error) {
 	return ret, nil
 }
 
-func setReadConfig(options []ReadOption) *readConfig {
-	// default config
-	config := &readConfig{
-		numHeaderRows:  1,
-		numLabelLevels: 0,
-		delimiter:      ',',
-		majorDimIsCols: false,
-	}
-	for _, option := range options {
-		option(config)
-	}
-	return config
-}
-
-func setWriteConfig(options []WriteOption) *writeConfig {
-	// default config
-	config := &writeConfig{
-		includeLabels: true,
-		delimiter:     ',',
-	}
-	for _, option := range options {
-		option(config)
-	}
-	return config
-}
-
 func setJoinConfig(options []JoinOption) *joinConfig {
 	// default config
 	config := &joinConfig{
@@ -652,163 +622,6 @@ func transposeInterfaceRecords(records [][]interface{}) [][]interface{} {
 	return ret
 }
 
-// expects non-nil cfg
-func readCSVByRows(csv [][]string, config *readConfig) (*DataFrame, error) {
-	numFields := len(csv[0])
-	for i := range csv {
-		if len(csv[i]) != numFields {
-			return nil, fmt.Errorf("row %d: all rows must have same number of columns as first row (%d != %d)",
-				i, len(csv[i]), numFields)
-		}
-	}
-
-	numRows := len(csv) - config.numHeaderRows
-	numCols := len(csv[0]) - config.numLabelLevels
-
-	// prepare intermediary values containers
-	vals := makeStringMatrix(numCols, numRows)
-	valsIsNull := makeBoolMatrix(numCols, numRows)
-	valsNames := makeStringMatrix(numCols, config.numHeaderRows)
-
-	// prepare intermediary label containers
-	labels := makeStringMatrix(config.numLabelLevels, numRows)
-	labelsIsNull := makeBoolMatrix(config.numLabelLevels, numRows)
-	levelNames := makeStringMatrix(config.numLabelLevels, config.numHeaderRows)
-
-	// iterate over csv and transpose rows and columns
-	for row := range csv {
-		for column := range csv[row] {
-			if row < config.numHeaderRows {
-				if column < config.numLabelLevels {
-					// write header rows to labels, no offset
-					levelNames[column][row] = csv[row][column]
-				} else {
-					// write header rows to cols, offset for label cols
-					offsetFromLabelCols := column - config.numLabelLevels
-					valsNames[offsetFromLabelCols][row] = csv[row][column]
-				}
-				continue
-			}
-			offsetFromHeaderRows := row - config.numHeaderRows
-			if column < config.numLabelLevels {
-				// write values to labels, offset for header rows
-				labels[column][offsetFromHeaderRows] = csv[row][column]
-				labelsIsNull[column][offsetFromHeaderRows] = isNullString(csv[row][column])
-			} else {
-				offsetFromLabelCols := column - config.numLabelLevels
-				// write values to cols, offset for label cols and header rows
-				vals[offsetFromLabelCols][offsetFromHeaderRows] = csv[row][column]
-				valsIsNull[offsetFromLabelCols][offsetFromHeaderRows] = isNullString(csv[row][column])
-			}
-		}
-	}
-
-	retNames := make([]string, len(valsNames))
-	for k := range valsNames {
-		retNames[k] = strings.Join(valsNames[k], optionLevelSeparator)
-	}
-	retLevelNames := make([]string, len(levelNames))
-	for k := range levelNames {
-		retLevelNames[k] = strings.Join(levelNames[k], optionLevelSeparator)
-	}
-
-	// transfer values and labels to final value containers
-	retVals := copyStringsIntoValueContainers(vals, valsIsNull, retNames)
-	retLabels := copyStringsIntoValueContainers(labels, labelsIsNull, retLevelNames)
-
-	// create default labels if no labels
-	retLabels = defaultLabelsIfEmpty(retLabels, numRows)
-
-	// create default col level names
-	var retColLevelNames []string
-	retColLevelNames, retVals = setColLevelNames(config.numHeaderRows, retVals)
-
-	return &DataFrame{
-		values:        retVals,
-		labels:        retLabels,
-		colLevelNames: retColLevelNames,
-	}, nil
-}
-
-// expects non-nil cfg
-func readCSVByCols(csv [][]string, config *readConfig) (*DataFrame, error) {
-	numLines := len(csv[0])
-	for i := range csv {
-		if len(csv[i]) != numLines {
-			return nil, fmt.Errorf("column %d: all columns must have same number of rows as first column (%d != %d)",
-				i, len(csv[i]), numLines)
-		}
-	}
-
-	numRows := len(csv[0]) - config.numHeaderRows
-	numCols := len(csv) - config.numLabelLevels
-
-	// prepare intermediary values containers
-	vals := make([][]string, numCols)
-	valsIsNull := make([][]bool, numCols)
-	valsNames := make([]string, numCols)
-
-	// prepare intermediary label containers
-	labels := make([][]string, config.numLabelLevels)
-	labelsIsNull := make([][]bool, config.numLabelLevels)
-	labelsNames := make([]string, config.numLabelLevels)
-
-	// iterate over all cols to get header names
-	for j := 0; j < config.numLabelLevels; j++ {
-		// write label headers, no offset
-		labelsNames[j] = strings.Join(csv[j][:config.numHeaderRows], optionLevelSeparator)
-	}
-	for k := 0; k < numCols; k++ {
-		// write col headers, offset for label cols
-		offsetFromLabelCols := k + config.numLabelLevels
-		valsNames[k] = strings.Join(csv[offsetFromLabelCols][:config.numHeaderRows], optionLevelSeparator)
-	}
-	for container := range csv {
-		if container < config.numLabelLevels {
-			// write label values as slice, offset for header rows
-			valsToWrite := csv[container][config.numHeaderRows:]
-			labels[container] = valsToWrite
-			// duck error because values are []string
-			nulls, _ := setNullsFromInterface(valsToWrite)
-			labelsIsNull[container] = nulls
-		} else {
-			// write column values as slice, offset for label cols and header rows
-			offsetFromLabelCols := container - config.numLabelLevels
-			valsToWrite := csv[container][config.numHeaderRows:]
-			vals[offsetFromLabelCols] = valsToWrite
-			// duck error because values are []string
-			nulls, _ := setNullsFromInterface(valsToWrite)
-			valsIsNull[offsetFromLabelCols] = nulls
-		}
-	}
-
-	// transfer values and labels to final value containers
-	retVals := copyStringsIntoValueContainers(vals, valsIsNull, valsNames)
-	retLabels := copyStringsIntoValueContainers(labels, labelsIsNull, labelsNames)
-
-	// create default labels if no labels
-	retLabels = defaultLabelsIfEmpty(retLabels, numRows)
-
-	// create default col level names
-	var retColLevelNames []string
-	retColLevelNames, retVals = setColLevelNames(config.numHeaderRows, retVals)
-
-	return &DataFrame{
-		values:        retVals,
-		labels:        retLabels,
-		colLevelNames: retColLevelNames,
-	}, nil
-
-}
-
-func defaultLabelsIfEmpty(labels []*valueContainer, numRows int) []*valueContainer {
-	if len(labels) == 0 {
-		defaultLabels := makeDefaultLabels(0, numRows, true)
-		labels = append(labels, defaultLabels)
-	}
-	return labels
-}
-
 // (colLevelNames, columnValues)
 func setColLevelNames(numHeaderRows int, columns []*valueContainer) ([]string, []*valueContainer) {
 	if numHeaderRows <= 0 {
@@ -824,16 +637,6 @@ func setColLevelNames(numHeaderRows int, columns []*valueContainer) ([]string, [
 		ret[l] = fmt.Sprintf("*%d", l)
 	}
 	return ret, columns
-}
-
-func validateStructSlice(sliceOfStructs interface{}) error {
-	if !isSlice(sliceOfStructs) {
-		return fmt.Errorf("unsupported kind (%v), must be slice", reflect.TypeOf(sliceOfStructs).Kind())
-	}
-	if kind := reflect.TypeOf(sliceOfStructs).Elem().Kind(); kind != reflect.Struct {
-		return fmt.Errorf("unsupported kind (%v), must be slice of structs", reflect.TypeOf(sliceOfStructs).Elem().Kind())
-	}
-	return nil
 }
 
 func writeStructSlice(containers []*valueContainer, slice interface{}) ([][]bool, error) {
@@ -1957,9 +1760,6 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 		return nil, fmt.Errorf("setting null values from interface{}: %v", err)
 	}
 	v := reflect.ValueOf(input)
-	if v.Len() == 0 {
-		return []bool{}, nil
-	}
 	// map or nested slice
 	// if len is empty -> null (this includes [][]byte, instead of treating them as strings)
 	t := v.Index(0).Kind()
@@ -2858,145 +2658,6 @@ func extractCSVDimensions(b []byte, comma rune) (numRows, numCols int, err error
 	return numRows, numCols, nil
 }
 
-// reads data from r into dstVals and dstNulls.
-// major dimension of input: rows
-// major dimension of output: columns
-// trims leading whitespace
-// supports custom comma but not comments
-func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune) error {
-	br := bufio.NewReaderSize(r, 1024)
-	commaLen := utf8.RuneLen(comma)
-	lengthLineEnd := func(b []byte) int {
-		if len(b) == 0 {
-			return 0
-		}
-		if b[len(b)-1] == '\n' || b[len(b)-1] == '\r' {
-			return 1
-		}
-		return 0
-	}
-	stripQuotationMarks := func(b []byte) []byte {
-		if len(b) > 0 && b[0] == '"' && b[len(b)-1] == '"' {
-			return b[1 : len(b)-1]
-		}
-		return b
-	}
-	var rowNumber int
-	for {
-		// iterate over rows
-		line, err := br.ReadBytes('\n')
-		if len(line) == 0 && err == io.EOF {
-			return nil
-		}
-		// Normalize \r\n to \n on all input lines.
-		if n := len(line); n >= 2 && line[n-2] == '\r' && line[n-1] == '\n' {
-			line[n-2] = '\n'
-			line = line[:n-1]
-		}
-
-		var columnNumber int
-		fieldCount := 1
-		for {
-			// iterate over fields in each row
-			line = bytes.TrimLeftFunc(line, unicode.IsSpace)
-			i := bytes.IndexRune(line, comma)
-			field := line
-			if i >= 0 {
-				field = field[:i]
-			} else {
-				// comma not found?
-				// use the remaining line up until the end, which may or may not be \n
-				field = field[:len(field)-lengthLineEnd(field)]
-			}
-			if fieldCount > len(dstVals) {
-				return fmt.Errorf("row %d: too many fields [%d] with length %d",
-					rowNumber, fieldCount, len(dstVals))
-			}
-			// write fields into column-oriented receiver
-			// if enclosed in quotation marks, strip the quotations
-			dstVals[columnNumber][rowNumber] = string(stripQuotationMarks(field))
-			if isNullString(string(field)) {
-				dstNulls[columnNumber][rowNumber] = true
-			}
-			if i >= 0 {
-				line = line[i+commaLen:]
-				columnNumber++
-				fieldCount++
-			} else {
-				if fieldCount != len(dstVals) {
-					return fmt.Errorf("row %d: not enough fields [%d] with length %d",
-						rowNumber, fieldCount, len(dstVals))
-				}
-				break
-			}
-		}
-		if err == io.EOF {
-			return nil
-		}
-		rowNumber++
-	}
-}
-
-// major dimension of input: columns
-func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *readConfig) *DataFrame {
-	numCols := len(values) - config.numLabelLevels
-	numRows := len(values[0]) - config.numHeaderRows
-	labelNames := make([]string, config.numLabelLevels)
-	// iterate over all label levels to get header names
-	if config.numHeaderRows > 0 {
-		for j := 0; j < config.numLabelLevels; j++ {
-			// only read from last header row
-			labelNames[j] = values[j][config.numHeaderRows-1]
-		}
-	}
-
-	colNames := make([]string, numCols)
-	for k := 0; k < numCols; k++ {
-		// write column header names, offset by label levels
-		colNames[k] = string(
-			strings.Join(values[k+config.numLabelLevels][:config.numHeaderRows], optionLevelSeparator))
-	}
-
-	// remove headers from original data
-	for container := 0; container < len(values); container++ {
-		values[container] = values[container][config.numHeaderRows:]
-		isNull[container] = isNull[container][config.numHeaderRows:]
-	}
-	// write labels up to the number of label levels
-	labels := copyStringsIntoValueContainers(
-		values[:config.numLabelLevels],
-		isNull[:config.numLabelLevels],
-		labelNames,
-	)
-
-	// write columns after the label levels
-	columns := copyStringsIntoValueContainers(
-		values[config.numLabelLevels:],
-		isNull[config.numLabelLevels:],
-		colNames,
-	)
-
-	// create default labels if no labels
-	labels = defaultLabelsIfEmpty(labels, numRows)
-
-	// update label names if labels provided but no header
-	if config.numHeaderRows == 0 && config.numLabelLevels != 0 {
-		for j := range labels {
-			labels[j].name = optionPrefix + fmt.Sprint(j)
-		}
-	}
-
-	// create default col level names
-	var colLevelNames []string
-	colLevelNames, columns = setColLevelNames(config.numHeaderRows, columns)
-
-	return &DataFrame{
-		values:        columns,
-		labels:        labels,
-		colLevelNames: colLevelNames,
-	}
-}
-
 func filter(containers []*valueContainer, filters map[string]FilterFn) ([]int, error) {
 	// subIndexes contains the index positions computed across all the filters
 	var subIndexes [][]int
@@ -3118,14 +2779,6 @@ type realClock struct{}
 
 func (c realClock) now() time.Time {
 	return time.Now()
-}
-
-func copySet(m map[string]bool) map[string]bool {
-	ret := make(map[string]bool)
-	for k, v := range m {
-		ret[k] = v
-	}
-	return ret
 }
 
 func writeRecords(containers []*valueContainer, byColumn bool, numColLevels int) [][]string {

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
+	"github.com/ptiger10/tablediff"
 )
 
 // ByColumn configures a read function to expect columns to be the major dimension of csv data
@@ -47,7 +49,10 @@ func (vc *valueContainer) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	var alias valueContainerAlias
-	json.Unmarshal(b, &alias)
+	err := json.Unmarshal(b, &alias)
+	if err != nil {
+		return fmt.Errorf("unmarshaling value container alias: %v", err)
+	}
 	*vc = alias.vc()
 	return nil
 }
@@ -81,7 +86,10 @@ func (df *DataFrame) UnmarshalJSON(b []byte) error {
 		return nil
 	}
 	var alias dataFrameAlias
-	json.Unmarshal(b, &alias)
+	err := json.Unmarshal(b, &alias)
+	if err != nil {
+		return fmt.Errorf("unmarshaling DataFrame: %v", err)
+	}
 	*df = alias.df()
 	return nil
 }
@@ -201,21 +209,24 @@ func (r SliceReader) Read() (*DataFrame, error) {
 
 // RecordReader reads [][]string records into a DataFrame.
 type RecordReader struct {
-	HeaderRows  int
-	LabelLevels int
-	ByColumn    bool
-	Name        string
-	InferTypes  bool
-	records     [][]string
+	HeaderRows        int
+	LabelLevels       int
+	ByColumn          bool
+	Name              string
+	InferTypes        bool
+	BlankStringAsNull bool
+	records           [][]string
 }
 
 // NewRecordReader returns a default RecordReader.
 func NewRecordReader(records [][]string) RecordReader {
 	return RecordReader{
-		HeaderRows:  1,
-		LabelLevels: 0,
-		ByColumn:    false,
-		records:     records,
+		HeaderRows:        1,
+		LabelLevels:       0,
+		ByColumn:          false,
+		BlankStringAsNull: false,
+		InferTypes:        false,
+		records:           records,
 	}
 }
 
@@ -227,6 +238,16 @@ func NewRecordReader(records [][]string) RecordReader {
 // If no headers are supplied, a default level of sequential column names (e.g., 0, 1, etc) is used. Default column names are displayed on printing.
 // Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
 func (r RecordReader) Read() (*DataFrame, error) {
+	if r.BlankStringAsNull {
+		_, ok := optionNullStrings[""]
+		if !ok {
+			defer func() {
+				SetOptionEmptyStringAsNull(false)
+			}()
+		}
+		SetOptionEmptyStringAsNull(true)
+	}
+
 	if len(r.records) == 0 {
 		return nil, fmt.Errorf("reading csv from records: must have at least one record")
 	}
@@ -281,7 +302,6 @@ func (w *RecordWriter) Write(df *DataFrame) error {
 type CSVReader struct {
 	RecordReader
 	*csv.Reader
-	BlankStringAsNull bool
 }
 
 // Records returns the [][]string records after they have been read.
@@ -296,22 +316,12 @@ func NewCSVReader(r io.Reader) *CSVReader {
 			HeaderRows:  1,
 			LabelLevels: 0,
 		},
-		Reader:            csv.NewReader(r),
-		BlankStringAsNull: false,
+		Reader: csv.NewReader(r),
 	}
 }
 
 // Read reads a DataFrame from a encoding/csv.Reader
 func (r *CSVReader) Read() (*DataFrame, error) {
-	if r.BlankStringAsNull {
-		_, ok := optionNullStrings[""]
-		if !ok {
-			defer func() {
-				SetOptionEmptyStringAsNull(false)
-			}()
-		}
-		SetOptionEmptyStringAsNull(true)
-	}
 	records, err := r.ReadAll()
 	if err != nil {
 		return nil, fmt.Errorf("CSVReader: %v", err)
@@ -542,4 +552,17 @@ func WriteMockCSV(r *CSVReader, w *CSVWriter, n int) error {
 		return fmt.Errorf("writing mock csv: %v", err)
 	}
 	return nil
+}
+
+// EqualRecords reduces df to [][]string records, reads [][]string records from want,
+// and evaluates whether the stringified values match.
+// If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
+func (df *DataFrame) EqualRecords(got *RecordWriter, want *CSVReader) (bool, *tablediff.Differences, error) {
+	got.Write(df) // RecordWriter.Write() cannot return error
+	_, err := want.Read()
+	if err != nil {
+		return false, nil, fmt.Errorf("comparing csv: reading want: %v", err)
+	}
+	diffs, eq := tablediff.Diff(got.Records(), want.records)
+	return eq, diffs, nil
 }
