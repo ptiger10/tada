@@ -4922,7 +4922,7 @@ func Test_readStructSlice(t *testing.T) {
 				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "name"},
 				{slice: []int{0, 0}, isNull: []bool{false, false}, id: mockID, name: "age"}},
 			false},
-		{"pass - with nulls",
+		{"pass - with supplied nulls",
 			args{
 				[]testStruct{
 					{"", 1},
@@ -4955,6 +4955,15 @@ func Test_readStructSlice(t *testing.T) {
 			[]*valueContainer{
 				{slice: []string{"", "bar", "baz"}, isNull: []bool{true, false, false}, id: mockID, name: "Name"},
 				{slice: []int{1, 2, 0}, isNull: []bool{false, false, true}, id: mockID, name: "Age"}},
+			false},
+		{"pass - with inferred nulls",
+			args{
+				[]testStruct{{optionsNullPrinter, 1}, {"bar", 2}},
+				nil,
+			},
+			[]*valueContainer{
+				{slice: []string{optionsNullPrinter, "bar"}, isNull: []bool{true, false}, id: mockID, name: "name"},
+				{slice: []int{1, 2}, isNull: []bool{false, false}, id: mockID, name: "age"}},
 			false},
 		{"fail - wrong number of null columns",
 			args{

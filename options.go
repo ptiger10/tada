@@ -2,6 +2,7 @@ package tada
 
 import (
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -13,13 +14,34 @@ var optionsNullPrinter = "(null)"
 var optionMergeRepeats = true
 var optionWrapLines = false
 var optionWarnings = true
-var optionNullStrings = map[string]bool{optionsNullPrinter: true}
+var optionNullStrings = &nullStrings{list: map[string]bool{optionsNullPrinter: true}}
 var optionNaNIsNull = true
 var optionPrefix = "*"
 var optionDateTimeFormats = []string{
 	"2006-01-02", "01-02-2006", "01/02/2006", "1/2/06", "1/2/2006", "2006-01-02 15:04:05 -0700 MST",
 	time.Kitchen, strings.ToLower(time.Kitchen),
 	time.RFC3339, time.RFC3339Nano, time.RFC822}
+
+type nullStrings struct {
+	list map[string]bool
+	mu   sync.RWMutex
+}
+
+func (opt *nullStrings) Toggle(s string) {
+	opt.mu.Lock()
+	if _, ok := opt.list[s]; !ok {
+		opt.list[s] = true
+	} else {
+		delete(opt.list, s)
+	}
+	opt.mu.Unlock()
+}
+
+func (opt *nullStrings) Read() map[string]bool {
+	opt.mu.RLock()
+	defer opt.mu.RUnlock()
+	return opt.list
+}
 
 // SetOptionDefaultSeparator changes the separator used in group names and multi-level column names to sep
 // (default: "|").
@@ -38,18 +60,24 @@ func GetOptionDefaultNullStrings() []string {
 	return []string{optionsNullPrinter}
 }
 
-// SetOptionAddNullString appends a value to the list of strings that tada considers null.
+// SetOptionAddNullString appends a value to the set of strings that tada considers null.
 func SetOptionAddNullString(s string) {
-	optionNullStrings[s] = true
+	if _, ok := optionNullStrings.Read()[s]; !ok {
+		optionNullStrings.Toggle(s)
+	}
 }
 
 // SetOptionEmptyStringAsNull changes whether tada considers "" to be a null value when reading in data (default: false).
 func SetOptionEmptyStringAsNull(set bool) {
 	if set {
-		optionNullStrings[""] = true
+		if _, ok := optionNullStrings.Read()[""]; !ok {
+			optionNullStrings.Toggle("")
+		}
 	}
 	if !set {
-		delete(optionNullStrings, "")
+		if _, ok := optionNullStrings.Read()[""]; ok {
+			optionNullStrings.Toggle("")
+		}
 	}
 }
 

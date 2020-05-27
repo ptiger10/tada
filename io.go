@@ -239,7 +239,7 @@ func NewRecordReader(records [][]string) RecordReader {
 // Label levels are named *i (e.g., *0, *1, etc) by default when first created. Default label names are hidden on printing.
 func (r RecordReader) Read() (*DataFrame, error) {
 	if r.BlankStringAsNull {
-		_, ok := optionNullStrings[""]
+		_, ok := optionNullStrings.Read()[""]
 		if !ok {
 			defer func() {
 				SetOptionEmptyStringAsNull(false)

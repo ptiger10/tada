@@ -737,7 +737,10 @@ func readStructSlice(slice interface{}, isNull [][]bool) ([]*valueContainer, err
 
 	// set null values
 	if isNull == nil {
-		isNull = makeBoolMatrix(len(ret), v.Len())
+		isNull = make([][]bool, len(ret))
+		for k := range ret {
+			isNull[k], _ = setNullsFromInterface(retValues[k])
+		}
 	} else {
 		if len(ret) != len(isNull[0]) {
 			return nil, fmt.Errorf("setting null values: number of columns in [][]bool (%d) does not match number of exported fields (%d)",
@@ -1884,7 +1887,7 @@ func isNullInterface(i interface{}) bool {
 }
 
 func isNullString(s string) bool {
-	if _, ok := optionNullStrings[s]; !ok {
+	if _, ok := optionNullStrings.Read()[s]; !ok {
 		return false
 	}
 	return true
