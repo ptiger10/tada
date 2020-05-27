@@ -665,6 +665,14 @@ func writeStructSlice(containers []*valueContainer, slice interface{}, noUnmatch
 		}
 	}
 
+	// check for type match
+	for key, value := range m {
+		if reflect.TypeOf(containers[value].slice).Elem() != protoStruct.Field(key).Type {
+			return nil, fmt.Errorf("writing to slice of structs: container[%d] (%s) must be same type as matching field (%v != %v)",
+				value, nameOfContainer(containers, value), reflect.TypeOf(containers[value].slice).Elem(), protoStruct.Field(key).Type)
+		}
+	}
+
 	if noUnmatchedCols {
 		if len(containers) > len(m) {
 			return nil, fmt.Errorf("writing to slice of structs: DataFrame has unmatched containers")
@@ -676,6 +684,7 @@ func writeStructSlice(containers []*valueContainer, slice interface{}, noUnmatch
 	v := reflect.ValueOf(slice)
 	v.Elem().Set(reflect.MakeSlice(reflect.SliceOf(protoStruct), numRows, numRows))
 
+	// copy values from containers into slice of struct
 	for i := 0; i < numRows; i++ {
 		s := reflect.New(protoStruct)
 		for key, value := range m {

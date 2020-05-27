@@ -5129,6 +5129,18 @@ func Test_writeStructSlice(t *testing.T) {
 			},
 			false,
 		},
+		{"fail - wrong type",
+			args{
+				[]*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "name", id: mockID},
+					{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "age", id: mockID},
+				}, &[]testStruct{},
+				true,
+			},
+			nil,
+			nil,
+			true,
+		},
 		{"fail - unmatched columns",
 			args{
 				[]*valueContainer{
