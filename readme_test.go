@@ -114,7 +114,7 @@ func Test_sampleDataPipelineTyped(t *testing.T) {
 		{"jane doe", 10},
 	}
 
-	want := []output{
+	wantRaw := []output{
 		{"jane doe", 9},
 		{"john doe", 5},
 	}
@@ -123,16 +123,22 @@ func Test_sampleDataPipelineTyped(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	out := sampleDataPipeline(df)
+	df = sampleDataPipeline(df)
+	var o []output
+	got := tada.NewStructWriter(&o)
+	got.IncludeLabels = true
+	want := tada.NewStructReader(wantRaw)
+	eq, diffs, _ := df.EqualStructs(got, want)
+	if !eq {
+		t.Errorf("sampleDataPipeline(): diffs:\n%v", diffs)
+	}
 
-	var got []output
-	w := tada.NewStructWriter(&got)
-	w.IncludeLabels = true
-	err = out.WriteTo(w)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("sampleDataPipelineTypedInput(): got %v, want %v", got, want)
-	}
+	// var got []output
+	// err = out.WriteTo(w)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// if !reflect.DeepEqual(got, want) {
+	// 	t.Errorf("sampleDataPipelineTypedInput(): got %v, want %v", got, want)
+	// }
 }

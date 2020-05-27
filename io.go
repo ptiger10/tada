@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"reflect"
 
+	"github.com/d4l3k/messagediff"
 	"github.com/ptiger10/tablediff"
 )
 
@@ -465,6 +467,7 @@ type StructWriter struct {
 	sliceOfStructs interface{}
 	isNull         [][]bool
 	IncludeLabels  bool
+	Strict         bool // returns error if DataFrame has columns that do not match exported fields
 }
 
 // NewStructWriter creates a new *StructWriter.
@@ -488,7 +491,7 @@ func (w *StructWriter) Write(df *DataFrame) error {
 	if w.IncludeLabels {
 		containers = append(df.labels, df.values...)
 	}
-	isNull, err := writeStructSlice(containers, w.sliceOfStructs)
+	isNull, err := writeStructSlice(containers, w.sliceOfStructs, w.Strict)
 	if err != nil {
 		return fmt.Errorf("writing to StructWriter: %v", err)
 	}
@@ -561,8 +564,35 @@ func (df *DataFrame) EqualRecords(got *RecordWriter, want *CSVReader) (bool, *ta
 	got.Write(df) // RecordWriter.Write() cannot return error
 	_, err := want.Read()
 	if err != nil {
-		return false, nil, fmt.Errorf("comparing csv: reading want: %v", err)
+		return false, nil, fmt.Errorf("comparing records: reading want: %v", err)
 	}
 	diffs, eq := tablediff.Diff(got.Records(), want.records)
 	return eq, diffs, nil
+}
+
+// EqualStructs writes df to a slice of structs, reads in a comparison slice of structs,
+// and returns whether they are equal. If not, returns the differences between the two.
+// If the want argument includes an IsNull field, null values are compared.
+func (df *DataFrame) EqualStructs(got *StructWriter, want StructReader) (eq bool, diff string, err error) {
+	err = df.WriteTo(got)
+	if err != nil {
+		return false, "", fmt.Errorf("comparing two slices of structs: writing to got: %v", err)
+	}
+
+	if want.IsNull != nil {
+		_, err := want.Read()
+		if err != nil {
+			return false, "", fmt.Errorf("comparing two slices of structs: reading want: %v", err)
+		}
+		diff, eq := messagediff.PrettyDiff(want.IsNull, got.IsNull())
+		if !eq {
+			return false, "IsNull: " + diff, nil
+		}
+	}
+	gotSlice := reflect.ValueOf(got.sliceOfStructs).Elem().Interface()
+	diff, eq = messagediff.PrettyDiff(want.sliceOfStructs, gotSlice)
+	if !eq {
+		return false, diff, nil
+	}
+	return true, "", nil
 }

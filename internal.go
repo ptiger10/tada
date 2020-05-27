@@ -639,7 +639,7 @@ func setColLevelNames(numHeaderRows int, columns []*valueContainer) ([]string, [
 	return ret, columns
 }
 
-func writeStructSlice(containers []*valueContainer, slice interface{}) ([][]bool, error) {
+func writeStructSlice(containers []*valueContainer, slice interface{}, noUnmatchedCols bool) ([][]bool, error) {
 	if reflect.TypeOf(slice).Kind() != reflect.Ptr ||
 		reflect.TypeOf(slice).Elem().Kind() != reflect.Slice ||
 		reflect.TypeOf(slice).Elem().Elem().Kind() != reflect.Struct {
@@ -648,7 +648,7 @@ func writeStructSlice(containers []*valueContainer, slice interface{}) ([][]bool
 	if len(containers) == 0 {
 		return nil, fmt.Errorf("writing to slice of structs: dataframe must have at least one container (label level or column)")
 	}
-	// {structFieldIndex: containerIndex}
+	// m: fields exported by the struct and the DataFrame {structFieldIndex: containerIndex}
 	m := make(map[int]int)
 	t := reflect.TypeOf(slice)
 	protoStruct := t.Elem().Elem()
@@ -662,6 +662,12 @@ func writeStructSlice(containers []*valueContainer, slice interface{}) ([][]bool
 		k, err := indexOfContainer(name, containers)
 		if err == nil {
 			m[i] = k
+		}
+	}
+
+	if noUnmatchedCols {
+		if len(containers) > len(m) {
+			return nil, fmt.Errorf("writing to slice of structs: DataFrame has unmatched containers")
 		}
 	}
 
@@ -679,19 +685,28 @@ func writeStructSlice(containers []*valueContainer, slice interface{}) ([][]bool
 		v.Elem().Index(i).Set(s.Elem())
 	}
 	// set nulls
-	nulls := make([][]bool, len(m))
+	nulls := make([][]bool, protoStruct.NumField())
 	fieldOrder := make([]int, 0, 5)
 	for k := range m {
 		fieldOrder = append(fieldOrder, k)
 	}
 	sort.Ints(fieldOrder)
 
-	for incrementor, field := range fieldOrder {
-		k := m[field]
-		nulls[incrementor] = containers[k].isNull
+	var counter int
+	for i := 0; i < protoStruct.NumField(); i++ {
+		if counter < len(fieldOrder) && i == fieldOrder[counter] {
+			k := m[i]
+			nulls[i] = containers[k].isNull
+			counter++
+		} else {
+			// if field is not exported by DataFrame, set all nulls to false
+			nulls[i] = make([]bool, numRows)
+		}
 	}
 
-	// return ret.Interface(), nulls, nil
+	// transpose nulls
+	nulls, _ = transposeNestedNulls(nulls) // ducks error because constructing nulls is controlled
+
 	return nulls, nil
 
 }
@@ -758,6 +773,51 @@ func readStructSlice(slice interface{}, isNull [][]bool) ([]*valueContainer, err
 	}
 	for k := range ret {
 		ret[k] = newValueContainer(retValues[k], isNull[k], retNames[k])
+	}
+	return ret, nil
+}
+
+// if requireSameType, all columns must be of same type; otherwise, each column is converted to []interface{}
+func readNestedInterfaceByCols(columns [][]interface{}) ([]interface{}, error) {
+	if len(columns) == 0 {
+		return nil, fmt.Errorf("reading [][]interface{}: must have at least one column")
+	}
+	l := len(columns[0])
+	ret := make([]interface{}, len(columns))
+	colTypes := make([]reflect.Type, len(columns))
+	for k := range columns {
+		colType := reflect.TypeOf(columns[k][0])
+		colTypes[k] = colType
+		ret[k] = make([]interface{}, len(columns))
+	}
+
+	for k := range columns {
+		if len(columns[k]) != l {
+			return nil, fmt.Errorf("reading [][]interface{} by columns: column %d: all columns must have same length as column 0 (%d != %d)",
+				k, len(columns[k]), l)
+		}
+		ret[k] = columns[k]
+
+	}
+	return ret, nil
+}
+
+func transposeNestedNulls(isNull [][]bool) ([][]bool, error) {
+	if len(isNull) == 0 {
+		return nil, nil
+	}
+	ret := make([][]bool, len(isNull[0]))
+	for k := range isNull[0] {
+		ret[k] = make([]bool, len(isNull))
+	}
+	for i := range isNull {
+		if len(isNull[i]) != len(isNull[0]) {
+			return nil, fmt.Errorf("transposing [][]bool: row %d: all rows must have same length as row 0 (%d != %d)",
+				i, len(isNull[i]), len(isNull[0]))
+		}
+		for k := range isNull[i] {
+			ret[k][i] = isNull[i][k]
+		}
 	}
 	return ret, nil
 }

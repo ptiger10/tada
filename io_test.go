@@ -1008,3 +1008,187 @@ func Test_valueContainer_MarshalJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestDataFrame_EqualStructs(t *testing.T) {
+	type fields struct {
+		labels        []*valueContainer
+		values        []*valueContainer
+		name          string
+		err           error
+		colLevelNames []string
+	}
+	type args struct {
+		got  *StructWriter
+		want StructReader
+	}
+	tests := []struct {
+		name     string
+		fields   fields
+		args     args
+		wantEq   bool
+		wantDiff string
+		wantErr  bool
+	}{
+		{"pass - eq - no null check",
+			fields{
+				values: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "name"},
+					{slice: []int{1, 2}, isNull: []bool{true, false}, id: mockID, name: "age"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
+				colLevelNames: []string{"*0"},
+			},
+			args{
+				NewStructWriter(&[]testStruct{}),
+				NewStructReader([]testStruct{
+					{"foo", 1},
+					{"bar", 2},
+				}),
+			},
+			true,
+			"",
+			false,
+		},
+		{"pass - eq - null check",
+			fields{
+				values: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "name"},
+					{slice: []int{1, 2}, isNull: []bool{true, false}, id: mockID, name: "age"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
+				colLevelNames: []string{"*0"},
+			},
+			args{
+				NewStructWriter(&[]testStruct{}),
+				StructReader{
+					sliceOfStructs: []testStruct{
+						{"foo", 1},
+						{"bar", 2},
+					},
+					IsNull: [][]bool{
+						{false, true},
+						{false, false},
+					},
+				},
+			},
+			true,
+			"",
+			false,
+		},
+		{"pass - neq - no null check",
+			fields{
+				values: []*valueContainer{
+					{slice: []string{"foo", "baz"}, isNull: []bool{false, false}, id: mockID, name: "name"},
+					{slice: []int{1, 2}, isNull: []bool{true, false}, id: mockID, name: "age"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
+				colLevelNames: []string{"*0"},
+			},
+			args{
+				NewStructWriter(&[]testStruct{}),
+				StructReader{
+					sliceOfStructs: []testStruct{
+						{"foo", 1},
+						{"bar", 2},
+					},
+				},
+			},
+			false,
+			"modified: [1].Name = \"baz\"\n",
+			false,
+		},
+		{"pass - neq - null check",
+			fields{
+				values: []*valueContainer{
+					{slice: []string{"foo", "baz"}, isNull: []bool{false, false}, id: mockID, name: "name"},
+					{slice: []int{1, 2}, isNull: []bool{true, false}, id: mockID, name: "age"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
+				colLevelNames: []string{"*0"},
+			},
+			args{
+				NewStructWriter(&[]testStruct{}),
+				StructReader{
+					sliceOfStructs: []testStruct{
+						{"foo", 1},
+						{"bar", 2},
+					},
+					IsNull: [][]bool{
+						{false, false},
+						{false, false},
+					},
+				},
+			},
+			false,
+			"IsNull: modified: [0][1] = true\n",
+			false,
+		},
+		{"fail - bad writer",
+			fields{
+				values: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "name"},
+					{slice: []int{1, 2}, isNull: []bool{true, false}, id: mockID, name: "age"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
+				colLevelNames: []string{"*0"},
+			},
+			args{
+				NewStructWriter("foo"),
+				StructReader{
+					sliceOfStructs: []testStruct{
+						{"foo", 1},
+						{"bar", 2},
+					},
+					IsNull: [][]bool{
+						{false, true},
+						{false, false},
+					},
+				},
+			},
+			false,
+			"",
+			true,
+		},
+		{"fail - bad reader nulls",
+			fields{
+				values: []*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "name"},
+					{slice: []int{1, 2}, isNull: []bool{true, false}, id: mockID, name: "age"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
+				colLevelNames: []string{"*0"},
+			},
+			args{
+				NewStructWriter(&[]testStruct{}),
+				StructReader{
+					sliceOfStructs: []testStruct{
+						{"foo", 1},
+						{"bar", 2},
+					},
+					IsNull: [][]bool{
+						{false},
+					},
+				},
+			},
+			false,
+			"",
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			df := &DataFrame{
+				labels:        tt.fields.labels,
+				values:        tt.fields.values,
+				name:          tt.fields.name,
+				err:           tt.fields.err,
+				colLevelNames: tt.fields.colLevelNames,
+			}
+			gotEq, gotDiff, err := df.EqualStructs(tt.args.got, tt.args.want)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DataFrame.EqualStructs() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if gotEq != tt.wantEq {
+				t.Errorf("DataFrame.EqualStructs() gotEq = %v, want %v", gotEq, tt.wantEq)
+			}
+			if gotDiff != tt.wantDiff {
+				t.Errorf("DataFrame.EqualStructs() gotDiff = %v, want %v", gotDiff, tt.wantDiff)
+			}
+		})
+	}
+}

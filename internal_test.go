@@ -5026,8 +5026,9 @@ func Test_readStructSlice(t *testing.T) {
 
 func Test_writeStructSlice(t *testing.T) {
 	type args struct {
-		containers []*valueContainer
-		slice      interface{}
+		containers      []*valueContainer
+		slice           interface{}
+		noUnmatchedCols bool
 	}
 	tests := []struct {
 		name      string
@@ -5036,12 +5037,14 @@ func Test_writeStructSlice(t *testing.T) {
 		wantNulls [][]bool
 		wantErr   bool
 	}{
-		{"pass", args{
-			[]*valueContainer{
-				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "name", id: mockID},
-				{slice: []int{1, 2}, isNull: []bool{false, false}, name: "age", id: mockID},
-			}, &[]testStruct{},
-		},
+		{"pass - no unmatched columns",
+			args{
+				[]*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "name", id: mockID},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "age", id: mockID},
+				}, &[]testStruct{},
+				true,
+			},
 			&[]testStruct{
 				{"foo", 1},
 				{"bar", 2},
@@ -5052,17 +5055,57 @@ func Test_writeStructSlice(t *testing.T) {
 			},
 			false,
 		},
-		{"pass - nulls", args{
-			[]*valueContainer{
-				{slice: []string{"", "bar"}, isNull: []bool{true, false}, name: "name", id: mockID},
-				{slice: []int{1, 2}, isNull: []bool{false, false}, name: "age", id: mockID},
-			}, &[]testStruct{},
-		},
+		{"pass - no unmatched columns, but unmatched fields",
+			args{
+				[]*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "name", id: mockID},
+				}, &[]testStruct{},
+				true,
+			},
 			&[]testStruct{
-				{"", 1},
+				{"foo", 0},
+				{"bar", 0},
+			},
+			[][]bool{
+				{false, false},
+				{false, false},
+			},
+			false,
+		},
+		{"pass - unmatched columns",
+			args{
+				[]*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "name", id: mockID},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "age", id: mockID},
+					{slice: []int{3, 4}, isNull: []bool{false, false}, name: "foobar", id: mockID},
+				}, &[]testStruct{},
+				false,
+			},
+			&[]testStruct{
+				{"foo", 1},
 				{"bar", 2},
 			},
 			[][]bool{
+				{false, false},
+				{false, false},
+			},
+			false,
+		},
+		{"pass - nulls",
+			args{
+				[]*valueContainer{
+					{slice: []string{"foo", "", "bar"}, isNull: []bool{false, true, false}, name: "name", id: mockID},
+					{slice: []int{1, 2, 3}, isNull: []bool{false, false, false}, name: "age", id: mockID},
+				}, &[]testStruct{},
+				false,
+			},
+			&[]testStruct{
+				{"foo", 1},
+				{"", 2},
+				{"bar", 3},
+			},
+			[][]bool{
+				{false, false},
 				{true, false},
 				{false, false},
 			},
@@ -5074,6 +5117,7 @@ func Test_writeStructSlice(t *testing.T) {
 					{slice: []string{"", "bar"}, isNull: []bool{true, false}, name: "Name", id: mockID},
 					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "Age", id: mockID},
 				}, &[]testStructNoTags{},
+				false,
 			},
 			&[]testStructNoTags{
 				{"", 1},
@@ -5085,12 +5129,26 @@ func Test_writeStructSlice(t *testing.T) {
 			},
 			false,
 		},
+		{"fail - unmatched columns",
+			args{
+				[]*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "name", id: mockID},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "age", id: mockID},
+					{slice: []int{3, 4}, isNull: []bool{false, false}, name: "foobar", id: mockID},
+				}, &[]testStruct{},
+				true,
+			},
+			nil,
+			nil,
+			true,
+		},
 		{"fail - wrong type",
 			args{
 				[]*valueContainer{
 					{slice: []string{"", "bar"}, isNull: []bool{true, false}, name: "Name", id: mockID},
 					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "Age", id: mockID},
 				}, "foo",
+				false,
 			},
 			nil,
 			nil,
@@ -5099,6 +5157,7 @@ func Test_writeStructSlice(t *testing.T) {
 		{"fail - empty df",
 			args{
 				[]*valueContainer{}, &[]testStructNoTags{},
+				false,
 			},
 			nil,
 			nil,
@@ -5107,7 +5166,7 @@ func Test_writeStructSlice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := writeStructSlice(tt.args.containers, tt.args.slice)
+			got, err := writeStructSlice(tt.args.containers, tt.args.slice, tt.args.noUnmatchedCols)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("writeStructSlice() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -5205,6 +5264,96 @@ func Test_castToInferredTypes(t *testing.T) {
 			castToInferredTypes(tt.args.containers)
 			if !reflect.DeepEqual(tt.args.containers, tt.want) {
 				t.Errorf("castToInferredTypes() -> %v, want %v", tt.args.containers, tt.want)
+			}
+		})
+	}
+}
+
+func Test_readNestedInterfaceByCols(t *testing.T) {
+	type args struct {
+		columns         [][]interface{}
+		requireSameType bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []interface{}
+		wantErr bool
+	}{
+		{"pass", args{
+			[][]interface{}{
+				{"foo", 0},
+				{"bar", 1},
+			}, false},
+			[]interface{}{[]interface{}{"foo", 0}, []interface{}{"bar", 1}},
+			false,
+		},
+		{"fail - no columns", args{
+			[][]interface{}{}, true},
+			nil,
+			true,
+		},
+		{"fail - different length columns", args{
+			[][]interface{}{
+				{"foo", "baz"},
+				{0},
+			}, true},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := readNestedInterfaceByCols(tt.args.columns)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readNestedInterfaceByCols() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("readNestedInterfaceByCols() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_transposeNestedNulls(t *testing.T) {
+	type args struct {
+		isNull [][]bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    [][]bool
+		wantErr bool
+	}{
+		{"pass", args{
+			[][]bool{{false, false, true}, {true, false, false}},
+		},
+			[][]bool{{false, true}, {false, false}, {true, false}},
+			false,
+		},
+		{"nil empty", args{
+			[][]bool{},
+		},
+			nil,
+			false,
+		},
+		{"fail - wrong shape", args{
+			[][]bool{{false, false}, {true}},
+		},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := transposeNestedNulls(tt.args.isNull)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("transposeNestedNulls() error = %v, want %v", got, tt.want)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("transposeNestedNulls() = %v, want %v", got, tt.want)
 			}
 		})
 	}
