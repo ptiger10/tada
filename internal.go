@@ -648,20 +648,27 @@ func writeStructSlice(containers []*valueContainer, slice interface{}, noUnmatch
 	if len(containers) == 0 {
 		return nil, fmt.Errorf("writing to slice of structs: dataframe must have at least one container (label level or column)")
 	}
-	// m: fields exported by the struct and the DataFrame {structFieldIndex: containerIndex}
-	m := make(map[int]int)
 	t := reflect.TypeOf(slice)
 	protoStruct := t.Elem().Elem()
-	for i := 0; i < protoStruct.NumField(); i++ {
+
+	exportedFields := make([]int, 0, 7)
+	for k := 0; k < protoStruct.NumField(); k++ {
+		if protoStruct.Field(k).PkgPath == "" { // exclude unexported fields from column count
+			exportedFields = append(exportedFields, k)
+		}
+	}
+	// m: fields exported by the struct and the DataFrame {structFieldIndex: containerIndex}
+	m := make(map[int]int, len(exportedFields))
+	for _, f := range exportedFields {
 		var name string
-		if js := protoStruct.Field(i).Tag.Get("json"); js != "" {
+		if js := protoStruct.Field(f).Tag.Get("json"); js != "" {
 			name = js
 		} else {
-			name = protoStruct.Field(i).Name
+			name = protoStruct.Field(f).Name
 		}
 		k, err := indexOfContainer(name, containers)
 		if err == nil {
-			m[i] = k
+			m[f] = k
 		}
 	}
 
@@ -678,13 +685,11 @@ func writeStructSlice(containers []*valueContainer, slice interface{}, noUnmatch
 			return nil, fmt.Errorf("writing to slice of structs: DataFrame has unmatched containers")
 		}
 	}
-
 	numRows := containers[0].len()
 
+	// copy values from containers into slice of struct
 	v := reflect.ValueOf(slice)
 	v.Elem().Set(reflect.MakeSlice(reflect.SliceOf(protoStruct), numRows, numRows))
-
-	// copy values from containers into slice of struct
 	for i := 0; i < numRows; i++ {
 		s := reflect.New(protoStruct)
 		for key, value := range m {
@@ -694,22 +699,22 @@ func writeStructSlice(containers []*valueContainer, slice interface{}, noUnmatch
 		v.Elem().Index(i).Set(s.Elem())
 	}
 	// set nulls
-	nulls := make([][]bool, protoStruct.NumField())
-	fieldOrder := make([]int, 0, 5)
+	nulls := make([][]bool, len(exportedFields))
+	fieldOrder := make([]int, 0, 7)
 	for k := range m {
 		fieldOrder = append(fieldOrder, k)
 	}
-	sort.Ints(fieldOrder)
+	sort.Ints(fieldOrder) // sort so that null columns align with field ordering
 
 	var counter int
-	for i := 0; i < protoStruct.NumField(); i++ {
-		if counter < len(fieldOrder) && i == fieldOrder[counter] {
-			k := m[i]
-			nulls[i] = containers[k].isNull
+	for incrementor, f := range exportedFields {
+		if counter < len(fieldOrder) && f == fieldOrder[counter] {
+			k := m[f]
+			nulls[incrementor] = containers[k].isNull
 			counter++
 		} else {
 			// if field is not exported by DataFrame, set all nulls to false
-			nulls[i] = make([]bool, numRows)
+			nulls[incrementor] = make([]bool, numRows)
 		}
 	}
 
@@ -731,13 +736,18 @@ func readStructSlice(slice interface{}, isNull [][]bool) ([]*valueContainer, err
 		return nil, fmt.Errorf("slice must contain at least one struct")
 	}
 	protoStruct := reflect.TypeOf(slice).Elem()
-	numCols := protoStruct.NumField()
-	if numCols == 0 {
-		return nil, fmt.Errorf("struct must contain at least one field")
+	exportedFields := make([]int, 0, 7)
+	for k := 0; k < protoStruct.NumField(); k++ {
+		if protoStruct.Field(k).PkgPath == "" { // exclude unexported fields from column count
+			exportedFields = append(exportedFields, k)
+		}
 	}
-	retValues := make([]interface{}, numCols)
-	retNames := make([]string, numCols)
-	for k := 0; k < numCols; k++ {
+	if len(exportedFields) == 0 {
+		return nil, fmt.Errorf("struct must contain at least one exported field")
+	}
+	retValues := make([]interface{}, len(exportedFields))
+	retNames := make([]string, len(exportedFields))
+	for incrementor, k := range exportedFields {
 		field := protoStruct.Field(k)
 		colType := field.Type
 		colValues := reflect.MakeSlice(reflect.SliceOf(colType), v.Len(), v.Len())
@@ -748,16 +758,16 @@ func readStructSlice(slice interface{}, isNull [][]bool) ([]*valueContainer, err
 		} else {
 			name = field.Name
 		}
-		retNames[k] = name
+		retNames[incrementor] = name
 		for i := 0; i < v.Len(); i++ {
 			dst := colValues.Index(i)
 			src := v.Index(i).Field(k)
 			dst.Set(src)
 		}
-		retValues[k] = colValues.Interface()
+		retValues[incrementor] = colValues.Interface()
 	}
 	// transfer to final container
-	ret := make([]*valueContainer, numCols)
+	ret := make([]*valueContainer, len(exportedFields))
 
 	// set null values
 	if isNull == nil {

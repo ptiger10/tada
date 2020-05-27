@@ -4885,6 +4885,11 @@ type testStruct struct {
 	Age  int    `json:"age"`
 }
 
+type testStructUnexported struct {
+	age  int
+	Name string `json:"name"`
+}
+
 type testStructNoTags struct {
 	Name string
 	Age  int
@@ -4964,6 +4969,14 @@ func Test_readStructSlice(t *testing.T) {
 			[]*valueContainer{
 				{slice: []string{optionsNullPrinter, "bar"}, isNull: []bool{true, false}, id: mockID, name: "name"},
 				{slice: []int{1, 2}, isNull: []bool{false, false}, id: mockID, name: "age"}},
+			false},
+		{"pass - unexported field",
+			args{
+				[]testStructUnexported{{1, "foo"}, {2, "bar"}},
+				nil,
+			},
+			[]*valueContainer{
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "name"}},
 			false},
 		{"fail - wrong number of null columns",
 			args{
@@ -5126,6 +5139,24 @@ func Test_writeStructSlice(t *testing.T) {
 			[][]bool{
 				{true, false},
 				{false, false},
+			},
+			false,
+		},
+		{"pass - unexported fields",
+			args{
+				[]*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "name", id: mockID},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "age", id: mockID},
+				}, &[]testStructUnexported{},
+				false,
+			},
+			&[]testStructUnexported{
+				{0, "foo"},
+				{0, "bar"},
+			},
+			[][]bool{
+				{false},
+				{false},
 			},
 			false,
 		},
