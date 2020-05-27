@@ -536,14 +536,13 @@ func (r MatrixReader) Read() (*DataFrame, error) {
 // WriteMockCSV reads r, infers the types, and writes n mock rows to w.
 func WriteMockCSV(r *CSVReader, w *CSVWriter, n int) error {
 	r.InferTypes = false
+	r.LabelLevels = 0
+	w.IncludeLabels = false
 	df, err := r.Read()
 	if err != nil {
 		return fmt.Errorf("writing mock csv: %v", err)
 	}
 	containers := df.values
-	if w.IncludeLabels {
-		containers = append(df.labels, df.values...)
-	}
 	dtypes := make([]DType, len(containers))
 	for k := range containers {
 		dtypes[k] = containers[k].inferType()
