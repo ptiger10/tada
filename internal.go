@@ -1,11 +1,9 @@
 package tada
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/csv"
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"math/rand"
@@ -15,11 +13,25 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
 	"cloud.google.com/go/civil"
 )
+
+func newValueContainer(slice interface{}, isNull []bool, name string, opts ...string) *valueContainer {
+	var id string
+	if len(opts) > 0 {
+		id = opts[0]
+	} else {
+		id = makeID()
+	}
+
+	return &valueContainer{
+		slice:  slice,
+		isNull: isNull,
+		name:   name,
+		id:     id,
+	}
+}
 
 func errorWarning(err error) {
 	if optionWarnings {
@@ -81,17 +93,42 @@ func isSlice(input interface{}) bool {
 	return reflect.TypeOf(input).Kind() == reflect.Slice
 }
 
-func makeValueContainerFromInterface(slice interface{}, name string) (*valueContainer, error) {
-	if reflect.ValueOf(slice).Len() == 0 {
-		return nil, fmt.Errorf("empty slice: cannot be empty")
+func unpackIDsByPosition(containers []*valueContainer, receivers ...*string) error {
+	if len(receivers) > len(containers) {
+		return fmt.Errorf("unpacking container ids by index position:"+
+			"len(receivers) out of range [%d] with length %d",
+			len(receivers), len(containers))
 	}
+	for i := range containers {
+		if i >= len(receivers) {
+			return nil
+		}
+		*receivers[i] = containers[i].id
+	}
+	return nil
+}
+
+func unpackIDsByName(containers []*valueContainer, receivers map[string]*string) error {
+	for k, v := range receivers {
+		i, err := indexOfContainer(k, containers)
+		if err != nil {
+			return fmt.Errorf("unpacking container ids by container name: %v", err)
+		}
+		*v = containers[i].id
+	}
+	return nil
+}
+
+func makeValueContainerFromInterface(slice interface{}, name string) (*valueContainer, error) {
 	isNull, err := setNullsFromInterface(slice)
 	if err != nil {
 		return nil, err
 	}
-	return &valueContainer{
-		slice: slice, isNull: isNull, name: name,
-	}, nil
+	return newValueContainer(slice, isNull, name), nil
+}
+
+func makeID() string {
+	return tadaID + strconv.Itoa(int(clock.now().UnixNano()))
 }
 
 func makeValueContainersFromInterfaces(slices []interface{}, usePrefix bool) ([]*valueContainer, error) {
@@ -103,7 +140,7 @@ func makeValueContainersFromInterfaces(slices []interface{}, usePrefix bool) ([]
 	for i, slice := range slices {
 		vc, err := makeValueContainerFromInterface(slice, namePrefix+fmt.Sprint(i))
 		if err != nil {
-			return nil, fmt.Errorf("position %d: %v", i, err)
+			return nil, fmt.Errorf("slice[%d]: %v", i, err)
 		}
 		ret[i] = vc
 	}
@@ -113,7 +150,7 @@ func makeValueContainersFromInterfaces(slices []interface{}, usePrefix bool) ([]
 func ensureEqualLengths(containers []*valueContainer, length int) error {
 	for k := range containers {
 		if containers[k].len() != length {
-			return fmt.Errorf("position %d: slice does not match required length (%d != %d)",
+			return fmt.Errorf("slice[%d] does not match required length (%d != %d)",
 				k, containers[k].len(), length)
 		}
 	}
@@ -133,11 +170,7 @@ func makeDefaultLabels(min, max int, prefixAsterisk bool) *valueContainer {
 	if prefixAsterisk {
 		name = "*0"
 	}
-	return &valueContainer{
-		slice:  labels,
-		isNull: isNull,
-		name:   name,
-	}
+	return newValueContainer(labels, isNull, name)
 }
 
 // makeIntRange returns a sequential series of numbers (inclusive of min, exclusive of max)
@@ -192,8 +225,14 @@ func nameOfContainer(containers []*valueContainer, n int) string {
 // case-sensitive
 func indexOfContainer(name string, containers []*valueContainer) (int, error) {
 	for j := range containers {
-		if containers[j].name == name {
-			return j, nil
+		if strings.HasPrefix(name, tadaID) {
+			if containers[j].id == name {
+				return j, nil
+			}
+		} else {
+			if containers[j].name == name {
+				return j, nil
+			}
 		}
 	}
 	return 0, fmt.Errorf("name (%v) not found", name)
@@ -223,10 +262,8 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 		}
 		cols[lvl].name = input.(string)
 	case reflect.Slice:
-		isNull, err := setNullsFromInterface(input)
-		if err != nil {
-			return nil, fmt.Errorf("unable to calculate null values ([]%v not supported)", reflect.TypeOf(input).Elem())
-		}
+		// duck error because it is known to be a slice
+		isNull, _ := setNullsFromInterface(input)
 		if l := reflect.ValueOf(input).Len(); l != requiredLen {
 			return nil, fmt.Errorf(
 				"cannot replace slice in container %s: length of input (%d) does not match existing length (%d)",
@@ -236,39 +273,16 @@ func withColumn(cols []*valueContainer, name string, input interface{}, required
 		lvl, err := indexOfContainer(name, cols)
 		if err != nil {
 			// name does not already exist: append new label level
-			cols = append(cols, &valueContainer{slice: input, name: name, isNull: isNull})
+			cols = append(cols, newValueContainer(input, isNull, name))
 		} else {
 			// name already exists: overwrite existing label level
 			cols[lvl].slice = input
 			cols[lvl].isNull = isNull
 			cols[lvl].resetCache()
 		}
-		// is Series? append or overwrite
-	case reflect.Ptr:
-		v, ok := input.(*Series)
-		if !ok {
-			return nil, fmt.Errorf("unsupported input: *Series is only supported pointer")
-		}
-
-		if v.Len() != requiredLen {
-			return nil, fmt.Errorf(
-				"cannot replace items in column %s: length of input Series does not match existing length (%d != %d)",
-				name, v.Len(), requiredLen)
-		}
-		// name does not already exist: append new level
-		lvl, err := indexOfContainer(name, cols)
-		if err != nil {
-			cols = append(cols, v.values)
-			cols[len(cols)-1].name = name
-		} else {
-			// name already exists: overwrite existing level
-			cols[lvl] = v.values
-			cols[lvl].name = name
-			cols[lvl].resetCache()
-		}
 
 	default:
-		return nil, fmt.Errorf("unsupported input kind: must be either slice, string, or Series")
+		return nil, fmt.Errorf("unsupported input kind (%v)", reflect.TypeOf(input).Kind())
 	}
 	return cols, nil
 }
@@ -287,11 +301,7 @@ func copyInterfaceIntoValueContainers(slices []interface{}, isNull [][]bool, nam
 		}
 	}
 	for k := range slices {
-		ret[k] = &valueContainer{
-			slice:  slices[k],
-			isNull: isNull[k],
-			name:   names[k],
-		}
+		ret[k] = newValueContainer(slices[k], isNull[k], names[k])
 	}
 	return ret
 }
@@ -350,6 +360,7 @@ func makeBoolMatrix(numCols, numRows int) [][]bool {
 	return ret
 }
 
+// returns []int that are shared by all slices
 func intersection(slices [][]int, maxLen int) []int {
 	// only one slice? intersection is that slice
 	if len(slices) == 1 {
@@ -481,32 +492,6 @@ func (df *DataFrame) toCSVByRows(includeLabels bool) ([][]string, error) {
 	return ret, nil
 }
 
-func setReadConfig(options []ReadOption) *readConfig {
-	// default config
-	config := &readConfig{
-		numHeaderRows:  1,
-		numLabelLevels: 0,
-		delimiter:      ',',
-		majorDimIsCols: false,
-	}
-	for _, option := range options {
-		option(config)
-	}
-	return config
-}
-
-func setWriteConfig(options []WriteOption) *writeConfig {
-	// default config
-	config := &writeConfig{
-		includeLabels: true,
-		delimiter:     ',',
-	}
-	for _, option := range options {
-		option(config)
-	}
-	return config
-}
-
 func setJoinConfig(options []JoinOption) *joinConfig {
 	// default config
 	config := &joinConfig{
@@ -518,163 +503,127 @@ func setJoinConfig(options []JoinOption) *joinConfig {
 	return config
 }
 
-// expects non-nil cfg
-func readCSVByRows(csv [][]string, cfg *readConfig) (*DataFrame, error) {
-	numFields := len(csv[0])
-	for i := range csv {
-		if len(csv[i]) != numFields {
-			return nil, fmt.Errorf("row %d: all rows must have same number of columns as first row (%d != %d)",
-				i, len(csv[i]), numFields)
-		}
+func containersToDF(containers []*valueContainer, numHeaders int, numLabels int, name string) *DataFrame {
+	labels := containers[:numLabels]
+	if numLabels == 0 {
+		labels = []*valueContainer{makeDefaultLabels(0, containers[0].len(), true)}
 	}
-	numRows := len(csv) - cfg.numHeaderRows
-	numCols := len(csv[0]) - cfg.numLabelLevels
-
-	// prepare intermediary values containers
-	vals := makeStringMatrix(numCols, numRows)
-	valsIsNull := makeBoolMatrix(numCols, numRows)
-	valsNames := makeStringMatrix(numCols, cfg.numHeaderRows)
-
-	// prepare intermediary label containers
-	labels := makeStringMatrix(cfg.numLabelLevels, numRows)
-	labelsIsNull := makeBoolMatrix(cfg.numLabelLevels, numRows)
-	levelNames := makeStringMatrix(cfg.numLabelLevels, cfg.numHeaderRows)
-
-	// iterate over csv and transpose rows and columns
-	for row := range csv {
-		for column := range csv[row] {
-			if row < cfg.numHeaderRows {
-				if column < cfg.numLabelLevels {
-					// write header rows to labels, no offset
-					levelNames[column][row] = csv[row][column]
-				} else {
-					// write header rows to cols, offset for label cols
-					offsetFromLabelCols := column - cfg.numLabelLevels
-					valsNames[offsetFromLabelCols][row] = csv[row][column]
-				}
-				continue
-			}
-			offsetFromHeaderRows := row - cfg.numHeaderRows
-			if column < cfg.numLabelLevels {
-				// write values to labels, offset for header rows
-				labels[column][offsetFromHeaderRows] = csv[row][column]
-				labelsIsNull[column][offsetFromHeaderRows] = isNullString(csv[row][column])
-			} else {
-				offsetFromLabelCols := column - cfg.numLabelLevels
-				// write values to cols, offset for label cols and header rows
-				vals[offsetFromLabelCols][offsetFromHeaderRows] = csv[row][column]
-				valsIsNull[offsetFromLabelCols][offsetFromHeaderRows] = isNullString(csv[row][column])
-			}
-		}
+	columns := containers[numLabels:]
+	var colLevelNames []string
+	colLevelNames, columns = setColLevelNames(numHeaders, columns)
+	df := &DataFrame{
+		labels:        labels,
+		values:        columns,
+		colLevelNames: colLevelNames,
+		name:          name,
 	}
-
-	retNames := make([]string, len(valsNames))
-	for k := range valsNames {
-		retNames[k] = strings.Join(valsNames[k], optionLevelSeparator)
-	}
-	retLevelNames := make([]string, len(levelNames))
-	for k := range levelNames {
-		retLevelNames[k] = strings.Join(levelNames[k], optionLevelSeparator)
-	}
-
-	// transfer values and labels to final value containers
-	retVals := copyStringsIntoValueContainers(vals, valsIsNull, retNames)
-	retLabels := copyStringsIntoValueContainers(labels, labelsIsNull, retLevelNames)
-
-	// create default labels if no labels
-	retLabels = defaultLabelsIfEmpty(retLabels, numRows)
-
-	// create default col level names
-	var retColLevelNames []string
-	retColLevelNames, retVals = defaultColsIfNoHeader(cfg.numHeaderRows, retVals)
-
-	return &DataFrame{
-		values:        retVals,
-		labels:        retLabels,
-		colLevelNames: retColLevelNames,
-	}, nil
+	return df
 }
 
-// expects non-nil cfg
-func readCSVByCols(csv [][]string, cfg *readConfig) (*DataFrame, error) {
-	numLines := len(csv[0])
-	for i := range csv {
-		if len(csv[i]) != numLines {
-			return nil, fmt.Errorf("column %d: all columns must have same number of rows as first column (%d != %d)",
-				i, len(csv[i]), numLines)
+func readRecords(records [][]string, byColumns bool, numHeaders int) ([]*valueContainer, error) {
+	xl := len(records[0])
+	for k := range records {
+		if len(records[k]) != xl {
+			return nil, fmt.Errorf("num items in row %d [%d] does not match row 0 [%d]", k, len(records[k]), xl)
 		}
 	}
+	if !byColumns {
+		records = transposeRecords(records)
+	}
+	headers := popNRecords(records, numHeaders)
+	ret := make([]*valueContainer, len(records))
+	for k := range records {
+		// duck error because slice is guaranteed
+		isNull, _ := setNullsFromInterface(records[k])
+		ret[k] = newValueContainer(
+			records[k],
+			isNull,
+			joinLevelsIntoName(headers[k]),
+		)
+	}
+	return ret, nil
+}
 
-	numRows := len(csv[0]) - cfg.numHeaderRows
-	numCols := len(csv) - cfg.numLabelLevels
+// major dimension: columns
+func popNRecords(records [][]string, n int) [][]string {
+	ret := make([][]string, len(records))
+	for k := range records {
+		ret[k] = records[k][:n]
+		records[k] = records[k][n:]
+	}
+	return ret
+}
 
-	// prepare intermediary values containers
-	vals := make([][]string, numCols)
-	valsIsNull := make([][]bool, numCols)
-	valsNames := make([]string, numCols)
+func transposeRecords(records [][]string) [][]string {
+	numCols := len(records[0])
+	numRows := len(records)
+	ret := make([][]string, numCols)
+	for i := range ret {
+		ret[i] = make([]string, numRows)
+	}
+	for i := 0; i < numCols; i++ {
+		for j := 0; j < numRows; j++ {
+			ret[i][j] = records[j][i]
+		}
+	}
+	return ret
+}
 
-	// prepare intermediary label containers
-	labels := make([][]string, cfg.numLabelLevels)
-	labelsIsNull := make([][]bool, cfg.numLabelLevels)
-	labelsNames := make([]string, cfg.numLabelLevels)
+func readInterfaceRecords(records [][]interface{}, byColumns bool, numHeaders int) ([]*valueContainer, error) {
+	xl := len(records[0])
+	for k := range records {
+		if len(records[k]) != xl {
+			return nil, fmt.Errorf("num items in row %d [%d] does not match row 0 [%d]", k, len(records[k]), xl)
+		}
+	}
+	if !byColumns {
+		records = transposeInterfaceRecords(records)
+	}
+	headers := popNInterfaceRecords(records, numHeaders)
+	ret := make([]*valueContainer, len(records))
+	for k := range records {
+		// duck error because slice is guaranteed
+		isNull, _ := setNullsFromInterface(records[k])
+		stringifiedHeaders := make([]string, len(headers[k]))
+		for i := range headers[k] {
+			stringifiedHeaders[i] = fmt.Sprint(headers[k][i])
+		}
+		ret[k] = newValueContainer(
+			records[k],
+			isNull,
+			joinLevelsIntoName(stringifiedHeaders),
+		)
+	}
+	return ret, nil
+}
 
-	// iterate over all cols to get header names
-	for j := 0; j < cfg.numLabelLevels; j++ {
-		// write label headers, no offset
-		labelsNames[j] = strings.Join(csv[j][:cfg.numHeaderRows], optionLevelSeparator)
+// major dimension: columns
+func popNInterfaceRecords(records [][]interface{}, n int) [][]interface{} {
+	ret := make([][]interface{}, len(records))
+	for k := range records {
+		ret[k] = records[k][:n]
+		records[k] = records[k][n:]
+	}
+	return ret
+}
+
+func transposeInterfaceRecords(records [][]interface{}) [][]interface{} {
+	numCols := len(records[0])
+	numRows := len(records)
+	ret := make([][]interface{}, numCols)
+	for i := range ret {
+		ret[i] = make([]interface{}, numRows)
 	}
 	for k := 0; k < numCols; k++ {
-		// write col headers, offset for label cols
-		offsetFromLabelCols := k + cfg.numLabelLevels
-		valsNames[k] = strings.Join(csv[offsetFromLabelCols][:cfg.numHeaderRows], optionLevelSeparator)
-	}
-	for container := range csv {
-		if container < cfg.numLabelLevels {
-			// write label values as slice, offset for header rows
-			valsToWrite := csv[container][cfg.numHeaderRows:]
-			labels[container] = valsToWrite
-			// duck error because values are all string, and therefore supported
-			nulls, _ := setNullsFromInterface(valsToWrite)
-			labelsIsNull[container] = nulls
-		} else {
-			// write column values as slice, offset for label cols and header rows
-			offsetFromLabelCols := container - cfg.numLabelLevels
-			valsToWrite := csv[container][cfg.numHeaderRows:]
-			vals[offsetFromLabelCols] = valsToWrite
-			// duck error because values are all string, and therefore supported
-			nulls, _ := setNullsFromInterface(valsToWrite)
-			valsIsNull[offsetFromLabelCols] = nulls
+		for i := 0; i < numRows; i++ {
+			ret[k][i] = records[i][k]
 		}
 	}
-
-	// transfer values and labels to final value containers
-	retVals := copyStringsIntoValueContainers(vals, valsIsNull, valsNames)
-	retLabels := copyStringsIntoValueContainers(labels, labelsIsNull, labelsNames)
-
-	// create default labels if no labels
-	retLabels = defaultLabelsIfEmpty(retLabels, numRows)
-
-	// create default col level names
-	var retColLevelNames []string
-	retColLevelNames, retVals = defaultColsIfNoHeader(cfg.numHeaderRows, retVals)
-
-	return &DataFrame{
-		values:        retVals,
-		labels:        retLabels,
-		colLevelNames: retColLevelNames,
-	}, nil
-
-}
-func defaultLabelsIfEmpty(labels []*valueContainer, numRows int) []*valueContainer {
-	if len(labels) == 0 {
-		defaultLabels := makeDefaultLabels(0, numRows, true)
-		labels = append(labels, defaultLabels)
-	}
-	return labels
+	return ret
 }
 
 // (colLevelNames, columnValues)
-func defaultColsIfNoHeader(numHeaderRows int, columns []*valueContainer) ([]string, []*valueContainer) {
+func setColLevelNames(numHeaderRows int, columns []*valueContainer) ([]string, []*valueContainer) {
 	if numHeaderRows <= 0 {
 		// if no header rows, change the names of the columns to be 0, 1...
 		for k := range columns {
@@ -690,129 +639,297 @@ func defaultColsIfNoHeader(numHeaderRows int, columns []*valueContainer) ([]stri
 	return ret, columns
 }
 
+func writeStructSlice(containers []*valueContainer, slice interface{}, noUnmatchedCols bool) ([][]bool, error) {
+	if reflect.TypeOf(slice).Kind() != reflect.Ptr ||
+		reflect.TypeOf(slice).Elem().Kind() != reflect.Slice ||
+		reflect.TypeOf(slice).Elem().Elem().Kind() != reflect.Struct {
+		return nil, fmt.Errorf("writing to slice of structs: unsupported input type (%v), must be *[]struct", reflect.TypeOf(slice))
+	}
+	if len(containers) == 0 {
+		return nil, fmt.Errorf("writing to slice of structs: dataframe must have at least one container (label level or column)")
+	}
+	t := reflect.TypeOf(slice)
+	protoStruct := t.Elem().Elem()
+
+	exportedFields := make([]int, 0, 7)
+	for k := 0; k < protoStruct.NumField(); k++ {
+		if protoStruct.Field(k).PkgPath == "" { // exclude unexported fields from column count
+			exportedFields = append(exportedFields, k)
+		}
+	}
+	// m: fields exported by the struct and the DataFrame {structFieldIndex: containerIndex}
+	m := make(map[int]int, len(exportedFields))
+	for _, f := range exportedFields {
+		var name string
+		if js := protoStruct.Field(f).Tag.Get("json"); js != "" {
+			name = js
+		} else {
+			name = protoStruct.Field(f).Name
+		}
+		k, err := indexOfContainer(name, containers)
+		if err == nil {
+			m[f] = k
+		}
+	}
+
+	// check for type match
+	for key, value := range m {
+		if reflect.TypeOf(containers[value].slice).Elem() != protoStruct.Field(key).Type {
+			return nil, fmt.Errorf("writing to slice of structs: container[%d] (%s) must be same type as matching field (%v != %v)",
+				value, nameOfContainer(containers, value), reflect.TypeOf(containers[value].slice).Elem(), protoStruct.Field(key).Type)
+		}
+	}
+
+	if noUnmatchedCols {
+		if len(containers) > len(m) {
+			return nil, fmt.Errorf("writing to slice of structs: DataFrame has unmatched containers")
+		}
+	}
+	numRows := containers[0].len()
+
+	// copy values from containers into slice of struct
+	v := reflect.ValueOf(slice)
+	v.Elem().Set(reflect.MakeSlice(reflect.SliceOf(protoStruct), numRows, numRows))
+	for i := 0; i < numRows; i++ {
+		s := reflect.New(protoStruct)
+		for key, value := range m {
+			dst := s.Elem().Field(key)
+			dst.Set(reflect.ValueOf(containers[value].slice).Index(i))
+		}
+		v.Elem().Index(i).Set(s.Elem())
+	}
+	// set nulls
+	nulls := make([][]bool, len(exportedFields))
+	fieldOrder := make([]int, 0, 7)
+	for k := range m {
+		fieldOrder = append(fieldOrder, k)
+	}
+	sort.Ints(fieldOrder) // sort so that null columns align with field ordering
+
+	var counter int
+	for incrementor, f := range exportedFields {
+		if counter < len(fieldOrder) && f == fieldOrder[counter] {
+			k := m[f]
+			nulls[incrementor] = containers[k].isNull
+			counter++
+		} else {
+			// if field is not exported by DataFrame, set all nulls to false
+			nulls[incrementor] = make([]bool, numRows)
+		}
+	}
+
+	// transpose nulls
+	nulls, _ = transposeNestedNulls(nulls) // ducks error because constructing nulls is controlled
+
+	return nulls, nil
+
+}
+
 // each struct becomes a different row
 // each field becomes a different column
-func readStruct(slice interface{}) ([]*valueContainer, error) {
-	if !isSlice(slice) {
-		return nil, fmt.Errorf("unsupported kind (%v); must be slice", reflect.TypeOf(slice).Kind())
-	}
-	if kind := reflect.TypeOf(slice).Elem().Kind(); kind != reflect.Struct {
-		return nil, fmt.Errorf("unsupported kind (%v); must be slice of structs", reflect.TypeOf(slice).Elem().Kind())
+func readStructSlice(slice interface{}, isNull [][]bool) ([]*valueContainer, error) {
+	if !isSlice(slice) || reflect.TypeOf(slice).Elem().Kind() != reflect.Struct {
+		return nil, fmt.Errorf("unsupported input type (%v), must be []struct", reflect.TypeOf(slice))
 	}
 	v := reflect.ValueOf(slice)
 	if v.Len() == 0 {
 		return nil, fmt.Errorf("slice must contain at least one struct")
 	}
-	firstStruct := v.Index(0)
-	numCols := firstStruct.NumField()
-	if numCols == 0 {
-		return nil, fmt.Errorf("struct must contain at least one field")
+	protoStruct := reflect.TypeOf(slice).Elem()
+	exportedFields := make([]int, 0, 7)
+	for k := 0; k < protoStruct.NumField(); k++ {
+		if protoStruct.Field(k).PkgPath == "" { // exclude unexported fields from column count
+			exportedFields = append(exportedFields, k)
+		}
 	}
-	retValues := make([]interface{}, numCols)
-	retNames := make([]string, numCols)
-	for k := 0; k < numCols; k++ {
-		colType := reflect.TypeOf(firstStruct.Field(k).Interface())
+	if len(exportedFields) == 0 {
+		return nil, fmt.Errorf("struct must contain at least one exported field")
+	}
+	retValues := make([]interface{}, len(exportedFields))
+	retNames := make([]string, len(exportedFields))
+	for incrementor, k := range exportedFields {
+		field := protoStruct.Field(k)
+		colType := field.Type
 		colValues := reflect.MakeSlice(reflect.SliceOf(colType), v.Len(), v.Len())
-		retNames[k] = v.Index(0).Type().Field(k).Name
+		// setting container name
+		var name string
+		if js := field.Tag.Get("json"); js != "" {
+			name = js
+		} else {
+			name = field.Name
+		}
+		retNames[incrementor] = name
 		for i := 0; i < v.Len(); i++ {
 			dst := colValues.Index(i)
 			src := v.Index(i).Field(k)
 			dst.Set(src)
 		}
-		retValues[k] = colValues.Interface()
+		retValues[incrementor] = colValues.Interface()
 	}
 	// transfer to final container
-	ret := make([]*valueContainer, numCols)
-	for k := range ret {
-		nulls, err := setNullsFromInterface(retValues[k])
-		if err != nil {
-			return nil, fmt.Errorf("field %v: %v", k, err)
+	ret := make([]*valueContainer, len(exportedFields))
+
+	// set null values
+	if isNull == nil {
+		isNull = make([][]bool, len(ret))
+		for k := range ret {
+			isNull[k], _ = setNullsFromInterface(retValues[k])
 		}
-		ret[k] = &valueContainer{
-			slice:  retValues[k],
-			isNull: nulls,
-			name:   retNames[k],
+	} else {
+		if len(ret) != len(isNull[0]) {
+			return nil, fmt.Errorf("setting null values: number of columns in [][]bool (%d) does not match number of exported fields (%d)",
+				len(ret), len(isNull[0]))
+		}
+		if v.Len() != len(isNull) {
+			return nil, fmt.Errorf("setting null values: number of rows in [][]bool (%d) does not match number of structs in slice (%d)",
+				v.Len(), len(isNull))
+		}
+		var err error
+		isNull, err = transposeNestedNulls(isNull)
+		if err != nil {
+			return nil, fmt.Errorf("reading slice of structs: setting null values: %v", err)
+		}
+	}
+	for k := range ret {
+		ret[k] = newValueContainer(retValues[k], isNull[k], retNames[k])
+	}
+	return ret, nil
+}
+
+// if requireSameType, all columns must be of same type; otherwise, each column is converted to []interface{}
+func readNestedInterfaceByCols(columns [][]interface{}) ([]interface{}, error) {
+	if len(columns) == 0 {
+		return nil, fmt.Errorf("reading [][]interface{}: must have at least one column")
+	}
+	l := len(columns[0])
+	ret := make([]interface{}, len(columns))
+	colTypes := make([]reflect.Type, len(columns))
+	for k := range columns {
+		colType := reflect.TypeOf(columns[k][0])
+		colTypes[k] = colType
+		ret[k] = make([]interface{}, len(columns))
+	}
+
+	for k := range columns {
+		if len(columns[k]) != l {
+			return nil, fmt.Errorf("reading [][]interface{} by columns: column %d: all columns must have same length as column 0 (%d != %d)",
+				k, len(columns[k]), l)
+		}
+		ret[k] = columns[k]
+
+	}
+	return ret, nil
+}
+
+func transposeNestedNulls(isNull [][]bool) ([][]bool, error) {
+	if len(isNull) == 0 {
+		return nil, nil
+	}
+	ret := make([][]bool, len(isNull[0]))
+	for k := range isNull[0] {
+		ret[k] = make([]bool, len(isNull))
+	}
+	for i := range isNull {
+		if len(isNull[i]) != len(isNull[0]) {
+			return nil, fmt.Errorf("transposing [][]bool: row %d: all rows must have same length as row 0 (%d != %d)",
+				i, len(isNull[i]), len(isNull[0]))
+		}
+		for k := range isNull[i] {
+			ret[k][i] = isNull[i][k]
 		}
 	}
 	return ret, nil
 }
 
-func inferType(input string) string {
-	if _, err := strconv.ParseInt(input, 10, 64); err == nil {
-		return "int"
-	}
+func inferType(input string) DType {
 	if _, err := strconv.ParseFloat(input, 64); err == nil {
-		return "float"
+		return Float64
 	}
 	if t, null := convertStringToDateTime(input); !null {
 		if t.Hour() == 0 && t.Minute() == 0 && t.Second() == 0 && t.Nanosecond() == 0 {
-			return "date"
+			return Date
 		}
-		return "datetime"
+		if t.Year() == 0 && t.Month() == 1 && t.Day() == 1 {
+			return Time
+		}
+		return DateTime
 	}
-	if _, err := strconv.ParseBool(input); err == nil {
-		return "bool"
-	}
-	return "string"
+	return String
 }
 
-func getDominantDType(dtypes map[string]int) string {
+// cast valueContainers in place
+func castToInferredTypes(containers []*valueContainer) {
+	for k := range containers {
+		dtype := containers[k].inferType()
+		containers[k].cast(dtype)
+	}
+	return
+}
+
+// expects vc.slice to be []string
+func (vc *valueContainer) inferType() DType {
+	s := vc.slice.([]string)
+	sampleSize := 10
+	if len(s) < sampleSize {
+		sampleSize = len(s)
+	}
+	inferredTypes := make(map[DType]int)
+	sample := s[:sampleSize]
+	for i := range sample {
+		dtype := inferType(sample[i])
+		inferredTypes[dtype]++
+	}
 	var highestCount int
-	var dominantDType string
-	for key, v := range dtypes {
+	var dtype DType
+	for key, v := range inferredTypes {
 		// tie resolves randomly
 		if v > highestCount {
-			dominantDType = key
+			dtype = key
 			highestCount = v
 		}
 	}
-	return dominantDType
+	return dtype
 }
 
 // major dimension of output is rows
-func mockCSVFromDTypes(dtypes []map[string]int, numMockRows int) [][]string {
-	rand.Seed(randSeed)
-	dominantDTypes := make([]string, len(dtypes))
-
-	// determine the dominant data type per column
-	for k := range dtypes {
-		dominantDTypes[k] = getDominantDType(dtypes[k])
-	}
-	ret := make([][]string, numMockRows)
-	for i := range ret {
-		ret[i] = make([]string, len(dtypes))
-		for k := range ret[i] {
-			ret[i][k] = mockString(dominantDTypes[k], .1)
+func mockContainersFromDTypes(names []string, dtypes []DType, numMockRows int) []*valueContainer {
+	ret := make([]*valueContainer, len(dtypes))
+	for k := range ret {
+		s := make([]string, numMockRows)
+		isNull := make([]bool, numMockRows)
+		for i := range s {
+			s[i], isNull[i] = mockString(dtypes[k], .1)
 		}
+		ret[k] = newValueContainer(s, isNull, names[k])
+		ret[k].cast(dtypes[k])
 	}
 	return ret
 }
 
-func mockString(dtype string, nullPct float64) string {
+func mockString(dtype DType, nullPct float64) (string, bool) {
 	var options []string
 	switch dtype {
 	// overwrite the options based on the dtype
-	case "float":
+	case Float64:
 		options = []string{".1", ".25", ".5", ".75", ".9"}
-	case "int":
-		options = []string{"1", "2", "3", "4", "5"}
-	case "string":
+	case String:
 		options = []string{"foo", "bar", "baz", "qux", "quuz"}
-	case "datetime":
+	case DateTime:
 		options = []string{
 			"2020-01-01T00:00:00Z00:00", "2020-01-01T12:00:00Z00:00", "2020-01-01T12:30:00Z00:00",
 			"2020-01-02T00:00:00Z00:00", "2020-01-01T12:30:00Z00:00"}
-	case "date":
+	case Date:
 		options = []string{"2019-12-31", "2020-01-01", "2020-01-02", "2020-02-01", "2020-02-02"}
-	case "bool":
-		options = []string{"true", "false"}
+	case Time:
+		options = []string{"10:00am", "11:00am", "1:00pm", "2:00pm", "3:30pm"}
 	}
+	rand.Seed(clock.now().UnixNano())
 	f := rand.Float64()
 	if f < nullPct {
-		return ""
+		return optionsNullPrinter, true
 	}
 	randomIndex := rand.Intn(len(options))
-	return options[randomIndex]
+	return options[randomIndex], false
 }
 
 // modifies vc in place
@@ -878,6 +995,7 @@ func (vc *valueContainer) valid() []int {
 	return index[:counter]
 }
 
+// index positions of any null value
 func (vc *valueContainer) null() []int {
 	index := make([]int, len(vc.isNull))
 	// increment counter for every null row
@@ -997,11 +1115,7 @@ func (vc *valueContainer) head(n int) *valueContainer {
 	retVals := v.Slice(0, n)
 	retIsNull = vc.isNull[:n]
 
-	return &valueContainer{
-		slice:  retVals.Interface(),
-		isNull: retIsNull,
-		name:   vc.name,
-	}
+	return newValueContainer(retVals.Interface(), retIsNull, vc.name, vc.id)
 }
 
 // tail returns the last number of rows specified by n
@@ -1011,11 +1125,7 @@ func (vc *valueContainer) tail(n int) *valueContainer {
 	retVals := v.Slice(len(vc.isNull)-n, len(vc.isNull))
 	retIsNull = vc.isNull[len(vc.isNull)-n : len(vc.isNull)]
 
-	return &valueContainer{
-		slice:  retVals.Interface(),
-		isNull: retIsNull,
-		name:   vc.name,
-	}
+	return newValueContainer(retVals.Interface(), retIsNull, vc.name, vc.id)
 }
 
 // rangeSlice returns the rows starting with first and ending with last (exclusive)
@@ -1025,11 +1135,7 @@ func (vc *valueContainer) rangeSlice(first, last int) *valueContainer {
 	retVals := v.Slice(first, last)
 	retIsNull = vc.isNull[first:last]
 
-	return &valueContainer{
-		slice:  retVals.Interface(),
-		isNull: retIsNull,
-		name:   vc.name,
-	}
+	return newValueContainer(retVals.Interface(), retIsNull, vc.name, vc.id)
 }
 
 func (vc *valueContainer) shift(n int) *valueContainer {
@@ -1045,14 +1151,11 @@ func (vc *valueContainer) shift(n int) *valueContainer {
 			isNull[i] = vc.isNull[position]
 		}
 	}
-	return &valueContainer{
-		slice:  vals.Interface(),
-		isNull: isNull,
-		name:   vc.name,
-	}
+	return newValueContainer(vals.Interface(), isNull, vc.name, vc.id)
 }
 
-// convert to string as lowest common denominator
+// append values to the end of a valueContainer
+// convert to string as lowest common denominator if types are not the same
 func (vc *valueContainer) append(other *valueContainer) *valueContainer {
 	var retSlice interface{}
 	if reflect.TypeOf(vc.slice) == reflect.TypeOf(other.slice) {
@@ -1063,11 +1166,7 @@ func (vc *valueContainer) append(other *valueContainer) *valueContainer {
 	}
 
 	retIsNull := append(vc.isNull, other.isNull...)
-	return &valueContainer{
-		slice:  retSlice,
-		isNull: retIsNull,
-		name:   vc.name,
-	}
+	return newValueContainer(retSlice, retIsNull, vc.name, vc.id)
 }
 
 func (vc *valueContainer) iterRow(index int) Element {
@@ -1289,11 +1388,12 @@ func reduceContainers(containers []*valueContainer) (
 	// create receiver for unique labels of same type as original levels
 	newContainers = make([]*valueContainer, len(containers))
 	for j := range containers {
-		newContainers[j] = &valueContainer{
-			slice:  reflect.MakeSlice(reflect.TypeOf(containers[j].slice), 0, 0).Interface(),
-			name:   containers[j].name,
-			isNull: make([]bool, 0),
-		}
+		newContainers[j] = newValueContainer(
+			reflect.MakeSlice(reflect.TypeOf(containers[j].slice), 0, 0).Interface(),
+			make([]bool, 0),
+			containers[j].name,
+			containers[j].id,
+		)
 	}
 	// create receiver for the original row indexes for each unique label combo
 	uniqueLabelRows := make(map[string][]int)
@@ -1339,11 +1439,12 @@ func reduceContainersForPromote(containers []*valueContainer) (
 	// create receiver for unique labels of same type as original levels
 	newContainers = make([]*valueContainer, len(containers))
 	for j := range containers {
-		newContainers[j] = &valueContainer{
-			slice:  reflect.MakeSlice(reflect.TypeOf(containers[j].slice), 0, 0).Interface(),
-			name:   containers[j].name,
-			isNull: make([]bool, 0),
-		}
+		newContainers[j] = newValueContainer(
+			reflect.MakeSlice(reflect.TypeOf(containers[j].slice), 0, 0).Interface(),
+			make([]bool, 0),
+			containers[j].name,
+			containers[j].id,
+		)
 	}
 	// create receiver for the original row indexes for each unique label combo
 	uniqueLabelRows := make(map[string][]int)
@@ -1452,7 +1553,7 @@ func (s *Series) combineMath(other *Series, ignoreNulls bool, fn func(v1 float64
 	}
 	// copy the labels to avoid sharing data with derivative Series
 	return &Series{
-		values: &valueContainer{slice: retFloat, isNull: retIsNull, name: s.values.name},
+		values: newValueContainer(retFloat, retIsNull, s.values.name),
 		labels: copyContainers(s.labels)}
 }
 
@@ -1540,7 +1641,7 @@ func lookupWithAnchor(
 		}
 	}
 	return &Series{
-		values: &valueContainer{slice: vals.Interface(), isNull: isNull, name: name},
+		values: newValueContainer(vals.Interface(), isNull, name),
 		labels: copyContainers(sourceLabels),
 	}
 }
@@ -1599,8 +1700,10 @@ func lookupDataFrameWithAnchor(
 				isNull[i] = true
 			}
 		}
-		retVals = append(retVals, &valueContainer{
-			slice: vals.Interface(), isNull: isNull, name: lookupColumns[k].name})
+		retVals = append(
+			retVals,
+			newValueContainer(vals.Interface(), isNull, lookupColumns[k].name),
+		)
 	}
 	// copy labels to avoid sharing data accidentally
 	return &DataFrame{
@@ -1697,6 +1800,7 @@ func (vc *valueContainer) copy() *valueContainer {
 		slice:  copyInterface(vc.slice),
 		isNull: copyNulls(vc.isNull),
 		name:   vc.name,
+		id:     vc.id,
 		cache:  copyCache(vc.cache),
 	}
 }
@@ -1720,53 +1824,36 @@ func isNullFloat(v float64) bool {
 
 func isSupportedSlice(slice interface{}) error {
 	if k := reflect.TypeOf(slice).Kind(); k != reflect.Slice {
-		return fmt.Errorf("unsupported kind (%v); must be slice", k)
+		return fmt.Errorf("unsupported kind (%v), must be slice", k)
 	}
-	switch slice.(type) {
-	case []float64, []string, []time.Time,
-		[]civil.Date, []civil.Time,
-		[][]byte, []bool, []float32,
-		[]uint, []uint8, []uint16, []uint32, []uint64,
-		[]int, []int8, []int16, []int32, []int64,
-		// nested types
-		[][]string, [][]float64, [][]time.Time, [][][]byte,
-		[][]civil.Date, [][]civil.Time,
-		[][]bool, [][]float32,
-		[][]uint, [][]uint16, [][]uint32, [][]uint64,
-		[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
-		return nil
-	case []interface{}:
-		vals := slice.([]interface{})
-		for i := range vals {
-			err := isSupportedInterface(vals[i])
-			if err != nil {
-				return fmt.Errorf("[]interface{}: %v", err)
-			}
-		}
-		return nil
+	if reflect.ValueOf(slice).Len() == 0 {
+		return fmt.Errorf("empty slice: cannot be empty")
 	}
-	return fmt.Errorf("unsupported type ([]%v)", reflect.TypeOf(slice).Elem())
-}
-
-func isSupportedInterface(val interface{}) error {
-	switch val.(type) {
-	case float64, string, time.Time,
-		[]float64, []string, []time.Time,
-		bool, uint, uint8, uint16, uint32, uint64,
-		int, int8, int16, int32, int64, float32,
-		[]bool, []uint, []uint8, []uint16, []uint32, []uint64,
-		[]int, []int8, []int16, []int32, []int64, []float32:
-		return nil
-	}
-	return fmt.Errorf("unsupported type (%v)", reflect.TypeOf(val))
+	return nil
 }
 
 func setNullsFromInterface(input interface{}) ([]bool, error) {
+	if input == nil {
+		return []bool{}, nil
+	}
 	var ret []bool
 	err := isSupportedSlice(input)
 	if err != nil {
 		return nil, fmt.Errorf("setting null values from interface{}: %v", err)
 	}
+	v := reflect.ValueOf(input)
+	// map or nested slice
+	// if len is empty -> null (this includes [][]byte, instead of treating them as strings)
+	t := v.Index(0).Kind()
+	if t == reflect.Map || t == reflect.Slice {
+		l := v.Len()
+		ret = make([]bool, l)
+		for i := range ret {
+			ret[i] = (v.Index(i).Len() == 0)
+		}
+		return ret, nil
+	}
+
 	switch input.(type) {
 	case []float64:
 		vals := input.([]float64)
@@ -1780,16 +1867,6 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 		ret = make([]bool, len(vals))
 		for i := range ret {
 			if isNullString(vals[i]) {
-				ret[i] = true
-			} else {
-				ret[i] = false
-			}
-		}
-	case [][]byte:
-		vals := input.([][]byte)
-		ret = make([]bool, len(vals))
-		for i := range ret {
-			if isNullString(string(vals[i])) {
 				ret[i] = true
 			} else {
 				ret[i] = false
@@ -1837,25 +1914,12 @@ func setNullsFromInterface(input interface{}) ([]bool, error) {
 				ret[i] = false
 			}
 		}
-		// no null value possible
-	case []bool, []uint, []uint8, []uint16, []uint32, []uint64, []int, []int8, []int16, []int32, []int64, []float32:
+	default:
+		// all other types are considered non-null
 		l := reflect.ValueOf(input).Len()
 		ret = make([]bool, l)
 		for i := range ret {
 			ret[i] = false
-		}
-	// nested slices
-	case [][]string, [][]float64, [][]time.Time, [][][]byte,
-		[][]civil.Date, [][]civil.Time,
-		[][]bool, [][]float32,
-		[][]uint, [][]uint16, [][]uint32, [][]uint64,
-		[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
-		v := reflect.ValueOf(input)
-		l := v.Len()
-		ret = make([]bool, l)
-		for i := range ret {
-			// if slice is empty -> null
-			ret[i] = (v.Index(i).Len() == 0)
 		}
 	}
 	return ret, nil
@@ -1865,32 +1929,44 @@ func isNullInterface(i interface{}) bool {
 	if i == nil {
 		return true
 	}
+	if v := reflect.ValueOf(i); v.Kind() == reflect.Slice {
+		if v.Len() == 0 {
+			return true
+		}
+		return false
+	}
 	switch i.(type) {
 	case float64:
 		f := i.(float64)
 		if isNullFloat(f) {
 			return true
 		}
-		return false
 	case string:
 		s := i.(string)
 		if isNullString(s) {
 			return true
 		}
-		return false
 	case time.Time:
 		t := i.(time.Time)
 		if (time.Time{}) == t {
 			return true
 		}
-		return false
-	default:
-		return false
+	case civil.Date:
+		t := i.(civil.Date)
+		if !t.IsValid() {
+			return true
+		}
+	case civil.Time:
+		t := i.(civil.Time)
+		if !t.IsValid() {
+			return true
+		}
 	}
+	return false
 }
 
 func isNullString(s string) bool {
-	if _, ok := optionNullStrings[s]; !ok {
+	if _, ok := optionNullStrings.Read()[s]; !ok {
 		return false
 	}
 	return true
@@ -2179,23 +2255,29 @@ func cut(vals []float64, isNull []bool,
 			"must be one more than number of supplied labels: (%d + %d + %d) != (%d + 1)",
 			originalBinCount, andLessEdge, andMoreEdge, len(labels))
 	}
+	// write final results
 	ret := make([]string, len(vals))
 	for i, val := range vals {
 		if isNull[i] {
+			ret[i] = optionsNullPrinter
 			continue
 		}
+		// check for value within every bin interval
 		// do not iterate over the last edge to avoid range error
+		// check if value is within bin
+		var found bool
 		for binEdge := 0; binEdge < len(bins)-1; binEdge++ {
-			// check if value is within bin
 			if leftInclusive && rightExclusive {
 				if val >= bins[binEdge] && val < bins[binEdge+1] {
 					ret[i] = labels[binEdge]
+					found = true
 					break
 				}
 			} else if !leftInclusive && !rightExclusive {
 				// default: leftExclusive and rightInclusive
 				if val > bins[binEdge] && val <= bins[binEdge+1] {
 					ret[i] = labels[binEdge]
+					found = true
 					break
 				}
 			} else {
@@ -2203,8 +2285,10 @@ func cut(vals []float64, isNull []bool,
 				return nil, fmt.Errorf("internal error: bad cut() conditions")
 			}
 		}
+		if !found {
+			ret[i] = optionsNullPrinter
+		}
 	}
-
 	return ret, nil
 }
 
@@ -2656,145 +2740,6 @@ func extractCSVDimensions(b []byte, comma rune) (numRows, numCols int, err error
 	return numRows, numCols, nil
 }
 
-// reads data from r into dstVals and dstNulls.
-// major dimension of input: rows
-// major dimension of output: columns
-// trims leading whitespace
-// supports custom comma but not comments
-func readCSVBytes(r io.Reader, dstVals [][]string, dstNulls [][]bool, comma rune) error {
-	br := bufio.NewReaderSize(r, 1024)
-	commaLen := utf8.RuneLen(comma)
-	lengthLineEnd := func(b []byte) int {
-		if len(b) == 0 {
-			return 0
-		}
-		if b[len(b)-1] == '\n' || b[len(b)-1] == '\r' {
-			return 1
-		}
-		return 0
-	}
-	stripQuotationMarks := func(b []byte) []byte {
-		if len(b) > 0 && b[0] == '"' && b[len(b)-1] == '"' {
-			return b[1 : len(b)-1]
-		}
-		return b
-	}
-	var rowNumber int
-	for {
-		// iterate over rows
-		line, err := br.ReadBytes('\n')
-		if len(line) == 0 && err == io.EOF {
-			return nil
-		}
-		// Normalize \r\n to \n on all input lines.
-		if n := len(line); n >= 2 && line[n-2] == '\r' && line[n-1] == '\n' {
-			line[n-2] = '\n'
-			line = line[:n-1]
-		}
-
-		var columnNumber int
-		fieldCount := 1
-		for {
-			// iterate over fields in each row
-			line = bytes.TrimLeftFunc(line, unicode.IsSpace)
-			i := bytes.IndexRune(line, comma)
-			field := line
-			if i >= 0 {
-				field = field[:i]
-			} else {
-				// comma not found?
-				// use the remaining line up until the end, which may or may not be \n
-				field = field[:len(field)-lengthLineEnd(field)]
-			}
-			if fieldCount > len(dstVals) {
-				return fmt.Errorf("row %d: too many fields [%d] with length %d",
-					rowNumber, fieldCount, len(dstVals))
-			}
-			// write fields into column-oriented receiver
-			// if enclosed in quotation marks, strip the quotations
-			dstVals[columnNumber][rowNumber] = string(stripQuotationMarks(field))
-			if isNullString(string(field)) {
-				dstNulls[columnNumber][rowNumber] = true
-			}
-			if i >= 0 {
-				line = line[i+commaLen:]
-				columnNumber++
-				fieldCount++
-			} else {
-				if fieldCount != len(dstVals) {
-					return fmt.Errorf("row %d: not enough fields [%d] with length %d",
-						rowNumber, fieldCount, len(dstVals))
-				}
-				break
-			}
-		}
-		if err == io.EOF {
-			return nil
-		}
-		rowNumber++
-	}
-}
-
-// major dimension of input: columns
-func makeDataFrameFromMatrices(values [][]string, isNull [][]bool, config *readConfig) *DataFrame {
-	numCols := len(values) - config.numLabelLevels
-	numRows := len(values[0]) - config.numHeaderRows
-	labelNames := make([]string, config.numLabelLevels)
-	// iterate over all label levels to get header names
-	if config.numHeaderRows > 0 {
-		for j := 0; j < config.numLabelLevels; j++ {
-			// only read from last header row
-			labelNames[j] = values[j][config.numHeaderRows-1]
-		}
-	}
-
-	colNames := make([]string, numCols)
-	for k := 0; k < numCols; k++ {
-		// write column header names, offset by label levels
-		colNames[k] = string(
-			strings.Join(values[k+config.numLabelLevels][:config.numHeaderRows], optionLevelSeparator))
-	}
-
-	// remove headers from original data
-	for container := 0; container < len(values); container++ {
-		values[container] = values[container][config.numHeaderRows:]
-		isNull[container] = isNull[container][config.numHeaderRows:]
-	}
-	// write labels up to the number of label levels
-	labels := copyStringsIntoValueContainers(
-		values[:config.numLabelLevels],
-		isNull[:config.numLabelLevels],
-		labelNames,
-	)
-
-	// write columns after the label levels
-	columns := copyStringsIntoValueContainers(
-		values[config.numLabelLevels:],
-		isNull[config.numLabelLevels:],
-		colNames,
-	)
-
-	// create default labels if no labels
-	labels = defaultLabelsIfEmpty(labels, numRows)
-
-	// update label names if labels provided but no header
-	if config.numHeaderRows == 0 && config.numLabelLevels != 0 {
-		for j := range labels {
-			labels[j].name = optionPrefix + fmt.Sprint(j)
-		}
-	}
-
-	// create default col level names
-	var colLevelNames []string
-	colLevelNames, columns = defaultColsIfNoHeader(config.numHeaderRows, columns)
-
-	return &DataFrame{
-		values:        columns,
-		labels:        labels,
-		colLevelNames: colLevelNames,
-	}
-}
-
 func filter(containers []*valueContainer, filters map[string]FilterFn) ([]int, error) {
 	// subIndexes contains the index positions computed across all the filters
 	var subIndexes [][]int
@@ -2884,27 +2829,80 @@ func (vc *valueContainer) expand(n []int) *valueContainer {
 			counter++
 		}
 	}
-	ret := &valueContainer{
-		slice:  vals.Interface(),
-		isNull: nulls,
-		name:   vc.name,
-	}
+	ret := newValueContainer(
+		vals.Interface(),
+		nulls,
+		vc.name,
+		vc.id,
+	)
 	return ret
 }
 
 // convert vc.slice to []interface
-func (vc *valueContainer) interfaceSlice(includeHeader bool) []interface{} {
+func (vc *valueContainer) interfaceSlice() []interface{} {
 	v := reflect.ValueOf(vc.slice)
 	ret := make([]interface{}, v.Len())
 	for i := range ret {
 		if vc.isNull[i] {
-			ret[i] = optionsNullPrinter
+			ret[i] = nil
 		} else {
 			ret[i] = v.Index(i).Interface()
 		}
 	}
-	if includeHeader {
-		ret = append([]interface{}{vc.name}, ret...)
+	return ret
+}
+
+// -- private
+type clocker interface {
+	now() time.Time
+}
+
+type realClock struct{}
+
+func (c realClock) now() time.Time {
+	return time.Now()
+}
+
+func writeRecords(containers []*valueContainer, byColumn bool, numColLevels int) [][]string {
+	ret := make([][]string, len(containers))
+	for k := range containers {
+		headerSlots := make([]string, numColLevels)
+		// len(headers) should never be > numColLevels()
+		// if len(headers) < numColLevels(), excess header rows will remain blank
+		headers := splitNameIntoLevels(containers[k].name)
+		for l := range headers {
+			headerSlots[l] = headers[l]
+		}
+		ret[k] = append(headerSlots, containers[k].string().slice...)
+	}
+	// overwrite null values, skipping headers
+	for k := range ret {
+		for i := range ret[k][numColLevels:] {
+			if containers[k].isNull[i] {
+				ret[k][i+numColLevels] = optionsNullPrinter
+			}
+		}
+	}
+	if !byColumn {
+		ret = transposeRecords(ret)
+	}
+	return ret
+}
+
+func writeInterfaceRecords(containers []*valueContainer, byColumn bool, numColLevels int) [][]interface{} {
+	ret := make([][]interface{}, len(containers))
+	for k := range containers {
+		headerSlots := make([]interface{}, numColLevels)
+		// len(headers) should never be > numColLevels()
+		// if len(headers) < numColLevels(), excess header rows will remain blank
+		headers := splitNameIntoLevels(containers[k].name)
+		for l := range headers {
+			headerSlots[l] = headers[l]
+		}
+		ret[k] = append(headerSlots, containers[k].interfaceSlice()...)
+	}
+	if !byColumn {
+		ret = transposeInterfaceRecords(ret)
 	}
 	return ret
 }

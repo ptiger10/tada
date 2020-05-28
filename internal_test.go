@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"os"
@@ -15,8 +14,18 @@ import (
 	"cloud.google.com/go/civil"
 )
 
+type mockClock struct{}
+
+func (c mockClock) now() time.Time {
+	return time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)
+}
+
+var mockID = tadaID + fmt.Sprint(int(mockClock{}.now().UnixNano()))
+
 func TestMain(m *testing.M) {
 	DisableWarnings()
+	clock = mockClock{}
+	defer func() { clock = realClock{} }()
 	code := m.Run()
 	os.Exit(code)
 }
@@ -65,9 +74,9 @@ func TestDataFrame_resetWithError(t *testing.T) {
 	}{
 		{"pass", fields{
 			values: []*valueContainer{
-				{slice: []float64{0, 1, 2}, isNull: []bool{true, false, false}, name: "0"},
-				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, true, false}, name: "1"}},
-			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, name: "*0"}},
+				{slice: []float64{0, 1, 2}, isNull: []bool{true, false, false}, id: mockID, name: "0"},
+				{slice: []string{"foo", "", "bar"}, isNull: []bool{false, true, false}, id: mockID, name: "1"}},
+			labels:        []*valueContainer{{slice: []int{0, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "*0"}},
 			colLevelNames: []string{"*0"},
 			name:          "baz"},
 			args{errors.New("foo")},
@@ -123,10 +132,8 @@ func Test_makeValueContainerFromInterface(t *testing.T) {
 		wantErr bool
 	}{
 		{"pass", args{[]float64{1}, "0"},
-			&valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "0"}, false},
+			&valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "0"}, false},
 		{"fail - empty slice", args{[]float64{}, "0"},
-			nil, true},
-		{"fail - unsupported slice", args{[]complex64{1}, "0"},
 			nil, true},
 		{"fail - not slice", args{"foo", "0"},
 			nil, true},
@@ -139,7 +146,7 @@ func Test_makeValueContainerFromInterface(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("makeValueContainerFromInterface() = %#v, want %#v", got.slice, tt.want.slice)
+				t.Errorf("makeValueContainerFromInterface() = %#v, want %#v", got, tt.want)
 			}
 		})
 	}
@@ -158,14 +165,14 @@ func Test_makeValueContainersFromInterfaces(t *testing.T) {
 	}{
 		{"pass, no prefix", args{[]interface{}{[]float64{1}, []string{"foo"}}, false},
 			[]*valueContainer{
-				{slice: []float64{1}, isNull: []bool{false}, name: "0"},
-				{slice: []string{"foo"}, isNull: []bool{false}, name: "1"}},
+				{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "0"},
+				{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "1"}},
 			false,
 		},
 		{"pass, prefix", args{[]interface{}{[]float64{1}, []string{"foo"}}, true},
 			[]*valueContainer{
-				{slice: []float64{1}, isNull: []bool{false}, name: "*0"},
-				{slice: []string{"foo"}, isNull: []bool{false}, name: "*1"}},
+				{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "*0"},
+				{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "*1"}},
 			false,
 		},
 		{"fail, unsupported", args{[]interface{}{"foo"}, false},
@@ -201,27 +208,27 @@ func Test_findMatchingKeysBetweenTwoContainers(t *testing.T) {
 	}{
 		{"1 match", args{
 			labels1: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "*1"},
-				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*1"},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"},
 			},
 			labels2: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
 		}, []int{1}, []int{0}, false},
 		{"duplicates", args{
 			labels1: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
-				{slice: []int{0}, isNull: []bool{false}, name: "*0"},
-				{slice: []int{0}, isNull: []bool{false}, name: "*1"},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*1"},
 			},
 			labels2: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
 		}, []int{0}, []int{0}, false},
 		{"no matches", args{
 			labels1: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "*1"},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*1"},
 			},
 			labels2: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "*0"}},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "*0"}},
 		}, nil, nil, true},
 	}
 	for _, tt := range tests {
@@ -253,20 +260,24 @@ func Test_setNullsFromInterface(t *testing.T) {
 	}{
 		{"float", args{[]float64{1, math.NaN()}}, []bool{false, true}, false},
 		{"int", args{[]int{0}}, []bool{false}, false},
-		{"string", args{[]string{"foo", ""}}, []bool{false, true}, false},
+		{"string", args{[]string{"foo", optionsNullPrinter}}, []bool{false, true}, false},
 		{"civil.date", args{[]civil.Date{civil.DateOf(time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC)), {}}}, []bool{false, true}, false},
 		{"civil.time", args{[]civil.Time{civil.TimeOf(time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC)), {Second: -1}}}, []bool{false, true}, false},
-		{"bytes", args{[][]byte{[]byte("foo"), []byte("")}}, []bool{false, true}, false},
 		{"dateTime", args{[]time.Time{time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC), {}}}, []bool{false, true, true}, false},
 		{"interface", args{[]interface{}{
 			int(1), uint(1), float32(1), float64(1), time.Date(2, 1, 1, 0, 0, 0, 0, time.UTC), "foo",
-			math.NaN(), "", time.Time{}}},
+			math.NaN(), "(null)", time.Time{}}},
 			[]bool{false, false, false, false, false, false,
 				true, true, true}, false},
 		{"nested string", args{[][]string{{"foo"}, {}}}, []bool{false, true}, false},
 		{"nested civil.date", args{[][]civil.Date{{{Year: 2020, Month: 1, Day: 1}, {}}, {}}}, []bool{false, true}, false},
+		{"map", args{[]map[string]string{{"foo": "bar"}, {}}}, []bool{false, true}, false},
+		{"not explicitly supported value", args{[]complex64{1}}, []bool{false}, false},
+		{"[]interface with slice", args{[]interface{}{[]float64{}, "foo"}}, []bool{true, false}, false},
+		{"[][]interface with first value slice", args{[][]interface{}{{[]float64{1}, "foo"}}}, []bool{false}, false},
+		{"nil", args{nil}, []bool{}, false},
+		{"empty", args{[]int{}}, nil, true},
 		{"fail - not slice", args{"foo"}, nil, true},
-		{"fail - interface with unsupported value", args{[]interface{}{complex64(1)}}, nil, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -291,15 +302,18 @@ func Test_isNullInterface(t *testing.T) {
 		want bool
 	}{
 		{"null float64", args{math.NaN()}, true},
-		{"null string", args{""}, true},
+		{"null string", args{optionsNullPrinter}, true},
 		{"null time.Time", args{time.Time{}}, true},
+		{"null civil.Date", args{civil.Date{}}, true},
+		{"null civil.Time", args{civil.Time{Second: -1}}, true},
 		{"nil", args{nil}, true},
 		{"float64", args{float64(1)}, false},
 		{"string", args{"foo"}, false},
 		{"time.Time", args{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)}, false},
-		{"other", args{true}, false},
-		{"other - slice", args{[]bool{true}}, false},
-		{"unsupported", args{complex64(1)}, false},
+		{"civil.Date", args{civil.Date{Year: 2020, Month: 1, Day: 1}}, false},
+		{"civil.Time", args{civil.Time{Hour: 12}}, false},
+		{"not explicitly supported - bool", args{[]bool{true}}, false},
+		{"not explicitly supported - complex64", args{complex64(1)}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -403,8 +417,8 @@ func Test_makeDefaultLabels(t *testing.T) {
 		args       args
 		wantLabels *valueContainer
 	}{
-		{"normal", args{0, 2, true}, &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-		{"normal", args{0, 2, false}, &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "0"}},
+		{"normal", args{0, 2, true}, &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
+		{"normal", args{0, 2, false}, &valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "0"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -477,34 +491,34 @@ func Test_lookup(t *testing.T) {
 		wantErr bool
 	}{
 		{name: "left", args: args{
-			how: "left", values1: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+			how: "left", values1: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
 			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}, leftOn: []int{0},
-			values2: &valueContainer{slice: []int{10, 20}, isNull: []bool{false, false}},
+			values2: &valueContainer{slice: []int{10, 20}, isNull: []bool{false, false}, id: mockID},
 			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}}}, rightOn: []int{0}},
 			want: &Series{
-				values: &valueContainer{slice: []int{10, 0}, isNull: []bool{false, true}, name: "foo"},
+				values: &valueContainer{slice: []int{10, 0}, isNull: []bool{false, true}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
 					{slice: []int{0, 1}, isNull: []bool{false, false}, cache: []string{"0", "1"}},
 				}}, wantErr: false,
 		},
 		{name: "right", args: args{
-			how: "right", values1: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+			how: "right", values1: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID},
 			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}, leftOn: []int{0},
-			values2: &valueContainer{slice: []int{10, 20}, isNull: []bool{false, false}},
+			values2: &valueContainer{slice: []int{10, 20}, isNull: []bool{false, false}, id: mockID},
 			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}}}, rightOn: []int{0}},
 			want: &Series{
-				values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}},
+				values: &valueContainer{slice: []float64{1, 0}, isNull: []bool{false, true}, id: mockID},
 				labels: []*valueContainer{
 					{slice: []int{0, 10}, isNull: []bool{false, false}, cache: []string{"0", "10"}},
 				}}, wantErr: false,
 		},
 		{name: "inner", args: args{
-			how: "inner", values1: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}},
+			how: "inner", values1: &valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID},
 			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}}}, leftOn: []int{0},
-			values2: &valueContainer{slice: []int{10, 20}, isNull: []bool{false, false}},
+			values2: &valueContainer{slice: []int{10, 20}, isNull: []bool{false, false}, id: mockID},
 			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}}}, rightOn: []int{0}},
 			want: &Series{
-				values: &valueContainer{slice: []int{10}, isNull: []bool{false}},
+				values: &valueContainer{slice: []int{10}, isNull: []bool{false}, id: mockID},
 				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}}}}, wantErr: false,
 		},
 	}
@@ -544,13 +558,13 @@ func Test_lookupDataFrame(t *testing.T) {
 	}{
 		{name: "left", args: args{
 			how: "left", name: "baz", colLevelNames: []string{"*0"},
-			values1: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"}},
-			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}, leftOn: []int{0},
-			values2: []*valueContainer{{slice: []int{10, 20}, isNull: []bool{false, false}, name: "bar"}},
-			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, name: "quux"}}, rightOn: []int{0}},
+			values1: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
+			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"}}, leftOn: []int{0},
+			values2: []*valueContainer{{slice: []int{10, 20}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
+			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, id: mockID, name: "quux"}}, rightOn: []int{0}},
 			want: &DataFrame{
-				values: []*valueContainer{{slice: []int{10, 0}, isNull: []bool{false, true}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux",
+				values: []*valueContainer{{slice: []int{10, 0}, isNull: []bool{false, true}, id: mockID, name: "bar"}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux",
 					cache: []string{"0", "1"}}},
 				name: "baz", colLevelNames: []string{"*0"},
 			},
@@ -558,13 +572,13 @@ func Test_lookupDataFrame(t *testing.T) {
 		},
 		{name: "left - nulls", args: args{
 			how: "left", name: "baz", colLevelNames: []string{"*0"},
-			values1: []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
-			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}, leftOn: []int{0},
-			values2: []*valueContainer{{slice: []string{"c"}, isNull: []bool{false}, name: "bar"}},
-			labels2: []*valueContainer{{slice: []int{1}, isNull: []bool{false}, name: "quux"}}, rightOn: []int{0}},
+			values1: []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
+			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"}}, leftOn: []int{0},
+			values2: []*valueContainer{{slice: []string{"c"}, isNull: []bool{false}, id: mockID, name: "bar"}},
+			labels2: []*valueContainer{{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "quux"}}, rightOn: []int{0}},
 			want: &DataFrame{
-				values: []*valueContainer{{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux",
+				values: []*valueContainer{{slice: []string{"", "c"}, isNull: []bool{true, false}, id: mockID, name: "bar"}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux",
 					cache: []string{"0", "1"}}},
 				name: "baz", colLevelNames: []string{"*0"},
 			},
@@ -572,13 +586,13 @@ func Test_lookupDataFrame(t *testing.T) {
 		},
 		{name: "left - repeated label appears only once", args: args{
 			how: "left", name: "baz", colLevelNames: []string{"*0"},
-			values1: []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
-			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}, leftOn: []int{0},
-			values2: []*valueContainer{{slice: []string{"c", "d"}, isNull: []bool{false, false}, name: "bar"}},
-			labels2: []*valueContainer{{slice: []int{1, 1}, isNull: []bool{false, false}, name: "quux"}}, rightOn: []int{0}},
+			values1: []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
+			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"}}, leftOn: []int{0},
+			values2: []*valueContainer{{slice: []string{"c", "d"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
+			labels2: []*valueContainer{{slice: []int{1, 1}, isNull: []bool{false, false}, id: mockID, name: "quux"}}, rightOn: []int{0}},
 			want: &DataFrame{
-				values: []*valueContainer{{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux",
+				values: []*valueContainer{{slice: []string{"", "c"}, isNull: []bool{true, false}, id: mockID, name: "bar"}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux",
 					cache: []string{"0", "1"}}},
 				name: "baz", colLevelNames: []string{"*0"},
 			},
@@ -586,16 +600,16 @@ func Test_lookupDataFrame(t *testing.T) {
 		},
 		{name: "left - exclude named column", args: args{
 			how: "left", name: "baz", colLevelNames: []string{"*0"},
-			values1: []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "foo"}},
-			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}, leftOn: []int{0},
+			values1: []*valueContainer{{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
+			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"}}, leftOn: []int{0},
 			values2: []*valueContainer{
-				{slice: []int{1}, isNull: []bool{false}, name: "baz"},
-				{slice: []string{"c"}, isNull: []bool{false}, name: "bar"}},
-			labels2: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "quux"}}, rightOn: []int{1},
+				{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "baz"},
+				{slice: []string{"c"}, isNull: []bool{false}, id: mockID, name: "bar"}},
+			labels2: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "quux"}}, rightOn: []int{1},
 			excludeRight: []string{"baz"}},
 			want: &DataFrame{
-				values: []*valueContainer{{slice: []string{"", "c"}, isNull: []bool{true, false}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux",
+				values: []*valueContainer{{slice: []string{"", "c"}, isNull: []bool{true, false}, id: mockID, name: "bar"}},
+				labels: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux",
 					cache: []string{"0", "1"}}},
 				name: "baz", colLevelNames: []string{"*0"},
 			},
@@ -603,13 +617,13 @@ func Test_lookupDataFrame(t *testing.T) {
 		},
 		{name: "right", args: args{
 			how: "right", name: "baz", colLevelNames: []string{"*0"},
-			values1: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"}},
-			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}, leftOn: []int{0},
-			values2: []*valueContainer{{slice: []int{10, 20}, isNull: []bool{false, false}, name: "bar"}},
-			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, name: "quux"}}, rightOn: []int{0}},
+			values1: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
+			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"}}, leftOn: []int{0},
+			values2: []*valueContainer{{slice: []int{10, 20}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
+			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, id: mockID, name: "quux"}}, rightOn: []int{0}},
 			want: &DataFrame{
-				values: []*valueContainer{{slice: []float64{1, 0}, isNull: []bool{false, true}, name: "foo"}},
-				labels: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, name: "quux",
+				values: []*valueContainer{{slice: []float64{1, 0}, isNull: []bool{false, true}, id: mockID, name: "foo"}},
+				labels: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, id: mockID, name: "quux",
 					cache: []string{"0", "10"}}},
 				name: "baz", colLevelNames: []string{"*0"},
 			},
@@ -617,13 +631,13 @@ func Test_lookupDataFrame(t *testing.T) {
 		},
 		{name: "inner", args: args{
 			how: "inner", name: "baz", colLevelNames: []string{"*0"},
-			values1: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"}},
-			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}}, leftOn: []int{0},
-			values2: []*valueContainer{{slice: []int{10, 20}, isNull: []bool{false, false}, name: "bar"}},
-			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, name: "quux"}}, rightOn: []int{0}},
+			values1: []*valueContainer{{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
+			labels1: []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"}}, leftOn: []int{0},
+			values2: []*valueContainer{{slice: []int{10, 20}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
+			labels2: []*valueContainer{{slice: []int{0, 10}, isNull: []bool{false, false}, id: mockID, name: "quux"}}, rightOn: []int{0}},
 			want: &DataFrame{
-				values: []*valueContainer{{slice: []int{10}, isNull: []bool{false}, name: "bar"}},
-				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, name: "qux"}},
+				values: []*valueContainer{{slice: []int{10}, isNull: []bool{false}, id: mockID, name: "bar"}},
+				labels: []*valueContainer{{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "qux"}},
 				name:   "baz", colLevelNames: []string{"*0"},
 			},
 			wantErr: false,
@@ -678,30 +692,30 @@ func Test_reduceContainers(t *testing.T) {
 	}{
 		{name: "single level",
 			args: args{containers: []*valueContainer{
-				{slice: []string{"bar", "qux", "bar"}, isNull: []bool{false, false, false}, name: "baz"},
+				{slice: []string{"bar", "qux", "bar"}, isNull: []bool{false, false, false}, id: mockID, name: "baz"},
 			}},
 			wantNewContainers: []*valueContainer{
-				{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, name: "baz"},
+				{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, id: mockID, name: "baz"},
 			},
 			wantOriginalRowIndexes: [][]int{{0, 2}, {1}},
 			wantOrderedKeys:        []string{"bar", "qux"}},
 		{name: "multi level",
 			args: args{containers: []*valueContainer{
-				{slice: []float64{1, 1, 1}, isNull: []bool{false, false, false}, name: "foo"},
-				{slice: []string{"bar", "qux", "bar"}, isNull: []bool{false, false, false}, name: "baz"},
+				{slice: []float64{1, 1, 1}, isNull: []bool{false, false, false}, id: mockID, name: "foo"},
+				{slice: []string{"bar", "qux", "bar"}, isNull: []bool{false, false, false}, id: mockID, name: "baz"},
 			}},
 			wantNewContainers: []*valueContainer{
-				{slice: []float64{1, 1}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, name: "baz"},
+				{slice: []float64{1, 1}, isNull: []bool{false, false}, id: mockID, name: "foo"},
+				{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, id: mockID, name: "baz"},
 			},
 			wantOriginalRowIndexes: [][]int{{0, 2}, {1}},
 			wantOrderedKeys:        []string{"1|bar", "1|qux"}},
 		{name: "single level - null",
 			args: args{containers: []*valueContainer{
-				{slice: []string{"bar", "", "bar"}, isNull: []bool{false, true, false}, name: "baz"},
+				{slice: []string{"bar", "", "bar"}, isNull: []bool{false, true, false}, id: mockID, name: "baz"},
 			}},
 			wantNewContainers: []*valueContainer{
-				{slice: []string{"bar", ""}, isNull: []bool{false, true}, name: "baz"},
+				{slice: []string{"bar", ""}, isNull: []bool{false, true}, id: mockID, name: "baz"},
 			},
 			wantOriginalRowIndexes: [][]int{{0, 2}, {1}},
 			wantOrderedKeys:        []string{"bar", ""}},
@@ -733,8 +747,8 @@ func Test_reduceContainersForLookup(t *testing.T) {
 	}{
 		{name: "single level",
 			args: args{containers: []*valueContainer{
-				{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, name: "foo"},
-				{slice: []string{"bar", "qux", "bar"}, isNull: []bool{false, false, false}, name: "baz"},
+				{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}, id: mockID, name: "foo"},
+				{slice: []string{"bar", "qux", "bar"}, isNull: []bool{false, false, false}, id: mockID, name: "baz"},
 			}},
 			want: map[string]int{"1|bar": 0, "2|qux": 1, "3|bar": 2}},
 	}
@@ -764,18 +778,18 @@ func Test_copyInterfaceIntoValueContainers(t *testing.T) {
 			names:  []string{"corge", "waldo"},
 		},
 			[]*valueContainer{
-				{slice: []string{"foo"}, isNull: []bool{false}, name: "corge"},
-				{slice: []float64{1}, isNull: []bool{false}, name: "waldo"},
+				{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "corge"},
+				{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "waldo"},
 			},
 		},
 		{"create nulls from interface", args{
-			slices: []interface{}{[]string{"foo", ""}, []float64{1, 2}},
+			slices: []interface{}{[]interface{}{"foo", nil}, []float64{1, 2}},
 			isNull: nil,
 			names:  []string{"corge", "waldo"},
 		},
 			[]*valueContainer{
-				{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "corge"},
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"},
+				{slice: []interface{}{"foo", nil}, isNull: []bool{false, true}, id: mockID, name: "corge"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "waldo"},
 			},
 		},
 	}
@@ -805,8 +819,8 @@ func Test_copyFloatsIntoValueContainers(t *testing.T) {
 			names:  []string{"corge", "waldo"},
 		},
 			[]*valueContainer{
-				{slice: []float64{0, 1}, isNull: []bool{true, false}, name: "corge"},
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "waldo"},
+				{slice: []float64{0, 1}, isNull: []bool{true, false}, id: mockID, name: "corge"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "waldo"},
 			}},
 	}
 	for _, tt := range tests {
@@ -889,6 +903,7 @@ func Test_valueContainer_shift(t *testing.T) {
 		slice  interface{}
 		isNull []bool
 		name   string
+		id     string
 	}
 	type args struct {
 		n int
@@ -899,18 +914,18 @@ func Test_valueContainer_shift(t *testing.T) {
 		args   args
 		want   *valueContainer
 	}{
-		{"positive", fields{slice: []string{"1", "2", "3"}, isNull: []bool{false, false, false}, name: "foo"},
+		{"positive", fields{slice: []string{"1", "2", "3"}, isNull: []bool{false, false, false}, id: mockID, name: "foo"},
 			args{1},
 			&valueContainer{
-				slice: []string{"", "1", "2"}, isNull: []bool{true, false, false}, name: "foo"}},
-		{"negative", fields{slice: []string{"1", "2", "3"}, isNull: []bool{false, false, false}, name: "foo"},
+				slice: []string{"", "1", "2"}, isNull: []bool{true, false, false}, id: mockID, name: "foo"}},
+		{"negative", fields{slice: []string{"1", "2", "3"}, isNull: []bool{false, false, false}, id: mockID, name: "foo"},
 			args{-1},
 			&valueContainer{
-				slice: []string{"2", "3", ""}, isNull: []bool{false, false, true}, name: "foo"}},
-		{"too many positions", fields{slice: []string{"1", "2", "3"}, isNull: []bool{false, false, false}, name: "foo"},
+				slice: []string{"2", "3", ""}, isNull: []bool{false, false, true}, id: mockID, name: "foo"}},
+		{"too many positions", fields{slice: []string{"1", "2", "3"}, isNull: []bool{false, false, false}, id: mockID, name: "foo"},
 			args{5},
 			&valueContainer{
-				slice: []string{"", "", ""}, isNull: []bool{true, true, true}, name: "foo"}},
+				slice: []string{"", "", ""}, isNull: []bool{true, true, true}, id: mockID, name: "foo"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -918,6 +933,7 @@ func Test_valueContainer_shift(t *testing.T) {
 				slice:  tt.fields.slice,
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
+				id:     tt.fields.id,
 			}
 			if got := vc.shift(tt.args.n); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("vc.shift() = %v, want %v", got, tt.want)
@@ -931,6 +947,7 @@ func Test_valueContainer_append(t *testing.T) {
 		slice  interface{}
 		isNull []bool
 		name   string
+		id     string
 	}
 	type args struct {
 		other *valueContainer
@@ -941,12 +958,12 @@ func Test_valueContainer_append(t *testing.T) {
 		args   args
 		want   *valueContainer
 	}{
-		{"floats", fields{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
-			args{&valueContainer{slice: []float64{2}, isNull: []bool{false}, name: "bar"}},
-			&valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"}},
-		{"floats and ints", fields{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
-			args{&valueContainer{slice: []int{2}, isNull: []bool{false}, name: "bar"}},
-			&valueContainer{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"}},
+		{"floats", fields{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
+			args{&valueContainer{slice: []float64{2}, isNull: []bool{false}, id: mockID, name: "bar"}},
+			&valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
+		{"floats and ints", fields{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
+			args{&valueContainer{slice: []int{2}, isNull: []bool{false}, id: mockID, name: "bar"}},
+			&valueContainer{slice: []string{"1", "2"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -954,6 +971,7 @@ func Test_valueContainer_append(t *testing.T) {
 				slice:  tt.fields.slice,
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
+				id:     tt.fields.id,
 			}
 			if got := vc.append(tt.args.other); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("valueContainer.append() = %v, want %v", got, tt.want)
@@ -1028,23 +1046,26 @@ func Test_indexOfContainer(t *testing.T) {
 		wantErr bool
 	}{
 		{"pass", args{"foo", []*valueContainer{
-			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-			{slice: []int{0}, isNull: []bool{false}, name: "foo"}}},
+			{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+			{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "foo"}}},
 			1, false},
 		{"pass - number as name", args{"1", []*valueContainer{
-			{slice: []int{0}, isNull: []bool{false}, name: "1"}}},
+			{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "1"}}},
+			0, false},
+		{"pass - search by id", args{mockID, []*valueContainer{
+			{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "1"}}},
 			0, false},
 		{"fail - uppercase search", args{"FOO", []*valueContainer{
-			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-			{slice: []int{0}, isNull: []bool{false}, name: "foo"}}},
+			{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+			{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "foo"}}},
 			0, true},
 		{"fail - title case name", args{"foo", []*valueContainer{
-			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-			{slice: []int{0}, isNull: []bool{false}, name: "Foo"}}},
+			{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+			{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "Foo"}}},
 			0, true},
 		{"fail - not found", args{"foo", []*valueContainer{
-			{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-			{slice: []int{0}, isNull: []bool{false}, name: "qux"}}},
+			{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+			{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "qux"}}},
 			0, true},
 	}
 	for _, tt := range tests {
@@ -1083,37 +1104,37 @@ func Test_cut(t *testing.T) {
 			leftInclusive: false, rightExclusive: false,
 			includeLess: false, includeMore: false,
 			labels: nil},
-			[]string{"", "1-2", ""}, false},
+			[]string{optionsNullPrinter, "1-2", optionsNullPrinter}, false},
 		{"pass - supplied labels", args{
 			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
 			leftInclusive: false, rightExclusive: false,
 			includeLess: false, includeMore: false,
 			labels: []string{"qualifies"}},
-			[]string{"", "qualifies", ""}, false},
+			[]string{optionsNullPrinter, "qualifies", optionsNullPrinter}, false},
 		{"skip nulls", args{
 			vals: []float64{1, 2, 3}, isNull: []bool{false, true, false}, bins: []float64{1, 2},
 			leftInclusive: false, rightExclusive: false,
 			includeLess: false, includeMore: false,
 			labels: []string{"qualifies"}},
-			[]string{"", "", ""}, false},
+			[]string{optionsNullPrinter, optionsNullPrinter, optionsNullPrinter}, false},
 		{"inlcudeLeft - default labels", args{
 			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
 			leftInclusive: false, rightExclusive: false,
 			includeLess: true, includeMore: false,
 			labels: nil},
-			[]string{"<=1", "1-2", ""}, false},
+			[]string{"<=1", "1-2", optionsNullPrinter}, false},
 		{"inlcudeLeft - default labels - leftInclusive/rightExclusive", args{
 			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{2, 3},
 			leftInclusive: true, rightExclusive: true,
 			includeLess: true, includeMore: false,
 			labels: nil},
-			[]string{"<2", "2-3", ""}, false},
+			[]string{"<2", "2-3", optionsNullPrinter}, false},
 		{"includeMore - default labels", args{
 			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
 			leftInclusive: false, rightExclusive: false,
 			includeLess: false, includeMore: true,
 			labels: nil},
-			[]string{"", "1-2", ">2"}, false},
+			[]string{optionsNullPrinter, "1-2", ">2"}, false},
 		{"includeMore - default labels - leftInclusive/rightExclusive", args{
 			vals: []float64{1, 2, 3}, isNull: []bool{false, false, false}, bins: []float64{1, 2},
 			leftInclusive: true, rightExclusive: true,
@@ -1158,6 +1179,7 @@ func Test_valueContainer_cut(t *testing.T) {
 		slice  interface{}
 		isNull []bool
 		name   string
+		id     string
 	}
 	type args struct {
 		bins    []float64
@@ -1173,55 +1195,55 @@ func Test_valueContainer_cut(t *testing.T) {
 		wantErr bool
 	}{
 		{"supplied labels, no less, no more",
-			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{0, 2, 4}, andLess: false, andMore: false, labels: []string{"low", "high"}},
 			[]string{"low", "low", "high", "high"}, false},
 		{"supplied labels, no less, no more, with null",
-			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, true}, name: "foo"},
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, true}, id: mockID, name: "foo"},
 			args{bins: []float64{0, 2, 4}, andLess: false, andMore: false, labels: []string{"low", "high"}},
-			[]string{"low", "low", "high", ""}, false},
+			[]string{"low", "low", "high", optionsNullPrinter}, false},
 		{"supplied labels, less, no more",
-			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: true, andMore: false, labels: []string{"low", "medium", "high"}},
-			[]string{"low", "medium", "high", ""}, false},
+			[]string{"low", "medium", "high", optionsNullPrinter}, false},
 		{"supplied labels, no less, more",
-			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: false, andMore: true, labels: []string{"low", "medium", "high"}},
-			[]string{"", "low", "medium", "high"}, false},
+			[]string{optionsNullPrinter, "low", "medium", "high"}, false},
 		{"supplied labels, less, more",
-			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: true, andMore: true, labels: []string{"low", "medium", "high", "higher"}},
 			[]string{"low", "medium", "high", "higher"}, false},
 		{"default labels, no less, no more",
-			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{0, 2, 4}, andLess: false, andMore: false, labels: nil},
 			[]string{"0-2", "0-2", "2-4", "2-4"}, false},
 		{"default labels, less, no more",
-			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: true, andMore: false, labels: nil},
-			[]string{"<=1", "1-2", "2-3", ""}, false},
+			[]string{"<=1", "1-2", "2-3", optionsNullPrinter}, false},
 		{"default labels, no less, more",
-			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: false, andMore: true, labels: nil},
-			[]string{"", "1-2", "2-3", ">3"}, false},
+			[]string{optionsNullPrinter, "1-2", "2-3", ">3"}, false},
 		{"default labels, less, more",
-			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: true, andMore: true, labels: nil},
 			[]string{"<=1", "1-2", "2-3", ">3"}, false},
 		{"fail: zero bins",
-			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{}, andLess: false, andMore: false, labels: []string{}},
 			nil, true},
 		{"fail: bin - label mismatch",
-			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: false, andMore: false, labels: []string{"foo"}},
 			nil, true},
 		{"fail: bin - label mismatch, less, no more",
-			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: true, andMore: false, labels: []string{"foo", "bar"}},
 			nil, true},
 		{"fail: bin - label mismatch, no less, more",
-			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{1, 2, 3}, andLess: false, andMore: true, labels: []string{"foo", "bar"}},
 			nil, true},
 	}
@@ -1231,6 +1253,7 @@ func Test_valueContainer_cut(t *testing.T) {
 				slice:  tt.fields.slice,
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
+				id:     tt.fields.id,
 			}
 			got, err := vc.cut(tt.args.bins, tt.args.andLess, tt.args.andMore, tt.args.labels)
 			if (err != nil) != tt.wantErr {
@@ -1249,6 +1272,7 @@ func Test_valueContainer_pcut(t *testing.T) {
 		slice  interface{}
 		isNull []bool
 		name   string
+		id     string
 	}
 	type args struct {
 		bins   []float64
@@ -1262,7 +1286,7 @@ func Test_valueContainer_pcut(t *testing.T) {
 		wantErr bool
 	}{
 		{"default labels",
-			fields{slice: []float64{5, 6, 7, 8}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{5, 6, 7, 8}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{0, .5, 1}, config: nil},
 			[]string{"0-0.5", "0-0.5", "0.5-1", "0.5-1"}, false},
 		{"supplied labels",
@@ -1281,13 +1305,13 @@ func Test_valueContainer_pcut(t *testing.T) {
 			fields{slice: []float64{5, 0, 6, 7, 7, 7, 8},
 				isNull: []bool{false, true, false, false, false, false, false}},
 			args{bins: []float64{0, .2, .4, .6, .8, 1}, config: nil},
-			[]string{"0-0.2", "", "0-0.2", "0.2-0.4", "0.2-0.4", "0.2-0.4", "0.8-1"}, false},
+			[]string{"0-0.2", optionsNullPrinter, "0-0.2", "0.2-0.4", "0.2-0.4", "0.2-0.4", "0.8-1"}, false},
 		{"fail: above 1",
-			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{0, .5, 1.5}, config: nil},
 			nil, true},
 		{"fail: below 0",
-			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{1, 2, 3, 4}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{bins: []float64{-0.1, .5, 1}, config: nil},
 			nil, true},
 	}
@@ -1297,6 +1321,7 @@ func Test_valueContainer_pcut(t *testing.T) {
 				slice:  tt.fields.slice,
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
+				id:     tt.fields.id,
 			}
 			got, err := vc.pcut(tt.args.bins, tt.args.config)
 			if (err != nil) != tt.wantErr {
@@ -1316,6 +1341,7 @@ func Test_valueContainer_sort(t *testing.T) {
 		slice  interface{}
 		isNull []bool
 		name   string
+		id     string
 	}
 	type args struct {
 		dtype     DType
@@ -1329,43 +1355,43 @@ func Test_valueContainer_sort(t *testing.T) {
 		want   []int
 	}{
 		{"float - no nulls",
-			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{dtype: Float64, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
 		{"float - convert from string",
-			fields{slice: []string{"3", "1", "0", "2"}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []string{"3", "1", "0", "2"}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{dtype: Float64, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
 		{"float - no nulls - descending",
-			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{dtype: Float64, ascending: false, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
 		{"float - nulls",
-			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, true, false}, name: "foo"},
+			fields{slice: []float64{3, 1, 0, 2}, isNull: []bool{false, false, true, false}, id: mockID, name: "foo"},
 			args{dtype: Float64, ascending: true, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
 		{"strings - no nulls",
-			fields{slice: []string{"foo", "bar", "a", "baz"}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []string{"foo", "bar", "a", "baz"}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{dtype: String, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
 		{"strings - convert from float",
-			fields{slice: []string{"3", "11", "0", "2"}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []string{"3", "11", "0", "2"}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{dtype: String, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
 		{"strings - no nulls - descending",
-			fields{slice: []string{"foo", "bar", "a", "baz"}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []string{"foo", "bar", "a", "baz"}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{dtype: String, ascending: false, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
 		{"strings - nulls",
-			fields{slice: []string{"foo", "bar", "a", "baz"}, isNull: []bool{false, false, true, false}, name: "foo"},
+			fields{slice: []string{"foo", "bar", "a", "baz"}, isNull: []bool{false, false, true, false}, id: mockID, name: "foo"},
 			args{dtype: String, ascending: true, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
 		{"datetime - no nulls",
-			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{dtype: DateTime, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
 		{"datetime - convert from string",
-			fields{slice: []string{"2020-01-04", "2020-01-02", "2020-01-01", "2020-01-03"}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []string{"2020-01-04", "2020-01-02", "2020-01-01", "2020-01-03"}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{dtype: DateTime, ascending: true, index: []int{0, 1, 2, 3}}, []int{2, 1, 3, 0}},
 		{"datetime - no nulls - descending",
-			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{dtype: DateTime, ascending: false, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
 		{"datetime - nulls",
-			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, true, false}, name: "foo"},
+			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, true, false}, id: mockID, name: "foo"},
 			args{dtype: DateTime, ascending: true, index: []int{0, 1, 2, 3}}, []int{1, 3, 0, 2}},
 		{"civil.Date - no nulls - descending",
-			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false, false}, name: "foo"},
+			fields{slice: []time.Time{d.AddDate(0, 0, 2), d, d.AddDate(0, 0, -1), d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{dtype: Date, ascending: false, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
 		{"civil.Time - no nulls - descending",
 			fields{slice: []time.Time{
@@ -1373,7 +1399,7 @@ func Test_valueContainer_sort(t *testing.T) {
 				time.Date(1, 1, 1, 9, 45, 0, 0, time.UTC),
 				time.Date(1, 1, 1, 9, 30, 0, 0, time.UTC),
 				time.Date(1, 1, 1, 9, 45, 1, 0, time.UTC)},
-				isNull: []bool{false, false, false, false}, name: "foo"},
+				isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
 			args{dtype: Date, ascending: false, index: []int{0, 1, 2, 3}}, []int{0, 3, 1, 2}},
 	}
 	for _, tt := range tests {
@@ -1382,6 +1408,7 @@ func Test_valueContainer_sort(t *testing.T) {
 				slice:  tt.fields.slice,
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
+				id:     tt.fields.id,
 			}
 			if got := vc.sort(tt.args.dtype, tt.args.ascending, tt.args.index); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("valueContainer.sort() = %v, want %v", got, tt.want)
@@ -1403,34 +1430,34 @@ func Test_sortContainers(t *testing.T) {
 		want    []int
 		wantErr bool
 	}{
-		// {"multi sort - floats",
-		// 	args{[]*valueContainer{
-		// 		{slice: []float64{2, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
-		// 		{slice: []float64{3, 2, 1}, isNull: []bool{false, false, false}, name: "bar"},
-		// 	}, []Sorter{{Name: "foo"}, {Name: "bar"}}},
-		// 	[]int{1, 2, 0}, false},
+		{"multi sort - floats",
+			args{[]*valueContainer{
+				{slice: []float64{2, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "foo"},
+				{slice: []float64{3, 2, 1}, isNull: []bool{false, false, false}, id: mockID, name: "bar"},
+			}, []Sorter{{Name: "foo"}, {Name: "bar"}}},
+			[]int{1, 2, 0}, false},
 		{"multi sort - floats - ordered repeats",
 			args{[]*valueContainer{
-				{slice: []float64{2, 2, 1}, isNull: []bool{false, false, false}, name: "foo"},
-				{slice: []float64{1, 2, 1}, isNull: []bool{false, false, false}, name: "bar"},
+				{slice: []float64{2, 2, 1}, isNull: []bool{false, false, false}, id: mockID, name: "foo"},
+				{slice: []float64{1, 2, 1}, isNull: []bool{false, false, false}, id: mockID, name: "bar"},
 			}, []Sorter{{Name: "foo"}, {Name: "bar"}}},
 			[]int{2, 0, 1}, false},
 		{"multi sort - converted string to date + string",
 			args{[]*valueContainer{
-				{slice: []string{"2020-01-02 00:00:00 +0000 UTC", "2020-01-02 00:00:00 +0000 UTC", "2020-01-01 00:00:00 +0000 UTC", "2020-01-01 00:00:00 +0000 UTC"}, isNull: []bool{false, false, false, false}, name: "foo"},
-				{slice: []string{"foo", "qux", "qux", "foo"}, isNull: []bool{false, false, false, false}, name: "bar"},
+				{slice: []string{"2020-01-02 00:00:00 +0000 UTC", "2020-01-02 00:00:00 +0000 UTC", "2020-01-01 00:00:00 +0000 UTC", "2020-01-01 00:00:00 +0000 UTC"}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
+				{slice: []string{"foo", "qux", "qux", "foo"}, isNull: []bool{false, false, false, false}, id: mockID, name: "bar"},
 			}, []Sorter{{Name: "foo", DType: DateTime}, {Name: "bar", DType: String}}},
 			[]int{3, 2, 0, 1}, false},
 		{"multi sort - converted string to date + string",
 			args{[]*valueContainer{
-				{slice: []time.Time{d, d1, d, d1}, isNull: []bool{false, false, false, false}, name: "foo"},
-				{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, name: "bar"},
+				{slice: []time.Time{d, d1, d, d1}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
+				{slice: []string{"foo", "foo", "bar", "bar"}, isNull: []bool{false, false, false, false}, id: mockID, name: "bar"},
 			}, []Sorter{{Name: "foo", DType: DateTime}, {Name: "bar", DType: String}}},
 			[]int{2, 0, 3, 1}, false},
 		{"fail - bad container",
 			args{[]*valueContainer{
-				{slice: []float64{2, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
-				{slice: []float64{3, 2, 1}, isNull: []bool{false, false, false}, name: "bar"},
+				{slice: []float64{2, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "foo"},
+				{slice: []float64{3, 2, 1}, isNull: []bool{false, false, false}, id: mockID, name: "bar"},
 			}, []Sorter{{Name: "corge"}}},
 			nil, true},
 	}
@@ -1448,85 +1475,32 @@ func Test_sortContainers(t *testing.T) {
 	}
 }
 
-func Test_getDominantDType(t *testing.T) {
-	type args struct {
-		dtypes map[string]int
-	}
-	tests := []struct {
-		name string
-		args args
-		want string
-	}{
-		{"pass", args{map[string]int{"int": 0, "float": 1, "string": 2, "datetime": 3}}, "datetime"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := getDominantDType(tt.args.dtypes); got != tt.want {
-				t.Errorf("getDominantDType() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_mockCSVFromDTypes(t *testing.T) {
-	randSeed = 3
-	type args struct {
-		dtypes      []map[string]int
-		numMockRows int
-	}
-	tests := []struct {
-		name string
-		args args
-		want [][]string
-	}{
-		{"2x rows",
-			args{
-				dtypes: []map[string]int{
-					{"float": 3, "int": 1, "string": 1, "datetime": 1, "date": 1, "bool": 1},
-					{"float": 1, "int": 3, "string": 1, "datetime": 1, "date": 1, "bool": 1},
-					{"float": 1, "int": 1, "string": 3, "datetime": 1, "date": 1, "bool": 1},
-					{"float": 1, "int": 1, "string": 1, "datetime": 3, "date": 1, "bool": 1},
-					{"float": 1, "int": 1, "string": 1, "datetime": 1, "date": 3, "bool": 1},
-					{"float": 1, "int": 1, "string": 1, "datetime": 1, "date": 1, "bool": 3}},
-				numMockRows: 2},
-			[][]string{
-				{".5", "1", "quuz", "2020-01-01T12:30:00Z00:00", "2020-01-02", "true"},
-				{".5", "4", "qux", "2020-01-01T12:30:00Z00:00", "2020-02-01", "true"}},
-		},
-		{"3x rows",
-			args{
-				[]map[string]int{
-					{"float": 1, "string": 0},
-					{"float": 0, "string": 1}},
-				3},
-			[][]string{{".5", "foo"}, {".9", "baz"}, {".5", "foo"}},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := mockCSVFromDTypes(tt.args.dtypes, tt.args.numMockRows); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("mockCSVFromDTypes() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_mockString(t *testing.T) {
 	type args struct {
-		dtype   string
+		dtype   DType
 		nullPct float64
 	}
 	tests := []struct {
-		name string
-		args args
-		want string
+		name     string
+		args     args
+		want     string
+		wantNull bool
 	}{
-		{"pass", args{"string", .99999999}, ""},
+		{"pass", args{String, .99}, optionsNullPrinter, true},
+		{"pass", args{String, .01}, "baz", false},
+		{"pass", args{Float64, .01}, ".5", false},
+		{"pass", args{DateTime, .01}, "2020-01-01T12:30:00Z00:00", false},
+		{"pass", args{Date, .01}, "2020-01-02", false},
+		{"pass", args{Time, .01}, "1:00pm", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := mockString(tt.args.dtype, tt.args.nullPct); got != tt.want {
+			got, got1 := mockString(tt.args.dtype, tt.args.nullPct)
+			if got != tt.want {
 				t.Errorf("mockString() = %v, want %v", got, tt.want)
+			}
+			if got1 != tt.wantNull {
+				t.Errorf("mockString() got1 = %v, want %v", got, tt.wantNull)
 			}
 		})
 	}
@@ -1539,14 +1513,13 @@ func Test_inferType(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
-		want string
+		want DType
 	}{
-		{"float", args{"1.5"}, "float"},
-		{"int", args{"1"}, "int"},
-		{"string", args{"foo"}, "string"},
-		{"datetime", args{"2020-01-01 03:00:00 +0000 UTC"}, "datetime"},
-		{"date", args{"2020-01-01"}, "date"},
-		{"bool", args{"true"}, "bool"},
+		{"float", args{"1.5"}, Float64},
+		{"string", args{"foo"}, String},
+		{"datetime", args{"2020-01-01 03:00:00 +0000 UTC"}, DateTime},
+		{"date", args{"2020-01-01"}, Date},
+		{"time", args{"1:00pm"}, Time},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1563,6 +1536,7 @@ func Test_valueContainer_apply(t *testing.T) {
 		isNull []bool
 		name   string
 		cache  []string
+		id     string
 	}
 	type args struct {
 		apply ApplyFn
@@ -1578,6 +1552,7 @@ func Test_valueContainer_apply(t *testing.T) {
 		{"float", fields{
 			slice:  []float64{1, 2},
 			isNull: []bool{false, false},
+			id:     mockID,
 			name:   "foo"},
 			args{func(slice interface{}, isNull []bool) interface{} {
 				vals := slice.([]float64)
@@ -1587,12 +1562,13 @@ func Test_valueContainer_apply(t *testing.T) {
 				}
 				return ret
 			}, nil},
-			&valueContainer{slice: []float64{2, 4}, isNull: []bool{false, false}, name: "foo"},
+			&valueContainer{slice: []float64{2, 4}, isNull: []bool{false, false}, id: mockID, name: "foo"},
 			false,
 		},
 		{"int to float - change null", fields{
 			slice:  []int{1, 2},
 			isNull: []bool{false, false},
+			id:     mockID,
 			name:   "foo"},
 			args{func(slice interface{}, isNull []bool) interface{} {
 				vals := slice.([]int)
@@ -1605,12 +1581,13 @@ func Test_valueContainer_apply(t *testing.T) {
 				}
 				return ret
 			}, nil},
-			&valueContainer{slice: []float64{2, 4}, isNull: []bool{true, false}, name: "foo"},
+			&valueContainer{slice: []float64{2, 4}, isNull: []bool{true, false}, id: mockID, name: "foo"},
 			false,
 		},
 		{"subset - with index", fields{
 			slice:  []int{1, 2},
 			isNull: []bool{false, false},
+			id:     mockID,
 			name:   "foo"},
 			args{func(slice interface{}, isNull []bool) interface{} {
 				vals := slice.([]int)
@@ -1620,34 +1597,37 @@ func Test_valueContainer_apply(t *testing.T) {
 				}
 				return ret
 			}, []int{1}},
-			&valueContainer{slice: []int{1, 4}, isNull: []bool{false, false}, name: "foo"},
+			&valueContainer{slice: []int{1, 4}, isNull: []bool{false, false}, id: mockID, name: "foo"},
 			false,
 		},
 		{"fail - does not return slice (resets isNulls to original)", fields{
 			slice:  []float64{1, 2},
 			isNull: []bool{false, false},
+			id:     mockID,
 			name:   "foo"},
 			args{func(slice interface{}, isNull []bool) interface{} {
 				isNull[0] = true
 				return "foo"
 			}, nil},
-			&valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+			&valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
 			true,
 		},
 		{"fail - does not return equal length slice (resets isNulls to original)", fields{
 			slice:  []float64{1, 2},
 			isNull: []bool{false, false},
+			id:     mockID,
 			name:   "foo"},
 			args{func(slice interface{}, isNull []bool) interface{} {
 				isNull[0] = true
 				return []float64{1}
 			}, nil},
-			&valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+			&valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
 			true,
 		},
 		{"fail - with index - wrong type (resets isNulls to original)", fields{
 			slice:  []float64{1, 2, 3},
 			isNull: []bool{false, true, true},
+			id:     mockID,
 			name:   "foo"},
 			args{func(slice interface{}, isNull []bool) interface{} {
 				vals := slice.([]float64)
@@ -1658,18 +1638,19 @@ func Test_valueContainer_apply(t *testing.T) {
 				}
 				return ret
 			}, []int{1, 2}},
-			&valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, true}, name: "foo"},
+			&valueContainer{slice: []float64{1, 2, 3}, isNull: []bool{false, true, true}, id: mockID, name: "foo"},
 			true,
 		},
 		{"fail - out of range", fields{
 			slice:  []float64{1, 2},
 			isNull: []bool{false, false},
+			id:     mockID,
 			name:   "foo"},
 			args{func(slice interface{}, isNull []bool) interface{} {
 				isNull[0] = true
 				return []float64{1}
 			}, []int{2}},
-			&valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
+			&valueContainer{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
 			true,
 		},
 	}
@@ -1680,6 +1661,7 @@ func Test_valueContainer_apply(t *testing.T) {
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
 				cache:  tt.fields.cache,
+				id:     tt.fields.id,
 			}
 			err := vc.apply(tt.args.apply, tt.args.index)
 			if (err != nil) != tt.wantErr {
@@ -1707,104 +1689,48 @@ func Test_withColumn(t *testing.T) {
 	}{
 		{"rename", args{
 			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
 			}, name: "foo", input: "corge", requiredLen: 2},
 			[]*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "corge"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "corge"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
 			}, false,
 		},
 		{"overwrite - reset cache", args{
 			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo",
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo",
 					cache: []string{"1", "2"}},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
 			}, name: "foo", input: []int{3, 4}, requiredLen: 2},
 			[]*valueContainer{
-				{slice: []int{3, 4}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []int{3, 4}, isNull: []bool{false, false}, id: mockID, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
 			}, false,
 		},
 		{"append", args{
 			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
 			}, name: "corge", input: []int{3, 4}, requiredLen: 2},
 			[]*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
-				{slice: []int{3, 4}, isNull: []bool{false, false}, name: "corge"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
+				{slice: []int{3, 4}, isNull: []bool{false, false}, id: mockID, name: "corge"},
 			}, false,
-		},
-		{"overwrite Series", args{
-			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo",
-					cache: []string{"1", "2"}},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
-			}, name: "foo", input: &Series{values: &valueContainer{
-				slice: []float64{3, 4}, isNull: []bool{false, false},
-			}}, requiredLen: 2},
-			[]*valueContainer{
-				{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
-			}, false,
-		},
-		{"append Series", args{
-			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
-			}, name: "corge", input: &Series{values: &valueContainer{
-				slice: []float64{3, 4}, isNull: []bool{false, false},
-			}}, requiredLen: 2},
-			[]*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
-				{slice: []float64{3, 4}, isNull: []bool{false, false}, name: "corge"},
-			}, false,
-		},
-		{"fail - unsupported type", args{
-			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
-			}, name: "corge", input: []complex64{3, 4}, requiredLen: 2},
-			nil, true,
 		},
 		{"fail - wrong length", args{
 			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
 			}, name: "foo", input: []float64{0, 1, 2, 3, 4}, requiredLen: 2},
-			nil, true,
-		},
-		{"fail - wrong length", args{
-			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
-			}, name: "foo", input: []float64{0, 1, 2, 3, 4}, requiredLen: 2},
-			nil, true,
-		},
-		{"fail - not Series pointer", args{
-			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
-			}, name: "foo", input: &time.Time{}, requiredLen: 2},
-			nil, true,
-		},
-		{"fail - Series of wrong length", args{
-			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
-			}, name: "foo", input: &Series{values: &valueContainer{
-				slice: []float64{1, 2, 3}, isNull: []bool{false, false, false},
-			}}, requiredLen: 2},
 			nil, true,
 		},
 		{"fail - unsupported input", args{
 			cols: []*valueContainer{
-				{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "qux"},
-			}, name: "foo", input: map[string]int{}, requiredLen: 2},
+				{slice: []float64{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, id: mockID, name: "qux"},
+			}, name: "foo", input: 1, requiredLen: 2},
 			nil, true,
 		},
 	}
@@ -1843,9 +1769,9 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 		{name: "one col level",
 			fields: fields{
 				values: []*valueContainer{
-					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"},
-					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
 				colLevelNames: []string{"*0"},
 			},
 			args: args{includeLabels: true},
@@ -1858,9 +1784,9 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 		{name: "one col level - ignore labels",
 			fields: fields{
 				values: []*valueContainer{
-					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"},
-					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
 				colLevelNames: []string{"*0"},
 			},
 			args: args{includeLabels: false},
@@ -1873,9 +1799,9 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 		{name: "two col levels",
 			fields: fields{
 				values: []*valueContainer{
-					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo|baz"},
-					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar|qux"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo|baz"},
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "bar|qux"}},
+				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"}},
 				colLevelNames: []string{"*0", "*1"},
 			},
 			args: args{includeLabels: true},
@@ -1888,11 +1814,11 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 		{name: "two label levels",
 			fields: fields{
 				values: []*valueContainer{
-					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "foo"},
-					{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"}},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, id: mockID, name: "foo"},
+					{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
 				labels: []*valueContainer{
-					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"},
-					{slice: []int{10, 11}, isNull: []bool{false, false}, name: "*1"},
+					{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"},
+					{slice: []int{10, 11}, isNull: []bool{false, false}, id: mockID, name: "*1"},
 				},
 				colLevelNames: []string{"*0"},
 			},
@@ -1907,8 +1833,8 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 			fields: fields{
 				values: nil,
 				labels: []*valueContainer{
-					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"},
-					{slice: []int{10, 11}, isNull: []bool{false, false}, name: "*1"},
+					{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "*0"},
+					{slice: []int{10, 11}, isNull: []bool{false, false}, id: mockID, name: "*1"},
 				},
 				colLevelNames: []string{"*0"},
 			},
@@ -1929,180 +1855,6 @@ func TestDataFrame_toCSVByRows(t *testing.T) {
 			}
 			if (err != nil) != tt.wantErr {
 				t.Errorf("DataFrame.toCSVByRows() err = %v, want %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-func Test_readCSVByRows(t *testing.T) {
-	type args struct {
-		csv    [][]string
-		config *readConfig
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *DataFrame
-		wantErr bool
-	}{
-		{"1 header row, 2 columns, no label levels",
-			args{
-				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				config: &readConfig{numHeaderRows: 1}},
-			&DataFrame{values: []*valueContainer{
-				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			false},
-		{"1 header row, 1 column, 1 label level",
-			args{
-				csv:    [][]string{{"foo", "bar"}, {"1", "5"}, {"2", "6"}},
-				config: &readConfig{numHeaderRows: 1, numLabelLevels: 1}},
-			&DataFrame{values: []*valueContainer{
-				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
-				labels: []*valueContainer{
-					{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"}},
-				colLevelNames: []string{"*0"}},
-			false},
-		{"misaligned: wrong numbers of columns: too many",
-			args{
-				csv:    [][]string{{"foo", "bar"}, {"1", "2", "3"}},
-				config: &readConfig{numHeaderRows: 1}},
-			nil,
-			true},
-		{"misaligned: wrong numbers of columns: too few",
-			args{
-				csv:    [][]string{{"foo", "bar"}, {"1"}},
-				config: &readConfig{numHeaderRows: 1}},
-			nil,
-			true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := readCSVByRows(tt.args.csv, tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readCSVByRows() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !EqualDataFrames(got, tt.want) {
-				t.Errorf("readCSVByRows() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_readCSVByCols(t *testing.T) {
-	type args struct {
-		csv    [][]string
-		config *readConfig
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    *DataFrame
-		wantErr bool
-	}{
-		{"1 header row, 2 columns, no label levels",
-			args{
-				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
-				config: &readConfig{numHeaderRows: 1}},
-			&DataFrame{values: []*valueContainer{
-				{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
-				labels:        []*valueContainer{{slice: []int{0, 1}, isNull: []bool{false, false}, name: "*0"}},
-				colLevelNames: []string{"*0"}},
-			false},
-		{"1 header row, 1 column, 1 label levels",
-			args{
-				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6"}},
-				config: &readConfig{numHeaderRows: 1, numLabelLevels: 1}},
-			&DataFrame{values: []*valueContainer{
-				{slice: []string{"5", "6"}, isNull: []bool{false, false}, name: "bar"}},
-				labels: []*valueContainer{
-					{slice: []string{"1", "2"}, isNull: []bool{false, false}, name: "foo"},
-				},
-				colLevelNames: []string{"*0"}},
-			false},
-		{"misaligned lines: too few",
-			args{
-				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5"}},
-				config: &readConfig{numHeaderRows: 1, numLabelLevels: 1}},
-			nil,
-			true},
-		{"misaligned lines: too many",
-			args{
-				csv:    [][]string{{"foo", "1", "2"}, {"bar", "5", "6,", "6"}},
-				config: &readConfig{numHeaderRows: 1, numLabelLevels: 1}},
-			nil,
-			true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := readCSVByCols(tt.args.csv, tt.args.config)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readCSVByRows() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !EqualDataFrames(got, tt.want) {
-				t.Errorf("readCSVByCols() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-type testStruct struct {
-	Name string
-	Age  int
-}
-
-type testStructUnsupported struct {
-	Age complex64
-}
-
-type testStructNoFields struct {
-}
-
-func Test_readStruct(t *testing.T) {
-	type args struct {
-		slice interface{}
-	}
-	tests := []struct {
-		name    string
-		args    args
-		want    []*valueContainer
-		wantErr bool
-	}{
-		{"pass", args{[]testStruct{{"foo", 1}, {"bar", 2}}},
-			[]*valueContainer{
-				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "Name"},
-				{slice: []int{1, 2}, isNull: []bool{false, false}, name: "Age"}},
-			false},
-		{"pass - partial", args{[]testStruct{{Name: "foo"}, {Name: "bar"}}},
-			[]*valueContainer{
-				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "Name"},
-				{slice: []int{0, 0}, isNull: []bool{false, false}, name: "Age"}},
-			false},
-		{"fail - not slice", args{testStruct{"foo", 1}},
-			nil, true},
-		{"fail - not struct", args{[]string{"foo"}},
-			nil, true},
-		{"fail - empty", args{[]testStruct{}},
-			nil, true},
-		{"fail - no fields", args{[]testStructNoFields{{}}},
-			nil, true},
-		{"fail - unsupported value", args{[]testStructUnsupported{{complex64(1)}}},
-			nil, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := readStruct(tt.args.slice)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readStruct() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("readStruct() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -2498,6 +2250,7 @@ func Test_valueContainer_resample(t *testing.T) {
 		isNull []bool
 		name   string
 		cache  []string
+		id     string
 	}
 	type args struct {
 		by Resampler
@@ -2509,33 +2262,33 @@ func Test_valueContainer_resample(t *testing.T) {
 		want   *valueContainer
 	}{
 		{"resets cache",
-			fields{slice: []time.Time{d}, isNull: []bool{false}, name: "foo",
+			fields{slice: []time.Time{d}, isNull: []bool{false}, id: mockID, name: "foo",
 				cache: []string{"2020-02-02 12:30:45 +0000 UTC"}},
 			args{Resampler{ByYear: true, Location: time.UTC}},
 			&valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
-				isNull: []bool{false}, name: "foo"}},
+				isNull: []bool{false}, id: mockID, name: "foo"}},
 		{"year - start and return to civil date",
-			fields{slice: []civil.Date{civil.DateOf(d)}, isNull: []bool{false}, name: "foo"},
+			fields{slice: []civil.Date{civil.DateOf(d)}, isNull: []bool{false}, id: mockID, name: "foo"},
 			args{Resampler{ByDay: true}},
 			&valueContainer{slice: []civil.Date{{Year: 2020, Month: 2, Day: 2}},
-				isNull: []bool{false}, name: "foo"}},
+				isNull: []bool{false}, id: mockID, name: "foo"}},
 		{"hour - start and return to civil time",
-			fields{slice: []civil.Time{civil.TimeOf(d)}, isNull: []bool{false}, name: "foo"},
+			fields{slice: []civil.Time{civil.TimeOf(d)}, isNull: []bool{false}, id: mockID, name: "foo"},
 			args{Resampler{ByDuration: time.Hour}},
 			&valueContainer{slice: []civil.Time{{Hour: 12}},
-				isNull: []bool{false}, name: "foo"}},
-		{"year - string - sets Location automatically ", fields{slice: []string{"2020-02-02T12:30:45Z"}, isNull: []bool{false}, name: "foo"},
+				isNull: []bool{false}, id: mockID, name: "foo"}},
+		{"year - string - sets Location automatically ", fields{slice: []string{"2020-02-02T12:30:45Z"}, isNull: []bool{false}, id: mockID, name: "foo"},
 			args{Resampler{ByYear: true}},
 			&valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
-				isNull: []bool{false}, name: "foo"}},
-		{"day - resets Location automatically ", fields{slice: []time.Time{time.Date(2019, 12, 31, 18, 30, 0, 0, tz)}, isNull: []bool{false}, name: "foo"},
+				isNull: []bool{false}, id: mockID, name: "foo"}},
+		{"day - resets Location automatically ", fields{slice: []time.Time{time.Date(2019, 12, 31, 18, 30, 0, 0, tz)}, isNull: []bool{false}, id: mockID, name: "foo"},
 			args{Resampler{ByDay: true}},
 			&valueContainer{slice: []time.Time{time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC)},
-				isNull: []bool{false}, name: "foo"}},
-		{"day - retains Location ", fields{slice: []time.Time{time.Date(2019, 12, 31, 18, 30, 0, 0, tz)}, isNull: []bool{false}, name: "foo"},
+				isNull: []bool{false}, id: mockID, name: "foo"}},
+		{"day - retains Location ", fields{slice: []time.Time{time.Date(2019, 12, 31, 18, 30, 0, 0, tz)}, isNull: []bool{false}, id: mockID, name: "foo"},
 			args{Resampler{ByDay: true, Location: tz}},
 			&valueContainer{slice: []time.Time{time.Date(2019, 12, 31, 0, 0, 0, 0, tz)},
-				isNull: []bool{false}, name: "foo"}},
+				isNull: []bool{false}, id: mockID, name: "foo"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2544,6 +2297,7 @@ func Test_valueContainer_resample(t *testing.T) {
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
 				cache:  tt.fields.cache,
+				id:     tt.fields.id,
 			}
 			vc.resample(tt.args.by)
 			if !reflect.DeepEqual(vc, tt.want) {
@@ -2690,15 +2444,15 @@ func Test_lookupWithAnchor(t *testing.T) {
 		args args
 		want *Series
 	}{
-		{"pass", args{name: "waldo", sourceLabels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+		{"pass", args{name: "waldo", sourceLabels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 			leftOn:       []int{0},
-			lookupValues: &valueContainer{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "qux"},
-			lookupLabels: []*valueContainer{{slice: []float64{1, 0, 2}, isNull: []bool{false, false, false}, name: "foo"}},
+			lookupValues: &valueContainer{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, id: mockID, name: "qux"},
+			lookupLabels: []*valueContainer{{slice: []float64{1, 0, 2}, isNull: []bool{false, false, false}, id: mockID, name: "foo"}},
 			rightOn:      []int{0}},
 			&Series{
-				values: &valueContainer{slice: []string{"", "foo"}, isNull: []bool{true, false}, name: "waldo"},
+				values: &valueContainer{slice: []string{"", "foo"}, isNull: []bool{true, false}, id: mockID, name: "waldo"},
 				labels: []*valueContainer{
-					{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo",
+					{slice: []float64{0, 1}, isNull: []bool{false, false}, id: mockID, name: "foo",
 						cache: []string{"0", "1"},
 					}},
 			}},
@@ -2731,64 +2485,64 @@ func Test_lookupDataFrameWithAnchor(t *testing.T) {
 		want *DataFrame
 	}{
 		{"no exclusion", args{name: "waldo", colLevelNames: []string{"*0"},
-			originalLabels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+			originalLabels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 			sourceContainers: []*valueContainer{
-				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []float64{0, 1}, isNull: []bool{false, false}, id: mockID, name: "foo"},
 			},
 			leftOn: []int{0},
 			lookupContainers: []*valueContainer{
-				{slice: []float64{1, 0, 2}, isNull: []bool{false, false, false}, name: "c"}},
+				{slice: []float64{1, 0, 2}, isNull: []bool{false, false, false}, id: mockID, name: "c"}},
 			rightOn: []int{0},
 			lookupColumns: []*valueContainer{
-				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "a"},
-				{slice: []string{"bar", "qux", "baz"}, isNull: []bool{false, false, false}, name: "b"}}},
+				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, id: mockID, name: "a"},
+				{slice: []string{"bar", "qux", "baz"}, isNull: []bool{false, false, false}, id: mockID, name: "b"}}},
 			&DataFrame{
 				values: []*valueContainer{
-					{slice: []string{"", "foo"}, isNull: []bool{true, false}, name: "a"},
-					{slice: []string{"qux", "bar"}, isNull: []bool{false, false}, name: "b"},
+					{slice: []string{"", "foo"}, isNull: []bool{true, false}, id: mockID, name: "a"},
+					{slice: []string{"qux", "bar"}, isNull: []bool{false, false}, id: mockID, name: "b"},
 				},
-				labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+				labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 				name:   "waldo", colLevelNames: []string{"*0"},
 			}},
 		{"exclusion", args{name: "waldo", colLevelNames: []string{"*0"},
-			originalLabels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+			originalLabels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 			sourceContainers: []*valueContainer{
-				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"},
-				{slice: []string{"a", "b"}, isNull: []bool{false, false}, name: "bar"},
+				{slice: []float64{0, 1}, isNull: []bool{false, false}, id: mockID, name: "foo"},
+				{slice: []string{"a", "b"}, isNull: []bool{false, false}, id: mockID, name: "bar"},
 			},
 			leftOn: []int{0},
 			lookupContainers: []*valueContainer{
-				{slice: []float64{1, 0, 2}, isNull: []bool{false, true, false}, name: "a"}},
+				{slice: []float64{1, 0, 2}, isNull: []bool{false, true, false}, id: mockID, name: "a"}},
 			rightOn: []int{0},
 			lookupColumns: []*valueContainer{
-				{slice: []float64{1, 0, 2}, isNull: []bool{false, true, false}, name: "a"},
-				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, name: "b"}},
+				{slice: []float64{1, 0, 2}, isNull: []bool{false, true, false}, id: mockID, name: "a"},
+				{slice: []string{"foo", "", "baz"}, isNull: []bool{false, true, false}, id: mockID, name: "b"}},
 			exclude: []string{"a"}},
 			&DataFrame{
 				values: []*valueContainer{
-					{slice: []string{"", "foo"}, isNull: []bool{true, false}, name: "b"},
+					{slice: []string{"", "foo"}, isNull: []bool{true, false}, id: mockID, name: "b"},
 				},
-				labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+				labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 				name:   "waldo", colLevelNames: []string{"*0"},
 			}},
 		{"equal labels", args{name: "waldo", colLevelNames: []string{"*0"},
-			originalLabels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+			originalLabels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 			sourceContainers: []*valueContainer{
-				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"},
+				{slice: []float64{0, 1}, isNull: []bool{false, false}, id: mockID, name: "foo"},
 			},
 			leftOn: []int{0},
 			lookupContainers: []*valueContainer{
-				{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+				{slice: []float64{0, 1}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 			rightOn: []int{0},
 			lookupColumns: []*valueContainer{
-				{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "a"},
-				{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, name: "b"}}},
+				{slice: []string{"foo", ""}, isNull: []bool{false, true}, id: mockID, name: "a"},
+				{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, id: mockID, name: "b"}}},
 			&DataFrame{
 				values: []*valueContainer{
-					{slice: []string{"foo", ""}, isNull: []bool{false, true}, name: "a"},
-					{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, name: "b"},
+					{slice: []string{"foo", ""}, isNull: []bool{false, true}, id: mockID, name: "a"},
+					{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, id: mockID, name: "b"},
 				},
-				labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, name: "foo"}},
+				labels: []*valueContainer{{slice: []float64{0, 1}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 				name:   "waldo", colLevelNames: []string{"*0"},
 			}},
 	}
@@ -2847,8 +2601,8 @@ func Test_multiUniqueIndex(t *testing.T) {
 		want []int
 	}{
 		{"pass", args{[]*valueContainer{
-			{slice: []float64{1, 1, 2, 1}, isNull: []bool{false, false, false, false}, name: "foo"},
-			{slice: []int{0, 0, 2, 3}, isNull: []bool{false, false, false, false}, name: "qux"},
+			{slice: []float64{1, 1, 2, 1}, isNull: []bool{false, false, false, false}, id: mockID, name: "foo"},
+			{slice: []int{0, 0, 2, 3}, isNull: []bool{false, false, false, false}, id: mockID, name: "qux"},
 		}}, []int{0, 2, 3}},
 	}
 	for _, tt := range tests {
@@ -2865,15 +2619,16 @@ func Test_valueContainer_dtype(t *testing.T) {
 		slice  interface{}
 		isNull []bool
 		name   string
+		id     string
 	}
 	tests := []struct {
 		name   string
 		fields fields
 		want   string
 	}{
-		{"pass", fields{slice: []float64{1}, isNull: []bool{false}, name: "foo"}, "[]float64"},
-		{"pass", fields{slice: []string{"1"}, isNull: []bool{false}, name: "foo"}, "[]string"},
-		{"pass", fields{slice: [][]string{{"1"}}, isNull: []bool{false}, name: "foo"}, "[][]string"},
+		{"pass", fields{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}, "[]float64"},
+		{"pass", fields{slice: []string{"1"}, isNull: []bool{false}, id: mockID, name: "foo"}, "[]string"},
+		{"pass", fields{slice: [][]string{{"1"}}, isNull: []bool{false}, id: mockID, name: "foo"}, "[][]string"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -2881,6 +2636,7 @@ func Test_valueContainer_dtype(t *testing.T) {
 				slice:  tt.fields.slice,
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
+				id:     tt.fields.id,
 			}
 			if got := vc.dtype(); got.String() != tt.want {
 				t.Errorf("valueContainer.dtype() = %v, want %v", got.String(), tt.want)
@@ -2940,15 +2696,15 @@ func TestEqualSeries(t *testing.T) {
 	}{
 		{"pass", args{
 			a: &Series{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				err: errors.New("foo")},
 			b: &Series{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				err: errors.New("foo")},
 		}, true},
@@ -2958,82 +2714,82 @@ func TestEqualSeries(t *testing.T) {
 		}, true},
 		{"fail - nil", args{
 			a: &Series{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				err: errors.New("foo")},
 			b: nil,
 		}, false},
 		{"fail - values", args{
 			a: &Series{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				err: errors.New("foo")},
 			b: &Series{
-				values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				err: errors.New("foo")},
 		}, false},
 		{"fail - labels", args{
 			a: &Series{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				err: errors.New("foo")},
 			b: &Series{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{1}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				err: errors.New("foo")},
 		}, false},
 		{"fail - shared data", args{
 			a: &Series{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				sharedData: true,
 				err:        errors.New("foo")},
 			b: &Series{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				sharedData: false,
 				err:        errors.New("foo")},
 		}, false},
 		{"fail - has err", args{
 			a: &Series{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				err: errors.New("foo")},
 			b: &Series{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				err: nil},
 		}, false},
 		{"fail - err value", args{
 			a: &Series{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				err: errors.New("foo")},
 			b: &Series{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				err: errors.New("bar")},
 		}, false},
@@ -3060,18 +2816,18 @@ func TestEqualDataFrames(t *testing.T) {
 		{"pass", args{
 			a: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          "baz",
 				err:           errors.New("foo")},
 			b: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          "baz",
@@ -3084,9 +2840,9 @@ func TestEqualDataFrames(t *testing.T) {
 		{"fail - nil", args{
 			a: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          "baz",
@@ -3096,18 +2852,18 @@ func TestEqualDataFrames(t *testing.T) {
 		{"fail - values", args{
 			a: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          "baz",
 				err:           errors.New("foo")},
 			b: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{2}, isNull: []bool{false}, name: "foo"}},
+					{slice: []float64{2}, isNull: []bool{false}, id: mockID, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          "baz",
@@ -3116,18 +2872,18 @@ func TestEqualDataFrames(t *testing.T) {
 		{"fail - labels", args{
 			a: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          "baz",
 				err:           errors.New("foo")},
 			b: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{1}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          "baz",
@@ -3136,18 +2892,18 @@ func TestEqualDataFrames(t *testing.T) {
 		{"fail - colLevel names", args{
 			a: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          "baz",
 				err:           errors.New("foo")},
 			b: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				colLevelNames: []string{"*1"},
 				name:          "baz",
@@ -3156,18 +2912,18 @@ func TestEqualDataFrames(t *testing.T) {
 		{"fail - names", args{
 			a: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          "baz",
 				err:           errors.New("foo")},
 			b: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          "corge",
@@ -3176,18 +2932,18 @@ func TestEqualDataFrames(t *testing.T) {
 		{"fail - has err", args{
 			a: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          "baz",
 				err:           errors.New("foo")},
 			b: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          "baz",
@@ -3196,18 +2952,18 @@ func TestEqualDataFrames(t *testing.T) {
 		{"fail - err value", args{
 			a: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          "baz",
 				err:           errors.New("foo")},
 			b: &DataFrame{
 				values: []*valueContainer{
-					{slice: []float64{1}, isNull: []bool{false}, name: "foo"}},
+					{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"}},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
 				},
 				colLevelNames: []string{"*0"},
 				name:          "baz",
@@ -3237,19 +2993,19 @@ func Test_equalGroupedSeries(t *testing.T) {
 			a: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")}},
 			true},
@@ -3261,10 +3017,10 @@ func Test_equalGroupedSeries(t *testing.T) {
 			a: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: nil,
@@ -3273,19 +3029,19 @@ func Test_equalGroupedSeries(t *testing.T) {
 			a: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedSeries{
 				orderedKeys: []string{"bar"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")}},
 			false},
@@ -3293,19 +3049,19 @@ func Test_equalGroupedSeries(t *testing.T) {
 			a: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{1}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")}},
 			false},
@@ -3313,19 +3069,19 @@ func Test_equalGroupedSeries(t *testing.T) {
 			a: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "baz"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "baz"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")}},
 			false},
@@ -3333,35 +3089,35 @@ func Test_equalGroupedSeries(t *testing.T) {
 			a: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				err:         errors.New("foo")}},
 			false},
 		{"fail - series", args{
 			a: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "corge"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "corge"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")}},
 			false},
@@ -3369,19 +3125,19 @@ func Test_equalGroupedSeries(t *testing.T) {
 			a: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: nil}},
 			false},
@@ -3389,19 +3145,19 @@ func Test_equalGroupedSeries(t *testing.T) {
 			a: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedSeries{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				series: &Series{
-					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: &valueContainer{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("bar")}},
 			false},
@@ -3429,19 +3185,19 @@ func Test_equalGroupedDataFrames(t *testing.T) {
 			a: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")}},
 			true},
@@ -3453,10 +3209,10 @@ func Test_equalGroupedDataFrames(t *testing.T) {
 			a: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: nil,
@@ -3465,19 +3221,19 @@ func Test_equalGroupedDataFrames(t *testing.T) {
 			a: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedDataFrame{
 				orderedKeys: []string{"bar"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")}},
 			false},
@@ -3485,19 +3241,19 @@ func Test_equalGroupedDataFrames(t *testing.T) {
 			a: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{1}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")}},
 			false},
@@ -3505,19 +3261,19 @@ func Test_equalGroupedDataFrames(t *testing.T) {
 			a: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "baz"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "baz"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")}},
 			false},
@@ -3525,35 +3281,35 @@ func Test_equalGroupedDataFrames(t *testing.T) {
 			a: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				err:         errors.New("foo")}},
 			false},
 		{"fail - df", args{
 			a: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "corge"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "corge"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")}},
 			false},
@@ -3561,19 +3317,19 @@ func Test_equalGroupedDataFrames(t *testing.T) {
 			a: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: nil}},
 			false},
@@ -3581,19 +3337,19 @@ func Test_equalGroupedDataFrames(t *testing.T) {
 			a: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("foo")},
 			b: &GroupedDataFrame{
 				orderedKeys: []string{"foo"},
 				rowIndices:  [][]int{{0}},
-				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				labels:      []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				df: &DataFrame{
-					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, name: "qux"}},
-					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+					values: []*valueContainer{{slice: []string{"baz"}, isNull: []bool{false}, id: mockID, name: "qux"}},
+					labels: []*valueContainer{{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 				},
 				err: errors.New("bar")}},
 			false},
@@ -3616,7 +3372,7 @@ func Test_isNullString(t *testing.T) {
 		args args
 		want bool
 	}{
-		{"is null", args{""}, true},
+		{"is null", args{""}, false},
 		{"is null", args{"(null)"}, true},
 		{"not null", args{"foo"}, false},
 	}
@@ -3664,264 +3420,6 @@ func Test_extractCSVDimensions(t *testing.T) {
 	}
 }
 
-func Test_readCSVBytes(t *testing.T) {
-	b0 := "\"foo\",\"bar\"\n\"qux\",\"quz\"\n"
-	b1 := "foo,bar,baz\nqux,quux,quz\n"
-	b2 := "foo, bar\nqux, quz\n"
-	b3 := ",foo\n"
-	b4 := "foo,bar\nqux,quz"
-	b5 := "foo\nbaz\r\n"
-	b6 := "foo\nbaz\r"
-	b7 := "foo, bar\n qux, \n quux, quz\n"
-
-	f0 := "foo\nbar,baz\n"
-	f1 := "foo,bar\nbaz\n"
-	type args struct {
-		r        io.Reader
-		dstVals  [][]string
-		dstNulls [][]bool
-		comma    rune
-	}
-	tests := []struct {
-		name      string
-		args      args
-		wantVals  [][]string
-		wantNulls [][]bool
-		wantErr   bool
-	}{
-		{name: "pass with quotes",
-			args: args{
-				r: bytes.NewBuffer([]byte(b0)),
-				dstVals: [][]string{
-					{"", ""},
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}, {false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "qux"},
-				{"bar", "quz"}},
-			wantNulls: [][]bool{{false, false}, {false, false}},
-			wantErr:   false,
-		},
-		{name: "pass normal",
-			args: args{
-				r: bytes.NewBuffer([]byte(b1)),
-				dstVals: [][]string{
-					{"", ""},
-					{"", ""},
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}, {false, false}, {false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "qux"},
-				{"bar", "quux"},
-				{"baz", "quz"}},
-			wantNulls: [][]bool{{false, false}, {false, false}, {false, false}},
-			wantErr:   false,
-		},
-		{name: "pass with leading whitespace",
-			args: args{
-				r: bytes.NewBuffer([]byte(b2)),
-				dstVals: [][]string{
-					{"", ""},
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}, {false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "qux"},
-				{"bar", "quz"}},
-			wantNulls: [][]bool{{false, false}, {false, false}},
-			wantErr:   false,
-		},
-		{name: "pass with nil",
-			args: args{
-				r: bytes.NewBuffer([]byte(b3)),
-				dstVals: [][]string{
-					{""},
-					{""}},
-				dstNulls: [][]bool{{true}, {false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{""},
-				{"foo"}},
-			wantNulls: [][]bool{{true}, {false}},
-			wantErr:   false,
-		},
-		{name: "pass with no final \n",
-			args: args{
-				r: bytes.NewBuffer([]byte(b4)),
-				dstVals: [][]string{
-					{"", ""},
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}, {false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "qux"},
-				{"bar", "quz"}},
-			wantNulls: [][]bool{{false, false}, {false, false}},
-			wantErr:   false,
-		},
-		{name: "pass with \r\n",
-			args: args{
-				r: bytes.NewBuffer([]byte(b5)),
-				dstVals: [][]string{
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "baz"}},
-			wantNulls: [][]bool{{false, false}},
-			wantErr:   false,
-		},
-		{name: "pass with final \r",
-			args: args{
-				r: bytes.NewBuffer([]byte(b6)),
-				dstVals: [][]string{
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "baz"}},
-			wantNulls: [][]bool{{false, false}},
-			wantErr:   false,
-		},
-		{name: "pass with missing value",
-			args: args{
-				r: bytes.NewBuffer([]byte(b7)),
-				dstVals: [][]string{
-					{"", "", ""},
-					{"", "", ""},
-				},
-				dstNulls: [][]bool{
-					{false, false, false},
-					{false, false, false},
-				},
-				comma: ','},
-			wantVals: [][]string{
-				{"foo", "qux", "quux"},
-				{"bar", "", "quz"},
-			},
-			wantNulls: [][]bool{
-				{false, false, false},
-				{false, true, false},
-			},
-			wantErr: false,
-		},
-		{name: "fail - too many fields",
-			args: args{
-				r: bytes.NewBuffer([]byte(f0)),
-				dstVals: [][]string{
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "bar"}},
-			wantNulls: [][]bool{{false, false}},
-			wantErr:   true,
-		},
-		{name: "fail - too few fields",
-			args: args{
-				r: bytes.NewBuffer([]byte(f1)),
-				dstVals: [][]string{
-					{"", ""},
-					{"", ""}},
-				dstNulls: [][]bool{{false, false}, {false, false}},
-				comma:    ','},
-			wantVals: [][]string{
-				{"foo", "baz"},
-				{"bar", ""}},
-			wantNulls: [][]bool{{false, false}, {false, false}},
-			wantErr:   true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := readCSVBytes(tt.args.r, tt.args.dstVals, tt.args.dstNulls, tt.args.comma)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("readCSVBytes() error = %v, wantErr %v", err, tt.wantErr)
-			}
-			if !reflect.DeepEqual(tt.args.dstVals, tt.wantVals) {
-				t.Errorf("readCSVBytes() -> dstVals = %#v, wantVals %#v", tt.args.dstVals, tt.wantVals)
-				for i := range tt.args.dstVals {
-					for j := range tt.args.dstVals[i] {
-						fmt.Println(string(tt.args.dstVals[i][j]))
-					}
-				}
-			}
-			if !reflect.DeepEqual(tt.args.dstNulls, tt.wantNulls) {
-				t.Errorf("readCSVBytes() -> dstNulls = %v, wantNulls %v", tt.args.dstNulls, tt.wantNulls)
-			}
-		})
-	}
-}
-
-func Test_makeDataFrameFromMatrices(t *testing.T) {
-	type args struct {
-		values [][]string
-		isNull [][]bool
-		config *readConfig
-	}
-	tests := []struct {
-		name string
-		args args
-		want *DataFrame
-	}{
-		{"pass - 1 header col", args{
-			values: [][]string{
-				{"foo", "bar"},
-				{"baz", ""}},
-			isNull: [][]bool{{false, false}, {false, true}},
-			config: &readConfig{numHeaderRows: 1}},
-			&DataFrame{
-				values: []*valueContainer{
-					{slice: []string{"bar"}, isNull: []bool{false}, name: "foo"},
-					{slice: []string{""}, isNull: []bool{true}, name: "baz"},
-				},
-				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "*0"},
-				},
-				colLevelNames: []string{"*0"},
-			}},
-		{"pass - 1 header col, 1 label level", args{
-			values: [][]string{
-				{"foo", "bar"},
-				{"baz", ""}},
-			isNull: [][]bool{{false, false}, {false, true}},
-			config: &readConfig{numHeaderRows: 1, numLabelLevels: 1}},
-			&DataFrame{
-				values: []*valueContainer{
-					{slice: []string{""}, isNull: []bool{true}, name: "baz"},
-				},
-				labels: []*valueContainer{
-					{slice: []string{"bar"}, isNull: []bool{false}, name: "foo"},
-				},
-				colLevelNames: []string{"*0"},
-			}},
-		{"pass - 1 label level", args{
-			values: [][]string{
-				{"foo", "bar"},
-				{"baz", ""}},
-			isNull: [][]bool{{false, false}, {false, true}},
-			config: &readConfig{numLabelLevels: 1}},
-			&DataFrame{
-				values: []*valueContainer{
-					{slice: []string{"baz", ""}, isNull: []bool{false, true}, name: "0"},
-				},
-				labels: []*valueContainer{
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "*0"},
-				},
-				colLevelNames: []string{"*0"},
-			}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := makeDataFrameFromMatrices(tt.args.values, tt.args.isNull, tt.args.config); !EqualDataFrames(got, tt.want) {
-				t.Errorf("makeDataFrameFromMatrices() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestSeries_combineMath(t *testing.T) {
 	type fields struct {
 		values     *valueContainer
@@ -3941,128 +3439,128 @@ func TestSeries_combineMath(t *testing.T) {
 		want   *Series
 	}{
 		{"same index", fields{
-			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 			labels: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+				{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"},
 			}},
 			args{
 				other: &Series{
-					values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, name: "foo"},
+					values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, id: mockID, name: "foo"},
 					labels: []*valueContainer{
-						{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-						{slice: []int{1}, isNull: []bool{false}, name: "qux"}}},
+						{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+						{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"}}},
 				ignoreNull: false,
 				fn:         func(v1, v2 float64) float64 { return v1 + v2 }},
 			&Series{
-				values: &valueContainer{slice: []float64{3}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{3}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+					{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"}},
 			},
 		},
 		{"different index", fields{
-			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 			labels: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+				{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"},
 			}},
 			args{
 				other: &Series{
-					values: &valueContainer{slice: []float64{2, 20}, isNull: []bool{false, false}, name: "foo"},
+					values: &valueContainer{slice: []float64{2, 20}, isNull: []bool{false, false}, id: mockID, name: "foo"},
 					labels: []*valueContainer{
-						{slice: []int{0, 1}, isNull: []bool{false, false}, name: "bar"}}},
+						{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "bar"}}},
 				ignoreNull: false,
 				fn:         func(v1, v2 float64) float64 { return v1 + v2 }},
 			&Series{
-				values: &valueContainer{slice: []float64{3}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{3}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar", cache: []string{"0"}},
-					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar", cache: []string{"0"}},
+					{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"}},
 			},
 		},
 		{"divide by zero", fields{
-			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 			labels: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+				{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"},
 			}},
 			args{
 				other: &Series{
-					values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, name: "foo"},
+					values: &valueContainer{slice: []float64{0}, isNull: []bool{false}, id: mockID, name: "foo"},
 					labels: []*valueContainer{
-						{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-						{slice: []int{1}, isNull: []bool{false}, name: "qux"}}},
+						{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+						{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"}}},
 				ignoreNull: false,
 				fn:         func(v1, v2 float64) float64 { return v1 / v2 }},
 			&Series{
-				values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, name: "foo"},
+				values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+					{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"}},
 			},
 		},
 		{"left nulls - do not ignore null", fields{
-			values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, name: "foo"},
+			values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, id: mockID, name: "foo"},
 			labels: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+				{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"},
 			}},
 			args{
 				other: &Series{
-					values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, name: "foo"},
+					values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, id: mockID, name: "foo"},
 					labels: []*valueContainer{
-						{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-						{slice: []int{1}, isNull: []bool{false}, name: "qux"}}},
+						{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+						{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"}}},
 				ignoreNull: false,
 				fn:         func(v1, v2 float64) float64 { return v1 + v2 }},
 			&Series{
-				values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, name: "foo"},
+				values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+					{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"}},
 			},
 		},
 		{"left nulls - ignore null", fields{
-			values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, name: "foo"},
+			values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, id: mockID, name: "foo"},
 			labels: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+				{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"},
 			}},
 			args{
 				other: &Series{
-					values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, name: "foo"},
+					values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, id: mockID, name: "foo"},
 					labels: []*valueContainer{
-						{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-						{slice: []int{1}, isNull: []bool{false}, name: "qux"}}},
+						{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+						{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"}}},
 				ignoreNull: true,
 				fn:         func(v1, v2 float64) float64 { return v1 + v2 }},
 			&Series{
-				values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{2}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+					{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"}},
 			},
 		},
 		{"right nulls - ignore null", fields{
-			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+			values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 			labels: []*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-				{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+				{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"},
 			}},
 			args{
 				other: &Series{
-					values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, name: "foo"},
+					values: &valueContainer{slice: []float64{0}, isNull: []bool{true}, id: mockID, name: "foo"},
 					labels: []*valueContainer{
-						{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-						{slice: []int{1}, isNull: []bool{false}, name: "qux"}}},
+						{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+						{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"}}},
 				ignoreNull: true,
 				fn:         func(v1, v2 float64) float64 { return v1 + v2 }},
 			&Series{
-				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, name: "foo"},
+				values: &valueContainer{slice: []float64{1}, isNull: []bool{false}, id: mockID, name: "foo"},
 				labels: []*valueContainer{
-					{slice: []int{0}, isNull: []bool{false}, name: "bar"},
-					{slice: []int{1}, isNull: []bool{false}, name: "qux"}},
+					{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "bar"},
+					{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"}},
 			},
 		},
 	}
@@ -4142,6 +3640,7 @@ func Test_valueContainer_subsetRows(t *testing.T) {
 		isNull []bool
 		cache  []string
 		name   string
+		id     string
 	}
 	type args struct {
 		index []int
@@ -4153,19 +3652,19 @@ func Test_valueContainer_subsetRows(t *testing.T) {
 		want    *valueContainer
 		wantErr bool
 	}{
-		{"pass", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"},
+		{"pass", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, id: mockID, name: "foo"},
 			args{[]int{1}},
-			&valueContainer{slice: []float64{1}, isNull: []bool{true}, name: "foo"}, false},
+			&valueContainer{slice: []float64{1}, isNull: []bool{true}, id: mockID, name: "foo"}, false},
 		{"pass - reset cache", fields{slice: []string{"foo", "bar"}, isNull: []bool{false, false},
-			cache: []string{"foo", "bar"}, name: "foo"},
+			cache: []string{"foo", "bar"}, id: mockID, name: "foo"},
 			args{[]int{1}},
-			&valueContainer{slice: []string{"bar"}, isNull: []bool{false}, name: "foo"}, false},
-		{"return existing", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"},
+			&valueContainer{slice: []string{"bar"}, isNull: []bool{false}, id: mockID, name: "foo"}, false},
+		{"return existing", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, id: mockID, name: "foo"},
 			args{[]int{0, 1, 2}},
-			&valueContainer{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"}, false},
-		{"fail", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"},
+			&valueContainer{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, id: mockID, name: "foo"}, false},
+		{"fail", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, id: mockID, name: "foo"},
 			args{[]int{10}},
-			&valueContainer{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, name: "foo"}, true},
+			&valueContainer{slice: []float64{0, 1, 2}, isNull: []bool{false, true, false}, id: mockID, name: "foo"}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -4174,6 +3673,7 @@ func Test_valueContainer_subsetRows(t *testing.T) {
 				isNull: tt.fields.isNull,
 				cache:  tt.fields.cache,
 				name:   tt.fields.name,
+				id:     tt.fields.id,
 			}
 			err := vc.subsetRows(tt.args.index)
 			if (err != nil) != tt.wantErr {
@@ -4193,6 +3693,7 @@ func Test_valueContainer_filter(t *testing.T) {
 		slice  interface{}
 		isNull []bool
 		name   string
+		id     string
 	}
 	type args struct {
 		filter FilterFn
@@ -4203,10 +3704,10 @@ func Test_valueContainer_filter(t *testing.T) {
 		args   args
 		want   []int
 	}{
-		{"Float64", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, name: "foo"},
+		{"Float64", fields{slice: []float64{0, 1, 2}, isNull: []bool{false, false, false}, id: mockID, name: "foo"},
 			args{func(val interface{}) bool { return val.(float64) > 1 }},
 			[]int{2}},
-		{"DateTime", fields{slice: []time.Time{d.AddDate(0, 0, -1), d, d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false}, name: "foo"},
+		{"DateTime", fields{slice: []time.Time{d.AddDate(0, 0, -1), d, d.AddDate(0, 0, 1)}, isNull: []bool{false, false, false}, id: mockID, name: "foo"},
 			args{func(val interface{}) bool { return val.(time.Time).Before(d) }},
 			[]int{0}},
 	}
@@ -4216,6 +3717,7 @@ func Test_valueContainer_filter(t *testing.T) {
 				slice:  tt.fields.slice,
 				isNull: tt.fields.isNull,
 				name:   tt.fields.name,
+				id:     tt.fields.id,
 			}
 			got := vc.filter(tt.args.filter)
 			if !reflect.DeepEqual(got, tt.want) {
@@ -4289,8 +3791,8 @@ func Test_filter(t *testing.T) {
 	}{
 		{"pass", args{
 			[]*valueContainer{
-				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
-				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
+				{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"},
+				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
 			map[string]FilterFn{
 				"qux": func(val interface{}) bool { return val.(int) >= 1 },
 				"bar": func(val interface{}) bool { return val.(string) == "foo" },
@@ -4299,8 +3801,8 @@ func Test_filter(t *testing.T) {
 			false},
 		{"fail - bad container name", args{
 			[]*valueContainer{
-				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
-				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
+				{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"},
+				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
 			map[string]FilterFn{
 				"corge": func(val interface{}) bool { return val.(int) >= 1 },
 			}},
@@ -4308,8 +3810,8 @@ func Test_filter(t *testing.T) {
 			true},
 		{"fail - no function", args{
 			[]*valueContainer{
-				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
-				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, name: "bar"}},
+				{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"},
+				{slice: []string{"foo", "foo"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
 			map[string]FilterFn{
 				"qux": nil,
 			}},
@@ -4374,22 +3876,22 @@ func Test_subsetContainerRows(t *testing.T) {
 		{"pass",
 			args{
 				containers: []*valueContainer{
-					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "bar"}},
+					{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"},
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
 				index: []int{0}},
 			[]*valueContainer{
-				{slice: []int{0}, isNull: []bool{false}, name: "qux"},
-				{slice: []string{"foo"}, isNull: []bool{false}, name: "bar"}},
+				{slice: []int{0}, isNull: []bool{false}, id: mockID, name: "qux"},
+				{slice: []string{"foo"}, isNull: []bool{false}, id: mockID, name: "bar"}},
 			false},
 		{"fail - out of range",
 			args{
 				containers: []*valueContainer{
-					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "bar"}},
+					{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"},
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
 				index: []int{2}},
 			[]*valueContainer{
-				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
-				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "bar"}},
+				{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"},
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
 			true},
 	}
 	for _, tt := range tests {
@@ -4419,17 +3921,17 @@ func Test_subsetContainers(t *testing.T) {
 		{"pass",
 			args{
 				containers: []*valueContainer{
-					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "bar"}},
+					{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"},
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
 				index: []int{0}},
 			[]*valueContainer{
-				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"}},
+				{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"}},
 			false},
 		{"fail - out of range",
 			args{
 				containers: []*valueContainer{
-					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "bar"}},
+					{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"},
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "bar"}},
 				index: []int{2}},
 			nil,
 			true},
@@ -4555,7 +4057,11 @@ func Test_dataFrameIsDistinct(t *testing.T) {
 				name:          "foo",
 				colLevelNames: []string{"*0"},
 			},
-			&DataFrame{values: []*valueContainer{vc}, labels: []*valueContainer{vc}, name: "foo", colLevelNames: colLevelNames}},
+			&DataFrame{
+				values:        []*valueContainer{vc},
+				labels:        []*valueContainer{vc},
+				name:          "foo",
+				colLevelNames: colLevelNames}},
 			true,
 		},
 		{"not distinct - value containers", args{
@@ -4563,7 +4069,11 @@ func Test_dataFrameIsDistinct(t *testing.T) {
 				values: vcs,
 				labels: []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
 				name:   "foo", colLevelNames: []string{"*0"}},
-			&DataFrame{values: vcs, labels: []*valueContainer{vc}, name: "foo", colLevelNames: colLevelNames}},
+			&DataFrame{
+				values:        vcs,
+				labels:        []*valueContainer{vc},
+				name:          "foo",
+				colLevelNames: colLevelNames}},
 			false,
 		},
 		{"not distinct - values", args{
@@ -4571,7 +4081,11 @@ func Test_dataFrameIsDistinct(t *testing.T) {
 				values: []*valueContainer{vc},
 				labels: []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
 				name:   "foo", colLevelNames: []string{"*0"}},
-			&DataFrame{values: []*valueContainer{vc}, labels: []*valueContainer{vc}, name: "foo", colLevelNames: colLevelNames}},
+			&DataFrame{
+				values:        []*valueContainer{vc},
+				labels:        []*valueContainer{vc},
+				name:          "foo",
+				colLevelNames: colLevelNames}},
 			false,
 		},
 		{"not distinct - label containers", args{
@@ -4579,14 +4093,21 @@ func Test_dataFrameIsDistinct(t *testing.T) {
 				values: []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
 				labels: vcs,
 				name:   "foo", colLevelNames: []string{"*0"}},
-			&DataFrame{values: []*valueContainer{vc}, labels: vcs, name: "foo", colLevelNames: colLevelNames}},
+			&DataFrame{
+				values:        []*valueContainer{vc},
+				labels:        vcs,
+				name:          "foo",
+				colLevelNames: colLevelNames}},
 			false,
 		},
 		{"not distinct - labels", args{
 			&DataFrame{
 				values: []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
 				labels: []*valueContainer{vc}, name: "foo", colLevelNames: []string{"*0"}},
-			&DataFrame{values: []*valueContainer{vc}, labels: []*valueContainer{vc}, name: "foo", colLevelNames: colLevelNames}},
+			&DataFrame{
+				values: []*valueContainer{vc},
+				labels: []*valueContainer{vc},
+				name:   "foo", colLevelNames: colLevelNames}},
 			false,
 		},
 		{"not distinct - col level names", args{
@@ -4595,7 +4116,11 @@ func Test_dataFrameIsDistinct(t *testing.T) {
 				labels:        []*valueContainer{{slice: []float64{1, 2, 3}, isNull: []bool{false, false, false}}},
 				name:          "foo",
 				colLevelNames: colLevelNames},
-			&DataFrame{values: []*valueContainer{vc}, labels: []*valueContainer{vc}, name: "foo", colLevelNames: colLevelNames}},
+			&DataFrame{
+				values:        []*valueContainer{vc},
+				labels:        []*valueContainer{vc},
+				name:          "foo",
+				colLevelNames: colLevelNames}},
 			false,
 		},
 	}
@@ -4614,6 +4139,7 @@ func Test_valueContainer_dropRow(t *testing.T) {
 		isNull []bool
 		cache  []string
 		name   string
+		id     string
 	}
 	type args struct {
 		index int
@@ -4626,15 +4152,15 @@ func Test_valueContainer_dropRow(t *testing.T) {
 		wantErr bool
 	}{
 		{"pass - reset cache", fields{slice: []int{0, 1}, isNull: []bool{false, false},
-			name: "qux", cache: []string{"0", "1"}},
+			name: "qux", id: mockID, cache: []string{"0", "1"}},
 			args{0},
-			&valueContainer{slice: []int{1}, isNull: []bool{false}, name: "qux"},
+			&valueContainer{slice: []int{1}, isNull: []bool{false}, id: mockID, name: "qux"},
 			false,
 		},
 		{"fail", fields{slice: []int{0, 1}, isNull: []bool{false, false},
-			name: "qux", cache: []string{"foo"}},
+			name: "qux", id: mockID, cache: []string{"foo"}},
 			args{10},
-			&valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux",
+			&valueContainer{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux",
 				cache: []string{"foo"}},
 			true,
 		},
@@ -4646,6 +4172,7 @@ func Test_valueContainer_dropRow(t *testing.T) {
 				isNull: tt.fields.isNull,
 				cache:  tt.fields.cache,
 				name:   tt.fields.name,
+				id:     tt.fields.id,
 			}
 			if err := vc.dropRow(tt.args.index); (err != nil) != tt.wantErr {
 				t.Errorf("valueContainer.dropRow() error = %v, wantErr %v", err, tt.wantErr)
@@ -4713,22 +4240,22 @@ func Test_xs(t *testing.T) {
 	}{
 		{"pass",
 			args{[]*valueContainer{
-				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
-				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "foo"}},
+				{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"},
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 				map[string]interface{}{"qux": 1, "foo": "bar"}},
 			[]int{1}, false,
 		},
 		{"pass - no matches",
 			args{[]*valueContainer{
-				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
-				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "foo"}},
+				{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"},
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 				map[string]interface{}{"qux": 0, "foo": "bar"}},
 			[]int{}, false,
 		},
 		{"fail",
 			args{[]*valueContainer{
-				{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
-				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "foo"}},
+				{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"},
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 				map[string]interface{}{"corge": 1, "foo": "bar"}},
 			nil, true,
 		},
@@ -4760,15 +4287,15 @@ func Test_nameOfContainer(t *testing.T) {
 		{"pass",
 			args{
 				[]*valueContainer{
-					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "foo"}},
+					{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"},
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 				0},
 			"qux"},
 		{"fail",
 			args{
 				[]*valueContainer{
-					{slice: []int{0, 1}, isNull: []bool{false, false}, name: "qux"},
-					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "foo"}},
+					{slice: []int{0, 1}, isNull: []bool{false, false}, id: mockID, name: "qux"},
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "foo"}},
 				10},
 			"index out of range [10] with length 2"},
 	}
@@ -4776,42 +4303,6 @@ func Test_nameOfContainer(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := nameOfContainer(tt.args.containers, tt.args.n); got != tt.want {
 				t.Errorf("nameOfContainer() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_setReadConfig(t *testing.T) {
-	type args struct {
-		options []ReadOption
-	}
-	tests := []struct {
-		name string
-		args args
-		want *readConfig
-	}{
-		{"default", args{nil}, &readConfig{
-			numHeaderRows:  1,
-			numLabelLevels: 0,
-			delimiter:      ',',
-			majorDimIsCols: false,
-		}},
-		{"pass", args{[]ReadOption{
-			ReadOptionHeaders(2),
-			ReadOptionLabels(2),
-			ReadOptionDelimiter('|'),
-			ReadOptionSwitchDims(),
-		}}, &readConfig{
-			numHeaderRows:  2,
-			numLabelLevels: 2,
-			delimiter:      '|',
-			majorDimIsCols: true,
-		}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := setReadConfig(tt.args.options); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("setReadConfig() = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -4988,28 +4479,17 @@ func Test_valueContainer_interfaceSlice(t *testing.T) {
 		cache  []string
 		name   string
 	}
-	type args struct {
-		includeHeader bool
-	}
 	tests := []struct {
 		name   string
 		fields fields
-		args   args
-		want   []interface{}
+
+		want []interface{}
 	}{
 		{"pass - exclude header", fields{
 			slice:  []int{1, 0, 2},
 			isNull: []bool{false, true, false},
 			name:   "foobar"},
-			args{false},
-			[]interface{}{1, "(null)", 2},
-		},
-		{"pass - include header", fields{
-			slice:  []int{1, 0, 2},
-			isNull: []bool{false, true, false},
-			name:   "foobar"},
-			args{true},
-			[]interface{}{"foobar", 1, "(null)", 2},
+			[]interface{}{1, nil, 2},
 		},
 	}
 	for _, tt := range tests {
@@ -5020,8 +4500,903 @@ func Test_valueContainer_interfaceSlice(t *testing.T) {
 				cache:  tt.fields.cache,
 				name:   tt.fields.name,
 			}
-			if got := vc.interfaceSlice(tt.args.includeHeader); !reflect.DeepEqual(got, tt.want) {
+			if got := vc.interfaceSlice(); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("valueContainer.interfaceSlice() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_unpackIDsByPosition(t *testing.T) {
+	var foo string
+	var bar string
+	type args struct {
+		containers []*valueContainer
+		receivers  []*string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []string
+		wantErr bool
+	}{
+		{"pass", args{
+			[]*valueContainer{
+				{id: "1"}, {id: "2"},
+			},
+			[]*string{&foo, &bar},
+		},
+			[]string{"1", "2"},
+			false,
+		},
+		{"pass - fewer receivers than columns", args{
+			[]*valueContainer{
+				{id: "1"}, {id: "2"},
+			},
+			[]*string{&foo},
+		},
+			[]string{"1"},
+			false,
+		},
+		{"fail - more receivers than columns", args{
+			[]*valueContainer{
+				{id: "1"}, {id: "2"},
+			},
+			[]*string{&foo, &bar, &bar},
+		},
+			[]string{"", ""},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		foo = ""
+		bar = ""
+		t.Run(tt.name, func(t *testing.T) {
+			err := unpackIDsByPosition(tt.args.containers, tt.args.receivers...)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("unpackIDsByPosition() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil {
+				for i := range tt.args.receivers {
+					if *tt.args.receivers[i] != tt.want[i] {
+						t.Errorf("unpackIDsByPosition() -> [%d] = %v, want %v", i, *tt.args.receivers[i], tt.want[i])
+					}
+				}
+			}
+		})
+	}
+}
+
+func Test_unpackIDsByName(t *testing.T) {
+	var foo string
+	var bar string
+	type args struct {
+		containers []*valueContainer
+		receivers  map[string]*string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    map[string]string
+		wantErr bool
+	}{
+		{"pass", args{
+			[]*valueContainer{
+				{name: "foo", id: "1"}, {name: "bar", id: "2"},
+			},
+			map[string]*string{"foo": &foo, "bar": &bar},
+		},
+			map[string]string{"foo": "1", "bar": "2"},
+			false,
+		},
+		{"pass - fewer receivers than containers", args{
+			[]*valueContainer{
+				{name: "foo", id: "1"},
+			},
+			map[string]*string{"foo": &foo},
+		},
+			map[string]string{"foo": "1"},
+			false,
+		},
+		{"fail - invalid container name", args{
+			[]*valueContainer{
+				{name: "foo", id: "1"},
+			},
+			map[string]*string{"corge": &foo},
+		},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			foo = ""
+			bar = ""
+			err := unpackIDsByName(tt.args.containers, tt.args.receivers)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("unpackIDsByName() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if err == nil {
+				for k := range tt.args.receivers {
+					if *tt.args.receivers[k] != tt.want[k] {
+						t.Errorf("unpackIDsByName() -> [%s] = %v, want %v", k, *tt.args.receivers[k], tt.want[k])
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestRealClock(t *testing.T) {
+	c := realClock{}
+	if !c.now().After(time.Time{}) {
+		t.Errorf("expected realClock to return a non-zero time")
+	}
+}
+
+func Test_transposeRecords(t *testing.T) {
+	type args struct {
+		records [][]string
+	}
+	tests := []struct {
+		name string
+		args args
+		want [][]string
+	}{
+		{"pass",
+			args{[][]string{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}}},
+			[][]string{{"foo", "quz"}, {"bar", "qux"}, {"baz", "quuz"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := transposeRecords(tt.args.records); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("transposeRecords() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_readRecords(t *testing.T) {
+	type args struct {
+		records    [][]string
+		byColumns  bool
+		numHeaders int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*valueContainer
+		wantErr bool
+	}{
+		{"pass - by row, no headers",
+			args{[][]string{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}}, false, 0},
+			[]*valueContainer{
+				{slice: []string{"foo", "quz"}, isNull: []bool{false, false}, name: "", id: mockID},
+				{slice: []string{"bar", "qux"}, isNull: []bool{false, false}, name: "", id: mockID},
+				{slice: []string{"baz", "quuz"}, isNull: []bool{false, false}, name: "", id: mockID},
+			},
+			false,
+		},
+		{"pass - by row, with header",
+			args{[][]string{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}}, false, 1},
+			[]*valueContainer{
+				{slice: []string{"quz"}, isNull: []bool{false}, name: "foo", id: mockID},
+				{slice: []string{"qux"}, isNull: []bool{false}, name: "bar", id: mockID},
+				{slice: []string{"quuz"}, isNull: []bool{false}, name: "baz", id: mockID},
+			},
+			false,
+		},
+		{"pass - by column, with header",
+			args{[][]string{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}}, true, 1},
+			[]*valueContainer{
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo", id: mockID},
+				{slice: []string{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz", id: mockID},
+			},
+			false,
+		},
+		{"fail - misshapen",
+			args{[][]string{{"foo", "bar"}, {"quz", "qux", "quuz"}}, false, 1},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := readRecords(tt.args.records, tt.args.byColumns, tt.args.numHeaders)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readRecords() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("readRecords() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_readInterfaceRecords(t *testing.T) {
+	type args struct {
+		records    [][]interface{}
+		byColumns  bool
+		numHeaders int
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*valueContainer
+		wantErr bool
+	}{
+		{"pass - by row, no headers",
+			args{[][]interface{}{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}}, false, 0},
+			[]*valueContainer{
+				{slice: []interface{}{"foo", "quz"}, isNull: []bool{false, false}, name: "", id: mockID},
+				{slice: []interface{}{"bar", "qux"}, isNull: []bool{false, false}, name: "", id: mockID},
+				{slice: []interface{}{"baz", "quuz"}, isNull: []bool{false, false}, name: "", id: mockID},
+			},
+			false,
+		},
+		{"pass - by row, with header",
+			args{[][]interface{}{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}}, false, 1},
+			[]*valueContainer{
+				{slice: []interface{}{"quz"}, isNull: []bool{false}, name: "foo", id: mockID},
+				{slice: []interface{}{"qux"}, isNull: []bool{false}, name: "bar", id: mockID},
+				{slice: []interface{}{"quuz"}, isNull: []bool{false}, name: "baz", id: mockID},
+			},
+			false,
+		},
+		{"pass - by column, with header",
+			args{[][]interface{}{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}}, true, 1},
+			[]*valueContainer{
+				{slice: []interface{}{"bar", "baz"}, isNull: []bool{false, false}, name: "foo", id: mockID},
+				{slice: []interface{}{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz", id: mockID},
+			},
+			false,
+		},
+		{"fail - misshapen",
+			args{[][]interface{}{{"foo", "bar"}, {"quz", "qux", "quuz"}}, false, 1},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := readInterfaceRecords(tt.args.records, tt.args.byColumns, tt.args.numHeaders)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readInterfaceRecords() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("readInterfaceRecords() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_writeRecords(t *testing.T) {
+	type args struct {
+		containers   []*valueContainer
+		byColumn     bool
+		numColLevels int
+	}
+	tests := []struct {
+		name string
+		args args
+		want [][]string
+	}{
+		{"pass - transpose rows - with null", args{
+			[]*valueContainer{
+				{slice: []string{"quz"}, isNull: []bool{false}, name: "foo", id: mockID},
+				{slice: []string{""}, isNull: []bool{true}, name: "bar", id: mockID},
+				{slice: []string{"quuz"}, isNull: []bool{false}, name: "baz", id: mockID},
+			}, false, 1,
+		},
+			[][]string{{"foo", "bar", "baz"}, {"quz", "(null)", "quuz"}},
+		},
+		{"pass - by column", args{
+			[]*valueContainer{
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo", id: mockID},
+				{slice: []string{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz", id: mockID},
+			}, true, 1,
+		},
+			[][]string{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}},
+		},
+		{"pass - by column - multi-level", args{
+			[]*valueContainer{
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo|corge", id: mockID},
+				{slice: []string{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz|fred", id: mockID},
+			}, true, 2,
+		},
+			[][]string{{"foo", "corge", "bar", "baz"}, {"quz", "fred", "qux", "quuz"}},
+		},
+		{"pass - by column - multi-level (uneven)", args{
+			[]*valueContainer{
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo", id: mockID},
+				{slice: []string{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz|fred", id: mockID},
+			}, true, 2,
+		},
+			[][]string{{"foo", "", "bar", "baz"}, {"quz", "fred", "qux", "quuz"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := writeRecords(tt.args.containers, tt.args.byColumn, tt.args.numColLevels); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("writeRecords() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_writeInterfaceRecords(t *testing.T) {
+	type args struct {
+		containers   []*valueContainer
+		byColumn     bool
+		numColLevels int
+	}
+	tests := []struct {
+		name string
+		args args
+		want [][]interface{}
+	}{
+		{"pass - transpose rows - with null", args{
+			[]*valueContainer{
+				{slice: []string{"quz"}, isNull: []bool{false}, name: "foo", id: mockID},
+				{slice: []string{""}, isNull: []bool{true}, name: "bar", id: mockID},
+				{slice: []string{"quuz"}, isNull: []bool{false}, name: "baz", id: mockID},
+			}, false, 1,
+		},
+			[][]interface{}{{"foo", "bar", "baz"}, {"quz", nil, "quuz"}},
+		},
+		{"pass - by column", args{
+			[]*valueContainer{
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo", id: mockID},
+				{slice: []string{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz", id: mockID},
+			}, true, 1,
+		},
+			[][]interface{}{{"foo", "bar", "baz"}, {"quz", "qux", "quuz"}},
+		},
+		{"pass - by column - multi-level", args{
+			[]*valueContainer{
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo|corge", id: mockID},
+				{slice: []string{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz|fred", id: mockID},
+			}, true, 2,
+		},
+			[][]interface{}{{"foo", "corge", "bar", "baz"}, {"quz", "fred", "qux", "quuz"}},
+		},
+		{"pass - by column - multi-level (uneven)", args{
+			[]*valueContainer{
+				{slice: []string{"bar", "baz"}, isNull: []bool{false, false}, name: "foo", id: mockID},
+				{slice: []string{"qux", "quuz"}, isNull: []bool{false, false}, name: "quz|fred", id: mockID},
+			}, true, 2,
+		},
+			[][]interface{}{{"foo", nil, "bar", "baz"}, {"quz", "fred", "qux", "quuz"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := writeInterfaceRecords(tt.args.containers, tt.args.byColumn, tt.args.numColLevels); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("writeInterfaceRecords() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+type testStruct struct {
+	Name string `json:"name"`
+	Age  int    `json:"age"`
+}
+
+type testStructUnexported struct {
+	age  int
+	Name string `json:"name"`
+}
+
+type testStructNoTags struct {
+	Name string
+	Age  int
+}
+
+type testStructNoFields struct {
+}
+
+func Test_readStructSlice(t *testing.T) {
+	type args struct {
+		slice  interface{}
+		isNull [][]bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*valueContainer
+		wantErr bool
+	}{
+		{"pass",
+			args{
+				[]testStruct{{"foo", 1}, {"bar", 2}},
+				nil,
+			},
+			[]*valueContainer{
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "name"},
+				{slice: []int{1, 2}, isNull: []bool{false, false}, id: mockID, name: "age"}},
+			false},
+		{"pass - missing field",
+			args{
+				[]testStruct{{Name: "foo"}, {Name: "bar"}},
+				nil,
+			},
+			[]*valueContainer{
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "name"},
+				{slice: []int{0, 0}, isNull: []bool{false, false}, id: mockID, name: "age"}},
+			false},
+		{"pass - with supplied nulls",
+			args{
+				[]testStruct{
+					{"", 1},
+					{"bar", 2},
+					{"baz", 0},
+				},
+				[][]bool{
+					{true, false},
+					{false, false},
+					{false, true},
+				},
+			},
+			[]*valueContainer{
+				{slice: []string{"", "bar", "baz"}, isNull: []bool{true, false, false}, id: mockID, name: "name"},
+				{slice: []int{1, 2, 0}, isNull: []bool{false, false, true}, id: mockID, name: "age"}},
+			false},
+		{"pass - no tags",
+			args{
+				[]testStructNoTags{
+					{"", 1},
+					{"bar", 2},
+					{"baz", 0},
+				},
+				[][]bool{
+					{true, false},
+					{false, false},
+					{false, true},
+				},
+			},
+			[]*valueContainer{
+				{slice: []string{"", "bar", "baz"}, isNull: []bool{true, false, false}, id: mockID, name: "Name"},
+				{slice: []int{1, 2, 0}, isNull: []bool{false, false, true}, id: mockID, name: "Age"}},
+			false},
+		{"pass - with inferred nulls",
+			args{
+				[]testStruct{{optionsNullPrinter, 1}, {"bar", 2}},
+				nil,
+			},
+			[]*valueContainer{
+				{slice: []string{optionsNullPrinter, "bar"}, isNull: []bool{true, false}, id: mockID, name: "name"},
+				{slice: []int{1, 2}, isNull: []bool{false, false}, id: mockID, name: "age"}},
+			false},
+		{"pass - unexported field",
+			args{
+				[]testStructUnexported{{1, "foo"}, {2, "bar"}},
+				nil,
+			},
+			[]*valueContainer{
+				{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, id: mockID, name: "name"}},
+			false},
+		{"fail - wrong number of null columns",
+			args{
+				[]testStruct{
+					{"", 1},
+					{"bar", 2},
+					{"baz", 3},
+				},
+				[][]bool{
+					{true, false},
+				},
+			},
+			nil, true},
+		{"fail - wrong number of null rows",
+			args{
+				[]testStruct{
+					{"", 1},
+					{"bar", 2},
+				},
+				[][]bool{
+					{true},
+					{false},
+				},
+			},
+			nil, true},
+		{"fail - uneven null rows",
+			args{
+				[]testStruct{
+					{"", 1},
+					{"bar", 2},
+				},
+				[][]bool{
+					{true, true},
+					{},
+				},
+			},
+			nil, true},
+		{"fail - not slice", args{testStruct{"foo", 1}, nil},
+			nil, true},
+		{"fail - not struct", args{[]string{"foo"}, nil},
+			nil, true},
+		{"fail - empty", args{[]testStruct{}, nil},
+			nil, true},
+		{"fail - no fields", args{[]testStructNoFields{{}}, nil},
+			nil, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := readStructSlice(tt.args.slice, tt.args.isNull)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readStructSlice() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("readStructSlice() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_writeStructSlice(t *testing.T) {
+	type args struct {
+		containers      []*valueContainer
+		slice           interface{}
+		noUnmatchedCols bool
+	}
+	tests := []struct {
+		name      string
+		args      args
+		want      interface{}
+		wantNulls [][]bool
+		wantErr   bool
+	}{
+		{"pass - no unmatched columns",
+			args{
+				[]*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "name", id: mockID},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "age", id: mockID},
+				}, &[]testStruct{},
+				true,
+			},
+			&[]testStruct{
+				{"foo", 1},
+				{"bar", 2},
+			},
+			[][]bool{
+				{false, false},
+				{false, false},
+			},
+			false,
+		},
+		{"pass - no unmatched columns, but unmatched fields",
+			args{
+				[]*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "name", id: mockID},
+				}, &[]testStruct{},
+				true,
+			},
+			&[]testStruct{
+				{"foo", 0},
+				{"bar", 0},
+			},
+			[][]bool{
+				{false, false},
+				{false, false},
+			},
+			false,
+		},
+		{"pass - unmatched columns",
+			args{
+				[]*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "name", id: mockID},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "age", id: mockID},
+					{slice: []int{3, 4}, isNull: []bool{false, false}, name: "foobar", id: mockID},
+				}, &[]testStruct{},
+				false,
+			},
+			&[]testStruct{
+				{"foo", 1},
+				{"bar", 2},
+			},
+			[][]bool{
+				{false, false},
+				{false, false},
+			},
+			false,
+		},
+		{"pass - nulls",
+			args{
+				[]*valueContainer{
+					{slice: []string{"foo", "", "bar"}, isNull: []bool{false, true, false}, name: "name", id: mockID},
+					{slice: []int{1, 2, 3}, isNull: []bool{false, false, false}, name: "age", id: mockID},
+				}, &[]testStruct{},
+				false,
+			},
+			&[]testStruct{
+				{"foo", 1},
+				{"", 2},
+				{"bar", 3},
+			},
+			[][]bool{
+				{false, false},
+				{true, false},
+				{false, false},
+			},
+			false,
+		},
+		{"pass - no tags",
+			args{
+				[]*valueContainer{
+					{slice: []string{"", "bar"}, isNull: []bool{true, false}, name: "Name", id: mockID},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "Age", id: mockID},
+				}, &[]testStructNoTags{},
+				false,
+			},
+			&[]testStructNoTags{
+				{"", 1},
+				{"bar", 2},
+			},
+			[][]bool{
+				{true, false},
+				{false, false},
+			},
+			false,
+		},
+		{"pass - unexported fields",
+			args{
+				[]*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "name", id: mockID},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "age", id: mockID},
+				}, &[]testStructUnexported{},
+				false,
+			},
+			&[]testStructUnexported{
+				{0, "foo"},
+				{0, "bar"},
+			},
+			[][]bool{
+				{false},
+				{false},
+			},
+			false,
+		},
+		{"fail - wrong type",
+			args{
+				[]*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "name", id: mockID},
+					{slice: []float64{1, 2}, isNull: []bool{false, false}, name: "age", id: mockID},
+				}, &[]testStruct{},
+				true,
+			},
+			nil,
+			nil,
+			true,
+		},
+		{"fail - unmatched columns",
+			args{
+				[]*valueContainer{
+					{slice: []string{"foo", "bar"}, isNull: []bool{false, false}, name: "name", id: mockID},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "age", id: mockID},
+					{slice: []int{3, 4}, isNull: []bool{false, false}, name: "foobar", id: mockID},
+				}, &[]testStruct{},
+				true,
+			},
+			nil,
+			nil,
+			true,
+		},
+		{"fail - wrong type",
+			args{
+				[]*valueContainer{
+					{slice: []string{"", "bar"}, isNull: []bool{true, false}, name: "Name", id: mockID},
+					{slice: []int{1, 2}, isNull: []bool{false, false}, name: "Age", id: mockID},
+				}, "foo",
+				false,
+			},
+			nil,
+			nil,
+			true,
+		},
+		{"fail - empty df",
+			args{
+				[]*valueContainer{}, &[]testStructNoTags{},
+				false,
+			},
+			nil,
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := writeStructSlice(tt.args.containers, tt.args.slice, tt.args.noUnmatchedCols)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("writeStructSlice() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.wantNulls) {
+				t.Errorf("writeStructSlice() got1 = %v, want %v", got, tt.wantNulls)
+			}
+			if err == nil && !reflect.DeepEqual(tt.args.slice, tt.want) {
+				t.Errorf("writeStructSlice() -> = %v, want %v", tt.args.slice, tt.want)
+			}
+		})
+	}
+}
+
+func Test_mockContainersFromDTypes(t *testing.T) {
+	type args struct {
+		names       []string
+		dtypes      []DType
+		numMockRows int
+	}
+	tests := []struct {
+		name string
+		args args
+		want []*valueContainer
+	}{
+		{"pass", args{[]string{"foo", "bar"}, []DType{String, Float64}, 1},
+			[]*valueContainer{
+				{slice: []string{"baz"}, isNull: []bool{false}, name: "foo", id: mockID, cache: []string{"baz"}},
+				{slice: []float64{.5}, isNull: []bool{false}, name: "bar", id: mockID, cache: []string{".5"}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := mockContainersFromDTypes(tt.args.names, tt.args.dtypes, tt.args.numMockRows); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("mockContainersFromDTypes() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_valueContainer_inferType(t *testing.T) {
+	type fields struct {
+		slice  interface{}
+		isNull []bool
+		cache  []string
+		name   string
+		id     string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		want   DType
+	}{
+		{"string", fields{slice: []string{"foo", "bar", "baz"}}, String},
+		{"float", fields{slice: []string{"3.5", "1", ""}}, Float64},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			vc := &valueContainer{
+				slice:  tt.fields.slice,
+				isNull: tt.fields.isNull,
+				cache:  tt.fields.cache,
+				name:   tt.fields.name,
+				id:     tt.fields.id,
+			}
+			if got := vc.inferType(); got != tt.want {
+				t.Errorf("valueContainer.inferType() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_castToInferredTypes(t *testing.T) {
+	type args struct {
+		containers []*valueContainer
+	}
+	tests := []struct {
+		name string
+		args args
+		want []*valueContainer
+	}{
+		{"pass", args{[]*valueContainer{
+			{slice: []string{"baz"}, isNull: []bool{false}, name: "foo", id: mockID},
+			{slice: []string{".5"}, isNull: []bool{false}, name: "bar", id: mockID},
+		}},
+			[]*valueContainer{
+				{slice: []string{"baz"}, isNull: []bool{false}, name: "foo", id: mockID, cache: []string{"baz"}},
+				{slice: []float64{.5}, isNull: []bool{false}, name: "bar", id: mockID, cache: []string{".5"}},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			castToInferredTypes(tt.args.containers)
+			if !reflect.DeepEqual(tt.args.containers, tt.want) {
+				t.Errorf("castToInferredTypes() -> %v, want %v", tt.args.containers, tt.want)
+			}
+		})
+	}
+}
+
+func Test_readNestedInterfaceByCols(t *testing.T) {
+	type args struct {
+		columns         [][]interface{}
+		requireSameType bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []interface{}
+		wantErr bool
+	}{
+		{"pass", args{
+			[][]interface{}{
+				{"foo", 0},
+				{"bar", 1},
+			}, false},
+			[]interface{}{[]interface{}{"foo", 0}, []interface{}{"bar", 1}},
+			false,
+		},
+		{"fail - no columns", args{
+			[][]interface{}{}, true},
+			nil,
+			true,
+		},
+		{"fail - different length columns", args{
+			[][]interface{}{
+				{"foo", "baz"},
+				{0},
+			}, true},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := readNestedInterfaceByCols(tt.args.columns)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("readNestedInterfaceByCols() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("readNestedInterfaceByCols() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_transposeNestedNulls(t *testing.T) {
+	type args struct {
+		isNull [][]bool
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    [][]bool
+		wantErr bool
+	}{
+		{"pass", args{
+			[][]bool{{false, false, true}, {true, false, false}},
+		},
+			[][]bool{{false, true}, {false, false}, {true, false}},
+			false,
+		},
+		{"nil empty", args{
+			[][]bool{},
+		},
+			nil,
+			false,
+		},
+		{"fail - wrong shape", args{
+			[][]bool{{false, false}, {true}},
+		},
+			nil,
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := transposeNestedNulls(tt.args.isNull)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("transposeNestedNulls() error = %v, want %v", got, tt.want)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("transposeNestedNulls() = %v, want %v", got, tt.want)
 			}
 		})
 	}

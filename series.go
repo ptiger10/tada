@@ -2,7 +2,6 @@ package tada
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"math/rand"
 	"reflect"
@@ -27,7 +26,7 @@ func NewSeries(slice interface{}, labels ...interface{}) *Series {
 	if slice == nil && labels == nil {
 		return seriesWithError(fmt.Errorf("constructing new Series: slice and labels cannot both be nil"))
 	}
-	values := &valueContainer{}
+	values := new(valueContainer)
 	var err error
 	if slice != nil {
 		// handle values
@@ -85,50 +84,12 @@ func (s *Series) DataFrame() *DataFrame {
 	}
 }
 
-// EqualsCSV reads want (configured by wantOptions) into a dataframe,
-// converts both s and want into [][]string records,
+// EqualRecords reduces s to [][]string records, reads [][]string records from want,
 // and evaluates whether the stringified values match.
 // If they do not match, returns a tablediff.Differences object that can be printed to isolate their differences.
-//
-// If includeLabels is true, then s's labels are included as columns.
-func (s *Series) EqualsCSV(includeLabels bool, want io.Reader, wantOptions ...ReadOption) (bool, *tablediff.Differences, error) {
+func (s *Series) EqualRecords(got *RecordWriter, want *CSVReader) (bool, *tablediff.Differences, error) {
 	df := s.DataFrame()
-	return df.EqualsCSV(includeLabels, want, wantOptions...)
-}
-
-// CSV converts a Series to a DataFrame and returns as [][]string.
-func (s *Series) CSV(options ...WriteOption) ([][]string, error) {
-	if s.values == nil {
-		return nil, fmt.Errorf("converting to csv: cannot export empty Series")
-	}
-	df := &DataFrame{
-		values:        []*valueContainer{s.values},
-		labels:        s.labels,
-		colLevelNames: []string{"*0"},
-		err:           s.err,
-	}
-	csv := df.CSVRecords(options...)
-	return csv, nil
-}
-
-// Struct writes the values of the df containers into structPointer.
-// Returns an error if df does not contain, from left-to-right, the same container names and types
-// as the exported fields that appear, from top-to-bottom, in structPointer.
-// Exported struct fields must be types that are supported by NewDataFrame().
-// If a "tada" tag is present with the value "isNull", this field must be [][]bool.
-// The null status of each value container in the DataFrame, from left-to-right, will be written into this field in equal-lengthed slices.
-// If df contains additional containers beyond those in structPointer, those are ignored.
-func (s *Series) Struct(structPointer interface{}, options ...WriteOption) error {
-	df := s.DataFrame()
-	return df.Struct(structPointer, options...)
-}
-
-// WriteCSV converts a DataFrame to a csv with rows as the major dimension,
-// and writes the output to w.
-// Null values are replaced with "(null)".
-func (s *Series) WriteCSV(w io.Writer, options ...WriteOption) error {
-	df := s.DataFrame()
-	return df.WriteCSV(w, options...)
+	return df.EqualRecords(got, want)
 }
 
 // -- GETTERS
@@ -393,13 +354,13 @@ func (s *Series) InPlace() *SeriesMutator {
 	return &SeriesMutator{series: s}
 }
 
-// WithLabels resolves as follows:
+// WithLabels accepts a name and input, which must be string or slice. It resolves as follows:
 //
-// If a scalar string is supplied as input and a label level exists that matches name: rename the level to match input.
+// If a string is supplied as input and a label level exists that matches name: rename the level to match input.
 // In this case, name must already exist.
 //
 // If a slice is supplied as input and a label level exists that matches name: replace the values at this level to match input.
-// If a slice is supplied as input and a label level does not exist that matches name: append a new level named name and values matching input.
+// If a slice is supplied as input and a label level does not exist that matches name: append a new level with name matching name and values matching input.
 // If input is a slice, it must be the same length as the underlying Series.
 //
 // In all cases, returns a new Series.
@@ -412,13 +373,13 @@ func (s *Series) WithLabels(name string, input interface{}) *Series {
 	return s
 }
 
-// WithLabels resolves as follows:
+// WithLabels accepts a name and input, which must be string or slice. It resolves as follows:
 //
-// If a scalar string is supplied as input and a label level exists that matches name: rename the level to match input.
+// If a string is supplied as input and a label level exists that matches name: rename the level to match input.
 // In this case, name must already exist.
 //
 // If a slice is supplied as input and a label level exists that matches name: replace the values at this level to match input.
-// If a slice is supplied as input and a label level does not exist that matches name: append a new level named name and values matching input.
+// If a slice is supplied as input and a label level does not exist that matches name: append a new level with name matching name and values matching input.
 // If input is a slice, it must be the same length as the underlying Series.
 //
 // In all cases, modifies the underlying Series in place.
@@ -432,7 +393,7 @@ func (s *SeriesMutator) WithLabels(name string, input interface{}) error {
 }
 
 // WithValues replaces the Series values with input.
-// input must be a supported slice type of the same length as the original Series.
+// Input must be a slice of the same length as the original Series.
 // Returns a new Series.
 func (s *Series) WithValues(input interface{}) *Series {
 	s = s.Copy()
@@ -444,7 +405,7 @@ func (s *Series) WithValues(input interface{}) *Series {
 }
 
 // WithValues replaces the Series values with input.
-// input must be a supported slice type of the same length as the original Series.
+// Input must be a slice of the same length as the original Series.
 // Modifies the underlying Series.
 func (s *SeriesMutator) WithValues(input interface{}) error {
 	// synthesize a collection of valueContainers, ensuring that name already exists
@@ -604,9 +565,9 @@ func (s *Series) Name() string {
 // -- SORT
 
 // Sort sorts the values by zero or more Sorter specifications.
-// If no Sorter is supplied, sorts by Series values (as float64) in ascending order.
+// If no Sorter is supplied, sorts by Series values (as string) in ascending order.
 // If a Sorter is supplied without a Name or with a name matching the Series name, sorts by Series values.
-// If no DType is supplied in a Sorter, sorts as float64.
+// If no DType is supplied in a Sorter, sorts as string.
 // DType is only used for the process of sorting. Once it has been sorted, data retains its original type.
 // Returns a new Series.
 func (s *Series) Sort(by ...Sorter) *Series {
@@ -619,9 +580,9 @@ func (s *Series) Sort(by ...Sorter) *Series {
 }
 
 // Sort sorts the values by zero or more Sorter specifications.
-// If no Sorter is supplied, sorts by Series values (as float64) in ascending order.
+// If no Sorter is supplied, sorts by Series values (as string) in ascending order.
 // If a Sorter is supplied without a Name or with a name matching the Series name, sorts by Series values.
-// If no DType is supplied in a Sorter, sorts as float64.
+// If no DType is supplied in a Sorter, sorts as string.
 // Modifies the underlying Series in place.
 func (s *SeriesMutator) Sort(by ...Sorter) error {
 	// default for handling no Sorters: values as Float64 in ascending order
@@ -715,10 +676,10 @@ func (s *SeriesMutator) Filter(filters map[string]FilterFn) error {
 // which is a map of container names (either the Series name or label name) and tada.FilterFn structs.
 // If yes, returns ifTrue at that row position.
 // If not, returns ifFalse at that row position.
-// Values are coerced from their original type to the selected field type for filtering, but after filtering retains their original type.
+// Values are coerced from their original type to the selected field type for filtering, but after filtering retain their original type.
+// Null values are retained.
 //
-// Returns an unnamed Series a copy of the labels from the original Series and null status based on the supplied values.
-// If an unsupported value type is supplied as either ifTrue or ifFalse, returns an error.
+// Returns an unnamed Series with a copy of the labels from the original Series and null status based on the supplied values.
 func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{}) (*Series, error) {
 	ret := make([]interface{}, s.Len())
 	// []int of positions where all filters are true
@@ -735,21 +696,8 @@ func (s *Series) Where(filters map[string]FilterFn, ifTrue, ifFalse interface{})
 	for _, i := range inverseIndex {
 		ret[i] = ifFalse
 	}
-	isNull, err := setNullsFromInterface(ret)
-	if err != nil {
-		err := isSupportedSlice([]interface{}{ifTrue})
-		// ifTrue is unsupported?
-		if err != nil {
-			return nil, fmt.Errorf("where: ifTrue: %v", err)
-		}
-		// ifFalse is unsupported?
-		return nil, fmt.Errorf("where: ifFalse: %v", err)
-	}
 	return &Series{
-		values: &valueContainer{
-			slice:  ret,
-			isNull: isNull,
-		},
+		values: newValueContainer(ret, s.values.isNull, ""),
 		labels: copyContainers(s.labels),
 	}, nil
 }
@@ -1156,14 +1104,10 @@ func (s *SeriesMutator) Resample(by Resampler) {
 func (s *Series) CumSum() *Series {
 	isNull := make([]bool, s.Len())
 	for i := range isNull {
-		isNull[i] = false
+		isNull[i] = false // no null values possible
 	}
 	return &Series{
-		values: &valueContainer{
-			slice: s.alignedMath(cumsum),
-			// no null values possible
-			isNull: isNull,
-			name:   "cumsum"},
+		values: newValueContainer(s.alignedMath(cumsum), isNull, "cumsum"),
 		labels: s.labels,
 	}
 }
@@ -1181,11 +1125,7 @@ func (s *Series) Rank() *Series {
 		}
 	}
 	return &Series{
-		values: &valueContainer{
-			slice:  slice,
-			isNull: isNull,
-			name:   "rank",
-		},
+		values: newValueContainer(slice, isNull, "rank"),
 		labels: s.labels,
 	}
 }
@@ -1210,13 +1150,8 @@ func (s *Series) Bin(bins []float64, config *Binner) (*Series, error) {
 	}
 	// ducks error because values are []string
 	nulls, _ := setNullsFromInterface(retSlice)
-	retVals := &valueContainer{
-		slice:  retSlice,
-		isNull: nulls,
-		name:   s.values.name,
-	}
 	return &Series{
-		values: retVals,
+		values: newValueContainer(retSlice, nulls, s.values.name),
 		labels: s.labels,
 	}, nil
 }
@@ -1235,7 +1170,7 @@ func (s *Series) Percentile() *Series {
 		}
 	}
 	return &Series{
-		values: &valueContainer{slice: retVals, isNull: retNulls, name: "percentile"},
+		values: newValueContainer(retVals, retNulls, "percentile"),
 		labels: copyContainers(s.labels),
 	}
 }
@@ -1260,13 +1195,8 @@ func (s *Series) PercentileBin(bins []float64, config *Binner) (*Series, error) 
 	}
 	// ducks error because values are []string
 	nulls, _ := setNullsFromInterface(retSlice)
-	retVals := &valueContainer{
-		slice:  retSlice,
-		isNull: nulls,
-		name:   s.values.name,
-	}
 	return &Series{
-		values: retVals,
+		values: newValueContainer(retSlice, nulls, s.values.name),
 		labels: s.labels,
 	}, nil
 }

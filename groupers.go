@@ -54,17 +54,13 @@ func (g *GroupedSeries) Apply(lambda ApplyFn) *GroupedSeries {
 	}
 }
 
-func (g *GroupedSeries) interfaceReduceFunc(name string, fn func(slice interface{}, isNull []bool) (value interface{}, null bool)) (
-	*Series, error) {
+func (g *GroupedSeries) interfaceReduceFunc(name string, fn func(slice interface{}, isNull []bool) (value interface{}, null bool)) *Series {
 	var sharedData bool
 	if g.series.values.name != "" {
 		name = fmt.Sprintf("%v_%v", name, g.series.values.name)
 	}
-	retVals, err := groupedInterfaceReduceFunc(
+	retVals := groupedInterfaceReduceFunc(
 		g.series.values.slice, g.series.values.isNull, name, g.aligned, g.rowIndices, fn)
-	if err != nil {
-		return nil, err
-	}
 	// default: grouped labels
 	retLabels := g.labels
 	if g.aligned {
@@ -76,7 +72,7 @@ func (g *GroupedSeries) interfaceReduceFunc(name string, fn func(slice interface
 		values:     retVals,
 		labels:     retLabels,
 		sharedData: sharedData,
-	}, nil
+	}
 }
 
 // for each group, returns the row at the selected index as a new row in a new Series
@@ -134,11 +130,7 @@ func (g *GroupedSeries) Reduce(name string, lambda ReduceFn) *Series {
 	if lambda == nil {
 		return seriesWithError(fmt.Errorf("reducing grouped Series: no lambda function provided"))
 	}
-	newSeries, err := g.interfaceReduceFunc(name, lambda)
-	if err != nil {
-		return seriesWithError(fmt.Errorf("reducing grouped Series: %v", err))
-	}
-	return newSeries
+	return g.interfaceReduceFunc(name, lambda)
 
 }
 
@@ -433,8 +425,7 @@ func (g *GroupedDataFrame) indexReduceFunc(name string, cols []string, index int
 }
 
 func (g *GroupedDataFrame) interfaceReduceFunc(
-	name string, cols []string, fn func(slice interface{}, isNull []bool) (value interface{}, null bool)) (
-	*DataFrame, error) {
+	name string, cols []string, fn func(slice interface{}, isNull []bool) (value interface{}, null bool)) *DataFrame {
 	if len(cols) == 0 {
 		cols = g.df.ListColNames()
 	}
@@ -442,15 +433,12 @@ func (g *GroupedDataFrame) interfaceReduceFunc(
 	for k := range cols {
 		adjustedColNames[k] = fmt.Sprintf("%v_%v", name, cols[k])
 	}
-	var err error
 	retVals := make([]*valueContainer, len(cols))
 	for k, colName := range cols {
 		index, _ := indexOfContainer(colName, g.df.values)
-		retVals[k], err = groupedInterfaceReduceFunc(
+		retVals[k] = groupedInterfaceReduceFunc(
 			g.df.values[index].slice, g.df.values[index].isNull, adjustedColNames[k], false, g.rowIndices, fn)
-		if err != nil {
-			return nil, err
-		}
+
 	}
 	if g.df.name != "" {
 		name = fmt.Sprintf("%v_%v", name, g.df.name)
@@ -461,7 +449,7 @@ func (g *GroupedDataFrame) interfaceReduceFunc(
 		labels:        g.labels,
 		colLevelNames: []string{"*0"},
 		name:          name,
-	}, nil
+	}
 }
 
 func (g *GroupedDataFrame) countReduceFunc(name string, cols []string, fn func(interface{}, []bool, []int) (int, bool)) *DataFrame {
@@ -599,11 +587,7 @@ func (g *GroupedDataFrame) Reduce(name string, cols []string, lambda ReduceFn) *
 		return dataFrameWithError(fmt.Errorf("reducing grouped DataFrame: no lambda function provided"))
 	}
 
-	newDataFrame, err := g.interfaceReduceFunc(name, cols, lambda)
-	if err != nil {
-		return dataFrameWithError(fmt.Errorf("reducing grouped DataFrame: %v", err))
-	}
-	return newDataFrame
+	return g.interfaceReduceFunc(name, cols, lambda)
 }
 
 // HavingCount removes any groups from g that do not satisfy the boolean function supplied in lambda.
@@ -754,7 +738,7 @@ func groupedInterfaceReduceFunc(
 	name string,
 	aligned bool,
 	rowIndices [][]int,
-	fn func(slice interface{}, isNull []bool) (value interface{}, null bool)) (*valueContainer, error) {
+	fn func(slice interface{}, isNull []bool) (value interface{}, null bool)) *valueContainer {
 
 	// default: return length is equal to the number of groups
 	retLength := len(rowIndices)
@@ -790,15 +774,7 @@ func groupedInterfaceReduceFunc(
 			}
 		}
 	}
-	err := isSupportedSlice(retVals.Interface())
-	if err != nil {
-		return nil, fmt.Errorf("constructing new slice: %v", err)
-	}
-	return &valueContainer{
-		slice:  retVals.Interface(),
-		isNull: retNulls,
-		name:   name,
-	}, nil
+	return newValueContainer(retVals.Interface(), retNulls, name)
 }
 
 func groupedApplyFunc(
@@ -829,10 +805,6 @@ func groupedApplyFunc(
 			return nil, fmt.Errorf("constructing new values: group %d: output must be slice (not %v)",
 				i, reflect.TypeOf(output).Kind())
 		}
-		err := isSupportedSlice(output)
-		if err != nil {
-			return nil, fmt.Errorf("constructing new values: group %d: %v", i, err)
-		}
 		if reflect.ValueOf(output).Len() != reflect.ValueOf(subsetRows).Len() {
 			return nil, fmt.Errorf("constructing new values: group %d: length of output slice must match length of input slice "+
 				"(%d != %d)", i, reflect.ValueOf(output).Len(), reflect.ValueOf(subsetRows).Len())
@@ -846,11 +818,7 @@ func groupedApplyFunc(
 		}
 	}
 
-	return &valueContainer{
-		slice:  retVals.Interface(),
-		isNull: retNulls,
-		name:   name,
-	}, nil
+	return newValueContainer(retVals.Interface(), retNulls, name), nil
 }
 
 func groupedIndexReduceFunc(
@@ -896,11 +864,7 @@ func groupedIndexReduceFunc(
 			}
 		}
 	}
-	return &valueContainer{
-		slice:  retVals.Interface(),
-		isNull: retNulls,
-		name:   name,
-	}
+	return newValueContainer(retVals.Interface(), retNulls, name)
 }
 
 func groupedCountReduceFunc(slice interface{}, nulls []bool, name string, aligned bool, rowIndices [][]int,
@@ -926,9 +890,5 @@ func groupedCountReduceFunc(slice interface{}, nulls []bool, name string, aligne
 			}
 		}
 	}
-	return &valueContainer{
-		slice:  retVals,
-		isNull: retNulls,
-		name:   name,
-	}
+	return newValueContainer(retVals, retNulls, name)
 }

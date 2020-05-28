@@ -38,7 +38,17 @@ type valueContainer struct {
 	isNull []bool
 	cache  []string
 	name   string
+	id     string
 }
+
+type valueContainerAlias struct {
+	Slice  interface{} `json:"slice"`
+	IsNull []bool      `json:"isNull"`
+	Name   string      `json:"name"`
+	ID     string      `json:"id"`
+}
+
+var tadaID = "tadaID_"
 
 // A Series is a single column of data with one or more levels of aligned labels.
 type Series struct {
@@ -67,6 +77,13 @@ type DataFrame struct {
 	name          string
 	err           error
 	colLevelNames []string
+}
+
+type dataFrameAlias struct {
+	Labels        []*valueContainer `json:"labels"`
+	Values        []*valueContainer `json:"values"`
+	Name          string            `json:"name"`
+	ColLevelNames []string          `json:"colLevelNames"`
 }
 
 // A DataFrameIterator iterates over the rows in a DataFrame.
@@ -120,6 +137,7 @@ type GroupedDataFrameIterator struct {
 type Matrix interface {
 	Dims() (r, c int)
 	At(i, j int) float64
+	T() Matrix
 }
 
 type floatValueContainer struct {
@@ -189,10 +207,10 @@ type ReduceFn func(slice interface{}, isNull []bool) (value interface{}, null bo
 type DType int
 
 const (
-	// Float64 -> float64
-	Float64 DType = iota
 	// String -> string
-	String
+	String DType = iota
+	// Float64 -> float64
+	Float64
 	// DateTime -> time.Time
 	DateTime // always tz-aware
 	// Time -> civil.Time
@@ -200,32 +218,6 @@ const (
 	// Date -> civil.Date
 	Date
 )
-
-// A WriteOption configures a write function.
-// Available write options: WriteOptionExcludeLabels, WriteOptionDelimiter.
-type WriteOption func(*writeConfig)
-
-// A writeConfig configures a read function.
-// All write functions accept zero or more modifiers that alter the default write config, which is:
-// Include labels; "," as field delimiter; and rows as the major dimension of a nested slice.
-type writeConfig struct {
-	includeLabels bool
-	delimiter     rune
-}
-
-// A ReadOption configures a read function.
-// Available read options: ReadOptionHeaders, ReadOptionLabels, ReadOptionDelimiter, and ReadOptionSwitchDims.
-type ReadOption func(*readConfig)
-
-// A readConfig configures a read function.
-// All read functions accept zero or more modifiers that alter the default read config, which is:
-// 1 header row, 0 label levels, "," as field delimiter, and rows as the major dimension of a nested slice.
-type readConfig struct {
-	numHeaderRows  int
-	numLabelLevels int
-	delimiter      rune
-	majorDimIsCols bool
-}
 
 // A JoinOption configures a lookup or merge function.
 // Available lookup options: JoinOptionHow, JoinOptionLeftOn, JoinOptionRightOn
@@ -274,3 +266,6 @@ type Binner struct {
 // that can be randomly shuffled or transposed into a column-oriented struct representation of a DataFrame.
 // It is useful for intuitive row-oriented testing.
 type StructTransposer [][]interface{}
+
+// clocker interface for generating random numbers
+var clock clocker = realClock{}

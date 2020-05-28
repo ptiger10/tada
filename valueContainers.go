@@ -250,12 +250,7 @@ func (vc *valueContainer) string() stringValueContainer {
 			}
 		}
 
-	case []float64, []bool,
-		[]uint, []uint8, []uint16, []uint32, []uint64, []int8, []int16, []int32, []int64,
-		[][]string, [][]float64, [][]time.Time,
-		[][]bool, [][]float32,
-		[][]uint, [][]uint16, [][]uint32, [][]uint64,
-		[][]int, [][]int8, [][]int16, [][]int32, [][]int64:
+	default:
 		d := reflect.ValueOf(vc.slice)
 		for i := 0; i < d.Len(); i++ {
 			newVals[i] = fmt.Sprint(d.Index(i).Interface())

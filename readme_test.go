@@ -14,7 +14,6 @@ func sampleDataPipeline(df *tada.DataFrame) *tada.DataFrame {
 	if err != nil {
 		log.Fatal(err)
 	}
-	df.InPlace().DropNull()
 	df.Cast(map[string]tada.DType{"score": tada.Float64})
 	validScore := func(v interface{}) bool { return v.(float64) >= 0 && v.(float64) <= 10 }
 	df.InPlace().Filter(map[string]tada.FilterFn{"score": validScore})
@@ -37,20 +36,29 @@ func Test_sampleDataPipeline(t *testing.T) {
             john doe, 4
 			jane doe, 10`
 
-	want := `name, mean_score
+	wantRaw := `name, mean_score
 			jane doe, 9
 			john doe, 5`
 
-	df, _ := tada.ReadCSV(strings.NewReader(data))
+	r := tada.NewCSVReader(strings.NewReader(data))
+	r.TrimLeadingSpace = true
+	df, err := r.Read()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	ret := sampleDataPipeline(df)
-	eq, diffs, _ := ret.EqualsCSV(true, strings.NewReader(want))
+	got := tada.NewRecordWriter()
+	got.IncludeLabels = true
+	want := tada.NewCSVReader(strings.NewReader(wantRaw))
+	want.TrimLeadingSpace = true
+	eq, diffs, _ := ret.EqualRecords(got, want)
 	if !eq {
-		t.Errorf("sampleDataPipeline(): got %v, want %v, has diffs: \n%v", ret, want, diffs)
+		t.Errorf("sampleDataPipeline(): got %v, want %v, has diffs: \n%v", got.Records(), want.Records(), diffs)
 	}
 }
 
-func Test_sampleDataPipelineTyped(t *testing.T) {
+func Test_sampleDataPipelineTypedOutput(t *testing.T) {
 	data := `name, score
 			joe doe,
 			john doe, -100
@@ -61,61 +69,76 @@ func Test_sampleDataPipelineTyped(t *testing.T) {
 			jane doe, 10`
 
 	type output struct {
-		Name      []string  `tada:"name"`
-		MeanScore []float64 `tada:"mean_score"`
+		Name      string  `json:"name"`
+		MeanScore float64 `json:"mean_score"`
 	}
-	want := output{
-		Name:      []string{"jane doe", "john doe"},
-		MeanScore: []float64{9, 5},
+	want := []output{
+		{"jane doe", 9},
+		{"john doe", 5},
 	}
 
-	df, _ := tada.ReadCSV(strings.NewReader(data))
+	r := tada.NewCSVReader(strings.NewReader(data))
+	r.TrimLeadingSpace = true
+	df, _ := r.Read()
 
 	out := sampleDataPipeline(df)
-	var got output
-	out.Struct(&got)
+	var got []output
+	w := tada.NewStructWriter(&got)
+	w.IncludeLabels = true
+	err := out.WriteTo(w)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if !reflect.DeepEqual(got, want) {
-		t.Errorf("sampleDataPipelineTyped(): got %v, want %v", got, want)
+		t.Errorf("sampleDataPipelineTypedOutput(): got %v, want %v", got, want)
 	}
 }
 
-func Test_sampleDataPipelineTypedInput(t *testing.T) {
+func Test_sampleDataPipelineTyped(t *testing.T) {
 	type input struct {
-		Name    []string `tada:"name"`
-		Score   []int    `tada:"score"`
-		NullMap [][]bool `tada:"isNull"`
+		Name  string `json:"name"`
+		Score int    `json:"score"`
 	}
 
 	type output struct {
-		Name      []string  `tada:"name"`
-		MeanScore []float64 `tada:"mean_score"`
-		NullMap   [][]bool  `tada:"isNull"`
+		Name      string  `json:"name"`
+		MeanScore float64 `json:"mean_score"`
 	}
 
-	data := input{
-		Name:    []string{"joe doe", "john doe", "jane doe", "john doe", "jane doe", "john doe", "jane doe"},
-		Score:   []int{0, -100, 1000, 6, 8, 4, 10},
-		NullMap: [][]bool{{true, false, false, false, false, false, false}, {false, false, false, false, false, false, false}},
+	data := []input{
+		{"john doe", -100},
+		{"jane doe", 1000},
+		{"john doe", 6},
+		{"jane doe", 8},
+		{"john doe", 4},
+		{"jane doe", 10},
 	}
 
-	want := output{
-		Name:      []string{"jane doe", "john doe"},
-		MeanScore: []float64{9, 5},
-		NullMap:   [][]bool{{false, false}, {false, false}},
+	wantRaw := []output{
+		{"jane doe", 9},
+		{"john doe", 5},
 	}
 
-	df, err := tada.ReadStruct(data)
+	df, err := tada.NewStructReader(data).Read()
 	if err != nil {
 		log.Fatal(err)
 	}
-	out := sampleDataPipeline(df)
+	df = sampleDataPipeline(df)
+	var o []output
+	got := tada.NewStructWriter(&o)
+	got.IncludeLabels = true
+	want := tada.NewStructReader(wantRaw)
+	eq, diffs, _ := df.EqualStructs(got, want)
+	if !eq {
+		t.Errorf("sampleDataPipeline(): diffs:\n%v", diffs)
+	}
 
-	var got output
-	err = out.Struct(&got)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("sampleDataPipelineTypedInput(): got %v, want %v", got, want)
-	}
+	// var got []output
+	// err = out.WriteTo(w)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// if !reflect.DeepEqual(got, want) {
+	// 	t.Errorf("sampleDataPipelineTypedInput(): got %v, want %v", got, want)
+	// }
 }
